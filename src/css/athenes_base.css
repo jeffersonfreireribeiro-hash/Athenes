@@ -36,6 +36,16 @@
   --ath-primary-line: #FFD9C7;
   --ath-primary-ink: #D9531E;
 
+  /* Tokens compatíveis com o Glaux GIS */
+  --glx-font: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --glx-font-mono: 'Nunito', system-ui, sans-serif;
+  --glx-primary: #FF6B2C;
+  --glx-text: #1F2733;
+  --glx-text-secondary: #475569;
+  --glx-muted: #6B7585;
+  --glx-field: #F4F5F8;
+  --glx-line: #E2E8F0;
+
   /* Tipografia e Textos */
   --ath-font: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --ath-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

@@ -435,7 +435,7 @@ export function criarEstilosPadrao(perfilId = 'abnt') {
       id: 'codigo',
       nome: 'Código / Algoritmo',
       tipo: 'paragrafo',
-      fonte: 'consolas',
+      fonte: 'nunito',
       tamanho_pt: 9.5,
       peso: 400,
       cor: '#0F172A',
@@ -481,7 +481,7 @@ export function estiloParaCss(estilo, fontesDisponiveis = FONTES_SISTEMA) {
   } else if (estilo.alinhamento === 'direita') {
     props.push('text-align: right;');
   } else if (estilo.alinhamento === 'justificado') {
-    props.push('text-align: justify; text-align-last: justify;');
+    props.push('text-align: justify; text-align-last: left;');
   } else if (estilo.alinhamento === 'justificado_esquerda') {
     props.push('text-align: justify; text-align-last: left;');
   } else {

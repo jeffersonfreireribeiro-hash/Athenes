@@ -10,7 +10,7 @@
  */
 
 import { dimensoesPapelMm } from '../core/athenes_grid.js';
-import { estiloParaCss } from '../core/athenes_estilos.js';
+import { estiloParaCss, FONTES_SISTEMA, PESOS_FONTE } from '../core/athenes_estilos.js';
 import {
   criarNovoBloco,
   modeloDaPagina,
@@ -47,9 +47,18 @@ export class EditorView {
     this.onAbrirZotero = opcoes.onAbrirZotero || (() => {});
     this.onAbrirConexoes = opcoes.onAbrirConexoes || (() => {});
 
+    this.normalizarBlocosLegados();
     repaginarDocumento(this.doc);
     this.salvarSnapshot();
     this.renderizar();
+  }
+
+  normalizarBlocosLegados() {
+    for (const sec of this.doc.secoes || []) {
+      for (const b of sec.blocos || []) {
+        if (!b.span || (b.span === 1 && (b.col || 1) === 1)) { b.col = 1; b.span = 12; }
+      }
+    }
   }
 
   setDocumento(doc) {
@@ -569,7 +578,7 @@ export class EditorView {
         </label>
         <label>Fonte
           <select id="rmEstFonte" class="glx-select">
-            ${FONTES_SISTEMA.map(f => `<option value="${f.nome}" ${f.nome === estAtivo.fonte ? 'selected' : ''}>${f.nome} (${f.classificacao})</option>`).join('')}
+            ${Object.values(FONTES_SISTEMA).map(f => `<option value="${f.id}" ${f.id === estAtivo.fonte ? 'selected' : ''}>${f.rotulo}</option>`).join('')}
           </select>
         </label>
         <div class="rm-linha2">
@@ -578,7 +587,7 @@ export class EditorView {
           </label>
           <label>Peso
             <select id="rmEstPeso" class="glx-select">
-              ${PESOS_FONTE.map(p => `<option value="${p.valor}" ${p.valor === estAtivo.peso ? 'selected' : ''}>${p.nome}</option>`).join('')}
+              ${PESOS_FONTE.map(p => `<option value="${p.valor}" ${p.valor === estAtivo.peso ? 'selected' : ''}>${p.rotulo}</option>`).join('')}
             </select>
           </label>
         </div>
@@ -745,7 +754,10 @@ export class EditorView {
       if (mestraPag?.cabecalho?.ativo) {
         const cab = document.createElement('div');
         cab.className = 'ath-folha-cabecalho';
-        const txtCab = (mestraPag.cabecalho.texto || '').replace('{{documento.titulo}}', this.doc.titulo || '');
+        const txtCab = (mestraPag.cabecalho.texto || '')
+          .replace(/\{\{?\s*documento\.titulo\s*\}?\}/g, this.doc.titulo || '')
+          .replace(/\{\{?\s*documento\.instituicao\s*\}?\}/g, this.doc.metadados?.instituicao || '')
+          .replace(/\n/g, ' · ');
         cab.innerHTML = `<span>${txtCab}</span><span>${this.doc.tipoDoc?.toUpperCase() || 'ARTIGO'}</span>`;
         areaUtil.appendChild(cab);
       }

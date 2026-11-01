@@ -228,7 +228,7 @@ export function criarNovoBloco(tipo, dados = {}) {
     id: dados.id || gerarId('bloco'),
     tipo: tipo || 'paragrafo',
     col: dados.col || 1,
-    span: dados.span || 1,
+    span: dados.span || 12,
     linha_grade: dados.linha_grade || null,
     estiloId: dados.estiloId || (tipo === 'titulo' ? 'titulo1' : tipo === 'subtitulo' ? 'subtitulo' : 'corpo'),
     alinhamento: dados.alinhamento || 'esquerda',
