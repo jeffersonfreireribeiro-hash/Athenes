@@ -676,7 +676,7 @@
   background: #FFFFFF;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
   border-radius: 4px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .ath-pdf-folha-texto {
@@ -1086,10 +1086,10 @@
   padding: 4px 6px 8px 4px !important;
 }
 
-/* Balão / Cartão de Nota Adesiva no PDF (Visualização + Edição Inline) */
+/* Balão / Cartão de Nota Adesiva no PDF (Visualização + Minimizado + Compacto + Edição Inline) */
 .ath-pdf-pin-balao {
   position: absolute;
-  width: 230px;
+  width: 220px;
   background: #FFFBEB;
   border: 2px solid #F59E0B;
   border-radius: 12px;
@@ -1098,15 +1098,34 @@
   overflow: hidden;
   font-family: var(--glx-font, 'Nunito', sans-serif);
   transition: width 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+  z-index: 12;
+}
+
+.ath-pdf-pin-balao.compacto {
+  width: 165px;
+}
+
+.ath-pdf-pin-balao.minimizado {
+  width: auto;
+  min-width: 110px;
+  max-width: 185px;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+}
+
+.ath-pdf-pin-balao.minimizado .ath-pdf-pin-cab {
+  padding: 4px 10px;
+  gap: 6px;
 }
 
 .ath-pdf-pin-balao:hover {
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.22);
+  z-index: 20;
 }
 
 .ath-pdf-pin-balao.editando {
-  width: 286px;
-  z-index: 30;
+  width: 276px;
+  z-index: 35;
   background: #FFFFFF !important;
   box-shadow: 0 16px 38px rgba(15, 23, 42, 0.28);
 }
@@ -1293,6 +1312,10 @@
 }
 
 /* Popover Flutuante de Seleção de Texto no PDF */
+.ath-pdf-selecao-popover[hidden] {
+  display: none !important;
+}
+
 .ath-pdf-selecao-popover {
   position: fixed;
   z-index: 2200;

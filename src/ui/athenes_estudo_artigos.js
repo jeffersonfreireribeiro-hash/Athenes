@@ -20,6 +20,7 @@ import { ZoteroClient } from '../core/athenes_zotero.js';
 import {
   obterPerfilColaborador,
   obterConfigGoogleDrive,
+  salvarConfigGoogleDrive,
   autenticarGoogleDrive,
   salvarArquivoNoGoogleDrive,
   salvarDocumentoNoSupabase
@@ -440,23 +441,6 @@ export class EstudoArtigosView {
         </div>
       </div>
 
-      <div class="ath-estudo-aviso-arquitetura">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-          <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:260px;">
-            <span class="ath-estudo-icone-destaque">${svgIcone('drive', 18)}</span>
-            <div>
-              <strong>Estúdio de Leitura em Tela Cheia (Samsung Notes + Zotero + Google Drive):</strong>
-              <span>Clique em qualquer artigo abaixo para abrir o <b>Estúdio Full-Screen de 3 Colunas</b> com todas as páginas empilhadas, caneta com modo de linhas retas, notas adesivas editáveis e menu inteligente ao selecionar texto.</span>
-            </div>
-          </div>
-          ${!conectado ? `
-            <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnConectarZoteroBanner">
-              Colar Chave API Zotero
-            </button>
-          ` : ''}
-        </div>
-      </div>
-
       <div class="ath-artigos-zotero-grid" id="athArtigosZoteroGrid"></div>
     `;
 
@@ -471,11 +455,6 @@ export class EstudoArtigosView {
     wrap.querySelector('#athBtnConfigurarChaveZotero').addEventListener('click', () => {
       this.abrirModalCredenciaisZotero();
     });
-
-    const btnBanner = wrap.querySelector('#athBtnConectarZoteroBanner');
-    if (btnBanner) {
-      btnBanner.addEventListener('click', () => this.abrirModalCredenciaisZotero());
-    }
 
     wrap.querySelector('#athBtnSincronizarZoteroHub').addEventListener('click', () => {
       this.sincronizarComZoteroApi();
@@ -1040,6 +1019,7 @@ export class EstudoArtigosView {
     paginasPdf.forEach((pagDados, idx) => {
       const numPag = idx + 1;
       const pinsDaPagina = art.fichamento.notasPagina?.[numPag] || [];
+      const tracosDaPagina = art.fichamento.tracosPorPagina?.[numPag] || [];
       const isPagAtiva = numPag === this.paginaAtual;
 
       const folhaWrap = document.createElement('div');
@@ -1048,15 +1028,8 @@ export class EstudoArtigosView {
 
       folhaWrap.innerHTML = `
         <div class="ath-pdf-etiqueta-pagina ${isPagAtiva ? 'ativa' : ''}" data-etiqueta-pag="${numPag}">
-          <span>Página ${numPag} de ${totalPags} — ${escapeHtml((pagDados.titulo || 'Folha do Artigo').slice(0, 65))}</span>
-          <div style="display:flex; align-items:center; gap:6px;">
-            <button type="button" class="ath-btn-mini-folha" data-add-nota-pag="${numPag}" title="Adicionar Nota Adesiva nesta página">
-              ${svgIcone('nota', 12)} + Nota
-            </button>
-            <button type="button" class="ath-btn-mini-folha" data-add-cit-pag="${numPag}" title="Registrar Citação desta página">
-              ${svgIcone('citacao', 12)} + Citação
-            </button>
-          </div>
+          <span class="ath-pdf-etiqueta-num">Página ${numPag} de ${totalPags} — ${escapeHtml((pagDados.titulo || 'Folha do Artigo').slice(0, 62))}</span>
+          <span class="ath-pdf-etiqueta-stats" data-stats-pag="${numPag}">${tracosDaPagina.length} risco(s) · ${pinsDaPagina.length} nota(s)</span>
         </div>
 
         <div class="ath-folha-a4 ath-pdf-folha-container ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" style="transform: scale(${this.zoomPct / 100}); transform-origin: top center;">
@@ -1100,17 +1073,6 @@ export class EstudoArtigosView {
       const folhaContainer = folhaWrap.querySelector('.ath-pdf-folha-container');
       folhaContainer.addEventListener('pointerdown', () => {
         this.definirPaginaAtivaSilencioso(numPag, root);
-      });
-
-      // Botões rápidos no cabeçalho da folha (+ Nota / + Citação)
-      folhaWrap.querySelector(`[data-add-nota-pag="${numPag}"]`).addEventListener('click', () => {
-        this.definirPaginaAtivaSilencioso(numPag, root);
-        this.criarNotaAdesivaNaPagina(art, numPag, 58, 24, '', root);
-      });
-
-      folhaWrap.querySelector(`[data-add-cit-pag="${numPag}"]`).addEventListener('click', () => {
-        this.definirPaginaAtivaSilencioso(numPag, root);
-        this.abrirModalCitacaoPdf(art, { pagina: numPag });
       });
     });
 
@@ -1168,8 +1130,24 @@ export class EstudoArtigosView {
 
   /* ==========================================================================
      PAINEL DE NOTAS ADESIVAS EDITÁVEIS NA FOLHA (SEM WINDOW.PROMPT)
+     Suporta: Minimizar (—), Tamanho Compacto (P/M), Arrastar e Sem Cortar Borda
      ========================================================================== */
-  criarNotaAdesivaNaPagina(art, numPag, xPct = 60, yPct = 25, textoInicial = '', root = null) {
+  atualizarPaineisLateraisDeNotas(root, art) {
+    if (!root) return;
+    this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
+    this.renderizarPainelDireitoEstudio(root.querySelector('#athEstudioPainelCorpo'), art);
+    (art.conteudoPaginasPdf || []).forEach((_, idx) => {
+      const pg = idx + 1;
+      const statsEl = root.querySelector(`[data-stats-pag="${pg}"]`);
+      if (statsEl) {
+        const nRiscos = (art.fichamento.tracosPorPagina?.[pg] || []).length;
+        const nNotas = (art.fichamento.notasPagina?.[pg] || []).length;
+        statsEl.textContent = `${nRiscos} risco(s) · ${nNotas} nota(s)`;
+      }
+    });
+  }
+
+  criarNotaAdesivaNaPagina(art, numPag, xPct = 52, yPct = 25, textoInicial = '', root = null) {
     const perfil = obterPerfilColaborador();
     if (!art.fichamento.notasPagina) art.fichamento.notasPagina = {};
     if (!Array.isArray(art.fichamento.notasPagina[numPag])) {
@@ -1177,12 +1155,14 @@ export class EstudoArtigosView {
     }
     const novoPin = {
       id: 'pin_' + Date.now().toString(36),
-      xPct: Math.max(4, Math.min(68, xPct)),
-      yPct: Math.max(4, Math.min(82, yPct)),
+      xPct: Math.max(3, Math.min(60, xPct)),
+      yPct: Math.max(3, Math.min(82, yPct)),
       titulo: perfil.nome || 'Nota de Leitura',
       texto: textoInicial || '',
       cor: this.corTinta === '#314F79' ? '#F59E0B' : this.corTinta,
-      autor: perfil.nome || 'Autor'
+      autor: perfil.nome || 'Autor',
+      minimizado: false,
+      tamanho: 'normal'
     };
     art.fichamento.notasPagina[numPag].push(novoPin);
     this.pinEditandoId = novoPin.id;
@@ -1191,7 +1171,7 @@ export class EstudoArtigosView {
     if (root) {
       const layer = root.querySelector(`[data-pins-pag="${numPag}"]`);
       this.renderizarPinsDaPagina(layer, art, numPag, root);
-      this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
+      this.atualizarPaineisLateraisDeNotas(root, art);
     } else {
       this.renderizar();
     }
@@ -1206,18 +1186,35 @@ export class EstudoArtigosView {
 
     pins.forEach((pin, idx) => {
       const estaEditando = this.pinEditandoId === pin.id;
+      const estaMinimizado = Boolean(pin.minimizado) && !estaEditando;
+      const ehCompacta = pin.tamanho === 'pequena' && !estaEditando;
+
+      // Impede que a nota ultrapasse a borda direita da página (794px)
+      const larguraCardPx = estaEditando ? 276 : (estaMinimizado ? 150 : (ehCompacta ? 168 : 220));
+      const xSeguroPct = Math.max(2, Math.min(96, pin.xPct ?? 55));
+      const ySeguroPct = Math.max(2, Math.min(90, pin.yPct ?? 25));
+
       const card = document.createElement('div');
-      card.className = `ath-pdf-pin-balao ${estaEditando ? 'editando' : ''}`;
-      card.style.left = `${pin.xPct}%`;
-      card.style.top = `${pin.yPct}%`;
+      card.className = [
+        'ath-pdf-pin-balao',
+        estaEditando ? 'editando' : '',
+        estaMinimizado ? 'minimizado' : '',
+        ehCompacta ? 'compacto' : ''
+      ].filter(Boolean).join(' ');
+
+      card.style.left = `min(${xSeguroPct}%, calc(100% - ${larguraCardPx + 12}px))`;
+      card.style.top = `${ySeguroPct}%`;
       card.style.borderColor = pin.cor || '#F59E0B';
       card.dataset.pinId = pin.id;
 
       if (estaEditando) {
         card.innerHTML = `
-          <div class="ath-pdf-pin-cab" style="background:${escapeHtml(pin.cor || '#F59E0B')};">
-            <strong>📌 Editar Nota #${idx + 1} (Pág. ${numPag})</strong>
-            <button type="button" class="ath-pin-del" data-fechar-edicao-pin="${escapeHtml(pin.id)}" title="Fechar edição">✕</button>
+          <div class="ath-pdf-pin-cab ath-pin-arrastavel" style="background:${escapeHtml(pin.cor || '#F59E0B')};">
+            <span class="ath-pin-cab-titulo">📌 Nota #${idx + 1} (Pág. ${numPag})</span>
+            <div class="ath-pin-cab-acoes">
+              <button type="button" class="ath-pin-edit-btn" data-min-edicao-pin="${escapeHtml(pin.id)}" title="Minimizar nota na folha">—</button>
+              <button type="button" class="ath-pin-del" data-fechar-edicao-pin="${escapeHtml(pin.id)}" title="Concluir edição">✕</button>
+            </div>
           </div>
           <div class="ath-pdf-pin-form">
             <input type="text" class="ath-pin-input-titulo" value="${escapeHtml(pin.titulo || '')}" placeholder="Título da nota...">
@@ -1228,7 +1225,8 @@ export class EstudoArtigosView {
                   <button type="button" class="ath-pin-cor-dot ${(pin.cor || '#F59E0B') === c ? 'on' : ''}" data-cor-pin="${c}" style="background:${c};" title="Cor ${c}"></button>
                 `).join('')}
               </div>
-              <div style="display:flex; gap:5px;">
+              <div class="ath-pin-botoes">
+                <button type="button" class="ath-pin-btn-fechar" data-tam-pin="${escapeHtml(pin.id)}" title="Alternar tamanho Pequena / Normal">${pin.tamanho === 'pequena' ? 'Tam: P' : 'Tam: M'}</button>
                 <button type="button" class="ath-pin-btn-excluir" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">Excluir</button>
                 <button type="button" class="ath-pin-btn-salvar" data-salvar-pin="${escapeHtml(pin.id)}">Salvar</button>
               </div>
@@ -1242,29 +1240,47 @@ export class EstudoArtigosView {
         card.querySelectorAll('[data-cor-pin]').forEach(dot => {
           dot.addEventListener('click', e => {
             e.stopPropagation();
+            pin.titulo = inputTit.value.trim() || pin.titulo;
+            pin.texto = txtArea.value.trim() || pin.texto;
             pin.cor = dot.dataset.corPin;
             salvarArtigosEstudo(this.artigos);
             this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+            this.atualizarPaineisLateraisDeNotas(root, art);
           });
         });
 
-        const salvarEdicaoPin = () => {
+        card.querySelector('[data-tam-pin]').addEventListener('click', e => {
+          e.stopPropagation();
+          pin.titulo = inputTit.value.trim() || pin.titulo;
+          pin.texto = txtArea.value.trim() || pin.texto;
+          pin.tamanho = pin.tamanho === 'pequena' ? 'normal' : 'pequena';
+          salvarArtigosEstudo(this.artigos);
+          this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+        });
+
+        const salvarEdicaoPin = (minimizarAoSalvar = false) => {
           pin.titulo = inputTit.value.trim() || 'Nota';
           pin.texto = txtArea.value.trim() || 'Anotação na página';
+          if (minimizarAoSalvar) pin.minimizado = true;
           this.pinEditandoId = null;
           salvarArtigosEstudo(this.artigos);
           this.renderizarPinsDaPagina(layerEl, art, numPag, root);
-          this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
+          this.atualizarPaineisLateraisDeNotas(root, art);
         };
 
         card.querySelector('[data-salvar-pin]').addEventListener('click', e => {
           e.stopPropagation();
-          salvarEdicaoPin();
+          salvarEdicaoPin(false);
         });
 
         card.querySelector('[data-fechar-edicao-pin]').addEventListener('click', e => {
           e.stopPropagation();
-          salvarEdicaoPin();
+          salvarEdicaoPin(false);
+        });
+
+        card.querySelector('[data-min-edicao-pin]').addEventListener('click', e => {
+          e.stopPropagation();
+          salvarEdicaoPin(true);
         });
 
         card.querySelector('[data-del-pin]').addEventListener('click', e => {
@@ -1273,15 +1289,46 @@ export class EstudoArtigosView {
           this.pinEditandoId = null;
           salvarArtigosEstudo(this.artigos);
           this.renderizarPinsDaPagina(layerEl, art, numPag, root);
-          this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
+          this.atualizarPaineisLateraisDeNotas(root, art);
         });
 
         setTimeout(() => txtArea?.focus(), 20);
+      } else if (estaMinimizado) {
+        // Modo Minimizado: pílula compacta que não cobre o texto do PDF
+        card.innerHTML = `
+          <div class="ath-pdf-pin-cab ath-pin-arrastavel" style="background:${escapeHtml(pin.cor || '#F59E0B')};" title="${escapeHtml(pin.texto || 'Clique para expandir esta nota')}">
+            <span class="ath-pin-cab-titulo" data-expandir-pin="${escapeHtml(pin.id)}">📌 #${idx + 1} ${escapeHtml(pin.titulo || 'Nota')}</span>
+            <div class="ath-pin-cab-acoes">
+              <button type="button" class="ath-pin-edit-btn" data-expandir-pin="${escapeHtml(pin.id)}" title="Expandir nota">+</button>
+              <button type="button" class="ath-pin-del" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">✕</button>
+            </div>
+          </div>
+        `;
+
+        card.querySelectorAll('[data-expandir-pin]').forEach(el => {
+          el.addEventListener('click', e => {
+            e.stopPropagation();
+            pin.minimizado = false;
+            salvarArtigosEstudo(this.artigos);
+            this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+            this.atualizarPaineisLateraisDeNotas(root, art);
+          });
+        });
+
+        card.querySelector('[data-del-pin]').addEventListener('click', e => {
+          e.stopPropagation();
+          art.fichamento.notasPagina[numPag] = pins.filter(p => p.id !== pin.id);
+          salvarArtigosEstudo(this.artigos);
+          this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+          this.atualizarPaineisLateraisDeNotas(root, art);
+        });
       } else {
         card.innerHTML = `
-          <div class="ath-pdf-pin-cab ath-pin-arrastavel" style="background:${escapeHtml(pin.cor || '#F59E0B')};" title="Arraste para mover ou clique para editar">
-            <strong>📌 #${idx + 1} · ${escapeHtml(pin.titulo || 'Nota')}</strong>
-            <div style="display:flex; align-items:center; gap:4px;">
+          <div class="ath-pdf-pin-cab ath-pin-arrastavel" style="background:${escapeHtml(pin.cor || '#F59E0B')};" title="Arraste para mover ou clique nos botões para diminuir/editar">
+            <span class="ath-pin-cab-titulo">📌 #${idx + 1} · ${escapeHtml(pin.titulo || 'Nota')}</span>
+            <div class="ath-pin-cab-acoes">
+              <button type="button" class="ath-pin-edit-btn" data-tam-rapido-pin="${escapeHtml(pin.id)}" title="Diminuir / Aumentar largura (${pin.tamanho === 'pequena' ? 'Pequena' : 'Normal'})">${pin.tamanho === 'pequena' ? 'M' : 'P'}</button>
+              <button type="button" class="ath-pin-edit-btn" data-minimizar-pin="${escapeHtml(pin.id)}" title="Minimizar nota em pílula">—</button>
               <button type="button" class="ath-pin-edit-btn" data-abrir-edicao-pin="${escapeHtml(pin.id)}" title="Editar esta nota">✎</button>
               <button type="button" class="ath-pin-del" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">✕</button>
             </div>
@@ -1291,7 +1338,6 @@ export class EstudoArtigosView {
           </div>
         `;
 
-        // Clicar no texto ou no ícone de lápis abre a edição inline da nota
         card.querySelectorAll('[data-abrir-edicao-pin]').forEach(el => {
           el.addEventListener('click', e => {
             e.stopPropagation();
@@ -1300,24 +1346,41 @@ export class EstudoArtigosView {
           });
         });
 
+        card.querySelector('[data-minimizar-pin]').addEventListener('click', e => {
+          e.stopPropagation();
+          pin.minimizado = true;
+          salvarArtigosEstudo(this.artigos);
+          this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+          this.atualizarPaineisLateraisDeNotas(root, art);
+        });
+
+        card.querySelector('[data-tam-rapido-pin]').addEventListener('click', e => {
+          e.stopPropagation();
+          pin.tamanho = pin.tamanho === 'pequena' ? 'normal' : 'pequena';
+          salvarArtigosEstudo(this.artigos);
+          this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+        });
+
         card.querySelector('[data-del-pin]').addEventListener('click', e => {
           e.stopPropagation();
           art.fichamento.notasPagina[numPag] = pins.filter(p => p.id !== pin.id);
           salvarArtigosEstudo(this.artigos);
           this.renderizarPinsDaPagina(layerEl, art, numPag, root);
-          this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
+          this.atualizarPaineisLateraisDeNotas(root, art);
         });
+      }
 
-        // Permite arrastar o cabeçalho do balão de nota para reposicionar na página
-        const cab = card.querySelector('.ath-pin-arrastavel');
+      // Permite arrastar o cabeçalho do balão de nota para reposicionar na página em qualquer estado
+      const cab = card.querySelector('.ath-pin-arrastavel');
+      if (cab) {
         cab.addEventListener('pointerdown', ev => {
           if (ev.target.closest('button')) return;
           ev.stopPropagation();
           const rectLayer = layerEl.getBoundingClientRect();
           const startX = ev.clientX;
           const startY = ev.clientY;
-          const origXPct = pin.xPct;
-          const origYPct = pin.yPct;
+          const origXPct = pin.xPct ?? 55;
+          const origYPct = pin.yPct ?? 25;
           let moveu = false;
 
           const onMove = (mev) => {
@@ -1326,7 +1389,7 @@ export class EstudoArtigosView {
             if (Math.hypot(dx, dy) > 4) moveu = true;
             pin.xPct = Math.max(2, Math.min(72, Math.round(origXPct + (dx / rectLayer.width) * 100)));
             pin.yPct = Math.max(2, Math.min(88, Math.round(origYPct + (dy / rectLayer.height) * 100)));
-            card.style.left = `${pin.xPct}%`;
+            card.style.left = `min(${pin.xPct}%, calc(100% - ${larguraCardPx + 12}px))`;
             card.style.top = `${pin.yPct}%`;
           };
 
@@ -1335,9 +1398,15 @@ export class EstudoArtigosView {
             window.removeEventListener('pointerup', onUp);
             if (moveu) {
               salvarArtigosEstudo(this.artigos);
-            } else {
-              this.pinEditandoId = pin.id;
+            } else if (!estaEditando) {
+              if (estaMinimizado) {
+                pin.minimizado = false;
+                salvarArtigosEstudo(this.artigos);
+              } else {
+                this.pinEditandoId = pin.id;
+              }
               this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+              this.atualizarPaineisLateraisDeNotas(root, art);
             }
           };
 
@@ -1358,6 +1427,7 @@ export class EstudoArtigosView {
     const popSel = root.querySelector('#athPdfSelecaoPopover');
     if (!palco || !popSel) return;
 
+    popSel.hidden = true;
     let ultimaSelecao = null; // { texto, numPag, range }
 
     const verificarSelecaoTexto = () => {
@@ -1392,9 +1462,8 @@ export class EstudoArtigosView {
       };
 
       const rectSel = range.getBoundingClientRect();
-      const rectPalco = palco.getBoundingClientRect();
-      const top = Math.max(8, (rectSel.top - rectPalco.top) + palco.scrollTop - 46);
-      const left = Math.max(16, Math.min(palco.clientWidth - 360, (rectSel.left - rectPalco.left) + (rectSel.width / 2) - 160));
+      const top = Math.max(12, rectSel.top - 50);
+      const left = Math.max(180, Math.min(window.innerWidth - 180, rectSel.left + (rectSel.width / 2)));
 
       popSel.style.top = `${Math.round(top)}px`;
       popSel.style.left = `${Math.round(left)}px`;
@@ -1403,6 +1472,12 @@ export class EstudoArtigosView {
 
     palco.addEventListener('mouseup', () => setTimeout(verificarSelecaoTexto, 20));
     palco.addEventListener('keyup', () => setTimeout(verificarSelecaoTexto, 20));
+    palco.addEventListener('scroll', () => { popSel.hidden = true; }, { passive: true });
+    palco.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest('#athPdfSelecaoPopover')) {
+        popSel.hidden = true;
+      }
+    });
 
     // 1. Grifar Trecho no Texto (<mark>)
     popSel.querySelector('#athSelBtnGrifar').addEventListener('click', (e) => {
@@ -1784,12 +1859,22 @@ export class EstudoArtigosView {
     }
 
     if (popDrive) {
+      const cfgDrive = obterConfigGoogleDrive();
+      const driveConectado = Boolean(cfgDrive.accessToken);
       popDrive.innerHTML = `
         <div class="rm-popover-head">
-          <strong>Arquivo PDF no Google Drive</strong>
+          <strong>Conexão & PDF no Google Drive</strong>
           <button type="button" class="rm-ic" data-fechar-pop-est>${svgIcone('fechar', 14)}</button>
         </div>
         <div class="rm-popover-body">
+          <label>Google OAuth Client ID
+            <input type="text" id="athPopDriveClientIdInput" value="${escapeHtml(cfgDrive.clientId || '')}">
+          </label>
+          <button type="button" class="glx-btn ${driveConectado ? 'ath-btn-zotero-ok' : 'glx-btn-primary'} glx-btn-sm" id="athBtnPopAutenticarDrive" style="width:100%; justify-content:center; margin-bottom:6px;">
+            ${svgIcone('drive', 13)} ${driveConectado ? 'Google Drive Conectado ✓ (Reconectar)' : 'Autorizar / Conectar meu Google Drive'}
+          </button>
+          <div id="athPopDriveStatusMsg" style="font-size:11.5px; font-weight:700; color:#15803D;"></div>
+          <hr class="rm-popover-div">
           <label>Nome do PDF no Google Drive
             <input type="text" id="athPopDriveNomeInput" value="${escapeHtml(art.driveFileName || '')}">
           </label>
@@ -1801,6 +1886,25 @@ export class EstudoArtigosView {
           </div>
         </div>
       `;
+      popDrive.querySelector('#athPopDriveClientIdInput').addEventListener('change', e => {
+        salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), clientId: e.target.value.trim() });
+      });
+      popDrive.querySelector('#athBtnPopAutenticarDrive').addEventListener('click', async () => {
+        const cid = popDrive.querySelector('#athPopDriveClientIdInput').value.trim();
+        const msgEl = popDrive.querySelector('#athPopDriveStatusMsg');
+        salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), clientId: cid });
+        msgEl.style.color = '#314F79';
+        msgEl.textContent = 'Abrindo janela oficial de login do Google...';
+        try {
+          await autenticarGoogleDrive(cid);
+          msgEl.style.color = '#15803D';
+          msgEl.textContent = 'Google Drive conectado com sucesso! ✓';
+          this.renderizar();
+        } catch (err) {
+          msgEl.style.color = '#B42318';
+          msgEl.textContent = `Atenção: ${err.message || 'Autorize o domínio athenes.vercel.app no Google Cloud Console.'}`;
+        }
+      });
       popDrive.querySelector('#athPopDriveNomeInput').addEventListener('change', e => {
         art.driveFileName = e.target.value.trim();
         salvarArtigosEstudo(this.artigos);
@@ -2046,26 +2150,122 @@ export class EstudoArtigosView {
 
     const f = art.fichamento;
 
+    // Coleta todas as notas adesivas fixadas em todas as páginas do PDF
+    const todasNotasPdf = [];
+    const notasPagObj = f.notasPagina || {};
+    Object.keys(notasPagObj).sort((a, b) => Number(a) - Number(b)).forEach(pgKey => {
+      const numPag = parseInt(pgKey, 10) || 1;
+      (notasPagObj[pgKey] || []).forEach((pin, idx) => {
+        todasNotasPdf.push({ numPag, idx: idx + 1, pin });
+      });
+    });
+
     if (this.abaDireita === 'resumo') {
       box.innerHTML = `
         <div class="ath-fichamento-bloco">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong class="ath-fichamento-rotulo" style="margin-bottom:0;">Notas Fixadas no PDF (${todasNotasPdf.length})</strong>
+            <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnNovaNotaLateral" style="height:24px; padding:0 9px; font-size:11px;">+ Nova Nota</button>
+          </div>
+
+          <div class="ath-lista-citacoes-pdf" style="margin-bottom:14px;">
+            ${todasNotasPdf.length === 0 ? `
+              <div style="padding:12px; text-align:center; color:#64748B; font-size:11.5px; background:#F8FAFC; border-radius:10px; border:1px dashed #CBD5E1;">
+                Nenhuma nota fixada nas páginas ainda. Clique em <b>+ Nova Nota</b> ou use a ferramenta <b>Nota</b> na barra superior.
+              </div>
+            ` : todasNotasPdf.map(({ numPag, idx, pin }) => `
+              <div class="ath-citacao-pdf-card" style="border-left: 4px solid ${escapeHtml(pin.cor || '#F59E0B')}; padding:8px 10px;">
+                <div class="ath-citacao-pdf-topo" style="margin-bottom:4px;">
+                  <span class="ath-citacao-pag-badge" data-ir-nota-pag="${numPag}" data-ir-nota-id="${escapeHtml(pin.id)}" title="Ir até esta nota na Página ${numPag}">
+                    📌 Pág. ${numPag} · #${idx} ${escapeHtml(pin.titulo || 'Nota')}
+                  </span>
+                  <div style="display:flex; gap:4px;">
+                    <button type="button" class="ath-btn ath-btn-sm" data-min-nota-lat="${escapeHtml(pin.id)}" data-min-nota-pag="${numPag}" title="${pin.minimizado ? 'Expandir nota na folha' : 'Minimizar nota na folha'}" style="height:21px; padding:0 6px; font-size:10px;">
+                      ${pin.minimizado ? '+ Expandir' : '— Diminuir'}
+                    </button>
+                    <button type="button" class="ath-btn ath-btn-sm" data-edit-nota-lat="${escapeHtml(pin.id)}" data-edit-nota-pag="${numPag}" title="Editar esta nota" style="height:21px; padding:0 6px; font-size:10px;">✎</button>
+                    <button type="button" class="ath-btn ath-btn-sm" data-del-nota-lat="${escapeHtml(pin.id)}" data-del-nota-pag="${numPag}" title="Excluir nota" style="height:21px; padding:0 6px; font-size:10px; color:#B42318;">✕</button>
+                  </div>
+                </div>
+                <div style="font-size:11.5px; color:#1E293B; line-height:1.38; cursor:pointer;" data-edit-nota-lat="${escapeHtml(pin.id)}" data-edit-nota-pag="${numPag}">
+                  ${escapeHtml(pin.texto || 'Sem texto (clique para editar)')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
           <label class="ath-fichamento-rotulo">Resumo Oficial do Artigo (Zotero)</label>
           <div class="ath-fichamento-resumo-orig">${escapeHtml(art.resumoOriginal || 'Sem resumo cadastrado no Zotero.')}</div>
 
           <label class="ath-fichamento-rotulo" style="margin-top:10px;">Meu Resumo & Síntese Crítica</label>
-          <textarea id="athEstudoResumoPessoal" class="ath-input" rows="6" placeholder="Escreva aqui o seu resumo do artigo, principais teses do autor e como ele dialoga com sua pesquisa...">${escapeHtml(f.resumoPessoal || '')}</textarea>
+          <textarea id="athEstudoResumoPessoal" class="ath-input" rows="5" placeholder="Escreva aqui o seu resumo do artigo, principais teses do autor e como ele dialoga com sua pesquisa...">${escapeHtml(f.resumoPessoal || '')}</textarea>
 
           <label class="ath-fichamento-rotulo" style="margin-top:10px;">Análise Metodológica & Anotações Livres</label>
-          <textarea id="athEstudoMetodoNotas" class="ath-input" rows="5" placeholder="Anote parâmetros, equações, dados estatísticos ou críticas metodológicas...">${escapeHtml(f.metodologiaNotas || '')}</textarea>
+          <textarea id="athEstudoMetodoNotas" class="ath-input" rows="4" placeholder="Anote parâmetros, equações, dados estatísticos ou críticas metodológicas...">${escapeHtml(f.metodologiaNotas || '')}</textarea>
 
           <label class="ath-fichamento-rotulo" style="margin-top:10px;">Tags / Palavras-Chave (Zotero)</label>
           <input type="text" id="athEstudoTagsInput" class="ath-input" value="${escapeHtml((art.palavrasChave || []).join(', '))}" placeholder="Ex.: REURB, Morfologia, SIG">
-
-          <div class="ath-fichamento-dica">
-            Tudo o que você escreve aqui é salvo automaticamente e enviado como uma <b>Nota Filha sincronizada no Zotero</b> e salvo junto ao PDF no seu <b>Google Drive</b>.
-          </div>
         </div>
       `;
+
+      box.querySelector('#athBtnNovaNotaLateral').addEventListener('click', () => {
+        const pg = this.paginaAtual || 1;
+        this.rolarParaPagina(pg, this.container);
+        this.criarNotaAdesivaNaPagina(art, pg, 52, 24, '', this.container);
+      });
+
+      box.querySelectorAll('[data-ir-nota-pag]').forEach(el => {
+        el.addEventListener('click', () => {
+          const pg = parseInt(el.dataset.irNotaPag, 10) || 1;
+          this.rolarParaPagina(pg, this.container);
+        });
+      });
+
+      box.querySelectorAll('[data-edit-nota-lat]').forEach(el => {
+        el.addEventListener('click', () => {
+          const pg = parseInt(el.dataset.editNotaPag, 10) || 1;
+          const pinId = el.dataset.editNotaLat;
+          const lista = art.fichamento.notasPagina?.[pg] || [];
+          const alvo = lista.find(p => p.id === pinId);
+          if (alvo) alvo.minimizado = false;
+          this.pinEditandoId = pinId;
+          this.rolarParaPagina(pg, this.container);
+          const layer = this.container?.querySelector(`[data-pins-pag="${pg}"]`);
+          this.renderizarPinsDaPagina(layer, art, pg, this.container);
+        });
+      });
+
+      box.querySelectorAll('[data-min-nota-lat]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const pg = parseInt(btn.dataset.minNotaPag, 10) || 1;
+          const pinId = btn.dataset.minNotaLat;
+          const lista = art.fichamento.notasPagina?.[pg] || [];
+          const alvo = lista.find(p => p.id === pinId);
+          if (alvo) {
+            alvo.minimizado = !alvo.minimizado;
+            if (alvo.minimizado && this.pinEditandoId === pinId) this.pinEditandoId = null;
+            salvarArtigosEstudo(this.artigos);
+            const layer = this.container?.querySelector(`[data-pins-pag="${pg}"]`);
+            this.renderizarPinsDaPagina(layer, art, pg, this.container);
+            this.atualizarPaineisLateraisDeNotas(this.container, art);
+          }
+        });
+      });
+
+      box.querySelectorAll('[data-del-nota-lat]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const pg = parseInt(btn.dataset.delNotaPag, 10) || 1;
+          const pinId = btn.dataset.delNotaLat;
+          if (art.fichamento.notasPagina?.[pg]) {
+            art.fichamento.notasPagina[pg] = art.fichamento.notasPagina[pg].filter(p => p.id !== pinId);
+            if (this.pinEditandoId === pinId) this.pinEditandoId = null;
+            salvarArtigosEstudo(this.artigos);
+            const layer = this.container?.querySelector(`[data-pins-pag="${pg}"]`);
+            this.renderizarPinsDaPagina(layer, art, pg, this.container);
+            this.atualizarPaineisLateraisDeNotas(this.container, art);
+          }
+        });
+      });
 
       box.querySelector('#athEstudoResumoPessoal').addEventListener('input', e => {
         f.resumoPessoal = e.target.value;
@@ -2157,12 +2357,17 @@ export class EstudoArtigosView {
     }
 
     // Aba 3: Vínculo Zotero & Google Drive
+    const cfgDrivePainel = obterConfigGoogleDrive();
+    const driveConectadoPainel = Boolean(cfgDrivePainel.accessToken);
     box.innerHTML = `
       <div class="ath-fichamento-bloco">
         <div style="padding:10px 12px; border-radius:12px; background:#F8FAFC; border:1px solid #CBD5E1; margin-bottom:10px;">
           <strong style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:#1F2733; text-transform:uppercase; margin-bottom:6px;">
-            ${svgIcone('zotero', 13)} Credenciais & Vínculo Zotero
+            ${svgIcone('zotero', 13)} Vínculo de Metadados com o Zotero
           </strong>
+          <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnVincularRefExistenteZotero" style="width:100%; justify-content:center; margin-bottom:8px;">
+            ${svgIcone('zotero', 13)} 🔗 Vincular a uma Referência já existente do Zotero
+          </button>
           <label style="font-size:11px; font-weight:700; display:block; margin-bottom:6px;">Sua Zotero API Key
             <input type="text" class="ath-input" id="athDirZoteroApiKey" value="${escapeHtml(this.zoteroClient.apiKey || '')}" placeholder="Ex.: KNEYoy8RTMlkaTuHx5WPc3bH" style="margin-top:3px; height:30px; font-size:11.5px;">
           </label>
@@ -2178,12 +2383,12 @@ export class EstudoArtigosView {
         </div>
 
         <div style="padding:10px 12px; border-radius:12px; background:#EEF4FA; border:1px solid #C8D7E6; margin-bottom:10px;">
-          <strong style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:#314F79; text-transform:uppercase; margin-bottom:4px;">
+          <strong style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:#314F79; text-transform:uppercase; margin-bottom:6px;">
             ${svgIcone('drive', 13)} Armazenamento do PDF no Google Drive
           </strong>
-          <p style="font-size:11px; color:#334155; margin:0 0 8px 0;">
-            O PDF é lido do Google Drive e salvo de volta com suas camadas de risco, sem consumir o armazenamento do Zotero.
-          </p>
+          <button type="button" class="ath-btn ${driveConectadoPainel ? 'ath-btn-zotero-ok' : 'ath-btn-primary'} ath-btn-sm" id="athBtnPainelConectarDrive" style="width:100%; justify-content:center; margin-bottom:8px;">
+            ${svgIcone('drive', 13)} ${driveConectadoPainel ? 'Google Drive Conectado ✓' : 'Conectar meu Google Drive (1 clique)'}
+          </button>
           <label style="font-size:11px; font-weight:700; display:block; margin-bottom:6px;">Nome do Arquivo no Drive
             <input type="text" class="ath-input" id="athDriveNomeArqArtigo" value="${escapeHtml(art.driveFileName || '')}" style="margin-top:3px; height:30px; font-size:11.5px;">
           </label>
@@ -2198,6 +2403,25 @@ export class EstudoArtigosView {
         <div id="athStatusSyncArtigo" style="font-size:11.5px; margin-top:8px; color:#15803D; font-weight:700;"></div>
       </div>
     `;
+
+    box.querySelector('#athBtnVincularRefExistenteZotero').addEventListener('click', () => {
+      this.abrirModalEscolherReferenciaZotero(art);
+    });
+
+    box.querySelector('#athBtnPainelConectarDrive').addEventListener('click', async () => {
+      const statusEl = box.querySelector('#athStatusSyncArtigo');
+      statusEl.style.color = '#314F79';
+      statusEl.textContent = 'Abrindo janela de autorização do Google Drive...';
+      try {
+        await autenticarGoogleDrive(cfgDrivePainel.clientId);
+        statusEl.style.color = '#15803D';
+        statusEl.textContent = 'Google Drive conectado com sucesso! ✓';
+        this.renderizar();
+      } catch (err) {
+        statusEl.style.color = '#B42318';
+        statusEl.textContent = `Atenção: ${err.message || 'Verifique se https://athenes.vercel.app está em Origens JavaScript autorizadas.'}`;
+      }
+    });
 
     box.querySelector('#athDirZoteroApiKey').addEventListener('change', e => {
       this.salvarConfigZotero({ apiKey: e.target.value.trim() });
@@ -2406,16 +2630,175 @@ export class EstudoArtigosView {
     }
   }
 
+  /**
+   * Modal para escolher uma referência já existente na biblioteca Zotero do usuário
+   * e vincular (puxar Título, Autores, Ano, Periódico, DOI, Resumo, Tags e Chave Zotero)
+   * a qualquer PDF lido do Google Drive — SEM enviar o PDF para o Zotero.
+   */
+  async abrirModalEscolherReferenciaZotero(artAlvo = null, onSelecionado = null) {
+    this.carregarConfigZotero();
+    const modal = document.createElement('div');
+    modal.className = 'ath-modal-backdrop';
+    modal.innerHTML = `
+      <div class="ath-modal" style="max-width:580px;">
+        <div class="ath-modal-head">
+          <h2>Vincular PDF a uma Referência do Zotero</h2>
+          <button type="button" class="ath-btn ath-btn-icon" id="athModalEscRefFechar">${svgIcone('fechar', 16)}</button>
+        </div>
+        <div class="ath-modal-corpo">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" class="ath-input" id="athBuscaRefZoteroModal" placeholder="Filtrar referências por título, autor ou ano..." style="flex:1;">
+            <button type="button" class="ath-btn ath-btn-sm" id="athBtnRecarregarRefZotModal">
+              ${svgIcone('zotero', 13)} Atualizar do Zotero
+            </button>
+          </div>
+          <div id="athStatusRefZoteroModal" style="font-size:11.5px; color:#314F79; font-weight:700;"></div>
+          <div id="athListaRefZoteroModal" style="max-height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+        <div class="ath-modal-foot">
+          <button type="button" class="ath-btn" id="athModalEscRefCancelar">Fechar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    const fechar = () => modal.remove();
+    modal.querySelector('#athModalEscRefFechar').addEventListener('click', fechar);
+    modal.querySelector('#athModalEscRefCancelar').addEventListener('click', fechar);
+    modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+
+    let catalogoRefs = this.artigos.map(a => ({
+      chave: a.chaveZotero,
+      titulo: a.titulo,
+      autores: a.autores,
+      ano: a.ano,
+      publicacao: a.publicacao,
+      volume: a.volume || '',
+      numero: a.numero || '',
+      paginas: a.paginas || '',
+      doi: a.doi || '',
+      resumo: a.resumoOriginal || '',
+      palavrasChave: a.palavrasChave || []
+    }));
+
+    const listaEl = modal.querySelector('#athListaRefZoteroModal');
+    const statusEl = modal.querySelector('#athStatusRefZoteroModal');
+    const inputBusca = modal.querySelector('#athBuscaRefZoteroModal');
+
+    const renderizarLista = () => {
+      const q = inputBusca.value.trim().toLowerCase();
+      const filtradas = catalogoRefs.filter(r => {
+        if (!q) return true;
+        const autStr = (r.autores || []).map(x => `${x.sobrenome} ${x.prenome}`).join(' ');
+        return `${r.titulo} ${autStr} ${r.ano} ${r.publicacao}`.toLowerCase().includes(q);
+      });
+
+      if (filtradas.length === 0) {
+        listaEl.innerHTML = `<div style="padding:16px; text-align:center; color:#64748B; font-size:12px;">Nenhuma referência encontrada. Clique em "Atualizar do Zotero" para buscar da sua conta.</div>`;
+        return;
+      }
+
+      listaEl.innerHTML = filtradas.map((r, i) => {
+        const autTxt = (r.autores || []).map(a => `${a.sobrenome}${a.prenome ? ', ' + a.prenome : ''}`).join('; ');
+        return `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border:1px solid #CBD5E1; border-radius:10px; background:#F8FAFC;">
+            <div style="min-width:0; flex:1;">
+              <div style="font-size:12.5px; font-weight:800; color:#0F172A; line-height:1.3;">${escapeHtml(r.titulo)}</div>
+              <div style="font-size:11px; color:#314F79; font-weight:700; margin-top:2px;">
+                ${escapeHtml(autTxt)} (${escapeHtml(r.ano)}) · ${escapeHtml(r.publicacao || '')}
+              </div>
+              <div style="font-size:10.5px; color:#64748B; margin-top:2px;">
+                Key: <code>${escapeHtml(r.chave || 'ZOT')}</code> ${r.doi ? `· DOI: ${escapeHtml(r.doi)}` : ''}
+              </div>
+            </div>
+            <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" data-vincular-ref-idx="${i}">
+              Vincular Info
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      listaEl.querySelectorAll('[data-vincular-ref-idx]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const ref = filtradas[parseInt(btn.dataset.vincularRefIdx, 10)];
+          if (!ref) return;
+          if (artAlvo) {
+            artAlvo.chaveZotero = ref.chave || artAlvo.chaveZotero;
+            artAlvo.titulo = ref.titulo || artAlvo.titulo;
+            artAlvo.autores = ref.autores?.length ? ref.autores : artAlvo.autores;
+            artAlvo.ano = ref.ano || artAlvo.ano;
+            artAlvo.publicacao = ref.publicacao || artAlvo.publicacao;
+            artAlvo.volume = ref.volume || artAlvo.volume;
+            artAlvo.numero = ref.numero || artAlvo.numero;
+            artAlvo.paginas = ref.paginas || artAlvo.paginas;
+            artAlvo.doi = ref.doi || artAlvo.doi;
+            if (ref.resumo) artAlvo.resumoOriginal = ref.resumo;
+            if (ref.palavrasChave?.length) artAlvo.palavrasChave = ref.palavrasChave;
+            if (artAlvo.conteudoPaginasPdf?.[0]) {
+              artAlvo.conteudoPaginasPdf[0].titulo = artAlvo.titulo.toUpperCase();
+              artAlvo.conteudoPaginasPdf[0].autores = (artAlvo.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome}`.trim()).join(' · ');
+            }
+            salvarArtigosEstudo(this.artigos);
+            this.renderizar();
+          }
+          if (onSelecionado) onSelecionado(ref);
+          fechar();
+        });
+      });
+    };
+
+    const buscarDaApi = async () => {
+      if (!this.zoteroClient.apiKey) return;
+      statusEl.textContent = 'Buscando referências da sua biblioteca Zotero...';
+      const remotos = await this.zoteroClient.buscarItens({ limite: 50 });
+      if (Array.isArray(remotos) && remotos.length > 0) {
+        remotos.forEach(it => {
+          if (!catalogoRefs.some(c => c.chave === it.chave || c.titulo === it.titulo)) {
+            catalogoRefs.unshift({
+              chave: it.chave || it.id,
+              titulo: it.titulo,
+              autores: it.autores || [{ sobrenome: 'Autor', prenome: '' }],
+              ano: it.ano || '2026',
+              publicacao: it.publicacao || it.editora || '',
+              volume: it.volume || '',
+              numero: it.numero || '',
+              paginas: it.paginas || '',
+              doi: it.doi || '',
+              resumo: it.resumo || '',
+              palavrasChave: it.palavrasChave || []
+            });
+          }
+        });
+        statusEl.textContent = `${remotos.length} referência(s) carregadas do Zotero ✓`;
+      } else {
+        statusEl.textContent = 'Exibindo referências sincronizadas.';
+      }
+      renderizarLista();
+    };
+
+    inputBusca.addEventListener('input', renderizarLista);
+    modal.querySelector('#athBtnRecarregarRefZotModal').addEventListener('click', buscarDaApi);
+    renderizarLista();
+    if (this.zoteroClient.apiKey) buscarDaApi();
+  }
+
   abrirModalVincularArtigo() {
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
     modal.innerHTML = `
       <div class="ath-modal" style="max-width:560px;">
         <div class="ath-modal-head">
-          <h2>Vincular Artigo do Zotero & PDF do Google Drive</h2>
+          <h2>Vincular PDF do Google Drive & Referência do Zotero</h2>
           <button type="button" class="ath-btn ath-btn-icon" id="athModalArtFechar">${svgIcone('fechar', 16)}</button>
         </div>
         <div class="ath-modal-corpo">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 12px; background:#EEF4FA; border:1px solid #C8D7E6; border-radius:10px;">
+            <span style="font-size:12px; font-weight:700; color:#1E293B;">Já cadastrou a referência no Zotero? Puxe os dados com 1 clique:</span>
+            <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnPuxarRefZoteroNoModal">
+              ${svgIcone('zotero', 13)} 🔗 Escolher do Zotero
+            </button>
+          </div>
+
           <div class="ath-prop-grupo">
             <label>Título do Artigo</label>
             <input type="text" class="ath-input" id="athNovoArtTitulo" placeholder="Ex.: Planejamento Urbano e Regularização Sustentável">
@@ -2436,14 +2819,13 @@ export class EstudoArtigosView {
               <input type="text" class="ath-input" id="athNovoArtPeriodico" placeholder="Ex.: Cadernos Metrópole">
             </div>
             <div class="ath-prop-grupo">
-              <label>Chave Zotero (Opcional)</label>
-              <input type="text" class="ath-input" id="athNovoArtZotKey" placeholder="Criado no Zotero ao sincronizar">
+              <label>Chave da Referência no Zotero (Item Key)</label>
+              <input type="text" class="ath-input" id="athNovoArtZotKey" placeholder="Vinculada do Zotero ou criada ao sincronizar">
             </div>
           </div>
           <div class="ath-prop-grupo">
-            <label>Arquivo PDF no Google Drive (ou selecione do computador)</label>
+            <label>Arquivo PDF no Google Drive (o PDF fica no Drive, não vai para o Zotero)</label>
             <input type="text" class="ath-input" id="athNovoArtDriveNome" placeholder="Ex.: Silva_2026_Planejamento_Urbano.pdf">
-            <small style="color:var(--ath-muted); display:block; margin-top:4px;">O PDF permanece no seu Google Drive e será aberto no Estúdio em Tela Cheia estilo Samsung Notes.</small>
           </div>
           <div class="ath-prop-grupo">
             <label>Resumo / Abstract do Artigo</label>
@@ -2452,7 +2834,7 @@ export class EstudoArtigosView {
         </div>
         <div class="ath-modal-foot">
           <button type="button" class="ath-btn" id="athModalArtCancelar">Cancelar</button>
-          <button type="button" class="ath-btn ath-btn-primary" id="athModalArtCriar">Adicionar & Abrir em Tela Cheia</button>
+          <button type="button" class="ath-btn ath-btn-primary" id="athModalArtCriar">Adicionar & Abrir no Estúdio</button>
         </div>
       </div>
     `;
@@ -2462,6 +2844,23 @@ export class EstudoArtigosView {
     modal.querySelector('#athModalArtFechar').addEventListener('click', fechar);
     modal.querySelector('#athModalArtCancelar').addEventListener('click', fechar);
     modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+
+    modal.querySelector('#athBtnPuxarRefZoteroNoModal').addEventListener('click', () => {
+      this.abrirModalEscolherReferenciaZotero(null, (ref) => {
+        modal.querySelector('#athNovoArtTitulo').value = ref.titulo || '';
+        const aut0 = ref.autores?.[0];
+        if (aut0) {
+          modal.querySelector('#athNovoArtAutor').value = `${aut0.sobrenome || ''}${aut0.prenome ? ', ' + aut0.prenome : ''}`;
+        }
+        modal.querySelector('#athNovoArtAno').value = ref.ano || '2026';
+        modal.querySelector('#athNovoArtPeriodico').value = ref.publicacao || '';
+        modal.querySelector('#athNovoArtZotKey').value = ref.chave || '';
+        modal.querySelector('#athNovoArtResumo').value = ref.resumo || '';
+        if (!modal.querySelector('#athNovoArtDriveNome').value.trim()) {
+          modal.querySelector('#athNovoArtDriveNome').value = `${aut0?.sobrenome || 'Artigo'}_${ref.ano || '2026'}.pdf`;
+        }
+      });
+    });
 
     modal.querySelector('#athModalArtCriar').addEventListener('click', () => {
       const titulo = modal.querySelector('#athNovoArtTitulo').value.trim() || 'Novo Artigo Científico';

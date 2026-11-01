@@ -557,32 +557,46 @@ export class SessaoColaborativaRealtime {
    ========================================================================== */
 
 export const GOOGLE_DRIVE_ESCOPO = 'https://www.googleapis.com/auth/drive.file';
+export const DEFAULT_GOOGLE_CLIENT_ID = '948015162542-j898e50a80pf0a9fo69belsar291fh41.apps.googleusercontent.com';
 
 export function obterConfigGoogleDrive() {
   try {
     if (typeof localStorage !== 'undefined') {
       const salvo = localStorage.getItem('athenes_gdrive_config');
-      if (salvo) return JSON.parse(salvo);
+      if (salvo) {
+        const parsed = JSON.parse(salvo);
+        return {
+          clientId: parsed.clientId || DEFAULT_GOOGLE_CLIENT_ID,
+          apiKey: parsed.apiKey || '',
+          accessToken: parsed.accessToken || ''
+        };
+      }
     }
   } catch (_) {}
-  return { clientId: '', apiKey: '', accessToken: '' };
+  return { clientId: DEFAULT_GOOGLE_CLIENT_ID, apiKey: '', accessToken: '' };
 }
 
 export function salvarConfigGoogleDrive(cfg) {
+  const normalizado = {
+    clientId: (cfg?.clientId || DEFAULT_GOOGLE_CLIENT_ID).trim(),
+    apiKey: cfg?.apiKey || '',
+    accessToken: cfg?.accessToken || ''
+  };
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('athenes_gdrive_config', JSON.stringify(cfg));
+      localStorage.setItem('athenes_gdrive_config', JSON.stringify(normalizado));
     }
   } catch (_) {}
-  return cfg;
+  return normalizado;
 }
 
 /**
  * Solicita autenticação OAuth2 do Google Identity Services com escopo restrito `drive.file`.
  */
-export async function autenticarGoogleDrive(clientId) {
+export async function autenticarGoogleDrive(clientId = DEFAULT_GOOGLE_CLIENT_ID) {
   if (typeof window === 'undefined') throw new Error('Autenticação Google requer navegador.');
-  if (!clientId) throw new Error('Informe o Google Client ID para conectar ao Google Drive.');
+  const cid = (clientId || obterConfigGoogleDrive().clientId || DEFAULT_GOOGLE_CLIENT_ID).trim();
+  if (!cid) throw new Error('Informe o Google Client ID para conectar ao Google Drive.');
 
   // Carrega script oficial do Google Identity Services se necessário
   if (!window.google?.accounts?.oauth2) {
@@ -592,7 +606,7 @@ export async function autenticarGoogleDrive(clientId) {
   return new Promise((resolve, reject) => {
     try {
       const tokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
+        client_id: cid,
         scope: GOOGLE_DRIVE_ESCOPO,
         callback: (resp) => {
           if (resp.error) {
@@ -600,7 +614,7 @@ export async function autenticarGoogleDrive(clientId) {
             return;
           }
           const cfgAtual = obterConfigGoogleDrive();
-          salvarConfigGoogleDrive({ ...cfgAtual, clientId, accessToken: resp.access_token });
+          salvarConfigGoogleDrive({ ...cfgAtual, clientId: cid, accessToken: resp.access_token });
           resolve(resp.access_token);
         }
       });
