@@ -1,3 +1,41 @@
+
+## Identidade Visual Azul (#314F79), Controles Completos de Formatação e Editor de Páginas Mestras (01/11/2026 - Tarde)
+
+- **Identidade Visual Athenes em Azul:**
+  - Substituição da cor primária de marca laranja (`#FF6B2C`) pela paleta azul ardósia (`#314F79`, RGB 49, 79, 121), com variantes suaves (`--ath-primary-soft: #EEF4FA`), bordas (`--ath-primary-line: #C8D7E6`) e texto escuro (`--ath-primary-ink: #1B2D47`).
+  - Unificação completa da tipografia na fonte Nunito em todos os componentes da interface.
+
+- **Controles Avançados de Formatação de Texto e Parágrafo:**
+  - Segmento de **7 alinhamentos tipográficos** com ícones SVG lineares e dicas de comportamento da última linha:
+    1. À esquerda (`esquerda`)
+    2. Centralizado (`centro`)
+    3. À direita (`direita`)
+    4. Justificado total (`justificado`)
+    5. Justificado com última linha à esquerda (`justificado_esquerda` / `text-align-last: left`, padrão ABNT)
+    6. Justificado com última linha centralizada (`justificado_centro` / `text-align-last: center`)
+    7. Justificado com última linha à direita (`justificado_direita` / `text-align-last: right`)
+  - Dropdown de fonte com opção "Do estilo (Nunito)" e fontes do sistema seguras.
+  - Seletor de cor do texto integrado com cápsula "do estilo", botão de restauração e color picker nativo.
+  - Caixa de seleção "Fundo atrás do texto" com escolha de cor.
+  - Pílulas segmentadas de bordas e linhas de destaque (sem borda, tachado, sublinhado).
+  - Pílulas segmentadas de marcador (círculo sólido, ponto-traço, traço, numeração).
+  - Painel expansível de espaçamentos e recuos de parágrafo (entrelinha, tracking, espaço antes/depois em pt, recuo 1ª linha em mm, recuo esquerdo/direito).
+  - Detecção inteligente de sobrescrita local com botões "Redefinir estilo a partir da seleção" e "Limpar ajustes locais".
+  - Barra contextual flutuante no texto selecionado (`.ath-barra-contextual`) com comandos de formatação e atalho de citação Zotero.
+
+- **Sistema de Páginas Mestras (Fixa vs Progressiva) e Editor Dedicado:**
+  - Inclusão do botão lápis (`✏️`) em cada item de seção e no catálogo de mestras para abrir o `ModalEditorMestra`.
+  - Botão de ação "+ Adicionar Mestra ao Documento" com escolha guiada de posição (início, após seção ativa, fim) e modo.
+  - Modal editor de mestras completo (`src/ui/athenes_editor_mestra.js`) com prévia interativa em escala da folha, controle de margens, formato, orientação, cabeçalho, rodapé e numeração.
+  - **Mestra Fixa:** Grade bidimensional 2D configurável (linhas × colunas e gutter em mm), permitindo posicionamento livre de blocos como no editor de pranchas.
+  - **Mestra Progressiva:** Colunas de fluxo contínuo (1, 2 ou 3 colunas) com cálculo dinâmico de gutter e repaginação automática quando o conteúdo cresce.
+  - Atualização automática de páginas existentes ao salvar alterações na mestra, preservando blocos e textos intactos.
+
+- **Exportadores PDF e DOCX:**
+  - Exportação PDF (`src/core/athenes_export_pdf.js`) aplicando os 7 modos de alinhamento com `text-align-last`, cores e recuos locais.
+  - Exportação DOCX (`src/core/athenes_export_docx.js`) mapeando alinhamentos para `<w:jc w:val="..."/>`, espaçamentos para `<w:spacing .../>` e indentações para `<w:ind .../>`.
+  - Suíte de testes automatizados com 53 testes passando (`npm test`) e validação visual de tela via Edge headless.
+
 # Passagem de Bastão — Athenes
 
 ## Implementação Inicial, Sincronização com GitHub e Estruturação do Segundo Cérebro (01/11/2026)
