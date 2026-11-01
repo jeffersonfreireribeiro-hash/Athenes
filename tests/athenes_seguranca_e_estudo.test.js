@@ -12,7 +12,8 @@ import {
 import {
   criarArtigosEstudoExemplo,
   formatarCitacaoAbntDoArtigo,
-  gerarHtmlNotaZoteroDoArtigo
+  gerarHtmlNotaZoteroDoArtigo,
+  calcularPontoFinalLinhaReta
 } from '../src/ui/athenes_estudo_artigos.js';
 import { ZoteroClient } from '../src/core/athenes_zotero.js';
 
@@ -98,4 +99,37 @@ test('Estúdio de Artigos Zotero & PDF usa estrutura Full-Screen de 3 colunas id
   assert.equal(codigoEstudo.includes('athEstudioColDir'), true);
   assert.equal(codigoEstudo.includes('rm-barra-blocos'), true);
   assert.equal(cssDash.includes('.ath-dashboard.ath-dashboard-estudio-full'), true);
+});
+
+test('Estúdio de Artigos renderiza todas as páginas em rolagem contínua, suporta linha reta, editor inline sem prompt nativo e popover de seleção de texto', () => {
+  const codigoEstudo = fs.readFileSync(path.resolve('src/ui/athenes_estudo_artigos.js'), 'utf8');
+
+  // Sem window.prompt( feio
+  assert.equal(codigoEstudo.includes('window.prompt('), false);
+
+  // Todas as páginas em pilha contínua
+  assert.equal(codigoEstudo.includes('athPdfTodasPaginasStack'), true);
+  assert.equal(codigoEstudo.includes('renderizarTodasAsPaginasNoPalco'), true);
+
+  // Distribuição 50/50 padronizada na coluna esquerda
+  assert.equal(codigoEstudo.includes('rm-card-meio-a-meio'), true);
+  assert.equal(codigoEstudo.includes('rm-card-meio-a-meio-corpo'), true);
+
+  // Editor inline de notas adesivas e popover de seleção de texto
+  assert.equal(codigoEstudo.includes('ath-pdf-pin-form'), true);
+  assert.equal(codigoEstudo.includes('athPdfSelecaoPopover'), true);
+  assert.equal(codigoEstudo.includes('athBtnModoLinhaReta'), true);
+
+  // Teste geométrico do snap ortogonal da Linha Reta
+  const horiz = calcularPontoFinalLinhaReta({ x: 100, y: 100 }, { x: 300, y: 104 });
+  assert.equal(horiz.y, 100);
+  assert.equal(horiz.x, 300);
+
+  const vert = calcularPontoFinalLinhaReta({ x: 100, y: 100 }, { x: 103, y: 320 });
+  assert.equal(vert.x, 100);
+  assert.equal(vert.y, 320);
+
+  const diag = calcularPontoFinalLinhaReta({ x: 100, y: 100 }, { x: 250, y: 240 });
+  assert.equal(diag.x, 250);
+  assert.equal(diag.y, 240);
 });

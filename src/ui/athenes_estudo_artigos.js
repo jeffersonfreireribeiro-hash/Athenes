@@ -2,29 +2,29 @@
 /**
  * Athenes — Estúdio de Leitura, Risco em PDF (estilo Samsung Notes) e Fichamento Síncrono (Zotero + Google Drive).
  *
- * Arquitetura em Tela Cheia (Full-Screen 3 Colunas idêntica ao Editor de Escrita .rm-conteudo / .rm-ed-grade):
- * - Topo Shell (.ath-topo-shell): Marca Athenes, Título editável do artigo, Selo ABNT, Status Zotero API e Salvar Drive & Zotero.
- * - Coluna Esquerda (.rm-col-esq, dividida 50/50):
- *     1. Metade Superior: Artigos da Coleção Zotero (troca rápida sem sair da tela cheia + sincronização).
- *     2. Metade Inferior: Páginas do PDF & Marcações (navegação por páginas, contagem de riscos/notas e + Folha Extra).
- * - Coluna Central (.rm-col-prev):
- *     1. Barra de informações e popovers de topo (Zotero API, Google Drive PDF, Opções de Caneta).
- *     2. Barra flutuante de pílula (.rm-barra-blocos) com ferramentas estilo Samsung Notes (Cursor, Caneta, Marca-texto, Borracha, Nota Adesiva, + Citação, Cores, Espessura, Paginador e Zoom).
- *     3. Palco rolável (.rm-prev-palco) com a Folha A4 do PDF + Camada vetorial <canvas> + Pinos de Nota.
- * - Coluna Direita (.rm-col-dir):
- *     Inspetor completo em altura total com 3 abas: Resumo & Notas, Citações (p. X) e Zotero & Drive.
+ * Recursos principais:
+ * 1. Tela Cheia em 3 Colunas (.rm-conteudo / .rm-ed-grade) idêntica ao Editor de Escrita:
+ *    - Coluna Esquerda 50/50 (.rm-card-meio-a-meio): Artigos do Zotero na metade superior + Páginas do PDF na metade inferior.
+ *    - Coluna Central: Todas as páginas do PDF empilhadas em rolagem contínua (.rm-prev-palco) com barra flutuante (.rm-barra-blocos).
+ *    - Coluna Direita: Inspetor em altura total (Resumo & Notas, Citações & Destaques, Zotero & Drive).
+ * 2. Desenho Livre + Modo Linha Reta (estilo Samsung Notes):
+ *    - Caneta e Marca-Texto operam à mão livre ou em Modo Linha Reta (botão "Linha Reta" na barra ou tecla Shift, com trava ortogonal 0°/90°).
+ * 3. Notas Adesivas Editáveis na Folha (sem window.prompt):
+ *    - Card flutuante Soft UI diretamente sobre a página do PDF; clicar em qualquer nota abre a edição de título, texto, cor e posição.
+ * 4. Seleção de Texto Interativa:
+ *    - Ao selecionar qualquer trecho do PDF, surge uma pílula flutuante sobre a seleção para Grifar Texto (<mark>),
+ *      Salvar Citação no Zotero (p. X), Criar Nota Adesiva ou Copiar em formato ABNT.
  */
 
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import {
   obterPerfilColaborador,
   obterConfigGoogleDrive,
-  salvarConfigGoogleDrive,
   autenticarGoogleDrive,
   salvarArquivoNoGoogleDrive,
   salvarDocumentoNoSupabase
 } from '../core/athenes_colaboracao.js';
-import { escapeHtml } from '../core/athenes_seguranca.js';
+import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 
 const STORAGE_KEY_ARTIGOS = 'athenes_estudo_artigos_v1';
@@ -77,8 +77,8 @@ export function criarArtigosEstudoExemplo() {
           1: [
             {
               id: 'pin_1',
-              xPct: 68,
-              yPct: 32,
+              xPct: 62,
+              yPct: 30,
               titulo: 'Destaque do Orientador',
               texto: 'Conferir como os autores definem o índice de consolidação viária na p. 115.',
               cor: '#F59E0B',
@@ -301,22 +301,43 @@ export function gerarHtmlNotaZoteroDoArtigo(artigo) {
   ].filter(Boolean).join('\n');
 }
 
+/**
+ * Calcula o ponto final de uma linha reta com trava suave (snap) horizontal/vertical (0° ou 90°)
+ */
+export function calcularPontoFinalLinhaReta(p0, p1, toleranciaGraus = 6) {
+  if (!p0 || !p1) return p1;
+  const dx = p1.x - p0.x;
+  const dy = p1.y - p0.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 4) return { x: p1.x, y: p1.y };
+
+  const anguloGraus = Math.abs(Math.atan2(dy, dx) * (180 / Math.PI));
+  if (anguloGraus <= toleranciaGraus || anguloGraus >= (180 - toleranciaGraus)) {
+    return { x: p1.x, y: p0.y }; // Trava perfeitamente na horizontal
+  }
+  if (Math.abs(anguloGraus - 90) <= toleranciaGraus) {
+    return { x: p0.x, y: p1.y }; // Trava perfeitamente na vertical
+  }
+  return { x: p1.x, y: p1.y };
+}
+
 export class EstudoArtigosView {
   constructor(containerEl, opcoes = {}) {
     this.container = containerEl;
     this.opcoes = opcoes;
     this.onModoFullScreenChange = opcoes.onModoFullScreenChange || (() => {});
     this.artigos = carregarArtigosEstudo();
-    this.artigoAberto = null; // null = catálogo; objeto = estúdio full-screen 3 colunas (100vw x 100vh)
+    this.artigoAberto = null;
     this.paginaAtual = 1;
     this.zoomPct = 100;
-    this.ferramentaAtiva = 'caneta'; // 'cursor' | 'caneta' | 'marcatexto' | 'borracha' | 'nota'
+    this.ferramentaAtiva = 'cursor'; // Começa com seleção de texto ou caneta; permite alternar livremente
+    this.modoLinhaReta = false; // Quando true, Caneta e Marca-Texto fazem retas perfeitas
     this.corTinta = '#314F79';
     this.espessuraTinta = 3;
     this.abaDireita = 'resumo'; // 'resumo' | 'citacoes' | 'zotero_drive'
+    this.pinEditandoId = null; // ID da nota adesiva atualmente aberta para edição na folha
     this.filtroBusca = '';
     this.filtroLateralEsq = '';
-    this.popoverTopoAberto = null;
     this.zoteroClient = new ZoteroClient();
     this.carregarConfigZotero();
     this.renderizar();
@@ -363,12 +384,15 @@ export class EstudoArtigosView {
 
   renderizar() {
     if (!this.container) return;
+    const palcoAntigo = this.container.querySelector('#athEstudioPalco');
+    const scrollSalvo = palcoAntigo ? palcoAntigo.scrollTop : 0;
+
     this.carregarConfigZotero();
     this.container.innerHTML = '';
 
     if (this.artigoAberto) {
       this.alternarModoDashboardFull(true);
-      this.renderizarEstudioPdfFullScreen(this.artigoAberto);
+      this.renderizarEstudioPdfFullScreen(this.artigoAberto, scrollSalvo);
     } else {
       this.alternarModoDashboardFull(false);
       this.renderizarCatalogoArtigos();
@@ -422,7 +446,7 @@ export class EstudoArtigosView {
             <span class="ath-estudo-icone-destaque">${svgIcone('drive', 18)}</span>
             <div>
               <strong>Estúdio de Leitura em Tela Cheia (Samsung Notes + Zotero + Google Drive):</strong>
-              <span>Clique em qualquer artigo abaixo para abrir o <b>Estúdio Full-Screen de 3 Colunas</b>. O PDF é lido do Google Drive (sem ocupar espaço no Zotero) e seus resumos e citações sincronizam direto na sua conta Zotero.</span>
+              <span>Clique em qualquer artigo abaixo para abrir o <b>Estúdio Full-Screen de 3 Colunas</b> com todas as páginas empilhadas, caneta com modo de linhas retas, notas adesivas editáveis e menu inteligente ao selecionar texto.</span>
             </div>
           </div>
           ${!conectado ? `
@@ -472,7 +496,6 @@ export class EstudoArtigosView {
         });
         salvarArtigosEstudo(this.artigos);
         this.atualizarGridCatalogo();
-        alert(`${adicionados} artigo(s) importado(s) do BibTeX para sua Biblioteca de Estudo!`);
       };
       reader.readAsText(arq);
     });
@@ -517,8 +540,8 @@ export class EstudoArtigosView {
           titulo: (item.titulo || 'ARTIGO CIENTÍFICO').toUpperCase(),
           autores: (item.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome || ''}`.trim()).join(' · '),
           paragrafos: [
-            `RESUMO: ${item.resumo || 'Texto integral carregado via vínculo do Google Drive. Use a barra superior flutuante para riscar com a caneta, destacar trechos com o marca-texto ou fixar notas adesivas nesta página.'}`,
-            '1. INTRODUÇÃO E PROBLEMATIZAÇÃO: Selecione qualquer trecho ou utilize o botão "+ Citação" na barra flutuante para extrair citações diretas já formatadas com o número da página para o seu fichamento Zotero.'
+            `RESUMO: ${item.resumo || 'Texto integral carregado via vínculo do Google Drive. Selecione qualquer frase desta página para grifar, transformar em citação ABNT ou fixar uma nota adesiva.'}`,
+            '1. INTRODUÇÃO E PROBLEMATIZAÇÃO: Use a barra superior flutuante para alternar entre Seleção de Texto, Caneta Livre, Linha Reta, Marca-Texto ou Notas Adesivas.'
           ]
         },
         {
@@ -527,7 +550,7 @@ export class EstudoArtigosView {
           titulo: '2. DESENVOLVIMENTO E RESULTADOS PRINCIPAIS',
           autores: 'Continuação do documento PDF vinculado',
           paragrafos: [
-            'As anotações feitas à mão livre nesta folha ficam salvas na camada vetorial do Athenes e sincronizadas diretamente com seu arquivo no Google Drive.'
+            'Todas as páginas do artigo aparecem empilhadas continuamente neste palco. Você pode rolar livremente entre elas, desenhar esquemas com linhas retas ou mão livre e sincronizar tudo com o Zotero e o Google Drive.'
           ]
         }
       ]
@@ -631,14 +654,14 @@ export class EstudoArtigosView {
   abrirArtigoNoEstudio(art) {
     this.artigoAberto = art;
     this.paginaAtual = 1;
-    this.popoverTopoAberto = null;
+    this.pinEditandoId = null;
     this.renderizar();
   }
 
   /* ==========================================================================
-     VISÃO 2: ESTÚDIO EM TELA CHEIA (FULL-SCREEN 3 COLUNAS IDÊNTICO À ESCRITA)
+     VISÃO 2: ESTÚDIO EM TELA CHEIA (TODAS AS PÁGINAS EMPILHADAS + 3 COLUNAS)
      ========================================================================== */
-  renderizarEstudioPdfFullScreen(art) {
+  renderizarEstudioPdfFullScreen(art, scrollSalvo = 0) {
     if (!art.fichamento) {
       art.fichamento = { resumoPessoal: '', metodologiaNotas: '', citacoesMarcadas: [], notasPagina: {}, tracosPorPagina: {} };
     }
@@ -651,12 +674,9 @@ export class EstudoArtigosView {
     if (this.paginaAtual > totalPags) this.paginaAtual = totalPags;
     if (this.paginaAtual < 1) this.paginaAtual = 1;
 
-    const pagDados = paginasPdf[this.paginaAtual - 1];
     const citacoes = art.fichamento.citacoesMarcadas || [];
-    const pinsDaPagina = art.fichamento.notasPagina?.[this.paginaAtual] || [];
     const conectadoZot = this.temZoteroConectado();
 
-    // Estrutura Raiz .rm-conteudo (100vh x 100vw, idêntica ao EditorView de Escrita)
     const root = document.createElement('div');
     root.className = 'rm-conteudo ath-estudio-full-shell';
 
@@ -697,26 +717,25 @@ export class EstudoArtigosView {
     `;
     root.appendChild(topoShell);
 
-    // 2. CORPO EM 3 COLUNAS (.rm-editor.rm-main > .rm-ed-grade: 310px | 1fr | 330px)
+    // 2. CORPO EM 3 COLUNAS (.rm-editor.rm-main > .rm-ed-grade)
     const editorEl = document.createElement('div');
     editorEl.className = 'rm-editor rm-main';
     editorEl.innerHTML = `
       <div class="rm-ed-grade">
-        <!-- COLUNA 1 (ESQUERDA): Dividida 50/50 igual ao Editor de Escrita (Artigos da Coleção + Páginas do PDF) -->
+        <!-- COLUNA 1 (ESQUERDA): Dividida 50/50 com .rm-card-meio-a-meio igual ao Editor de Escrita -->
         <aside class="rm-col rm-col-esq" id="athEstudioColEsq"></aside>
 
-        <!-- COLUNA 2 (CENTRO): Barra de Topo + Barra Flutuante de Pílula (.rm-barra-blocos) + Palco A4 (.rm-prev-palco) -->
+        <!-- COLUNA 2 (CENTRO): Barra de Topo + Barra Flutuante (.rm-barra-blocos) + Palco Contínuo de Todas as Páginas -->
         <section class="rm-col rm-col-prev" id="athEstudioColPrev">
           <div class="rm-prev-topo">
             <div class="rm-prev-topo-esq">
               <strong>Estúdio PDF</strong>
               <span class="rm-prev-info">
-                Página ${this.paginaAtual} de ${totalPags} · ${escapeHtml(art.driveFileName || 'PDF no Google Drive')} · Ferramenta: <b id="athLabelModoRisco">${this.rotuloFerramenta(this.ferramentaAtiva)}</b>
+                ${totalPags} ${totalPags === 1 ? 'página' : 'páginas'} em rolagem contínua · <b id="athLabelModoRisco">${this.rotuloFerramenta(this.ferramentaAtiva)}${this.modoLinhaReta ? ' (Linha Reta)' : ''}</b>
               </span>
             </div>
 
             <div class="rm-prev-menus-topo" id="athEstudioMenusTopo">
-              <!-- Popover 1: Zotero API & Sincronização -->
               <div class="rm-menu-topo-item" data-menu-est="zotero">
                 <button type="button" class="rm-btn-menu-topo" id="athBtnPopZotero" aria-haspopup="dialog" aria-expanded="false">
                   ${svgIcone('zotero', 14)}
@@ -728,7 +747,6 @@ export class EstudoArtigosView {
                 <div class="rm-topo-popover" id="athPopoverEstZotero" role="dialog" hidden style="width:340px;"></div>
               </div>
 
-              <!-- Popover 2: Arquivo PDF & Google Drive -->
               <div class="rm-menu-topo-item" data-menu-est="drive">
                 <button type="button" class="rm-btn-menu-topo" id="athBtnPopDrive" aria-haspopup="dialog" aria-expanded="false">
                   ${svgIcone('drive', 14)}
@@ -740,11 +758,10 @@ export class EstudoArtigosView {
                 <div class="rm-topo-popover" id="athPopoverEstDrive" role="dialog" hidden style="width:340px;"></div>
               </div>
 
-              <!-- Popover 3: Estilo da Caneta & Marca-Texto -->
               <div class="rm-menu-topo-item" data-menu-est="caneta">
                 <button type="button" class="rm-btn-menu-topo" id="athBtnPopCaneta" aria-haspopup="dialog" aria-expanded="false">
                   ${svgIcone('lapis', 14)}
-                  <span>Caneta & Traço</span>
+                  <span>Espessura & Zoom</span>
                   <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
                     <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
@@ -754,7 +771,7 @@ export class EstudoArtigosView {
             </div>
           </div>
 
-          <!-- BARRA DE PÍLULA FLUTUANTE (.rm-barra-blocos) IDÊNTICA AO EDITOR DE ESCRITA -->
+          <!-- BARRA DE PÍLULA FLUTUANTE (.rm-barra-blocos) -->
           <div class="rm-barra-blocos" id="athEstudioBarraFlutuante">
             <button type="button" class="rm-ic-bt" id="athBtnVoltarCatalogoArtigos" title="Voltar para o Catálogo de Artigos" aria-label="Voltar">
               ${svgIcone('voltar', 16)}
@@ -764,94 +781,86 @@ export class EstudoArtigosView {
             </button>
             <span class="rm-barra-sep" aria-hidden="true"></span>
 
-            <button type="button" class="rm-ic-bt" id="athBtnDesfazerTraco" title="Desfazer último risco desta página" aria-label="Desfazer risco">
+            <button type="button" class="rm-ic-bt" id="athBtnDesfazerTraco" title="Desfazer último risco da página ativa" aria-label="Desfazer risco">
               ${svgIcone('desfazer', 16)}
             </button>
-            <button type="button" class="rm-ic-bt" id="athBtnLimparTracosPagina" title="Limpar todos os riscos desta página" aria-label="Limpar riscos">
+            <button type="button" class="rm-ic-bt" id="athBtnLimparTracosPagina" title="Limpar riscos da página ativa" aria-label="Limpar riscos">
               ${svgIcone('lixeira', 15)}
             </button>
             <span class="rm-barra-sep" aria-hidden="true"></span>
 
-            <!-- Ferramentas de Leitura e Risco estilo Samsung Notes -->
-            <button type="button" class="rm-ic-bt ath-tool-pilula ${this.ferramentaAtiva === 'cursor' ? 'ativo' : ''}" data-tool="cursor" data-tip="Selecionar Texto" title="Modo Seleção de Texto">
+            <!-- Ferramentas: Seleção de Texto, Caneta, Marca-Texto, Modo Linha Reta, Borracha, Nota Adesiva, Citação -->
+            <button type="button" class="rm-ic-bt ath-tool-pilula ${this.ferramentaAtiva === 'cursor' ? 'ativo' : ''}" data-tool="cursor" data-tip="Selecionar Texto (Grifar / Citar)" title="Selecionar Texto no PDF (abre menu flutuante para Grifar, Citar ou Criar Nota)">
               ${svgIcone('paragrafo', 15)}
             </button>
-            <button type="button" class="rm-ic-bt ath-tool-pilula ${this.ferramentaAtiva === 'caneta' ? 'ativo' : ''}" data-tool="caneta" data-tip="Caneta Livre" title="Caneta de Risco Livre (Samsung Notes)">
+            <button type="button" class="rm-ic-bt ath-tool-pilula ${this.ferramentaAtiva === 'caneta' ? 'ativo' : ''}" data-tool="caneta" data-tip="Caneta" title="Caneta de Desenho (mão livre ou reta)">
               ${svgIcone('lapis', 15)}
             </button>
             <button type="button" class="rm-ic-bt ath-tool-pilula ${this.ferramentaAtiva === 'marcatexto' ? 'ativo' : ''}" data-tool="marcatexto" data-tip="Marca-Texto" title="Marca-Texto Translúcido">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
             </button>
+
+            <!-- Botão de Ativar/Desativar Modo Linha Reta -->
+            <button type="button" class="rm-ic-bt ath-btn-linha-reta ${this.modoLinhaReta ? 'ativo' : ''}" id="athBtnModoLinhaReta" data-tip="Linha Reta" title="Ativar/Desativar Modo Linha Reta para Caneta e Marca-Texto (ou segure Shift ao riscar)" aria-pressed="${this.modoLinhaReta ? 'true' : 'false'}">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <line x1="4" y1="20" x2="20" y2="4"/>
+                <circle cx="4" cy="20" r="2" fill="currentColor"/>
+                <circle cx="20" cy="4" r="2" fill="currentColor"/>
+              </svg>
+            </button>
+
             <button type="button" class="rm-ic-bt ath-tool-pilula ${this.ferramentaAtiva === 'borracha' ? 'ativo' : ''}" data-tool="borracha" data-tip="Borracha" title="Borracha para apagar traços">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
             </button>
-            <button type="button" class="rm-ic-bt ath-tool-pilula ${this.ferramentaAtiva === 'nota' ? 'ativo' : ''}" data-tool="nota" data-tip="Nota Adesiva" title="Clique na folha do PDF para fixar um balão de nota">
+            <button type="button" class="rm-ic-bt ath-tool-pilula ${this.ferramentaAtiva === 'nota' ? 'ativo' : ''}" data-tool="nota" data-tip="Nota Adesiva" title="Clique em qualquer ponto da folha para abrir um painel de Nota Adesiva editável">
               ${svgIcone('nota', 15)}
             </button>
-            <button type="button" class="rm-ic-bt" id="athBtnCapturarCitacaoPdf" data-tip="Marcar Citação" title="Capturar trecho selecionado da página para o Zotero">
+            <button type="button" class="rm-ic-bt" id="athBtnCapturarCitacaoPdf" data-tip="Nova Citação" title="Registrar citação direta no fichamento Zotero">
               ${svgIcone('citacao', 15)}
             </button>
 
             <span class="rm-barra-sep" aria-hidden="true"></span>
 
-            <!-- Bolinhas de Cor Rápidas na Barra Flutuante -->
-            <div class="ath-cores-tinta" title="Cor da caneta ou marca-texto">
+            <!-- Bolinhas de Cor Rápidas -->
+            <div class="ath-cores-tinta" title="Cor da caneta, linha reta, marca-texto ou nota">
               ${['#314F79', '#DC2626', '#059669', '#D97706', '#7C3AED', '#FACC15'].map(cor => `
                 <button type="button" class="ath-cor-dot ${this.corTinta === cor ? 'on' : ''}" data-cor="${cor}" style="background:${cor};" aria-label="Cor ${cor}"></button>
               `).join('')}
             </div>
 
-            <!-- Paginador e Zoom à Direita da Barra Flutuante -->
-            <div style="margin-left:auto; display:flex; align-items:center; gap:5px;">
-              <button type="button" class="rm-ic-bt" id="athPdfPagAnt" title="Página Anterior" ${this.paginaAtual <= 1 ? 'disabled' : ''} style="width:30px; height:30px;">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m15 18-6-6 6-6"/></svg>
-              </button>
-              <span style="font:800 11.5px var(--glx-font); color:#1F2733; min-width:48px; text-align:center;">${this.paginaAtual} / ${totalPags}</span>
-              <button type="button" class="rm-ic-bt" id="athPdfPagProx" title="Próxima Página" ${this.paginaAtual >= totalPags ? 'disabled' : ''} style="width:30px; height:30px;">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m9 18 6-6-6-6"/></svg>
-              </button>
-              <button type="button" class="rm-ic-bt" id="athPdfNovaPag" data-tip="Folha Extra" title="Adicionar folha extra de esquemas/notas ao PDF" style="width:30px; height:30px;">
+            <!-- Botão de Adicionar Folha Extra e Indicador de Página à Direita -->
+            <div style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+              <span id="athIndicadorPagBarra" style="font:800 11.5px var(--glx-font); color:#314F79; background:#EEF4FA; padding:4px 10px; border-radius:999px;">
+                Pág. ${this.paginaAtual} de ${totalPags}
+              </span>
+              <button type="button" class="rm-ic-bt" id="athPdfNovaPag" data-tip="Folha Extra" title="Adicionar folha extra de esquemas/notas ao final do PDF" style="width:32px; height:32px;">
                 ${svgIcone('mais', 14)}
               </button>
             </div>
           </div>
 
-          <!-- PALCO CENTRAL DE FOLHA A4 (.rm-prev-palco) -->
+          <!-- PALCO CENTRAL COM TODAS AS PÁGINAS EMPILHADAS (.rm-prev-palco) -->
           <div class="rm-prev-palco" id="athEstudioPalco">
-            <div class="ath-folha-a4 ath-pdf-folha-container" id="athPdfFolhaContainer" style="transform: scale(${this.zoomPct / 100}); transform-origin: top center;">
-              ${art.pdfBlobUrl ? `
-                <embed src="${art.pdfBlobUrl}#page=${this.paginaAtual}" type="application/pdf" class="ath-pdf-embed-nativo">
-              ` : `
-                <div class="ath-pdf-folha-texto" id="athPdfFolhaTexto">
-                  <div class="ath-pdf-folha-cabecalho">${escapeHtml(pagDados.cabecalho || '')}</div>
-                  <h2 class="ath-pdf-folha-titulo">${escapeHtml(pagDados.titulo || '')}</h2>
-                  ${pagDados.autores ? `<div class="ath-pdf-folha-autores">${escapeHtml(pagDados.autores)}</div>` : ''}
-                  <div class="ath-pdf-folha-colunas">
-                    ${(pagDados.paragrafos || []).map(p => `<p>${escapeHtml(p)}</p>`).join('')}
-                  </div>
-                  <div class="ath-pdf-folha-rodape">
-                    <span>DOI: ${escapeHtml(art.doi || '10.1000/athenes.zotero')}</span>
-                    <span>Página ${this.paginaAtual} de ${totalPags} · Google Drive (${escapeHtml(art.driveFileName || 'PDF')})</span>
-                  </div>
-                </div>
-              `}
-
-              <!-- Camada Transparente de Risco Livre e Marca-Texto (Samsung Notes Canvas) -->
-              <canvas id="athPdfInkCanvas" class="ath-pdf-ink-canvas" width="794" height="1123" style="pointer-events: ${this.ferramentaAtiva === 'cursor' ? 'none' : 'auto'}; cursor: ${this.ferramentaAtiva === 'cursor' ? 'text' : 'crosshair'};"></canvas>
-
-              <!-- Camada de Pinos / Balões de Notificação na Página -->
-              <div class="ath-pdf-pins-layer" id="athPdfPinsLayer">
-                ${pinsDaPagina.map((pin, idx) => `
-                  <div class="ath-pdf-pin-balao" style="left:${pin.xPct}%; top:${pin.yPct}%; border-color:${escapeHtml(pin.cor || '#F59E0B')};" data-pin-id="${escapeHtml(pin.id)}">
-                    <div class="ath-pdf-pin-cab" style="background:${escapeHtml(pin.cor || '#F59E0B')};">
-                      <strong>📌 #${idx + 1} · ${escapeHtml(pin.titulo || 'Nota')}</strong>
-                      <button type="button" class="ath-pin-del" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">✕</button>
-                    </div>
-                    <div class="ath-pdf-pin-txt">${escapeHtml(pin.texto)}</div>
-                  </div>
-                `).join('')}
-              </div>
+            <!-- Pílula Contextual Flutuante ao Selecionar Texto no PDF -->
+            <div class="ath-pdf-selecao-popover" id="athPdfSelecaoPopover" hidden>
+              <button type="button" class="ath-sel-pop-btn" id="athSelBtnGrifar" title="Grifar o trecho selecionado na página">
+                <span class="ath-sel-cor-dot" style="background:#FDE047;"></span>
+                <span>Grifar Texto</span>
+              </button>
+              <button type="button" class="ath-sel-pop-btn primario" id="athSelBtnCitar" title="Salvar trecho selecionado como Citação no Zotero com página">
+                ${svgIcone('citacao', 13)}
+                <span>+ Citação Zotero</span>
+              </button>
+              <button type="button" class="ath-sel-pop-btn" id="athSelBtnNota" title="Criar uma Nota Adesiva na página com este trecho">
+                ${svgIcone('nota', 13)}
+                <span>Criar Nota</span>
+              </button>
+              <button type="button" class="ath-sel-pop-btn" id="athSelBtnCopiarAbnt" title="Copiar trecho já formatado com (AUTOR, ANO, p. X)">
+                <span>Copiar ABNT</span>
+              </button>
             </div>
+
+            <div class="ath-pdf-todas-paginas-stack" id="athPdfTodasPaginasStack"></div>
           </div>
         </section>
 
@@ -878,11 +887,17 @@ export class EstudoArtigosView {
     root.appendChild(editorEl);
     this.container.appendChild(root);
 
+    // Renderiza TODAS as páginas empilhadas no palco central
+    this.renderizarTodasAsPaginasNoPalco(root, art, paginasPdf);
+
     // Monta a Coluna Esquerda 50/50 (Artigos Zotero em cima + Páginas do PDF embaixo)
     this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, paginasPdf);
 
     // Monta Popovers de Topo
     this.configurarPopoversTopoEstudio(root, art);
+
+    // Configura o Menu Flutuante de Seleção de Texto no PDF
+    this.configurarSelecaoTextoInterativa(root, art, paginasPdf);
 
     // Eventos de Topo e Barra Flutuante
     const voltarParaCatalogo = () => {
@@ -909,13 +924,14 @@ export class EstudoArtigosView {
     root.querySelector('#athBtnSalvarDriveEZotero').addEventListener('click', (e) => acionarSalvarCompleto(e.currentTarget));
     root.querySelector('#athBtnSalvarPilula').addEventListener('click', () => acionarSalvarCompleto(root.querySelector('#athBtnSalvarDriveEZotero')));
 
-    // Desfazer último risco e limpar riscos
+    // Desfazer último risco e limpar riscos da página ativa
     root.querySelector('#athBtnDesfazerTraco').addEventListener('click', () => {
       const lista = art.fichamento?.tracosPorPagina?.[this.paginaAtual];
       if (Array.isArray(lista) && lista.length > 0) {
         lista.pop();
         salvarArtigosEstudo(this.artigos);
-        this.redesenharCanvasTinta(root.querySelector('#athPdfInkCanvas'), art);
+        const canvasAtivo = root.querySelector(`canvas[data-canvas-pag="${this.paginaAtual}"]`);
+        this.redesenharCanvasTinta(canvasAtivo, art, this.paginaAtual);
         this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, paginasPdf);
       }
     });
@@ -924,22 +940,26 @@ export class EstudoArtigosView {
       if (!art.fichamento.tracosPorPagina) art.fichamento.tracosPorPagina = {};
       art.fichamento.tracosPorPagina[this.paginaAtual] = [];
       salvarArtigosEstudo(this.artigos);
-      this.redesenharCanvasTinta(root.querySelector('#athPdfInkCanvas'), art);
+      const canvasAtivo = root.querySelector(`canvas[data-canvas-pag="${this.paginaAtual}"]`);
+      this.redesenharCanvasTinta(canvasAtivo, art, this.paginaAtual);
       this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, paginasPdf);
+    });
+
+    // Alternar Modo Linha Reta
+    const btnLinhaReta = root.querySelector('#athBtnModoLinhaReta');
+    btnLinhaReta.addEventListener('click', () => {
+      this.modoLinhaReta = !this.modoLinhaReta;
+      if (this.modoLinhaReta && (this.ferramentaAtiva === 'cursor' || this.ferramentaAtiva === 'borracha' || this.ferramentaAtiva === 'nota')) {
+        this.ferramentaAtiva = 'caneta';
+      }
+      this.atualizarEstadoFerramentasNoDom(root);
     });
 
     // Seleção de Ferramenta (Cursor, Caneta, Marca-Texto, Borracha, Nota)
     root.querySelectorAll('[data-tool]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.ferramentaAtiva = btn.dataset.tool;
-        root.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('ativo', b.dataset.tool === this.ferramentaAtiva));
-        const canvas = root.querySelector('#athPdfInkCanvas');
-        if (canvas) {
-          canvas.style.pointerEvents = this.ferramentaAtiva === 'cursor' ? 'none' : 'auto';
-          canvas.style.cursor = this.ferramentaAtiva === 'cursor' ? 'text' : 'crosshair';
-        }
-        const lbl = root.querySelector('#athLabelModoRisco');
-        if (lbl) lbl.textContent = this.rotuloFerramenta(this.ferramentaAtiva);
+        this.atualizarEstadoFerramentasNoDom(root);
       });
     });
 
@@ -952,21 +972,7 @@ export class EstudoArtigosView {
     });
 
     root.querySelector('#athBtnCapturarCitacaoPdf').addEventListener('click', () => {
-      this.capturarCitacaoDaPagina(art);
-    });
-
-    root.querySelector('#athPdfPagAnt').addEventListener('click', () => {
-      if (this.paginaAtual > 1) {
-        this.paginaAtual--;
-        this.renderizar();
-      }
-    });
-
-    root.querySelector('#athPdfPagProx').addEventListener('click', () => {
-      if (this.paginaAtual < totalPags) {
-        this.paginaAtual++;
-        this.renderizar();
-      }
+      this.abrirModalCitacaoPdf(art, { pagina: this.paginaAtual });
     });
 
     root.querySelector('#athPdfNovaPag').addEventListener('click', () => {
@@ -983,18 +989,6 @@ export class EstudoArtigosView {
       this.renderizar();
     });
 
-    // Excluir pinos de nota na página
-    root.querySelectorAll('[data-del-pin]').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        const pinId = btn.dataset.delPin;
-        const listaPins = art.fichamento.notasPagina?.[this.paginaAtual] || [];
-        art.fichamento.notasPagina[this.paginaAtual] = listaPins.filter(p => p.id !== pinId);
-        salvarArtigosEstudo(this.artigos);
-        this.renderizar();
-      });
-    });
-
     // Abas do painel lateral direito
     root.querySelectorAll('.ath-estudio-aba').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1004,9 +998,569 @@ export class EstudoArtigosView {
       });
     });
 
-    // Inicializa Canvas de Risco Livre e Inspetor Direito
-    this.inicializarCanvasTinta(root.querySelector('#athPdfInkCanvas'), art);
+    // Renderiza Inspetor Direito
     this.renderizarPainelDireitoEstudio(root.querySelector('#athEstudioPainelCorpo'), art);
+
+    // Restaura rolagem do palco se houver
+    const palcoNovo = root.querySelector('#athEstudioPalco');
+    if (palcoNovo && scrollSalvo > 0) {
+      palcoNovo.scrollTop = scrollSalvo;
+    }
+  }
+
+  atualizarEstadoFerramentasNoDom(root) {
+    root.querySelectorAll('[data-tool]').forEach(b => {
+      b.classList.toggle('ativo', b.dataset.tool === this.ferramentaAtiva);
+    });
+    const btnReta = root.querySelector('#athBtnModoLinhaReta');
+    if (btnReta) {
+      btnReta.classList.toggle('ativo', this.modoLinhaReta);
+      btnReta.setAttribute('aria-pressed', this.modoLinhaReta ? 'true' : 'false');
+    }
+    root.querySelectorAll('.ath-pdf-ink-canvas').forEach(canvas => {
+      canvas.style.pointerEvents = this.ferramentaAtiva === 'cursor' ? 'none' : 'auto';
+      canvas.style.cursor = this.ferramentaAtiva === 'cursor' ? 'text' : 'crosshair';
+    });
+    const lbl = root.querySelector('#athLabelModoRisco');
+    if (lbl) {
+      lbl.textContent = `${this.rotuloFerramenta(this.ferramentaAtiva)}${this.modoLinhaReta && (this.ferramentaAtiva === 'caneta' || this.ferramentaAtiva === 'marcatexto') ? ' (Linha Reta)' : ''}`;
+    }
+  }
+
+  /* ==========================================================================
+     RENDERIZAÇÃO DE TODAS AS PÁGINAS EMPILHADAS NO PALCO CENTRAL
+     ========================================================================== */
+  renderizarTodasAsPaginasNoPalco(root, art, paginasPdf) {
+    const stack = root.querySelector('#athPdfTodasPaginasStack');
+    if (!stack) return;
+    stack.innerHTML = '';
+
+    const totalPags = paginasPdf.length;
+
+    paginasPdf.forEach((pagDados, idx) => {
+      const numPag = idx + 1;
+      const pinsDaPagina = art.fichamento.notasPagina?.[numPag] || [];
+      const isPagAtiva = numPag === this.paginaAtual;
+
+      const folhaWrap = document.createElement('div');
+      folhaWrap.className = 'ath-pdf-pagina-bloco-wrap';
+      folhaWrap.dataset.wrapPagina = String(numPag);
+
+      folhaWrap.innerHTML = `
+        <div class="ath-pdf-etiqueta-pagina ${isPagAtiva ? 'ativa' : ''}" data-etiqueta-pag="${numPag}">
+          <span>Página ${numPag} de ${totalPags} — ${escapeHtml((pagDados.titulo || 'Folha do Artigo').slice(0, 65))}</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button type="button" class="ath-btn-mini-folha" data-add-nota-pag="${numPag}" title="Adicionar Nota Adesiva nesta página">
+              ${svgIcone('nota', 12)} + Nota
+            </button>
+            <button type="button" class="ath-btn-mini-folha" data-add-cit-pag="${numPag}" title="Registrar Citação desta página">
+              ${svgIcone('citacao', 12)} + Citação
+            </button>
+          </div>
+        </div>
+
+        <div class="ath-folha-a4 ath-pdf-folha-container ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" style="transform: scale(${this.zoomPct / 100}); transform-origin: top center;">
+          ${art.pdfBlobUrl && numPag === 1 ? `
+            <embed src="${art.pdfBlobUrl}" type="application/pdf" class="ath-pdf-embed-nativo">
+          ` : `
+            <div class="ath-pdf-folha-texto" data-texto-pag="${numPag}">
+              <div class="ath-pdf-folha-cabecalho">${escapeHtml(pagDados.cabecalho || '')}</div>
+              <h2 class="ath-pdf-folha-titulo">${escapeHtml(pagDados.titulo || '')}</h2>
+              ${pagDados.autores ? `<div class="ath-pdf-folha-autores">${escapeHtml(pagDados.autores)}</div>` : ''}
+              <div class="ath-pdf-folha-colunas" data-colunas-pag="${numPag}">
+                ${pagDados.htmlGrifado
+                  ? sanitizarHtmlEditorial(pagDados.htmlGrifado)
+                  : (pagDados.paragrafos || []).map(p => `<p>${escapeHtml(p)}</p>`).join('')}
+              </div>
+              <div class="ath-pdf-folha-rodape">
+                <span>DOI: ${escapeHtml(art.doi || '10.1000/athenes.zotero')}</span>
+                <span>Página ${numPag} de ${totalPags} · Google Drive (${escapeHtml(art.driveFileName || 'PDF')})</span>
+              </div>
+            </div>
+          `}
+
+          <!-- Camada Transparente de Risco Livre, Linha Reta e Marca-Texto (Samsung Notes Canvas) -->
+          <canvas class="ath-pdf-ink-canvas" data-canvas-pag="${numPag}" width="794" height="1123" style="pointer-events: ${this.ferramentaAtiva === 'cursor' ? 'none' : 'auto'}; cursor: ${this.ferramentaAtiva === 'cursor' ? 'text' : 'crosshair'};"></canvas>
+
+          <!-- Camada de Notas Adesivas Editáveis na Página -->
+          <div class="ath-pdf-pins-layer" data-pins-pag="${numPag}"></div>
+        </div>
+      `;
+
+      stack.appendChild(folhaWrap);
+
+      // Renderiza as notas adesivas (pins) desta página
+      this.renderizarPinsDaPagina(folhaWrap.querySelector(`[data-pins-pag="${numPag}"]`), art, numPag, root);
+
+      // Inicializa o Canvas de Risco Livre + Linha Reta desta página
+      const canvasPag = folhaWrap.querySelector(`canvas[data-canvas-pag="${numPag}"]`);
+      this.inicializarCanvasTinta(canvasPag, art, numPag, root);
+
+      // Clicar na folha define ela como página ativa
+      const folhaContainer = folhaWrap.querySelector('.ath-pdf-folha-container');
+      folhaContainer.addEventListener('pointerdown', () => {
+        this.definirPaginaAtivaSilencioso(numPag, root);
+      });
+
+      // Botões rápidos no cabeçalho da folha (+ Nota / + Citação)
+      folhaWrap.querySelector(`[data-add-nota-pag="${numPag}"]`).addEventListener('click', () => {
+        this.definirPaginaAtivaSilencioso(numPag, root);
+        this.criarNotaAdesivaNaPagina(art, numPag, 58, 24, '', root);
+      });
+
+      folhaWrap.querySelector(`[data-add-cit-pag="${numPag}"]`).addEventListener('click', () => {
+        this.definirPaginaAtivaSilencioso(numPag, root);
+        this.abrirModalCitacaoPdf(art, { pagina: numPag });
+      });
+    });
+
+    // Atualiza página ativa conforme rolagem do palco
+    const palco = root.querySelector('#athEstudioPalco');
+    if (palco) {
+      palco.addEventListener('scroll', () => {
+        const folhas = palco.querySelectorAll('.ath-pdf-folha-container');
+        let melhorPag = this.paginaAtual;
+        let menorDist = Infinity;
+        const palcoRect = palco.getBoundingClientRect();
+        folhas.forEach(f => {
+          const r = f.getBoundingClientRect();
+          const dist = Math.abs(r.top - palcoRect.top - 40);
+          if (dist < menorDist) {
+            menorDist = dist;
+            melhorPag = parseInt(f.dataset.numPagina, 10) || 1;
+          }
+        });
+        if (melhorPag !== this.paginaAtual) {
+          this.definirPaginaAtivaSilencioso(melhorPag, root);
+        }
+      }, { passive: true });
+    }
+  }
+
+  definirPaginaAtivaSilencioso(numPag, root) {
+    if (this.paginaAtual === numPag) return;
+    this.paginaAtual = numPag;
+    if (!root) return;
+    const totalPags = this.artigoAberto?.conteudoPaginasPdf?.length || 1;
+    const indBarra = root.querySelector('#athIndicadorPagBarra');
+    if (indBarra) indBarra.textContent = `Pág. ${numPag} de ${totalPags}`;
+
+    root.querySelectorAll('.ath-pdf-folha-container').forEach(el => {
+      el.classList.toggle('pagina-ativa', parseInt(el.dataset.numPagina, 10) === numPag);
+    });
+    root.querySelectorAll('.ath-pdf-etiqueta-pagina').forEach(el => {
+      el.classList.toggle('ativa', parseInt(el.dataset.etiquetaPag, 10) === numPag);
+    });
+    root.querySelectorAll('[data-ir-pagina-esq]').forEach(li => {
+      li.classList.toggle('sel', parseInt(li.dataset.irPaginaEsq, 10) === numPag);
+    });
+  }
+
+  rolarParaPagina(numPag, root) {
+    this.definirPaginaAtivaSilencioso(numPag, root);
+    const wrapPag = root?.querySelector(`[data-wrap-pagina="${numPag}"]`);
+    if (wrapPag && wrapPag.scrollIntoView) {
+      try {
+        wrapPag.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (_) {}
+    }
+  }
+
+  /* ==========================================================================
+     PAINEL DE NOTAS ADESIVAS EDITÁVEIS NA FOLHA (SEM WINDOW.PROMPT)
+     ========================================================================== */
+  criarNotaAdesivaNaPagina(art, numPag, xPct = 60, yPct = 25, textoInicial = '', root = null) {
+    const perfil = obterPerfilColaborador();
+    if (!art.fichamento.notasPagina) art.fichamento.notasPagina = {};
+    if (!Array.isArray(art.fichamento.notasPagina[numPag])) {
+      art.fichamento.notasPagina[numPag] = [];
+    }
+    const novoPin = {
+      id: 'pin_' + Date.now().toString(36),
+      xPct: Math.max(4, Math.min(68, xPct)),
+      yPct: Math.max(4, Math.min(82, yPct)),
+      titulo: perfil.nome || 'Nota de Leitura',
+      texto: textoInicial || '',
+      cor: this.corTinta === '#314F79' ? '#F59E0B' : this.corTinta,
+      autor: perfil.nome || 'Autor'
+    };
+    art.fichamento.notasPagina[numPag].push(novoPin);
+    this.pinEditandoId = novoPin.id;
+    salvarArtigosEstudo(this.artigos);
+
+    if (root) {
+      const layer = root.querySelector(`[data-pins-pag="${numPag}"]`);
+      this.renderizarPinsDaPagina(layer, art, numPag, root);
+      this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
+    } else {
+      this.renderizar();
+    }
+  }
+
+  renderizarPinsDaPagina(layerEl, art, numPag, root) {
+    if (!layerEl) return;
+    layerEl.innerHTML = '';
+
+    const pins = art.fichamento.notasPagina?.[numPag] || [];
+    const coresNota = ['#F59E0B', '#314F79', '#059669', '#DC2626', '#7C3AED', '#0284C7'];
+
+    pins.forEach((pin, idx) => {
+      const estaEditando = this.pinEditandoId === pin.id;
+      const card = document.createElement('div');
+      card.className = `ath-pdf-pin-balao ${estaEditando ? 'editando' : ''}`;
+      card.style.left = `${pin.xPct}%`;
+      card.style.top = `${pin.yPct}%`;
+      card.style.borderColor = pin.cor || '#F59E0B';
+      card.dataset.pinId = pin.id;
+
+      if (estaEditando) {
+        card.innerHTML = `
+          <div class="ath-pdf-pin-cab" style="background:${escapeHtml(pin.cor || '#F59E0B')};">
+            <strong>📌 Editar Nota #${idx + 1} (Pág. ${numPag})</strong>
+            <button type="button" class="ath-pin-del" data-fechar-edicao-pin="${escapeHtml(pin.id)}" title="Fechar edição">✕</button>
+          </div>
+          <div class="ath-pdf-pin-form">
+            <input type="text" class="ath-pin-input-titulo" value="${escapeHtml(pin.titulo || '')}" placeholder="Título da nota...">
+            <textarea class="ath-pin-textarea" rows="3" placeholder="Escreva sua anotação, crítica ou lembrete aqui...">${escapeHtml(pin.texto || '')}</textarea>
+            <div class="ath-pin-form-rodape">
+              <div class="ath-pin-cores">
+                ${coresNota.map(c => `
+                  <button type="button" class="ath-pin-cor-dot ${(pin.cor || '#F59E0B') === c ? 'on' : ''}" data-cor-pin="${c}" style="background:${c};" title="Cor ${c}"></button>
+                `).join('')}
+              </div>
+              <div style="display:flex; gap:5px;">
+                <button type="button" class="ath-pin-btn-excluir" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">Excluir</button>
+                <button type="button" class="ath-pin-btn-salvar" data-salvar-pin="${escapeHtml(pin.id)}">Salvar</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const inputTit = card.querySelector('.ath-pin-input-titulo');
+        const txtArea = card.querySelector('.ath-pin-textarea');
+
+        card.querySelectorAll('[data-cor-pin]').forEach(dot => {
+          dot.addEventListener('click', e => {
+            e.stopPropagation();
+            pin.cor = dot.dataset.corPin;
+            salvarArtigosEstudo(this.artigos);
+            this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+          });
+        });
+
+        const salvarEdicaoPin = () => {
+          pin.titulo = inputTit.value.trim() || 'Nota';
+          pin.texto = txtArea.value.trim() || 'Anotação na página';
+          this.pinEditandoId = null;
+          salvarArtigosEstudo(this.artigos);
+          this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+          this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
+        };
+
+        card.querySelector('[data-salvar-pin]').addEventListener('click', e => {
+          e.stopPropagation();
+          salvarEdicaoPin();
+        });
+
+        card.querySelector('[data-fechar-edicao-pin]').addEventListener('click', e => {
+          e.stopPropagation();
+          salvarEdicaoPin();
+        });
+
+        card.querySelector('[data-del-pin]').addEventListener('click', e => {
+          e.stopPropagation();
+          art.fichamento.notasPagina[numPag] = pins.filter(p => p.id !== pin.id);
+          this.pinEditandoId = null;
+          salvarArtigosEstudo(this.artigos);
+          this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+          this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
+        });
+
+        setTimeout(() => txtArea?.focus(), 20);
+      } else {
+        card.innerHTML = `
+          <div class="ath-pdf-pin-cab ath-pin-arrastavel" style="background:${escapeHtml(pin.cor || '#F59E0B')};" title="Arraste para mover ou clique para editar">
+            <strong>📌 #${idx + 1} · ${escapeHtml(pin.titulo || 'Nota')}</strong>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <button type="button" class="ath-pin-edit-btn" data-abrir-edicao-pin="${escapeHtml(pin.id)}" title="Editar esta nota">✎</button>
+              <button type="button" class="ath-pin-del" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">✕</button>
+            </div>
+          </div>
+          <div class="ath-pdf-pin-txt" data-abrir-edicao-pin="${escapeHtml(pin.id)}" title="Clique para editar o texto desta nota">
+            ${escapeHtml(pin.texto || 'Clique para escrever na nota...')}
+          </div>
+        `;
+
+        // Clicar no texto ou no ícone de lápis abre a edição inline da nota
+        card.querySelectorAll('[data-abrir-edicao-pin]').forEach(el => {
+          el.addEventListener('click', e => {
+            e.stopPropagation();
+            this.pinEditandoId = pin.id;
+            this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+          });
+        });
+
+        card.querySelector('[data-del-pin]').addEventListener('click', e => {
+          e.stopPropagation();
+          art.fichamento.notasPagina[numPag] = pins.filter(p => p.id !== pin.id);
+          salvarArtigosEstudo(this.artigos);
+          this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+          this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
+        });
+
+        // Permite arrastar o cabeçalho do balão de nota para reposicionar na página
+        const cab = card.querySelector('.ath-pin-arrastavel');
+        cab.addEventListener('pointerdown', ev => {
+          if (ev.target.closest('button')) return;
+          ev.stopPropagation();
+          const rectLayer = layerEl.getBoundingClientRect();
+          const startX = ev.clientX;
+          const startY = ev.clientY;
+          const origXPct = pin.xPct;
+          const origYPct = pin.yPct;
+          let moveu = false;
+
+          const onMove = (mev) => {
+            const dx = mev.clientX - startX;
+            const dy = mev.clientY - startY;
+            if (Math.hypot(dx, dy) > 4) moveu = true;
+            pin.xPct = Math.max(2, Math.min(72, Math.round(origXPct + (dx / rectLayer.width) * 100)));
+            pin.yPct = Math.max(2, Math.min(88, Math.round(origYPct + (dy / rectLayer.height) * 100)));
+            card.style.left = `${pin.xPct}%`;
+            card.style.top = `${pin.yPct}%`;
+          };
+
+          const onUp = () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            if (moveu) {
+              salvarArtigosEstudo(this.artigos);
+            } else {
+              this.pinEditandoId = pin.id;
+              this.renderizarPinsDaPagina(layerEl, art, numPag, root);
+            }
+          };
+
+          window.addEventListener('pointermove', onMove);
+          window.addEventListener('pointerup', onUp);
+        });
+      }
+
+      layerEl.appendChild(card);
+    });
+  }
+
+  /* ==========================================================================
+     SELEÇÃO DE TEXTO INTERATIVA (GRIFAR TRECHO, CITAR NO ZOTERO, CRIAR NOTA)
+     ========================================================================== */
+  configurarSelecaoTextoInterativa(root, art, paginasPdf) {
+    const palco = root.querySelector('#athEstudioPalco');
+    const popSel = root.querySelector('#athPdfSelecaoPopover');
+    if (!palco || !popSel) return;
+
+    let ultimaSelecao = null; // { texto, numPag, range }
+
+    const verificarSelecaoTexto = () => {
+      const sel = typeof window !== 'undefined' && window.getSelection ? window.getSelection() : null;
+      if (!sel || sel.isCollapsed || !sel.rangeCount) {
+        popSel.hidden = true;
+        return;
+      }
+      const texto = sel.toString().trim();
+      if (texto.length < 2) {
+        popSel.hidden = true;
+        return;
+      }
+
+      const range = sel.getRangeAt(0);
+      const containerEl = range.commonAncestorContainer.nodeType === 1
+        ? range.commonAncestorContainer
+        : range.commonAncestorContainer.parentElement;
+      const folhaTextoEl = containerEl?.closest?.('.ath-pdf-folha-texto');
+      if (!folhaTextoEl) {
+        popSel.hidden = true;
+        return;
+      }
+
+      const numPag = parseInt(folhaTextoEl.dataset.textoPag, 10) || 1;
+      this.definirPaginaAtivaSilencioso(numPag, root);
+      ultimaSelecao = {
+        texto,
+        numPag,
+        range: range.cloneRange(),
+        folhaTextoEl
+      };
+
+      const rectSel = range.getBoundingClientRect();
+      const rectPalco = palco.getBoundingClientRect();
+      const top = Math.max(8, (rectSel.top - rectPalco.top) + palco.scrollTop - 46);
+      const left = Math.max(16, Math.min(palco.clientWidth - 360, (rectSel.left - rectPalco.left) + (rectSel.width / 2) - 160));
+
+      popSel.style.top = `${Math.round(top)}px`;
+      popSel.style.left = `${Math.round(left)}px`;
+      popSel.hidden = false;
+    };
+
+    palco.addEventListener('mouseup', () => setTimeout(verificarSelecaoTexto, 20));
+    palco.addEventListener('keyup', () => setTimeout(verificarSelecaoTexto, 20));
+
+    // 1. Grifar Trecho no Texto (<mark>)
+    popSel.querySelector('#athSelBtnGrifar').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!ultimaSelecao) return;
+      try {
+        const mark = document.createElement('mark');
+        mark.className = 'ath-pdf-grifo-texto';
+        mark.style.backgroundColor = this.corTinta === '#314F79' ? '#FEF08A' : `${this.corTinta}44`;
+        ultimaSelecao.range.surroundContents(mark);
+        const colEl = ultimaSelecao.folhaTextoEl.querySelector(`[data-colunas-pag="${ultimaSelecao.numPag}"]`);
+        if (colEl && paginasPdf[ultimaSelecao.numPag - 1]) {
+          paginasPdf[ultimaSelecao.numPag - 1].htmlGrifado = colEl.innerHTML;
+          salvarArtigosEstudo(this.artigos);
+        }
+      } catch (_) {
+        // Caso a seleção cruze múltiplos parágrafos, registra também como destaque nas citações
+        this.abrirModalCitacaoPdf(art, {
+          pagina: ultimaSelecao.numPag,
+          texto: ultimaSelecao.texto,
+          comentario: 'Trecho grifado na leitura'
+        });
+      }
+      window.getSelection()?.removeAllRanges();
+      popSel.hidden = true;
+    });
+
+    // 2. + Citação Zotero (abre modal elegante preenchido com o trecho e a página)
+    popSel.querySelector('#athSelBtnCitar').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!ultimaSelecao) return;
+      const { texto, numPag } = ultimaSelecao;
+      popSel.hidden = true;
+      window.getSelection()?.removeAllRanges();
+      this.abrirModalCitacaoPdf(art, { pagina: numPag, texto });
+    });
+
+    // 3. Criar Nota Adesiva na página com o trecho selecionado
+    popSel.querySelector('#athSelBtnNota').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!ultimaSelecao) return;
+      const { texto, numPag } = ultimaSelecao;
+      popSel.hidden = true;
+      window.getSelection()?.removeAllRanges();
+      this.criarNotaAdesivaNaPagina(art, numPag, 58, 28, `"${texto.slice(0, 140)}"`, root);
+    });
+
+    // 4. Copiar ABNT direto
+    popSel.querySelector('#athSelBtnCopiarAbnt').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!ultimaSelecao) return;
+      const formatada = `"${ultimaSelecao.texto}" ${formatarCitacaoAbntDoArtigo(art, ultimaSelecao.numPag)}`;
+      navigator.clipboard?.writeText(formatada);
+      const btn = popSel.querySelector('#athSelBtnCopiarAbnt span');
+      if (btn) {
+        btn.textContent = 'Copiado ✓';
+        setTimeout(() => {
+          btn.textContent = 'Copiar ABNT';
+          popSel.hidden = true;
+        }, 900);
+      }
+    });
+  }
+
+  /* ==========================================================================
+     MODAL ELEGANTE PARA CRIAR OU EDITAR CITAÇÃO DO PDF (SEM WINDOW.PROMPT)
+     ========================================================================== */
+  abrirModalCitacaoPdf(art, dadosIniciais = {}) {
+    const editandoId = dadosIniciais.id || null;
+    const paginaInicial = dadosIniciais.pagina || this.paginaAtual || 1;
+    const textoInicial = dadosIniciais.texto || '';
+    const comentarioInicial = dadosIniciais.comentario || '';
+    const corInicial = dadosIniciais.cor || this.corTinta || '#314F79';
+
+    const modal = document.createElement('div');
+    modal.className = 'ath-modal-backdrop';
+    modal.innerHTML = `
+      <div class="ath-modal" style="max-width:520px;">
+        <div class="ath-modal-head">
+          <h2>${editandoId ? 'Editar Citação do Fichamento' : 'Guardar Citação Direta no Zotero'}</h2>
+          <button type="button" class="ath-btn ath-btn-icon" id="athModalCitFechar">${svgIcone('fechar', 16)}</button>
+        </div>
+        <div class="ath-modal-corpo">
+          <div class="ath-linha2">
+            <div class="ath-prop-grupo">
+              <label>Página do PDF</label>
+              <input type="number" min="1" class="ath-input" id="athModalCitPagina" value="${escapeHtml(paginaInicial)}">
+            </div>
+            <div class="ath-prop-grupo">
+              <label>Referência Gerada (ABNT)</label>
+              <input type="text" class="ath-input" id="athModalCitPreviewAbnt" value="${escapeHtml(formatarCitacaoAbntDoArtigo(art, paginaInicial))}" readonly style="background:#F8FAFC; font-weight:700; color:#314F79;">
+            </div>
+          </div>
+
+          <div class="ath-prop-grupo">
+            <label>Trecho Citado do Artigo</label>
+            <textarea class="ath-input" id="athModalCitTexto" rows="4" placeholder="Cole ou digite o trecho exato do artigo...">${escapeHtml(textoInicial)}</textarea>
+          </div>
+
+          <div class="ath-prop-grupo">
+            <label>Sua Nota / Onde Usar no Seu Artigo (Opcional)</label>
+            <input type="text" class="ath-input" id="athModalCitComentario" value="${escapeHtml(comentarioInicial)}" placeholder="Ex.: Usar na seção de Metodologia para fundamentar...">
+          </div>
+        </div>
+        <div class="ath-modal-foot">
+          <button type="button" class="ath-btn" id="athModalCitCancelar">Cancelar</button>
+          <button type="button" class="ath-btn ath-btn-primary" id="athModalCitSalvar">
+            ${svgIcone('salvar', 14)} ${editandoId ? 'Salvar Alterações' : 'Salvar Citação no Fichamento'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    const fechar = () => modal.remove();
+    modal.querySelector('#athModalCitFechar').addEventListener('click', fechar);
+    modal.querySelector('#athModalCitCancelar').addEventListener('click', fechar);
+    modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+
+    const inputPag = modal.querySelector('#athModalCitPagina');
+    const previewAbnt = modal.querySelector('#athModalCitPreviewAbnt');
+    inputPag.addEventListener('input', () => {
+      previewAbnt.value = formatarCitacaoAbntDoArtigo(art, parseInt(inputPag.value, 10) || 1);
+    });
+
+    modal.querySelector('#athModalCitSalvar').addEventListener('click', () => {
+      const txt = modal.querySelector('#athModalCitTexto').value.trim();
+      if (!txt) return;
+      const pag = parseInt(inputPag.value, 10) || 1;
+      const com = modal.querySelector('#athModalCitComentario').value.trim();
+
+      if (!Array.isArray(art.fichamento.citacoesMarcadas)) {
+        art.fichamento.citacoesMarcadas = [];
+      }
+
+      if (editandoId) {
+        const alvo = art.fichamento.citacoesMarcadas.find(x => x.id === editandoId);
+        if (alvo) {
+          alvo.pagina = pag;
+          alvo.texto = txt;
+          alvo.comentario = com;
+        }
+      } else {
+        art.fichamento.citacoesMarcadas.unshift({
+          id: 'cit_' + Date.now().toString(36),
+          pagina: pag,
+          texto: txt,
+          comentario: com,
+          cor: corInicial,
+          criadoEm: new Date().toISOString()
+        });
+      }
+
+      salvarArtigosEstudo(this.artigos);
+      this.abaDireita = 'citacoes';
+      fechar();
+      this.renderizar();
+    });
   }
 
   adicionarFolhaExtraNoPdf(art, paginasPdf) {
@@ -1015,19 +1569,22 @@ export class EstudoArtigosView {
       numero: novoNum,
       cabecalho: `${art.titulo.slice(0, 55)} · Folha de Anotações Manuscritas #${novoNum}`,
       titulo: `FOLHA DE RASCUNHO E ESQUEMAS VISUAIS (PÁGINA ${novoNum})`,
-      autores: 'Espaço livre estilo Samsung Notes para esquemas, mapas mentais e fórmulas sobre o artigo',
+      autores: 'Espaço livre estilo Samsung Notes para esquemas, mapas mentais e linhas retas sobre o artigo',
       paragrafos: [
-        'Use a Caneta ou Marca-texto acima para desenhar esquemas ou fixar balões de anotação nesta folha complementar.'
+        'Use a Caneta, o Modo Linha Reta ou as Notas Adesivas acima para desenhar esquemas e fixar lembretes nesta folha complementar.'
       ]
     });
     art.totalPaginas = paginasPdf.length;
     this.paginaAtual = novoNum;
     salvarArtigosEstudo(this.artigos);
     this.renderizar();
+    requestAnimationFrame(() => {
+      this.rolarParaPagina(novoNum, this.container);
+    });
   }
 
   /* ==========================================================================
-     COLUNA ESQUERDA 50/50 (ARTIGOS DA COLEÇÃO ZOTERO + PÁGINAS DO PDF)
+     COLUNA ESQUERDA 50/50 COM .rm-card-meio-a-meio (IDÊNTICA À ESCRITA)
      ========================================================================== */
   renderizarColunaEsquerdaEstudio(colEsq, artAtivo, paginasPdf) {
     if (!colEsq) return;
@@ -1038,56 +1595,65 @@ export class EstudoArtigosView {
     });
 
     colEsq.innerHTML = `
-      <!-- METADE SUPERIOR: ARTIGOS DA BIBLIOTECA ZOTERO -->
-      <div class="rm-sec rm-painel-metade">
-        <div class="rm-painel-metade-topo">
-          <strong class="rm-rot" style="color:var(--glx-primary, #314F79);">ARTIGOS DO ZOTERO (${this.artigos.length})</strong>
-          <div style="display:flex; gap:4px;">
-            <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athEsqBtnSyncZotero" title="Sincronizar com Zotero API" style="height:24px; padding:0 8px; font-size:10.5px;">
-              ${svgIcone('zotero', 11)} Sync
-            </button>
-            <button type="button" class="glx-btn glx-btn-primary glx-btn-xs" id="athEsqBtnNovoArtigo" title="Vincular novo artigo" style="height:24px; padding:0 8px; font-size:10.5px;">
-              + Artigo
-            </button>
+      <!-- METADE SUPERIOR (50%): ARTIGOS DO ZOTERO -->
+      <div class="rm-card-meio-a-meio">
+        <div class="rm-card-meio-a-meio-topo">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:8px;">
+            <strong style="font:800 11.5px var(--glx-font); color:var(--glx-muted, #6B7585); text-transform:uppercase; letter-spacing:.06em;">
+              Artigos do Zotero <span class="rm-contagem">(${this.artigos.length})</span>
+            </strong>
+            <div style="display:flex; gap:4px;">
+              <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athEsqBtnSyncZotero" title="Sincronizar com Zotero API" style="height:24px; padding:0 8px; font-size:10.5px;">
+                ${svgIcone('zotero', 11)} Sync
+              </button>
+              <button type="button" class="glx-btn glx-btn-primary glx-btn-xs" id="athEsqBtnNovoArtigo" title="Vincular novo artigo" style="height:24px; padding:0 8px; font-size:10.5px;">
+                + Artigo
+              </button>
+            </div>
+          </div>
+          <div style="margin-bottom:8px;">
+            <input type="search" id="athInputFiltroEsqArtigos" value="${escapeHtml(this.filtroLateralEsq)}" placeholder="Filtrar artigos da biblioteca..." style="height:32px; font-size:11.5px;">
           </div>
         </div>
 
-        <div class="rm-painel-metade-sub">
-          <input type="search" id="athInputFiltroEsqArtigos" value="${escapeHtml(this.filtroLateralEsq)}" placeholder="Filtrar artigos da biblioteca..." style="height:30px; font-size:11.5px;">
-        </div>
-
-        <div class="rm-painel-metade-scroll">
-          <div class="rm-lista-mestras">
-            ${artigosFiltrados.map((item, idx) => {
-              const isAtivo = item.id === artAtivo.id;
-              const qtdCit = item.fichamento?.citacoesMarcadas?.length || 0;
-              return `
-                <div class="rm-mestra-card ${isAtivo ? 'ativa' : ''}" data-abrir-artigo-esq="${escapeHtml(item.id)}">
-                  <div class="rm-mestra-card-topo">
-                    <span class="rm-mestra-num">${idx + 1}</span>
-                    <strong class="rm-mestra-nome" title="${escapeHtml(item.titulo)}">${escapeHtml(item.titulo)}</strong>
-                  </div>
-                  <div class="rm-mestra-card-meta">
-                    <span class="rm-mestra-badge progressiva">${escapeHtml(formatarCitacaoAbntDoArtigo(item))}</span>
-                    <span class="rm-mestra-orient">${qtdCit} citaç${qtdCit === 1 ? 'ão' : 'ões'}</span>
-                  </div>
+        <div class="rm-card-meio-a-meio-corpo">
+          ${artigosFiltrados.map((item, idx) => {
+            const isAtivo = item.id === artAtivo.id;
+            const qtdCit = item.fichamento?.citacoesMarcadas?.length || 0;
+            return `
+              <div class="rm-mestra-card ${isAtivo ? 'sel' : ''}" data-abrir-artigo-esq="${escapeHtml(item.id)}" style="display:flex; flex-direction:column; gap:4px; padding:8px 10px; border-radius:10px; border:1.5px solid ${isAtivo ? 'var(--ath-primary, #314F79)' : '#E2E8F0'}; background:${isAtivo ? '#EEF4FA' : '#FFFFFF'}; cursor:pointer; flex-shrink:0;">
+                <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                  <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:${isAtivo ? '#314F79' : '#E2E8F0'}; color:${isAtivo ? '#fff' : '#475569'}; font:800 10.5px var(--glx-font); flex:none;">
+                    ${idx + 1}
+                  </span>
+                  <strong style="font-size:12px; font-weight:800; color:#1F2733; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="${escapeHtml(item.titulo)}">
+                    ${escapeHtml(item.titulo)}
+                  </strong>
                 </div>
-              `;
-            }).join('')}
-          </div>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:2px;">
+                  <span class="rm-selo" style="font-size:9.5px; padding:2px 7px;">${escapeHtml(formatarCitacaoAbntDoArtigo(item))}</span>
+                  <span style="font-size:10.5px; color:#314F79; font-weight:700;">${qtdCit} citaç${qtdCit === 1 ? 'ão' : 'ões'}</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
 
-      <!-- METADE INFERIOR: PÁGINAS DO PDF & CAMADAS DE RISCO -->
-      <div class="rm-sec rm-painel-metade">
-        <div class="rm-painel-metade-topo">
-          <strong class="rm-rot">PÁGINAS DO PDF (${paginasPdf.length})</strong>
-          <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athEsqBtnNovaFolha" style="height:24px; padding:0 8px; font-size:10.5px;">
-            + Folha Extra
-          </button>
+      <!-- METADE INFERIOR (50%): PÁGINAS DO PDF & MARCAÇÕES -->
+      <div class="rm-card-meio-a-meio">
+        <div class="rm-card-meio-a-meio-topo">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:8px;">
+            <strong style="font:800 11.5px var(--glx-font); color:var(--glx-muted, #6B7585); text-transform:uppercase; letter-spacing:.06em;">
+              Páginas do PDF <span class="rm-contagem">(${paginasPdf.length})</span>
+            </strong>
+            <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athEsqBtnNovaFolha" style="height:24px; padding:0 9px; font-size:10.5px;">
+              + Folha Extra
+            </button>
+          </div>
         </div>
 
-        <div class="rm-painel-metade-scroll">
+        <div class="rm-card-meio-a-meio-corpo">
           <ul class="rm-blocos">
             ${paginasPdf.map((pg, idx) => {
               const numPag = idx + 1;
@@ -1098,9 +1664,16 @@ export class EstudoArtigosView {
               return `
                 <li class="rm-bl ${isPagAtiva ? 'sel' : ''}" data-ir-pagina-esq="${numPag}">
                   <button type="button" class="rm-bl-nome">
-                    <strong>Página ${numPag} — ${escapeHtml((pg.titulo || 'Folha do Artigo').slice(0, 32))}</strong>
+                    <strong>Página ${numPag} — ${escapeHtml((pg.titulo || 'Folha do Artigo').slice(0, 30))}</strong>
                     <span>${qtdRiscos} risco(s) · ${qtdNotas} nota(s) · ${qtdCitsPag} citação(ões)</span>
                   </button>
+                  ${paginasPdf.length > 1 ? `
+                    <div class="rm-bl-acoes">
+                      <button type="button" class="rm-ic rm-ic-perigo" data-excluir-pag-pdf="${numPag}" title="Remover esta página">
+                        ${svgIcone('fechar', 11)}
+                      </button>
+                    </div>
+                  ` : ''}
                 </li>
               `;
             }).join('')}
@@ -1137,12 +1710,23 @@ export class EstudoArtigosView {
     });
 
     colEsq.querySelectorAll('[data-ir-pagina-esq]').forEach(li => {
-      li.addEventListener('click', () => {
+      li.addEventListener('click', (e) => {
+        if (e.target.closest('[data-excluir-pag-pdf]')) return;
         const pg = parseInt(li.dataset.irPaginaEsq, 10) || 1;
-        if (pg !== this.paginaAtual) {
-          this.paginaAtual = pg;
-          this.renderizar();
-        }
+        this.rolarParaPagina(pg, this.container);
+      });
+    });
+
+    colEsq.querySelectorAll('[data-excluir-pag-pdf]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (paginasPdf.length <= 1) return;
+        const pgDel = parseInt(btn.dataset.excluirPagPdf, 10);
+        artAtivo.conteudoPaginasPdf = paginasPdf.filter((_, i) => (i + 1) !== pgDel);
+        artAtivo.totalPaginas = artAtivo.conteudoPaginasPdf.length;
+        if (this.paginaAtual > artAtivo.totalPaginas) this.paginaAtual = artAtivo.totalPaginas;
+        salvarArtigosEstudo(this.artigos);
+        this.renderizar();
       });
     });
   }
@@ -1242,7 +1826,7 @@ export class EstudoArtigosView {
               <option value="10" ${this.espessuraTinta === 10 ? 'selected' : ''}>Pincel Largo (10 px)</option>
             </select>
           </label>
-          <label>Escala / Zoom da Folha PDF (${this.zoomPct}%)
+          <label>Escala / Zoom das Folhas PDF (${this.zoomPct}%)
             <div style="display:flex; gap:6px;">
               <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athZoomMenos">- 10%</button>
               <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athZoom100">100%</button>
@@ -1268,7 +1852,6 @@ export class EstudoArtigosView {
       });
     }
 
-    // Controle de abrir/fechar popovers de topo
     root.querySelectorAll('[data-menu-est]').forEach(item => {
       const btn = item.querySelector('.rm-btn-menu-topo');
       const pop = item.querySelector('.rm-topo-popover');
@@ -1296,29 +1879,30 @@ export class EstudoArtigosView {
 
   rotuloFerramenta(tool) {
     const map = {
-      cursor: 'Seleção de Texto',
-      caneta: 'Caneta de Risco Livre',
+      cursor: 'Selecionar Texto (Grifar / Citar)',
+      caneta: 'Caneta de Risco',
       marcatexto: 'Marca-Texto Translúcido',
       borracha: 'Borracha de Traços',
-      nota: 'Fixar Nota Adesiva no PDF'
+      nota: 'Fixar Nota Adesiva Editável'
     };
     return map[tool] || tool;
   }
 
   /* ==========================================================================
-     MOTOR DE TINTA DIGITAL E MARCAÇÃO EM CANVAS (ESTILO SAMSUNG NOTES)
+     MOTOR DE TINTA DIGITAL + MODO LINHA RETA EM CANVAS (POR PÁGINA)
      ========================================================================== */
-  inicializarCanvasTinta(canvas, art) {
+  inicializarCanvasTinta(canvas, art, numPag, root) {
     if (!canvas) return;
     if (!art.fichamento.tracosPorPagina) art.fichamento.tracosPorPagina = {};
-    if (!Array.isArray(art.fichamento.tracosPorPagina[this.paginaAtual])) {
-      art.fichamento.tracosPorPagina[this.paginaAtual] = [];
+    if (!Array.isArray(art.fichamento.tracosPorPagina[numPag])) {
+      art.fichamento.tracosPorPagina[numPag] = [];
     }
 
-    this.redesenharCanvasTinta(canvas, art);
+    this.redesenharCanvasTinta(canvas, art, numPag);
 
     let desenhando = false;
     let tracoAtual = null;
+    let pontoInicialReta = null;
 
     const obterPosicaoNoCanvas = (ev) => {
       const rect = canvas.getBoundingClientRect();
@@ -1327,97 +1911,108 @@ export class EstudoArtigosView {
       return {
         x: Math.round((ev.clientX - rect.left) * scaleX),
         y: Math.round((ev.clientY - rect.top) * scaleY),
-        xPct: Math.max(4, Math.min(78, Math.round(((ev.clientX - rect.left) / rect.width) * 100))),
-        yPct: Math.max(4, Math.min(88, Math.round(((ev.clientY - rect.top) / rect.height) * 100)))
+        xPct: Math.max(4, Math.min(68, Math.round(((ev.clientX - rect.left) / rect.width) * 100))),
+        yPct: Math.max(4, Math.min(82, Math.round(((ev.clientY - rect.top) / rect.height) * 100)))
       };
     };
 
     canvas.addEventListener('pointerdown', (ev) => {
       if (this.ferramentaAtiva === 'cursor') return;
+      this.definirPaginaAtivaSilencioso(numPag, root);
       const pos = obterPosicaoNoCanvas(ev);
 
+      // Se a ferramenta for "Nota Adesiva", cria o card editável diretamente no ponto clicado (sem window.prompt)
       if (this.ferramentaAtiva === 'nota') {
-        const textoNota = window.prompt
-          ? window.prompt('Texto da anotação / lembrete neste ponto do PDF:', 'Verificar este argumento / dado para citar no artigo.')
-          : 'Verificar este argumento / dado para citar no artigo.';
-        if (!textoNota) return;
-        const perfil = obterPerfilColaborador();
-        if (!art.fichamento.notasPagina) art.fichamento.notasPagina = {};
-        if (!Array.isArray(art.fichamento.notasPagina[this.paginaAtual])) {
-          art.fichamento.notasPagina[this.paginaAtual] = [];
-        }
-        art.fichamento.notasPagina[this.paginaAtual].push({
-          id: 'pin_' + Date.now().toString(36),
-          xPct: pos.xPct,
-          yPct: pos.yPct,
-          titulo: perfil.nome || 'Nota',
-          texto: textoNota,
-          cor: this.corTinta,
-          autor: perfil.nome || 'Autor'
-        });
-        salvarArtigosEstudo(this.artigos);
-        this.renderizar();
+        this.criarNotaAdesivaNaPagina(art, numPag, pos.xPct, pos.yPct, '', root);
         return;
       }
 
       if (this.ferramentaAtiva === 'borracha') {
         desenhando = true;
-        this.apagarTracosProximos(art, pos.x, pos.y);
-        this.redesenharCanvasTinta(canvas, art);
+        this.apagarTracosProximos(art, numPag, pos.x, pos.y);
+        this.redesenharCanvasTinta(canvas, art, numPag);
         return;
       }
 
+      // Caneta ou Marca-texto (livre ou Linha Reta)
       desenhando = true;
       canvas.setPointerCapture?.(ev.pointerId);
+      pontoInicialReta = { x: pos.x, y: pos.y };
       tracoAtual = {
         tipo: this.ferramentaAtiva === 'marcatexto' ? 'marcatexto' : 'caneta',
+        reta: Boolean(this.modoLinhaReta || ev.shiftKey),
         cor: this.ferramentaAtiva === 'marcatexto' && this.corTinta === '#314F79' ? '#FACC15' : this.corTinta,
         espessura: this.ferramentaAtiva === 'marcatexto' ? 18 : this.espessuraTinta,
         pontos: [{ x: pos.x, y: pos.y }]
       };
-      art.fichamento.tracosPorPagina[this.paginaAtual].push(tracoAtual);
-      this.redesenharCanvasTinta(canvas, art);
+      art.fichamento.tracosPorPagina[numPag].push(tracoAtual);
+      this.redesenharCanvasTinta(canvas, art, numPag);
     });
 
     canvas.addEventListener('pointermove', (ev) => {
       if (!desenhando) return;
       const pos = obterPosicaoNoCanvas(ev);
       if (this.ferramentaAtiva === 'borracha') {
-        this.apagarTracosProximos(art, pos.x, pos.y);
-        this.redesenharCanvasTinta(canvas, art);
+        this.apagarTracosProximos(art, numPag, pos.x, pos.y);
+        this.redesenharCanvasTinta(canvas, art, numPag);
         return;
       }
       if (!tracoAtual) return;
-      tracoAtual.pontos.push({ x: pos.x, y: pos.y });
-      this.redesenharCanvasTinta(canvas, art);
+
+      // Se Modo Linha Reta estiver ativo ou tecla Shift pressionada, desenha segmento reto com trava ortogonal (0°/90°)
+      if (this.modoLinhaReta || ev.shiftKey || tracoAtual.reta) {
+        const pFim = calcularPontoFinalLinhaReta(pontoInicialReta, pos, 6);
+        tracoAtual.pontos = [
+          { x: pontoInicialReta.x, y: pontoInicialReta.y },
+          { x: pFim.x, y: pFim.y }
+        ];
+      } else {
+        tracoAtual.pontos.push({ x: pos.x, y: pos.y });
+      }
+      this.redesenharCanvasTinta(canvas, art, numPag);
     });
 
     const finalizarTraco = () => {
       if (!desenhando) return;
       desenhando = false;
       tracoAtual = null;
+      pontoInicialReta = null;
       salvarArtigosEstudo(this.artigos);
+      if (root) {
+        this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
+      }
     };
 
     canvas.addEventListener('pointerup', finalizarTraco);
     canvas.addEventListener('pointercancel', finalizarTraco);
   }
 
-  apagarTracosProximos(art, x, y, raio = 22) {
-    const lista = art.fichamento?.tracosPorPagina?.[this.paginaAtual];
+  apagarTracosProximos(art, numPag, x, y, raio = 24) {
+    const lista = art.fichamento?.tracosPorPagina?.[numPag];
     if (!Array.isArray(lista)) return;
-    art.fichamento.tracosPorPagina[this.paginaAtual] = lista.filter(traco => {
-      return !(traco.pontos || []).some(pt => Math.hypot(pt.x - x, pt.y - y) <= raio);
+    art.fichamento.tracosPorPagina[numPag] = lista.filter(traco => {
+      const pts = traco.pontos || [];
+      if (pts.length === 2) {
+        // Verifica distância ponto-segmento para linhas retas
+        const [a, b] = pts;
+        const l2 = Math.hypot(b.x - a.x, b.y - a.y) ** 2;
+        if (l2 === 0) return Math.hypot(x - a.x, y - a.y) > raio;
+        const t = Math.max(0, Math.min(1, ((x - a.x) * (b.x - a.x) + (y - a.y) * (b.y - a.y)) / l2));
+        const projX = a.x + t * (b.x - a.x);
+        const projY = a.y + t * (b.y - a.y);
+        return Math.hypot(x - projX, y - projY) > raio;
+      }
+      return !pts.some(pt => Math.hypot(pt.x - x, pt.y - y) <= raio);
     });
   }
 
-  redesenharCanvasTinta(canvas, art) {
+  redesenharCanvasTinta(canvas, art, numPag = this.paginaAtual) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const tracos = art.fichamento?.tracosPorPagina?.[this.paginaAtual] || [];
+    const tracos = art.fichamento?.tracosPorPagina?.[numPag] || [];
     tracos.forEach(tr => {
       const pts = tr.pontos || [];
       if (pts.length === 0) return;
@@ -1440,37 +2035,6 @@ export class EstudoArtigosView {
       ctx.stroke();
       ctx.restore();
     });
-  }
-
-  capturarCitacaoDaPagina(art) {
-    const sel = typeof window !== 'undefined' && window.getSelection ? window.getSelection() : null;
-    let textoCapturado = (sel && !sel.isCollapsed) ? sel.toString().trim() : '';
-    if (!textoCapturado) {
-      textoCapturado = typeof window !== 'undefined' && window.prompt
-        ? window.prompt(`Digite ou cole o trecho citado da página ${this.paginaAtual}:`, '')
-        : '';
-    }
-    if (!textoCapturado) return;
-
-    const comentario = typeof window !== 'undefined' && window.prompt
-      ? window.prompt('Nota ou comentário sobre esta citação (opcional):', 'Citar na fundamentação teórica')
-      : '';
-
-    if (!Array.isArray(art.fichamento.citacoesMarcadas)) {
-      art.fichamento.citacoesMarcadas = [];
-    }
-    art.fichamento.citacoesMarcadas.unshift({
-      id: 'cit_' + Date.now().toString(36),
-      pagina: this.paginaAtual,
-      texto: textoCapturado,
-      comentario: comentario || '',
-      cor: this.corTinta,
-      criadoEm: new Date().toISOString()
-    });
-
-    salvarArtigosEstudo(this.artigos);
-    this.abaDireita = 'citacoes';
-    this.renderizar();
   }
 
   /* ==========================================================================
@@ -1526,19 +2090,20 @@ export class EstudoArtigosView {
         <div class="ath-fichamento-bloco">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <strong style="font-size:11.5px; color:#314F79; text-transform:uppercase;">Citações Marcadas (${citacoes.length})</strong>
-            <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnNovaCitacaoPainel">+ Marcar Citação</button>
+            <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnNovaCitacaoPainel">+ Nova Citação</button>
           </div>
 
           <div class="ath-lista-citacoes-pdf">
             ${citacoes.length === 0 ? `
               <div style="padding:20px 12px; text-align:center; color:#64748B; font-size:12px; background:#F8FAFC; border-radius:10px; border:1px dashed #CBD5E1;">
-                Selecione qualquer frase no PDF ao lado e clique em <b>+ Citação</b> para guardar o trecho com a página exata.
+                Selecione qualquer frase no PDF ao lado para abrir o menu flutuante e clique em <b>+ Citação Zotero</b>.
               </div>
             ` : citacoes.map(c => `
               <div class="ath-citacao-pdf-card" style="border-left: 4px solid ${escapeHtml(c.cor || '#314F79')};">
                 <div class="ath-citacao-pdf-topo">
-                  <span class="ath-citacao-pag-badge" data-ir-pag="${escapeHtml(c.pagina)}" title="Ir para a página ${escapeHtml(c.pagina)}">Página ${escapeHtml(c.pagina)}</span>
+                  <span class="ath-citacao-pag-badge" data-ir-pag="${escapeHtml(c.pagina)}" title="Rolar até a página ${escapeHtml(c.pagina)}">Página ${escapeHtml(c.pagina)}</span>
                   <div style="display:flex; gap:4px;">
+                    <button type="button" class="ath-btn ath-btn-sm" data-edit-cit="${escapeHtml(c.id)}" title="Editar esta citação" style="height:22px; padding:0 7px; font-size:10.5px;">✎ Editar</button>
                     <button type="button" class="ath-btn ath-btn-sm" data-copiar-cit="${escapeHtml(c.id)}" style="height:22px; padding:0 7px; font-size:10.5px;">Copiar ABNT</button>
                     <button type="button" class="ath-btn ath-btn-sm" data-del-cit="${escapeHtml(c.id)}" style="height:22px; padding:0 6px; font-size:10.5px; color:#B42318;">✕</button>
                   </div>
@@ -1553,13 +2118,20 @@ export class EstudoArtigosView {
       `;
 
       box.querySelector('#athBtnNovaCitacaoPainel').addEventListener('click', () => {
-        this.capturarCitacaoDaPagina(art);
+        this.abrirModalCitacaoPdf(art, { pagina: this.paginaAtual });
       });
 
       box.querySelectorAll('[data-ir-pag]').forEach(el => {
         el.addEventListener('click', () => {
-          this.paginaAtual = parseInt(el.dataset.irPag, 10) || 1;
-          this.renderizar();
+          const pg = parseInt(el.dataset.irPag, 10) || 1;
+          this.rolarParaPagina(pg, this.container);
+        });
+      });
+
+      box.querySelectorAll('[data-edit-cit]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const c = citacoes.find(x => x.id === btn.dataset.editCit);
+          if (c) this.abrirModalCitacaoPdf(art, c);
         });
       });
 
@@ -1752,7 +2324,6 @@ export class EstudoArtigosView {
 
     const resultados = [];
 
-    // 1. Sincroniza Nota Filha com Zotero (e cria o item bibliográfico pai caso ainda seja apenas local)
     const htmlNotaZotero = gerarHtmlNotaZoteroDoArtigo(art);
     const resZot = await this.zoteroClient.sincronizarNotaFilhaNoZotero({
       parentItemKey: art.chaveZotero,
@@ -1768,7 +2339,6 @@ export class EstudoArtigosView {
     }
     resultados.push(resZot.ok ? 'Zotero sincronizado ✓' : 'Fichamento salvo localmente ✓');
 
-    // 2. Salva na nuvem Supabase
     try {
       await salvarDocumentoNoSupabase({
         id: `artigo_${art.id}`,
@@ -1781,7 +2351,6 @@ export class EstudoArtigosView {
       resultados.push('Nuvem Supabase ✓');
     } catch (_) {}
 
-    // 3. Salva pacote de anotações no Google Drive se configurado
     const driveCfg = obterConfigGoogleDrive();
     if (driveCfg.accessToken || driveCfg.clientId) {
       try {
