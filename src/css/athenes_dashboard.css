@@ -2,24 +2,45 @@
 /* Athenes — Estilos da Área Inicial / Dashboard (Escrita + Estúdio de Artigos Zotero & PDF estilo Samsung Notes) */
 
 .ath-dashboard {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 20px 24px 36px 24px;
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  margin: 0;
+  padding: 12px 14px 24px 14px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+#athSecaoDashEscrita:not([hidden]),
+#athSecaoDashArtigosZotero:not([hidden]) {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border: 1px solid var(--ath-line, #E2E8F0);
+  border-radius: 18px;
+  padding: 20px 24px 28px 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  box-sizing: border-box;
 }
 
 /* Barra Superior: Marca + Abas (Escrita vs Artigos Zotero/PDF) + Identificação/Login */
 .ath-dash-topbar {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   background: #FFFFFF;
   border: 1px solid var(--ath-primary-line, #C8D7E6);
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 10px 18px;
-  margin-bottom: 24px;
-  box-shadow: 0 4px 16px rgba(24, 39, 75, 0.04);
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   flex-wrap: wrap;
+  box-sizing: border-box;
 }
 
 .ath-dash-brand {
@@ -934,11 +955,15 @@
 
 .ath-dashboard.ath-dashboard-estudio-full #athSecaoDashArtigosZotero,
 .ath-dashboard.ath-dashboard-estudio-full #athContainerEstudoArtigos {
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
 }
 
 .ath-estudio-full-shell .rm-editor.rm-main {
@@ -1068,10 +1093,19 @@
 
 /* Botão Modo Linha Reta Ativo */
 .rm-ic-bt.ath-btn-linha-reta.ativo {
-  background: #FEF3C7 !important;
-  border-color: #F59E0B !important;
-  color: #92400E !important;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.22);
+  background: var(--glx-primary, #314F79) !important;
+  border-color: var(--glx-primary, #314F79) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 3px 10px rgba(49, 79, 121, 0.28) !important;
+}
+
+.rm-ic-bt.ath-btn-linha-reta.ativo svg {
+  stroke: #FFFFFF !important;
+  color: #FFFFFF !important;
+}
+
+.rm-ic-bt.ath-btn-linha-reta.ativo svg circle {
+  fill: #FFFFFF !important;
 }
 
 /* Botões compactos no cabeçalho do cartão 50/50 esquerdo */
