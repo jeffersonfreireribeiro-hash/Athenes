@@ -23,12 +23,20 @@ import {
   salvarConfigGoogleDrive,
   autenticarGoogleDrive,
   salvarArquivoNoGoogleDrive,
+  listarPdfsDoGoogleDrive,
   salvarDocumentoNoSupabase
 } from '../core/athenes_colaboracao.js';
 import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 
 const STORAGE_KEY_ARTIGOS = 'athenes_estudo_artigos_v1';
+const IDS_ARTIGOS_EXEMPLO = new Set(['zot_art_01', 'zot_art_02', 'zot_art_03']);
+const CHAVES_ZOTERO_EXEMPLO = new Set(['ZOT8K2M9', 'ZOT4P9L2', 'ZOT9R3X7']);
+
+export function ehArtigoExemploFicticio(art) {
+  if (!art) return false;
+  return IDS_ARTIGOS_EXEMPLO.has(art.id) || CHAVES_ZOTERO_EXEMPLO.has(art.chaveZotero) || CHAVES_ZOTERO_EXEMPLO.has(art.chave);
+}
 
 export function criarArtigosEstudoExemplo() {
   return [
@@ -239,13 +247,35 @@ export function criarArtigosEstudoExemplo() {
   ];
 }
 
+let _timerDebounceSalvarArtigos = null;
+
 export function carregarArtigosEstudo() {
   try {
     if (typeof localStorage !== 'undefined') {
+      let temChaveZotero = false;
+      try {
+        const zCfg = JSON.parse(localStorage.getItem('athenes_zotero_cfg') || '{}');
+        temChaveZotero = Boolean(zCfg.apiKey && String(zCfg.apiKey).trim());
+      } catch (_) {}
+
       const salvo = localStorage.getItem(STORAGE_KEY_ARTIGOS);
-      if (salvo) {
+      if (salvo !== null) {
         const parsed = JSON.parse(salvo);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          if (temChaveZotero) {
+            const semExemplos = parsed.filter(a => !ehArtigoExemploFicticio(a));
+            if (semExemplos.length !== parsed.length) {
+              salvarArtigosEstudo(semExemplos);
+            }
+            return semExemplos;
+          }
+          return parsed;
+        }
+      }
+
+      if (temChaveZotero) {
+        salvarArtigosEstudo([]);
+        return [];
       }
     }
   } catch (_) {}
@@ -257,10 +287,18 @@ export function carregarArtigosEstudo() {
 export function salvarArtigosEstudo(lista) {
   try {
     if (typeof localStorage !== 'undefined') {
+      // Remove pdfBlobUrl temporário antes de serializar se necessário, preservando na memória
       localStorage.setItem(STORAGE_KEY_ARTIGOS, JSON.stringify(lista));
     }
   } catch (_) {}
   return lista;
+}
+
+export function salvarArtigosEstudoDebounced(lista, delayMs = 320) {
+  if (_timerDebounceSalvarArtigos) clearTimeout(_timerDebounceSalvarArtigos);
+  _timerDebounceSalvarArtigos = setTimeout(() => {
+    salvarArtigosEstudo(lista);
+  }, delayMs);
 }
 
 export function formatarCitacaoAbntDoArtigo(artigo, pagina = null) {
@@ -1076,25 +1114,32 @@ export class EstudoArtigosView {
       });
     });
 
-    // Atualiza página ativa conforme rolagem do palco
+    // Atualiza página ativa conforme rolagem do palco (com throttle via requestAnimationFrame)
     const palco = root.querySelector('#athEstudioPalco');
     if (palco) {
+      const folhasCache = Array.from(palco.querySelectorAll('.ath-pdf-folha-container'));
+      let scrollRafPendente = false;
       palco.addEventListener('scroll', () => {
-        const folhas = palco.querySelectorAll('.ath-pdf-folha-container');
-        let melhorPag = this.paginaAtual;
-        let menorDist = Infinity;
-        const palcoRect = palco.getBoundingClientRect();
-        folhas.forEach(f => {
-          const r = f.getBoundingClientRect();
-          const dist = Math.abs(r.top - palcoRect.top - 40);
-          if (dist < menorDist) {
-            menorDist = dist;
-            melhorPag = parseInt(f.dataset.numPagina, 10) || 1;
+        if (scrollRafPendente) return;
+        scrollRafPendente = true;
+        requestAnimationFrame(() => {
+          scrollRafPendente = false;
+          let melhorPag = this.paginaAtual;
+          let menorDist = Infinity;
+          const palcoRect = palco.getBoundingClientRect();
+          for (let i = 0; i < folhasCache.length; i++) {
+            const f = folhasCache[i];
+            const r = f.getBoundingClientRect();
+            const dist = Math.abs(r.top - palcoRect.top - 40);
+            if (dist < menorDist) {
+              menorDist = dist;
+              melhorPag = parseInt(f.dataset.numPagina, 10) || 1;
+            }
+          }
+          if (melhorPag !== this.paginaAtual) {
+            this.definirPaginaAtivaSilencioso(melhorPag, root);
           }
         });
-        if (melhorPag !== this.paginaAtual) {
-          this.definirPaginaAtivaSilencioso(melhorPag, root);
-        }
       }, { passive: true });
     }
   }
@@ -1640,7 +1685,14 @@ export class EstudoArtigosView {
       salvarArtigosEstudo(this.artigos);
       this.abaDireita = 'citacoes';
       fechar();
-      this.renderizar();
+      if (this.container) {
+        const abasDir = this.container.querySelectorAll('[data-aba-dir]');
+        abasDir.forEach(b => b.classList.toggle('ativo', b.dataset.abaDir === 'citacoes'));
+        this.renderizarPainelDireitoEstudio(this.container.querySelector('#athEstudioPainelCorpo'), art);
+        this.renderizarColunaEsquerdaEstudio(this.container.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
+      } else {
+        this.renderizar();
+      }
     });
   }
 
@@ -2013,9 +2065,20 @@ export class EstudoArtigosView {
     let desenhando = false;
     let tracoAtual = null;
     let pontoInicialReta = null;
+    let rectCache = null;
+    let rafDesenhoPendente = false;
+
+    const agendarRedesenho = () => {
+      if (rafDesenhoPendente) return;
+      rafDesenhoPendente = true;
+      requestAnimationFrame(() => {
+        rafDesenhoPendente = false;
+        this.redesenharCanvasTinta(canvas, art, numPag);
+      });
+    };
 
     const obterPosicaoNoCanvas = (ev) => {
-      const rect = canvas.getBoundingClientRect();
+      const rect = rectCache || canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
       return {
@@ -2029,6 +2092,7 @@ export class EstudoArtigosView {
     canvas.addEventListener('pointerdown', (ev) => {
       if (this.ferramentaAtiva === 'cursor') return;
       this.definirPaginaAtivaSilencioso(numPag, root);
+      rectCache = canvas.getBoundingClientRect();
       const pos = obterPosicaoNoCanvas(ev);
 
       // Se a ferramenta for "Nota Adesiva", cria o card editável diretamente no ponto clicado (sem window.prompt)
@@ -2040,7 +2104,7 @@ export class EstudoArtigosView {
       if (this.ferramentaAtiva === 'borracha') {
         desenhando = true;
         this.apagarTracosProximos(art, numPag, pos.x, pos.y);
-        this.redesenharCanvasTinta(canvas, art, numPag);
+        agendarRedesenho();
         return;
       }
 
@@ -2056,7 +2120,7 @@ export class EstudoArtigosView {
         pontos: [{ x: pos.x, y: pos.y }]
       };
       art.fichamento.tracosPorPagina[numPag].push(tracoAtual);
-      this.redesenharCanvasTinta(canvas, art, numPag);
+      agendarRedesenho();
     });
 
     canvas.addEventListener('pointermove', (ev) => {
@@ -2064,7 +2128,7 @@ export class EstudoArtigosView {
       const pos = obterPosicaoNoCanvas(ev);
       if (this.ferramentaAtiva === 'borracha') {
         this.apagarTracosProximos(art, numPag, pos.x, pos.y);
-        this.redesenharCanvasTinta(canvas, art, numPag);
+        agendarRedesenho();
         return;
       }
       if (!tracoAtual) return;
@@ -2079,7 +2143,7 @@ export class EstudoArtigosView {
       } else {
         tracoAtual.pontos.push({ x: pos.x, y: pos.y });
       }
-      this.redesenharCanvasTinta(canvas, art, numPag);
+      agendarRedesenho();
     });
 
     const finalizarTraco = () => {
@@ -2087,7 +2151,9 @@ export class EstudoArtigosView {
       desenhando = false;
       tracoAtual = null;
       pontoInicialReta = null;
-      salvarArtigosEstudo(this.artigos);
+      rectCache = null;
+      this.redesenharCanvasTinta(canvas, art, numPag);
+      salvarArtigosEstudoDebounced(this.artigos, 180);
       if (root) {
         this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
       }
@@ -2279,12 +2345,12 @@ export class EstudoArtigosView {
 
       box.querySelector('#athEstudoResumoPessoal').addEventListener('input', e => {
         f.resumoPessoal = e.target.value;
-        salvarArtigosEstudo(this.artigos);
+        salvarArtigosEstudoDebounced(this.artigos);
       });
 
       box.querySelector('#athEstudoMetodoNotas').addEventListener('input', e => {
         f.metodologiaNotas = e.target.value;
-        salvarArtigosEstudo(this.artigos);
+        salvarArtigosEstudoDebounced(this.artigos);
       });
 
       box.querySelector('#athEstudoTagsInput').addEventListener('change', e => {
@@ -2376,7 +2442,7 @@ export class EstudoArtigosView {
             ${svgIcone('zotero', 13)} Vínculo de Metadados com o Zotero
           </strong>
           <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnVincularRefExistenteZotero" style="width:100%; justify-content:center; margin-bottom:8px;">
-            ${svgIcone('zotero', 13)} 🔗 Vincular a uma Referência já existente do Zotero
+            ${svgIcone('zotero', 13)} Vincular a uma Referência já existente do Zotero
           </button>
           <label style="font-size:11px; font-weight:700; display:block; margin-bottom:6px;">Sua Zotero API Key
             <input type="text" class="ath-input" id="athDirZoteroApiKey" value="${escapeHtml(this.zoteroClient.apiKey || '')}" placeholder="Ex.: KNEYoy8RTMlkaTuHx5WPc3bH" style="margin-top:3px; height:30px; font-size:11.5px;">
@@ -2394,16 +2460,27 @@ export class EstudoArtigosView {
 
         <div style="padding:10px 12px; border-radius:12px; background:#EEF4FA; border:1px solid #C8D7E6; margin-bottom:10px;">
           <strong style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:#314F79; text-transform:uppercase; margin-bottom:6px;">
-            ${svgIcone('drive', 13)} Armazenamento do PDF no Google Drive
+            ${svgIcone('drive', 13)} Selecionar & Vincular PDF (Google Drive / Local)
           </strong>
-          <button type="button" class="ath-btn ${driveConectadoPainel ? 'ath-btn-zotero-ok' : 'ath-btn-primary'} ath-btn-sm" id="athBtnPainelConectarDrive" style="width:100%; justify-content:center; margin-bottom:8px;">
-            ${svgIcone('drive', 13)} ${driveConectadoPainel ? 'Google Drive Conectado ✓' : 'Conectar meu Google Drive (1 clique)'}
-          </button>
-          <label style="font-size:11px; font-weight:700; display:block; margin-bottom:6px;">Nome do Arquivo no Drive
-            <input type="text" class="ath-input" id="athDriveNomeArqArtigo" value="${escapeHtml(art.driveFileName || '')}" style="margin-top:3px; height:30px; font-size:11.5px;">
+          <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;">
+            <label class="ath-btn ath-btn-primary ath-btn-sm" style="width:100%; justify-content:center; cursor:pointer;">
+              ${svgIcone('upload', 13)} Selecionar Arquivo PDF (Computador / Pasta Drive)
+              <input type="file" accept=".pdf,application/pdf" id="athPainelInputArquivoPdf" style="display:none;">
+            </label>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="ath-btn ath-btn-sm" id="athBtnPainelEscolherPdfDrive" style="flex:1; justify-content:center;">
+                ${svgIcone('drive', 13)} Buscar PDF no Google Drive
+              </button>
+              <button type="button" class="ath-btn ${driveConectadoPainel ? 'ath-btn-zotero-ok' : ''} ath-btn-sm" id="athBtnPainelConectarDrive" title="Conectar conta do Google Drive">
+                ${driveConectadoPainel ? 'Drive OK ✓' : 'Conectar Drive'}
+              </button>
+            </div>
+          </div>
+          <label style="font-size:11px; font-weight:700; display:block; margin-bottom:6px;">Arquivo PDF Selecionado
+            <input type="text" class="ath-input" id="athDriveNomeArqArtigo" value="${escapeHtml(art.driveFileName || '')}" placeholder="Ex.: Silva_2026_Planejamento.pdf" style="margin-top:3px; height:30px; font-size:11.5px;">
           </label>
           <label style="font-size:11px; font-weight:700; display:block;">ID / Link do PDF no Google Drive
-            <input type="text" class="ath-input" id="athDriveIdArqArtigo" value="${escapeHtml(art.driveFileId || '')}" placeholder="Ex.: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs" style="margin-top:3px; height:30px; font-size:11.5px;">
+            <input type="text" class="ath-input" id="athDriveIdArqArtigo" value="${escapeHtml(art.driveFileId || '')}" placeholder="Preenchido ao escolher do Google Drive" style="margin-top:3px; height:30px; font-size:11.5px;">
           </label>
         </div>
 
@@ -2416,6 +2493,44 @@ export class EstudoArtigosView {
 
     box.querySelector('#athBtnVincularRefExistenteZotero').addEventListener('click', () => {
       this.abrirModalEscolherReferenciaZotero(art);
+    });
+
+    box.querySelector('#athPainelInputArquivoPdf')?.addEventListener('change', async e => {
+      const fPdf = e.target.files?.[0];
+      if (!fPdf) return;
+      art.driveFileName = fPdf.name;
+      art.pdfBlobUrl = URL.createObjectURL(fPdf);
+      salvarArtigosEstudo(this.artigos);
+      const statusEl = box.querySelector('#athStatusSyncArtigo');
+      if (statusEl) {
+        statusEl.style.color = '#15803D';
+        statusEl.textContent = `PDF "${fPdf.name}" carregado na folha!`;
+      }
+      if (cfgDrivePainel.accessToken) {
+        try {
+          const salvo = await salvarArquivoNoGoogleDrive({
+            nomeArquivo: fPdf.name,
+            conteudoBlobOuTexto: fPdf,
+            mimeType: 'application/pdf',
+            accessToken: cfgDrivePainel.accessToken,
+            driveFileId: art.driveFileId || null
+          });
+          if (salvo?.id) {
+            art.driveFileId = salvo.id;
+            salvarArtigosEstudo(this.artigos);
+          }
+        } catch (_) {}
+      }
+      this.renderizar();
+    });
+
+    box.querySelector('#athBtnPainelEscolherPdfDrive')?.addEventListener('click', () => {
+      this.abrirModalEscolherPdfDoGoogleDrive((arqDrive) => {
+        art.driveFileName = arqDrive.name;
+        art.driveFileId = arqDrive.id;
+        salvarArtigosEstudo(this.artigos);
+        this.renderizar();
+      });
     });
 
     box.querySelector('#athBtnPainelConectarDrive').addEventListener('click', async () => {
@@ -2617,7 +2732,13 @@ export class EstudoArtigosView {
       return;
     }
 
-    const itens = await this.zoteroClient.buscarItens({ limite: 40 });
+    // Remove os 3 artigos fictícios de demonstração assim que o usuário sincroniza a conta real do Zotero
+    this.artigos = this.artigos.filter(a => !ehArtigoExemploFicticio(a));
+    if (this.artigoAtivo && ehArtigoExemploFicticio(this.artigoAtivo)) {
+      this.artigoAtivo = null;
+    }
+
+    const itens = await this.zoteroClient.buscarItens({ limite: 60 });
     if (this.zoteroClient.userId) {
       this.salvarConfigZotero({ userId: this.zoteroClient.userId });
     }
@@ -2633,7 +2754,12 @@ export class EstudoArtigosView {
     this.renderizar();
     if (!silencioso) {
       if (!itens || itens.length === 0) {
-        alert(`Conexão ativa com sua biblioteca Zotero (User ID #${this.zoteroClient.userId || 'OK'})! Sua biblioteca remota ainda não possui itens ou todos já estão sincronizados.`);
+        alert(
+          `Conexão ativa com sua conta Zotero (${this.zoteroClient.username || 'User'} · ID #${this.zoteroClient.userId || 'OK'}).\n\n` +
+          `A nuvem online do Zotero (zotero.org) retornou 0 itens para esta conta.\n` +
+          `• Se os seus artigos estão no Zotero Desktop do seu computador, clique no ícone redondo verde "Sincronizar com zotero.org" no canto superior direito do Zotero Desktop.\n` +
+          `• Ou use o botão "Importar .bib" no topo para carregar sua coleção instantaneamente!`
+        );
       } else {
         alert(`Sincronização Zotero concluída! ${novos} novo(s) artigo(s) trazido(s) da sua biblioteca (${itens.length} itens lidos).`);
       }
@@ -2650,17 +2776,21 @@ export class EstudoArtigosView {
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
     modal.innerHTML = `
-      <div class="ath-modal" style="max-width:580px;">
+      <div class="ath-modal" style="max-width:600px;">
         <div class="ath-modal-head">
           <h2>Vincular PDF a uma Referência do Zotero</h2>
           <button type="button" class="ath-btn ath-btn-icon" id="athModalEscRefFechar">${svgIcone('fechar', 16)}</button>
         </div>
         <div class="ath-modal-corpo">
-          <div style="display:flex; gap:8px; align-items:center;">
-            <input type="text" class="ath-input" id="athBuscaRefZoteroModal" placeholder="Filtrar referências por título, autor ou ano..." style="flex:1;">
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="text" class="ath-input" id="athBuscaRefZoteroModal" placeholder="Filtrar referências por título, autor ou ano..." style="flex:1; min-width:200px;">
             <button type="button" class="ath-btn ath-btn-sm" id="athBtnRecarregarRefZotModal">
               ${svgIcone('zotero', 13)} Atualizar do Zotero
             </button>
+            <label class="ath-btn ath-btn-sm" style="cursor:pointer;">
+              ${svgIcone('upload', 13)} Importar .bib
+              <input type="file" accept=".bib,.txt" id="athInputBibNoModalRef" style="display:none;">
+            </label>
           </div>
           <div id="athStatusRefZoteroModal" style="font-size:11.5px; color:#314F79; font-weight:700;"></div>
           <div id="athListaRefZoteroModal" style="max-height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
@@ -2677,19 +2807,22 @@ export class EstudoArtigosView {
     modal.querySelector('#athModalEscRefCancelar').addEventListener('click', fechar);
     modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
 
-    let catalogoRefs = this.artigos.map(a => ({
-      chave: a.chaveZotero,
-      titulo: a.titulo,
-      autores: a.autores,
-      ano: a.ano,
-      publicacao: a.publicacao,
-      volume: a.volume || '',
-      numero: a.numero || '',
-      paginas: a.paginas || '',
-      doi: a.doi || '',
-      resumo: a.resumoOriginal || '',
-      palavrasChave: a.palavrasChave || []
-    }));
+    // Filtra estritamente os artigos reais do usuário (nunca exibe os 3 artigos fictícios de exemplo)
+    let catalogoRefs = this.artigos
+      .filter(a => !ehArtigoExemploFicticio(a))
+      .map(a => ({
+        chave: a.chaveZotero,
+        titulo: a.titulo,
+        autores: a.autores,
+        ano: a.ano,
+        publicacao: a.publicacao,
+        volume: a.volume || '',
+        numero: a.numero || '',
+        paginas: a.paginas || '',
+        doi: a.doi || '',
+        resumo: a.resumoOriginal || '',
+        palavrasChave: a.palavrasChave || []
+      }));
 
     const listaEl = modal.querySelector('#athListaRefZoteroModal');
     const statusEl = modal.querySelector('#athStatusRefZoteroModal');
@@ -2704,7 +2837,12 @@ export class EstudoArtigosView {
       });
 
       if (filtradas.length === 0) {
-        listaEl.innerHTML = `<div style="padding:16px; text-align:center; color:#64748B; font-size:12px;">Nenhuma referência encontrada. Clique em "Atualizar do Zotero" para buscar da sua conta.</div>`;
+        listaEl.innerHTML = `
+          <div style="padding:18px 16px; text-align:center; color:#475569; font-size:12.5px; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:10px; line-height:1.5;">
+            <strong style="color:#0F172A; display:block; margin-bottom:4px;">Nenhuma referência encontrada na sua nuvem do Zotero (${escapeHtml(this.zoteroClient.username || 'ID #' + (this.zoteroClient.userId || '18806479'))}).</strong>
+            Se os seus artigos estão no <b>Zotero Desktop</b> do seu computador, clique no botão redondo verde <b>Sincronizar com zotero.org</b> no canto superior direito do Zotero Desktop e depois em <b>Atualizar do Zotero</b> acima — ou clique em <b>Importar .bib</b> ao lado para carregar suas referências agora mesmo!
+          </div>
+        `;
         return;
       }
 
@@ -2758,9 +2896,13 @@ export class EstudoArtigosView {
     };
 
     const buscarDaApi = async () => {
-      if (!this.zoteroClient.apiKey) return;
-      statusEl.textContent = 'Buscando referências da sua biblioteca Zotero...';
-      const remotos = await this.zoteroClient.buscarItens({ limite: 50 });
+      if (!this.zoteroClient.apiKey) {
+        statusEl.textContent = 'Conecte sua Zotero API Key ou importe um arquivo .bib.';
+        renderizarLista();
+        return;
+      }
+      statusEl.textContent = 'Buscando referências da sua biblioteca Zotero (pessoal e grupos)...';
+      const remotos = await this.zoteroClient.buscarItens({ limite: 60 });
       if (Array.isArray(remotos) && remotos.length > 0) {
         remotos.forEach(it => {
           if (!catalogoRefs.some(c => c.chave === it.chave || c.titulo === it.titulo)) {
@@ -2779,12 +2921,45 @@ export class EstudoArtigosView {
             });
           }
         });
-        statusEl.textContent = `${remotos.length} referência(s) carregadas do Zotero ✓`;
+        statusEl.textContent = `${remotos.length} referência(s) carregadas da sua biblioteca Zotero ✓`;
       } else {
-        statusEl.textContent = 'Exibindo referências sincronizadas.';
+        statusEl.textContent = catalogoRefs.length > 0
+          ? `Exibindo ${catalogoRefs.length} referência(s) da sua biblioteca.`
+          : 'Sua biblioteca online em zotero.org ainda possui 0 itens sincronizados.';
       }
       renderizarLista();
     };
+
+    modal.querySelector('#athInputBibNoModalRef')?.addEventListener('change', async e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const texto = await file.text();
+      const importados = ZoteroClient.importarBibTeX(texto);
+      importados.forEach(it => {
+        const novo = this.converterItemZoteroParaEstudo(it);
+        if (!this.artigos.some(a => a.titulo === novo.titulo)) {
+          this.artigos.unshift(novo);
+        }
+        if (!catalogoRefs.some(c => c.titulo === it.titulo)) {
+          catalogoRefs.unshift({
+            chave: it.chave || it.id,
+            titulo: it.titulo,
+            autores: it.autores || [{ sobrenome: 'Autor', prenome: '' }],
+            ano: it.ano || '2026',
+            publicacao: it.publicacao || '',
+            volume: it.volume || '',
+            numero: it.numero || '',
+            paginas: it.paginas || '',
+            doi: it.doi || '',
+            resumo: it.resumo || '',
+            palavrasChave: []
+          });
+        }
+      });
+      salvarArtigosEstudo(this.artigos);
+      statusEl.textContent = `${importados.length} referência(s) importada(s) do arquivo .bib ✓`;
+      renderizarLista();
+    });
 
     inputBusca.addEventListener('input', renderizarLista);
     modal.querySelector('#athBtnRecarregarRefZotModal').addEventListener('click', buscarDaApi);
@@ -2792,11 +2967,77 @@ export class EstudoArtigosView {
     if (this.zoteroClient.apiKey) buscarDaApi();
   }
 
-  abrirModalVincularArtigo() {
+  /**
+   * Modal para escolher um arquivo PDF diretamente da nuvem do Google Drive do usuário.
+   */
+  async abrirModalEscolherPdfDoGoogleDrive(onEscolhido) {
+    const cfg = obterConfigGoogleDrive();
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
     modal.innerHTML = `
-      <div class="ath-modal" style="max-width:560px;">
+      <div class="ath-modal" style="max-width:540px;">
+        <div class="ath-modal-head">
+          <h2>Escolher Arquivo PDF do Google Drive</h2>
+          <button type="button" class="ath-btn ath-btn-icon" id="athModalEscPdfDriveFechar">${svgIcone('fechar', 16)}</button>
+        </div>
+        <div class="ath-modal-corpo">
+          <div id="athStatusPdfDriveModal" style="font-size:12px; color:#314F79; font-weight:700;">Conectando ao seu Google Drive...</div>
+          <div id="athListaPdfDriveModal" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+        <div class="ath-modal-foot">
+          <button type="button" class="ath-btn" id="athModalEscPdfDriveCancelar">Fechar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const fechar = () => modal.remove();
+    modal.querySelector('#athModalEscPdfDriveFechar').addEventListener('click', fechar);
+    modal.querySelector('#athModalEscPdfDriveCancelar').addEventListener('click', fechar);
+    modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+
+    const statusEl = modal.querySelector('#athStatusPdfDriveModal');
+    const listaEl = modal.querySelector('#athListaPdfDriveModal');
+
+    try {
+      const token = cfg.accessToken || await autenticarGoogleDrive(cfg.clientId);
+      statusEl.textContent = 'Listando seus arquivos PDF no Google Drive...';
+      const arquivos = await listarPdfsDoGoogleDrive(token);
+      if (!arquivos || arquivos.length === 0) {
+        statusEl.textContent = 'Nenhum PDF listado via API. Use o botão "Selecionar Arquivo PDF" para abrir da sua pasta do Google Drive ou computador.';
+        return;
+      }
+      statusEl.textContent = `${arquivos.length} arquivo(s) PDF encontrado(s) no seu Google Drive:`;
+      listaEl.innerHTML = arquivos.map((arq, idx) => `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border:1px solid #CBD5E1; border-radius:10px; background:#F8FAFC;">
+          <div style="min-width:0; flex:1;">
+            <div style="font-size:12.5px; font-weight:800; color:#0F172A; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(arq.name)}</div>
+            <div style="font-size:10.5px; color:#64748B;">ID Drive: <code>${escapeHtml(arq.id)}</code></div>
+          </div>
+          <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" data-sel-pdf-drive="${idx}">Selecionar PDF</button>
+        </div>
+      `).join('');
+
+      listaEl.querySelectorAll('[data-sel-pdf-drive]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const arq = arquivos[parseInt(btn.dataset.selPdfDrive, 10)];
+          if (arq && onEscolhido) onEscolhido(arq);
+          fechar();
+        });
+      });
+    } catch (err) {
+      statusEl.style.color = '#B42318';
+      statusEl.textContent = `Não foi possível listar da nuvem (${err.message || 'autorize o domínio no Google Cloud'}). Você pode selecionar o PDF direto pela janela de arquivo do computador/pasta Google Drive.`;
+    }
+  }
+
+  abrirModalVincularArtigo() {
+    let arquivoPdfSelecionado = null;
+    let driveFileIdSelecionado = '';
+
+    const modal = document.createElement('div');
+    modal.className = 'ath-modal-backdrop';
+    modal.innerHTML = `
+      <div class="ath-modal" style="max-width:580px;">
         <div class="ath-modal-head">
           <h2>Vincular PDF do Google Drive & Referência do Zotero</h2>
           <button type="button" class="ath-btn ath-btn-icon" id="athModalArtFechar">${svgIcone('fechar', 16)}</button>
@@ -2805,8 +3046,25 @@ export class EstudoArtigosView {
           <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 12px; background:#EEF4FA; border:1px solid #C8D7E6; border-radius:10px;">
             <span style="font-size:12px; font-weight:700; color:#1E293B;">Já cadastrou a referência no Zotero? Puxe os dados com 1 clique:</span>
             <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnPuxarRefZoteroNoModal">
-              ${svgIcone('zotero', 13)} 🔗 Escolher do Zotero
+              ${svgIcone('zotero', 13)} Escolher do Zotero
             </button>
+          </div>
+
+          <div class="ath-prop-grupo">
+            <label>Arquivo PDF (o PDF fica no seu Google Drive / Computador e não ocupa espaço no Zotero)</label>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:10px 12px; background:#F8FAFC; border:1.5px dashed #94A3B8; border-radius:10px;">
+              <label class="ath-btn ath-btn-primary ath-btn-sm" style="cursor:pointer;">
+                ${svgIcone('upload', 13)} Selecionar Arquivo PDF...
+                <input type="file" accept=".pdf,application/pdf" id="athNovoArtInputPdfFile" style="display:none;">
+              </label>
+              <button type="button" class="ath-btn ath-btn-sm" id="athBtnEscolherPdfDriveNoModal">
+                ${svgIcone('drive', 13)} Buscar no Google Drive
+              </button>
+              <span id="athNovoArtPdfBadge" style="font-size:11.5px; color:#314F79; font-weight:700; flex:1; min-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                Nenhum arquivo selecionado
+              </span>
+            </div>
+            <input type="text" class="ath-input" id="athNovoArtDriveNome" placeholder="Nome do arquivo PDF (preenchido automaticamente ao selecionar)" style="margin-top:6px;">
           </div>
 
           <div class="ath-prop-grupo">
@@ -2834,12 +3092,8 @@ export class EstudoArtigosView {
             </div>
           </div>
           <div class="ath-prop-grupo">
-            <label>Arquivo PDF no Google Drive (o PDF fica no Drive, não vai para o Zotero)</label>
-            <input type="text" class="ath-input" id="athNovoArtDriveNome" placeholder="Ex.: Silva_2026_Planejamento_Urbano.pdf">
-          </div>
-          <div class="ath-prop-grupo">
             <label>Resumo / Abstract do Artigo</label>
-            <textarea class="ath-input" id="athNovoArtResumo" rows="3" placeholder="Cole o abstract do artigo..."></textarea>
+            <textarea class="ath-input" id="athNovoArtResumo" rows="2" placeholder="Cole o abstract do artigo..."></textarea>
           </div>
         </div>
         <div class="ath-modal-foot">
@@ -2855,6 +3109,34 @@ export class EstudoArtigosView {
     modal.querySelector('#athModalArtCancelar').addEventListener('click', fechar);
     modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
 
+    const badgePdf = modal.querySelector('#athNovoArtPdfBadge');
+    const inputDriveNome = modal.querySelector('#athNovoArtDriveNome');
+    const inputTitulo = modal.querySelector('#athNovoArtTitulo');
+
+    modal.querySelector('#athNovoArtInputPdfFile').addEventListener('change', e => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      arquivoPdfSelecionado = f;
+      inputDriveNome.value = f.name;
+      badgePdf.style.color = '#15803D';
+      badgePdf.textContent = `✓ ${f.name} (${Math.max(1, Math.round(f.size / 1024))} KB)`;
+      if (!inputTitulo.value.trim()) {
+        inputTitulo.value = f.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ');
+      }
+    });
+
+    modal.querySelector('#athBtnEscolherPdfDriveNoModal').addEventListener('click', () => {
+      this.abrirModalEscolherPdfDoGoogleDrive((arqDrive) => {
+        driveFileIdSelecionado = arqDrive.id || '';
+        inputDriveNome.value = arqDrive.name || '';
+        badgePdf.style.color = '#15803D';
+        badgePdf.textContent = `✓ Drive: ${arqDrive.name}`;
+        if (!inputTitulo.value.trim() && arqDrive.name) {
+          inputTitulo.value = arqDrive.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ');
+        }
+      });
+    });
+
     modal.querySelector('#athBtnPuxarRefZoteroNoModal').addEventListener('click', () => {
       this.abrirModalEscolherReferenciaZotero(null, (ref) => {
         modal.querySelector('#athNovoArtTitulo').value = ref.titulo || '';
@@ -2866,20 +3148,20 @@ export class EstudoArtigosView {
         modal.querySelector('#athNovoArtPeriodico').value = ref.publicacao || '';
         modal.querySelector('#athNovoArtZotKey').value = ref.chave || '';
         modal.querySelector('#athNovoArtResumo').value = ref.resumo || '';
-        if (!modal.querySelector('#athNovoArtDriveNome').value.trim()) {
-          modal.querySelector('#athNovoArtDriveNome').value = `${aut0?.sobrenome || 'Artigo'}_${ref.ano || '2026'}.pdf`;
+        if (!inputDriveNome.value.trim()) {
+          inputDriveNome.value = `${aut0?.sobrenome || 'Artigo'}_${ref.ano || '2026'}.pdf`;
         }
       });
     });
 
-    modal.querySelector('#athModalArtCriar').addEventListener('click', () => {
+    modal.querySelector('#athModalArtCriar').addEventListener('click', async () => {
       const titulo = modal.querySelector('#athNovoArtTitulo').value.trim() || 'Novo Artigo Científico';
       const autorRaw = modal.querySelector('#athNovoArtAutor').value.trim() || 'Autor, Pesquisador';
       const partesAutor = autorRaw.split(',').map(s => s.trim());
       const ano = modal.querySelector('#athNovoArtAno').value.trim() || '2026';
       const publicacao = modal.querySelector('#athNovoArtPeriodico').value.trim() || 'Periódico Acadêmico';
       const chaveZotero = modal.querySelector('#athNovoArtZotKey').value.trim() || ('ZOT' + Math.random().toString(36).slice(2, 7).toUpperCase());
-      const driveFileName = modal.querySelector('#athNovoArtDriveNome').value.trim() || `${partesAutor[0]}_${ano}.pdf`;
+      const driveFileName = inputDriveNome.value.trim() || `${partesAutor[0]}_${ano}.pdf`;
       const resumo = modal.querySelector('#athNovoArtResumo').value.trim() || 'Artigo vinculado ao Zotero e ao Google Drive.';
 
       const novoArt = this.converterItemZoteroParaEstudo({
@@ -2892,6 +3174,26 @@ export class EstudoArtigosView {
         resumo
       });
       novoArt.driveFileName = driveFileName;
+      if (driveFileIdSelecionado) {
+        novoArt.driveFileId = driveFileIdSelecionado;
+      }
+      if (arquivoPdfSelecionado) {
+        novoArt.pdfBlobUrl = URL.createObjectURL(arquivoPdfSelecionado);
+        const cfgDrive = obterConfigGoogleDrive();
+        if (cfgDrive.accessToken) {
+          salvarArquivoNoGoogleDrive({
+            nomeArquivo: arquivoPdfSelecionado.name,
+            conteudoBlobOuTexto: arquivoPdfSelecionado,
+            mimeType: 'application/pdf',
+            accessToken: cfgDrive.accessToken
+          }).then(salvo => {
+            if (salvo?.id) {
+              novoArt.driveFileId = salvo.id;
+              salvarArtigosEstudo(this.artigos);
+            }
+          }).catch(() => {});
+        }
+      }
 
       this.artigos.unshift(novoArt);
       salvarArtigosEstudo(this.artigos);

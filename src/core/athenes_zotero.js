@@ -145,13 +145,43 @@ export class ZoteroClient {
       if (!res.ok) throw new Error(`Erro ao buscar itens (${res.status})`);
 
       const dados = await res.json();
-      const itensNormalizados = dados
+      const filtrarENormalizar = (listaBruta) => (Array.isArray(listaBruta) ? listaBruta : [])
         .filter(d => {
           const t = d?.data?.itemType;
-          return t !== 'attachment' && t !== 'note' && t !== 'annotation';
+          if (t === 'note' || t === 'annotation') return false;
+          if (t === 'attachment' && d?.data?.parentItem) return false;
+          return true;
         })
         .map(d => this.normalizarItemZotero(d))
         .filter(Boolean);
+
+      let itensNormalizados = filtrarENormalizar(dados);
+
+      // Se /items/top veio vazio, tenta /items (inclui referências e anexos independentes) e grupos do usuário
+      if (itensNormalizados.length === 0 && !colecaoKey) {
+        try {
+          const resAll = await fetch(`${this.getBaseUrl()}/items?${params.toString()}`, { headers: this.getHeaders() });
+          if (resAll.ok) {
+            const dadosAll = await resAll.json();
+            itensNormalizados = filtrarENormalizar(dadosAll);
+          }
+        } catch (_) {}
+
+        try {
+          const resGroups = await fetch(`${ZOTERO_API_BASE}/users/${encodeURIComponent(this.userId)}/groups`, { headers: this.getHeaders() });
+          if (resGroups.ok) {
+            const grupos = await resGroups.json();
+            for (const g of (Array.isArray(grupos) ? grupos.slice(0, 5) : [])) {
+              if (!g?.id) continue;
+              const resG = await fetch(`${ZOTERO_API_BASE}/groups/${encodeURIComponent(g.id)}/items/top?${params.toString()}`, { headers: this.getHeaders() });
+              if (resG.ok) {
+                const dadosG = await resG.json();
+                itensNormalizados.push(...filtrarENormalizar(dadosG));
+              }
+            }
+          }
+        } catch (_) {}
+      }
 
       for (const item of itensNormalizados) {
         this.cacheItens.set(item.id, item);

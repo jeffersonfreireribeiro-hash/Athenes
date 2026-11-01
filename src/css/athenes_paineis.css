@@ -100,7 +100,7 @@
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(4px);
+  /* sem backdrop-filter para evitar lag de GPU sobre canvas/PDF */
   display: flex;
   align-items: center;
   justify-content: center;

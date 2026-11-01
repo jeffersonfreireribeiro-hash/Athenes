@@ -703,6 +703,25 @@ export async function listarArquivosDoGoogleDrive(accessToken, fetchImpl = globa
 }
 
 /**
+ * Lista arquivos PDF disponíveis no Google Drive do usuário.
+ */
+export async function listarPdfsDoGoogleDrive(accessToken, fetchImpl = globalThis.fetch) {
+  if (!accessToken) throw new Error('Token de acesso do Google Drive ausente.');
+  const q = encodeURIComponent("trashed = false and (mimeType = 'application/pdf' or name contains '.pdf')");
+  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime,size,webViewLink)&orderBy=modifiedTime desc&pageSize=40`;
+
+  const resp = await fetchImpl(url, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${accessToken}` }
+  });
+  if (!resp.ok) {
+    throw new Error(`Erro ao listar PDFs do Google Drive (${resp.status}).`);
+  }
+  const data = await resp.json();
+  return data.files || [];
+}
+
+/**
  * Baixa o conteúdo de um arquivo do Google Drive pelo seu fileId.
  */
 export async function baixarArquivoDoGoogleDrive(fileId, accessToken, fetchImpl = globalThis.fetch) {
