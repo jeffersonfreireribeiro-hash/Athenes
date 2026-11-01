@@ -1017,23 +1017,4 @@ export class ModalEditorMestra {
       });
     });
   }
-
-    container.innerHTML = `
-      ${elementosHtml}
-      ${cabHtml}
-      ${gradeHtml}
-      ${rodHtml}
-    `;
-
-    // Clique interativo nos elementos da folha mestra
-    container.querySelectorAll('[data-elem-id]').forEach(el => {
-      el.addEventListener('click', e => {
-        e.stopPropagation();
-        this.elementoSelecionadoId = el.dataset.elemId;
-        const modal = this.backdrop.querySelector('.ath-modal');
-        if (modal) this.renderizarListaElementos(modal);
-        this.atualizarPreviaVisual();
-      });
-    });
-  }
 }
