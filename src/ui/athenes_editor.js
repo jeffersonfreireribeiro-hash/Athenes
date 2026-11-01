@@ -42,6 +42,26 @@ import {
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
+import {
+  MODOS_TRABALHO,
+  obterPerfilColaborador,
+  salvarPerfilColaborador,
+  garantirEstruturaSugestoes,
+  registrarSugestao,
+  gerarHtmlMarcacaoSugestao,
+  aceitarSugestaoNoDocumento,
+  rejeitarSugestaoNoDocumento,
+  salvarDocumentoNoSupabase,
+  listarDocumentosDoSupabase,
+  carregarDocumentoDoSupabase,
+  SessaoColaborativaRealtime,
+  obterConfigGoogleDrive,
+  salvarConfigGoogleDrive,
+  autenticarGoogleDrive,
+  salvarArquivoNoGoogleDrive,
+  listarArquivosDoGoogleDrive,
+  baixarArquivoDoGoogleDrive
+} from '../core/athenes_colaboracao.js';
 
 const TIPO_ROTULO = {
   titulo: 'Título', subtitulo: 'Subtítulo', paragrafo: 'Texto', citacao: 'Citação', tabela: 'Tabela',
@@ -112,13 +132,85 @@ export class EditorView {
     this.onRenderizado = opcoes.onRenderizado || (() => {});
     this.onEditarEstilo = opcoes.onEditarEstilo || (() => {});
     this.menuTopoAberto = null;
+    this.modoTrabalho = MODOS_TRABALHO.EDICAO; // 'edicao' | 'sugestao' | 'leitura'
+    this.perfilColaborador = obterPerfilColaborador();
+    this.colaboradoresOnline = [this.perfilColaborador];
+    this.statusNuvem = 'Local + Supabase';
 
+    garantirEstruturaSugestoes(this.doc);
     repaginarDocumento(this.doc);
     this.normalizarBlocosLegados();
     repaginarDocumento(this.doc);
     this.salvarSnapshot();
     this.renderizar();
     this.inicializarBarraContextualTexto();
+    this.iniciarSessaoColaborativa();
+  }
+
+  iniciarSessaoColaborativa() {
+    if (this.sessaoRealtime) {
+      this.sessaoRealtime.encerrar();
+    }
+    this.sessaoRealtime = new SessaoColaborativaRealtime(this.doc, {
+      perfil: this.perfilColaborador,
+      onPresencaAlterada: (lista) => {
+        this.colaboradoresOnline = lista;
+        this.atualizarAvataresPresenca();
+        this.pintarCursoresRemotosNaFolha();
+      },
+      onCursorRemoto: () => {
+        this.pintarCursoresRemotosNaFolha();
+      },
+      onBlocoRemotoAlterado: (blocoRemoto, sugestoesRemotas) => {
+        const alvo = this.buscarBlocoPorId(blocoRemoto.id);
+        if (alvo) {
+          Object.assign(alvo, blocoRemoto);
+        }
+        if (Array.isArray(sugestoesRemotas)) {
+          this.doc.sugestoes = sugestoesRemotas;
+        }
+        this.renderizarFolhasPaginas();
+      },
+      onDocumentoRemotoAlterado: (docSnap) => {
+        this.doc = docSnap;
+        repaginarDocumento(this.doc);
+        this.renderizar();
+      }
+    });
+    this.sessaoRealtime.iniciar();
+  }
+
+  atualizarAvataresPresenca() {
+    const box = this.container?.querySelector('#athAvataresPresenca');
+    if (!box) return;
+    const lista = this.colaboradoresOnline || [this.perfilColaborador];
+    box.innerHTML = lista.map(col => {
+      const iniciais = String(col.nome || 'U')
+        .split(/\s+/)
+        .map(p => p[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+      const papelRot = col.papel === 'orientador' ? 'Orientador / Professor' : col.papel === 'revisor' ? 'Revisor' : 'Autor';
+      return `<span class="ath-avatar-bolinha" style="background:${col.cor || '#314F79'};" title="${col.nome} (${papelRot}) — Online agora">${iniciais}</span>`;
+    }).join('');
+  }
+
+  pintarCursoresRemotosNaFolha() {
+    if (!this.container) return;
+    this.container.querySelectorAll('.ath-cursor-remoto-badge').forEach(n => n.remove());
+    const remotos = (this.colaboradoresOnline || []).filter(c => c.id !== this.perfilColaborador.id && c.blocoId);
+    for (const r of remotos) {
+      const elBloco = this.container.querySelector(`.ath-bloco-folha[data-bloco-id="${r.blocoId}"]`);
+      if (elBloco) {
+        elBloco.style.outline = `2px dashed ${r.cor || '#10B981'}`;
+        const badge = document.createElement('span');
+        badge.className = 'ath-cursor-remoto-badge';
+        badge.style.background = r.cor || '#10B981';
+        badge.textContent = r.nome;
+        elBloco.appendChild(badge);
+      }
+    }
   }
 
   normalizarBlocosLegados() {
@@ -204,8 +296,25 @@ export class EditorView {
         <span class="rm-selo">${(this.doc.perfil || 'abnt').toUpperCase()}</span>
       </div>
       <div class="ath-topo-dir">
+        <!-- Presença em Tempo Real (Avatares Online) -->
+        <div class="ath-presenca-avatares" id="athAvataresPresenca" title="Colaboradores online neste documento"></div>
+
+        <!-- Seletor dos 3 Modos de Trabalho estilo Google Docs (Edição / Sugestão / Visualização) -->
+        <div class="ath-seletor-modo-trabalho" id="athSeletorModoTrabalho" role="group" aria-label="Modo de Trabalho">
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.EDICAO ? 'on' : ''}" data-modo="edicao" title="Modo Edição: edita o documento diretamente">
+            ${svgIcone('lapis', 13)} <span>Edição</span>
+          </button>
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.SUGESTAO ? 'on' : ''}" data-modo="sugestao" title="Modo Sugestão: alterações ficam marcadas para Aceitar (✓) ou Rejeitar (✗)">
+            ${svgIcone('sugestao', 13)} <span>Sugestão</span>
+            ${(this.doc.sugestoes?.length > 0) ? `<span style="background:#FFFFFF; color:#059669; border-radius:999px; padding:0 5px; font-size:10px; font-weight:800;">${this.doc.sugestoes.length}</span>` : ''}
+          </button>
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.VISUALIZACAO ? 'on' : ''}" data-modo="leitura" title="Modo Visualização: trava o documento somente para leitura">
+            ${svgIcone('olho', 13)} <span>Leitura</span>
+          </button>
+        </div>
+
         <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="athBtnAbaZotero">
-          ${svgIcone('zotero', 15)} <span>Zotero & Fichamento</span>
+          ${svgIcone('zotero', 15)} <span>Zotero</span>
         </button>
         <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="athBtnAbaConexoes">
           ${svgIcone('conexoes', 15)} <span>Grafo</span>
@@ -264,6 +373,17 @@ export class EditorView {
                   </svg>
                 </button>
                 <div class="rm-topo-popover rm-topo-popover-estilos" id="athPopoverEstilos" role="dialog" aria-label="Estilos de Texto" hidden></div>
+              </div>
+
+              <div class="rm-menu-topo-item" data-menu="nuvem">
+                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuNuvem" aria-haspopup="dialog" aria-expanded="false" title="Supabase Nuvem, Google Drive e Revisões Colaborativas">
+                  ${svgIcone('nuvem_ok', 14)}
+                  <span>Nuvem & Drive</span>
+                  <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
+                    <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <div class="rm-topo-popover" id="athPopoverNuvem" role="dialog" aria-label="Nuvem, Google Drive e Revisões" hidden style="width:360px;"></div>
               </div>
             </div>
           </div>
@@ -342,8 +462,10 @@ export class EditorView {
     // Renderiza Folhas no Palco Central
     this.renderizarFolhasPaginas();
 
-    // Atualiza diagrama de margens
+    // Atualiza diagrama de margens e avatares de presença
     this.pintarDiagramaMargens();
+    this.atualizarAvataresPresenca();
+    this.pintarCursoresRemotosNaFolha();
 
     const palcoNovo = root.querySelector('#rmPrevPalco');
     const esqNovo = root.querySelector('#rmColEsq');
@@ -376,8 +498,22 @@ export class EditorView {
     root.querySelector('#athBtnAbaConexoes').addEventListener('click', () => this.onAbrirConexoes());
     root.querySelector('#athBtnExportarModal').addEventListener('click', () => this.onAbrirExportar());
 
+    // Seletor de Modos de Trabalho estilo Google Docs (Edição / Sugestão / Visualização)
+    root.querySelectorAll('.ath-btn-modo-trab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const novoModo = btn.dataset.modo;
+        if (!novoModo || this.modoTrabalho === novoModo) return;
+        this.modoTrabalho = novoModo;
+        this.renderizar();
+      });
+    });
+
     // Botões de inserção de blocos
     const adicionar = (tipo, dados = {}) => {
+      if (this.modoTrabalho === MODOS_TRABALHO.VISUALIZACAO) {
+        alert('O documento está em Modo Visualização (Somente Leitura). Mude para Edição ou Sugestão no topo para inserir blocos.');
+        return;
+      }
       const sec = this.obterSecaoAtiva();
       if (!sec) return;
       const b = criarNovoBloco(tipo, dados);
@@ -415,13 +551,15 @@ export class EditorView {
     const popArquivo = root.querySelector('#athPopoverArquivo');
     const popCabRod = root.querySelector('#athPopoverCabRod');
     const popEstilos = root.querySelector('#athPopoverEstilos');
+    const popNuvem = root.querySelector('#athPopoverNuvem');
 
     const btnArquivo = root.querySelector('#athBtnMenuArquivo');
     const btnCabRod = root.querySelector('#athBtnMenuCabRod');
     const btnEstilos = root.querySelector('#athBtnMenuEstilos');
+    const btnNuvem = root.querySelector('#athBtnMenuNuvem');
 
-    const popovers = { arquivo: popArquivo, cabrod: popCabRod, estilos: popEstilos };
-    const botoes = { arquivo: btnArquivo, cabrod: btnCabRod, estilos: btnEstilos };
+    const popovers = { arquivo: popArquivo, cabrod: popCabRod, estilos: popEstilos, nuvem: popNuvem };
+    const botoes = { arquivo: btnArquivo, cabrod: btnCabRod, estilos: btnEstilos, nuvem: btnNuvem };
 
     const fecharTodos = () => {
       Object.values(popovers).forEach(p => { if (p) p.hidden = true; });
@@ -464,6 +602,11 @@ export class EditorView {
     btnEstilos.addEventListener('click', (e) => {
       e.stopPropagation();
       togglePopover('estilos');
+    });
+
+    btnNuvem?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePopover('nuvem');
     });
 
     // 1. Popover Arquivo & Margens
@@ -757,6 +900,284 @@ export class EditorView {
       this.renderizar();
       this.onEditarEstilo(novo);
     });
+
+    // 4. Popover Nuvem (Supabase), Google Drive & Revisões Colaborativas
+    if (popNuvem) {
+      const sugestoesPendentes = garantirEstruturaSugestoes(this.doc);
+      const driveCfg = obterConfigGoogleDrive();
+      const perfilColab = this.perfilColaborador;
+
+      popNuvem.innerHTML = `
+        <div class="rm-popover-topo-head">
+          <strong>Nuvem, Drive & Revisão</strong>
+          <button type="button" class="rm-ic" data-fechar-popover title="Fechar">${svgIcone('fechar', 13)}</button>
+        </div>
+
+        <!-- Identificação do Colaborador / Professor Orientador -->
+        <div style="padding:8px 10px; border-radius:10px; background:#F8FAFC; border:1px solid #E2E8F0; display:flex; flex-direction:column; gap:6px;">
+          <span style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase;">Seu Perfil na Colaboração</span>
+          <div style="display:grid; grid-template-columns:1fr 115px; gap:6px; align-items:end;">
+            <label style="font-size:11px;">Nome exibido no cursor/sugestões
+              <input type="text" id="athColabNome" value="${perfilColab.nome || 'Autor'}" style="height:28px; font-size:11.5px; padding:3px 8px;">
+            </label>
+            <label style="font-size:11px;">Papel
+              <select id="athColabPapel" class="glx-select" style="height:28px; font-size:11.5px; padding:0 6px;">
+                <option value="autor" ${perfilColab.papel === 'autor' ? 'selected' : ''}>Autor</option>
+                <option value="orientador" ${perfilColab.papel === 'orientador' ? 'selected' : ''}>Prof. Orientador</option>
+                <option value="revisor" ${perfilColab.papel === 'revisor' ? 'selected' : ''}>Coautor / Revisor</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <!-- Passo 1 & 3: Supabase Cloud + Realtime -->
+        <div style="padding:8px 10px; border-radius:10px; background:#EEF4FA; border:1px solid var(--ath-primary-line, #C8D7E6); display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <strong style="font:800 11px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; display:inline-flex; align-items:center; gap:5px;">
+              ${svgIcone('nuvem_ok', 14)} Nuvem Supabase (Athenes)
+            </strong>
+            <span id="athBadgeStatusSupabase" style="font:700 10px var(--glx-font); color:#15803D; background:#DCFCE7; padding:2px 7px; border-radius:999px;">Ativo · Realtime</span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-primary" id="athBtnSalvarSupabase" style="height:30px; display:flex; align-items:center; justify-content:center; gap:5px; font-weight:700;">
+              ${svgIcone('salvar', 13)} Salvar na Nuvem
+            </button>
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnAbrirSupabase" style="height:30px; display:flex; align-items:center; justify-content:center; gap:5px; font-weight:700; background:#fff;">
+              ${svgIcone('documento', 13)} Abrir da Nuvem
+            </button>
+          </div>
+          <div id="athListaArquivosSupabase" hidden style="max-height:130px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; margin-top:4px;"></div>
+        </div>
+
+        <!-- Passo 4: Google Drive Pessoal (escopo seguro drive.file) -->
+        <div style="padding:8px 10px; border-radius:10px; background:#FFFFFF; border:1px solid #CBD5E1; display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <strong style="font:800 11px var(--glx-font); color:#1F2733; text-transform:uppercase; display:inline-flex; align-items:center; gap:5px;">
+              ${svgIcone('drive', 14)} Google Drive (drive.file)
+            </strong>
+            <span style="font-size:10px; color:#64748B;">Privacidade segura</span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnSalvarDrive" style="height:30px; display:flex; align-items:center; justify-content:center; gap:5px; font-weight:700;">
+              ${svgIcone('salvar', 13)} Salvar no Drive
+            </button>
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnAbrirDrive" style="height:30px; display:flex; align-items:center; justify-content:center; gap:5px; font-weight:700;">
+              ${svgIcone('drive', 13)} Abrir do Drive
+            </button>
+          </div>
+          <details style="font-size:11px; color:#475569;">
+            <summary style="cursor:pointer; font-weight:700; font-size:10.5px;">Configurar Client ID Google Cloud (OAuth2)</summary>
+            <div style="display:flex; flex-direction:column; gap:4px; margin-top:6px;">
+              <input type="text" id="athInputDriveClientId" value="${driveCfg.clientId || ''}" placeholder="Ex: 123456-abc.apps.googleusercontent.com" style="font-size:11px; height:26px; padding:2px 6px;">
+              <small style="font-size:10px; color:#64748B;">Escopo <code>drive.file</code>: acessa apenas arquivos criados pelo Athenes.</small>
+            </div>
+          </details>
+          <div id="athListaArquivosDrive" hidden style="max-height:120px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;"></div>
+        </div>
+
+        <!-- Passo 2: Lista de Sugestões de Revisão (Aceitar ✓ / Rejeitar ✗) -->
+        <div style="display:flex; flex-direction:column; gap:6px; border-top:1px solid #E2E8F0; padding-top:8px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <strong style="font:800 11px var(--glx-font); color:#065F46; text-transform:uppercase;">
+              Sugestões de Revisão (${sugestoesPendentes.length})
+            </strong>
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnNovaSugestaoDemo" style="font-size:10.5px; height:22px; padding:0 8px;" title="Registrar sugestão no bloco selecionado">
+              + Sugerir no bloco
+            </button>
+          </div>
+          <div id="athListaSugestoesPopover" style="max-height:170px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
+            ${sugestoesPendentes.length === 0
+              ? `<span style="font-size:11.5px; color:#64748B;">Nenhuma sugestão pendente. Ative o modo <b>Sugestão</b> no topo para revisar com marcações verdes/vermelhas.</span>`
+              : sugestoesPendentes.map(s => `
+                <div class="ath-balao-sugestao" data-sug-card="${s.id}">
+                  <div class="ath-balao-sugestao-topo">
+                    <span class="ath-balao-sugestao-autor">Sugestão de ${s.autor}</span>
+                    <div class="ath-balao-sugestao-acoes">
+                      <button type="button" class="ath-btn-sug-aceitar" data-aceitar-sug="${s.id}" title="Aceitar sugestão (✓)">✓ Aceitar</button>
+                      <button type="button" class="ath-btn-sug-rejeitar" data-rejeitar-sug="${s.id}" title="Rejeitar sugestão (✗)">✗</button>
+                    </div>
+                  </div>
+                  <div style="font-size:11.5px; color:#1F2733; line-height:1.35;">
+                    ${s.textoOriginal ? `<del class="ath-sug-del">${s.textoOriginal}</del> ` : ''}
+                    ${s.textoNovo ? `<ins class="ath-sug-ins">${s.textoNovo}</ins>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+          </div>
+        </div>
+      `;
+
+      popNuvem.querySelector('#athColabNome')?.addEventListener('change', e => {
+        this.perfilColaborador.nome = e.target.value.trim() || 'Autor';
+        salvarPerfilColaborador(this.perfilColaborador);
+        this.sessaoRealtime?.atualizarPresencaLocal();
+        this.atualizarAvataresPresenca();
+      });
+
+      popNuvem.querySelector('#athColabPapel')?.addEventListener('change', e => {
+        this.perfilColaborador.papel = e.target.value;
+        if (e.target.value === 'orientador' && this.perfilColaborador.nome === 'Autor Principal') {
+          this.perfilColaborador.nome = 'Prof. Orientador';
+          popNuvem.querySelector('#athColabNome').value = 'Prof. Orientador';
+        }
+        salvarPerfilColaborador(this.perfilColaborador);
+        this.sessaoRealtime?.atualizarPresencaLocal();
+        this.atualizarAvataresPresenca();
+      });
+
+      popNuvem.querySelector('#athBtnSalvarSupabase')?.addEventListener('click', async () => {
+        const badge = popNuvem.querySelector('#athBadgeStatusSupabase');
+        try {
+          if (badge) { badge.textContent = 'Salvando...'; badge.style.background = '#FEF3C7'; badge.style.color = '#92400E'; }
+          await salvarDocumentoNoSupabase(this.doc, this.perfilColaborador);
+          this.sessaoRealtime?.transmitirDocumento(this.doc);
+          if (badge) { badge.textContent = 'Salvo na Nuvem ✓'; badge.style.background = '#DCFCE7'; badge.style.color = '#15803D'; }
+        } catch (err) {
+          if (badge) { badge.textContent = 'Erro ao salvar'; badge.style.background = '#FEE2E2'; badge.style.color = '#991B1B'; }
+          alert(err.message);
+        }
+      });
+
+      popNuvem.querySelector('#athBtnAbrirSupabase')?.addEventListener('click', async () => {
+        const boxLista = popNuvem.querySelector('#athListaArquivosSupabase');
+        if (!boxLista) return;
+        boxLista.hidden = false;
+        boxLista.innerHTML = '<span style="font-size:11px; color:#64748B;">Buscando documentos no Supabase...</span>';
+        try {
+          const docs = await listarDocumentosDoSupabase();
+          if (!docs.length) {
+            boxLista.innerHTML = '<span style="font-size:11px; color:#64748B;">Nenhum documento salvo na nuvem ainda.</span>';
+            return;
+          }
+          boxLista.innerHTML = docs.map(d => `
+            <button type="button" class="ath-ctx-menu-item" data-abrir-supa-id="${d.id}" style="background:#fff; border:1px solid #CBD5E1;">
+              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${d.titulo}</span>
+              <small style="color:#64748B; flex:none;">${d.atualizado_por || ''}</small>
+            </button>
+          `).join('');
+          boxLista.querySelectorAll('[data-abrir-supa-id]').forEach(bt => {
+            bt.addEventListener('click', async () => {
+              const docCarregado = await carregarDocumentoDoSupabase(bt.dataset.abrirSupaId);
+              if (docCarregado) {
+                this.setDocumento(docCarregado);
+                this.iniciarSessaoColaborativa();
+                this.onAlterado(this.doc);
+                fecharTodos();
+              }
+            });
+          });
+        } catch (err) {
+          boxLista.innerHTML = `<span style="font-size:11px; color:#B42318;">${err.message}</span>`;
+        }
+      });
+
+      // Eventos Google Drive
+      popNuvem.querySelector('#athInputDriveClientId')?.addEventListener('change', e => {
+        const cfg = obterConfigGoogleDrive();
+        salvarConfigGoogleDrive({ ...cfg, clientId: e.target.value.trim() });
+      });
+
+      popNuvem.querySelector('#athBtnSalvarDrive')?.addEventListener('click', async () => {
+        const cfg = obterConfigGoogleDrive();
+        const nomeArq = `${(this.doc.titulo || 'Documento_Athenes').replace(/[^\w\d_-]+/g, '_')}.athenes`;
+        if (!cfg.clientId && !cfg.accessToken) {
+          // Quando ainda não há Client ID OAuth configurado, permite salvar direto na pasta sincronizada do Google Drive Desktop (.athenes) ou informar Client ID
+          const blob = new Blob([JSON.stringify(this.doc, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = nomeArq;
+          a.click();
+          URL.revokeObjectURL(a.href);
+          return;
+        }
+        try {
+          const token = cfg.accessToken || await autenticarGoogleDrive(cfg.clientId);
+          const salvo = await salvarArquivoNoGoogleDrive({
+            nomeArquivo: nomeArq,
+            conteudoBlobOuTexto: this.doc,
+            accessToken: token,
+            driveFileId: this.doc.driveFileId || null
+          });
+          if (salvo?.id) this.doc.driveFileId = salvo.id;
+          alert(`Documento salvo com sucesso no Google Drive (${salvo.name || nomeArq})!`);
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+
+      popNuvem.querySelector('#athBtnAbrirDrive')?.addEventListener('click', async () => {
+        const cfg = obterConfigGoogleDrive();
+        if (!cfg.clientId && !cfg.accessToken) {
+          // Seletor rápido de arquivo .athenes/.json (compatível com pasta do Google Drive no computador)
+          const inp = document.createElement('input');
+          inp.type = 'file';
+          inp.accept = '.athenes,.json,application/json';
+          inp.onchange = async () => {
+            const f = inp.files?.[0];
+            if (!f) return;
+            const txt = await f.text();
+            const parsed = JSON.parse(txt);
+            if (parsed && parsed.secoes) {
+              this.setDocumento(parsed);
+              this.onAlterado(this.doc);
+              fecharTodos();
+            }
+          };
+          inp.click();
+          return;
+        }
+        const boxDrive = popNuvem.querySelector('#athListaArquivosDrive');
+        if (!boxDrive) return;
+        boxDrive.hidden = false;
+        boxDrive.innerHTML = '<span style="font-size:11px; color:#64748B;">Consultando Google Drive...</span>';
+        try {
+          const token = cfg.accessToken || await autenticarGoogleDrive(cfg.clientId);
+          const arqs = await listarArquivosDoGoogleDrive(token);
+          if (!arqs.length) {
+            boxDrive.innerHTML = '<span style="font-size:11px; color:#64748B;">Nenhum arquivo .athenes encontrado no seu Drive.</span>';
+            return;
+          }
+          boxDrive.innerHTML = arqs.map(f => `
+            <button type="button" class="ath-ctx-menu-item" data-drive-file="${f.id}">
+              <span>${f.name}</span>
+            </button>
+          `).join('');
+          boxDrive.querySelectorAll('[data-drive-file]').forEach(bt => {
+            bt.addEventListener('click', async () => {
+              const docDrive = await baixarArquivoDoGoogleDrive(bt.dataset.driveFile, token);
+              if (docDrive && docDrive.secoes) {
+                this.setDocumento(docDrive);
+                this.onAlterado(this.doc);
+                fecharTodos();
+              }
+            });
+          });
+        } catch (err) {
+          boxDrive.innerHTML = `<span style="font-size:11px; color:#B42318;">${err.message}</span>`;
+        }
+      });
+
+      // Eventos de Aceitar / Rejeitar Sugestões
+      popNuvem.querySelectorAll('[data-aceitar-sug]').forEach(bt => {
+        bt.addEventListener('click', () => {
+          aceitarSugestaoNoDocumento(this.doc, bt.dataset.aceitarSug);
+          this.notificarMudanca();
+          this.renderizar();
+        });
+      });
+
+      popNuvem.querySelectorAll('[data-rejeitar-sug]').forEach(bt => {
+        bt.addEventListener('click', () => {
+          rejeitarSugestaoNoDocumento(this.doc, bt.dataset.rejeitarSug);
+          this.notificarMudanca();
+          this.renderizar();
+        });
+      });
+
+      popNuvem.querySelector('#athBtnNovaSugestaoDemo')?.addEventListener('click', () => {
+        this.criarSugestaoInterativaNoBloco();
+      });
+    }
 
     // Fechar ao clicar nos botões 'X'
     root.querySelectorAll('[data-fechar-popover]').forEach(btn => {
@@ -1713,11 +2134,12 @@ export class EditorView {
       this.selecionarBloco(b, pag);
     });
 
-    // Foco ao clicar dentro do texto para digitar: sincroniza imediatamente a lista lateral
+    // Foco ao clicar dentro do texto para digitar: sincroniza imediatamente a lista lateral e presença Realtime
     el.addEventListener('focusin', () => {
       if (this.blocoSelecionado?.id !== b.id) {
         this.selecionarBloco(b, pag);
       }
+      this.sessaoRealtime?.informarCursorBloco(b.id);
     });
 
     const estilo = (this.doc.estilos || []).find(e => e.id === b.estiloId) || {};
@@ -1757,17 +2179,20 @@ export class EditorView {
     const espacoParagrafosPt = b.espaco_paragrafos_pt ?? estiloMesclado.espaco_paragrafos_pt ?? 6;
     el.style.setProperty('--ath-paragrafo-gap', `${espacoParagrafosPt}pt`);
 
+    const ehSomenteLeitura = this.modoTrabalho === MODOS_TRABALHO.VISUALIZACAO;
+
     // 1. TÍTULO
     if (b.tipo === 'titulo' || b.tipo === 'subtitulo') {
       const tag = b.nivel === 1 ? 'h1' : b.nivel === 2 ? 'h2' : 'h3';
       const heading = document.createElement(tag);
-      heading.contentEditable = 'true';
+      heading.contentEditable = ehSomenteLeitura ? 'false' : 'true';
       heading.className = 'ath-titulo-editable';
       heading.style.cssText = `${cssEstilo}; margin:0; outline:none;`;
       heading.innerHTML = b.texto || 'Título da Seção';
 
       heading.addEventListener('input', () => {
         b.texto = heading.innerHTML;
+        this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida();
       });
       el.appendChild(heading);
@@ -1776,21 +2201,73 @@ export class EditorView {
     // 2. PARÁGRAFO
     else if (b.tipo === 'paragrafo') {
       const p = document.createElement('div');
-      p.contentEditable = 'true';
+      p.contentEditable = ehSomenteLeitura ? 'false' : 'true';
       p.className = 'ath-texto-editable';
       p.style.cssText = `${cssEstilo}; outline:none;`;
 
       let conteudoHtml = b.texto || 'Escreva diretamente neste bloco...';
-      if (b.marcador_tipo && !conteudoHtml.includes('<ul') && !conteudoHtml.includes('<ol')) {
-        const clsAlinea = b.marcador_tipo === 'traco' ? ' class="ath-lista-alinea"' : b.marcador_tipo === 'ponto_traco' ? ' class="ath-lista-ponto-traco"' : '';
+      if (b.marcador_tipo && b.marcador_tipo !== 'nenhum' && !conteudoHtml.includes('<ul') && !conteudoHtml.includes('<ol')) {
         if (b.marcador_tipo === 'numero') {
           conteudoHtml = `<ol><li>${conteudoHtml}</li></ol>`;
         } else {
-          conteudoHtml = `<ul${clsAlinea}><li>${conteudoHtml}</li></ul>`;
+          conteudoHtml = `<ul><li>${conteudoHtml}</li></ul>`;
         }
       }
 
       p.innerHTML = resolverReferenciasCruzadas(conteudoHtml, this.doc);
+      this.aplicarConfigListaNoBloco(p, b);
+
+      // Modo Sugestão (estilo Google Docs): intercepta deleção/digitação quando modoTrabalho === 'sugestao'
+      p.addEventListener('beforeinput', e => {
+        if (this.modoTrabalho !== MODOS_TRABALHO.SUGESTAO) return;
+        const tipoIn = e.inputType;
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return;
+        const range = sel.getRangeAt(0);
+        const textoSelecionado = range.toString();
+
+        // Se o professor apaga um trecho selecionado, marca com <del class="ath-sug-del"> (tachado vermelho) sem apagar de verdade
+        if ((tipoIn === 'deleteContentBackward' || tipoIn === 'deleteContentForward' || tipoIn === 'deleteByCut') && textoSelecionado.trim()) {
+          e.preventDefault();
+          const sug = registrarSugestao(this.doc, {
+            blocoId: b.id,
+            tipo: 'exclusao',
+            textoOriginal: textoSelecionado,
+            textoNovo: '',
+            autor: this.perfilColaborador.nome,
+            corAutor: this.perfilColaborador.cor
+          });
+          const htmlDel = gerarHtmlMarcacaoSugestao(sug);
+          document.execCommand('insertHTML', false, htmlDel);
+          b.texto = p.innerHTML;
+          this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
+          this.notificarMudancaRapida();
+          return;
+        }
+
+        // Se o professor digita substituindo uma seleção, cria sugestão de substituição (<del> + <ins>)
+        if (tipoIn === 'insertText' && e.data && textoSelecionado.trim()) {
+          e.preventDefault();
+          const sug = registrarSugestao(this.doc, {
+            blocoId: b.id,
+            tipo: 'substituicao',
+            textoOriginal: textoSelecionado,
+            textoNovo: e.data,
+            autor: this.perfilColaborador.nome,
+            corAutor: this.perfilColaborador.cor
+          });
+          const htmlSub = gerarHtmlMarcacaoSugestao(sug);
+          document.execCommand('insertHTML', false, htmlSub);
+          b.texto = p.innerHTML;
+          this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
+          this.notificarMudancaRapida();
+        }
+      });
+
+      p.addEventListener('input', () => {
+        b.texto = p.innerHTML;
+        this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
+      });
 
       p.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
@@ -2247,6 +2724,37 @@ export class EditorView {
     diag.style.inset = `${(m.t / H) * 100}% ${(m.r / W) * 100}% ${(m.b / H) * 100}% ${(m.l / W) * 100}%`;
   }
 
+  criarSugestaoInterativaNoBloco() {
+    const b = this.blocoSelecionado || this.obterSecaoAtiva()?.blocos?.find(x => x.tipo === 'paragrafo');
+    if (!b) return;
+    const sel = window.getSelection();
+    const textoOriginal = (sel && !sel.isCollapsed) ? sel.toString().trim() : '';
+    const textoNovo = window.prompt
+      ? window.prompt('Digite o texto sugerido pelo revisor/professor:', 'Revisão sugerida pelo orientador')
+      : 'Revisão sugerida pelo orientador';
+    if (textoNovo === null) return;
+
+    const sug = registrarSugestao(this.doc, {
+      blocoId: b.id,
+      tipo: textoOriginal ? 'substituicao' : 'insercao',
+      textoOriginal,
+      textoNovo,
+      autor: this.perfilColaborador.nome || 'Prof. Orientador',
+      corAutor: this.perfilColaborador.cor
+    });
+
+    const htmlMark = gerarHtmlMarcacaoSugestao(sug);
+    if (textoOriginal && String(b.texto || '').includes(textoOriginal)) {
+      b.texto = String(b.texto).replace(textoOriginal, htmlMark);
+    } else {
+      b.texto = `${b.texto || ''} ${htmlMark}`.trim();
+    }
+
+    this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
+    this.notificarMudanca();
+    this.renderizar();
+  }
+
   inserirCitacaoNoCursor(ref) {
     if (!ref) return;
     const autor = (ref.autores?.[0]?.sobrenome || 'AUTOR').toUpperCase();
@@ -2286,6 +2794,38 @@ export class EditorView {
       this.agendarSnapshot();
     }
   }
+  aplicarConfigListaNoBloco(containerEditable, b) {
+    if (!containerEditable || !b) return;
+    const listas = containerEditable.querySelectorAll('ul, ol');
+    if (!listas.length) return;
+
+    const nivel = Math.max(1, parseInt(b.marcador_nivel, 10) || 1);
+    const tabMm = Math.max(3, parseFloat(b.marcador_tab_mm) || 7);
+    const indentMm = (nivel - 1) * 6;
+    const align = b.marcador_alinhamento || 'left';
+    const inicio = Math.max(1, parseInt(b.marcador_inicio, 10) || 1);
+
+    listas.forEach(lista => {
+      lista.classList.add('ath-lista-config');
+      lista.style.setProperty('--ath-list-tab', `${tabMm}mm`);
+      lista.style.setProperty('--ath-list-indent', `${indentMm}mm`);
+      lista.style.setProperty('--ath-list-align', align);
+      lista.style.setProperty('--ath-list-counter-start', String(inicio - 1));
+
+      if (lista.tagName.toLowerCase() === 'ol') {
+        lista.dataset.numEstilo = b.marcador_estilo_num || 'decimal';
+        lista.dataset.numSep = b.marcador_separador || 'ponto';
+      } else {
+        const tipoMarc = (b.marcador_tipo && b.marcador_tipo !== 'numero') ? b.marcador_tipo
+          : lista.classList.contains('ath-lista-alinea') ? 'traco'
+          : lista.classList.contains('ath-lista-ponto-traco') ? 'ponto_traco'
+          : lista.classList.contains('ath-lista-quadrado') ? 'quadrado'
+          : 'circulo';
+        lista.dataset.marcador = tipoMarc;
+      }
+    });
+  }
+
   inicializarBarraContextualTexto() {
     if (document.getElementById('athBarraContextualTexto')) return;
 
@@ -2299,7 +2839,7 @@ export class EditorView {
     barra.style.borderRadius = '999px';
     barra.style.boxShadow = '0 6px 22px rgba(49, 79, 121, 0.22)';
     barra.style.border = '1px solid var(--ath-primary-line, #C8D7E6)';
-    barra.style.padding = '4px 10px';
+    barra.style.padding = '5px 10px';
     barra.style.gap = '4px';
     barra.style.alignItems = 'center';
     barra.style.transform = 'translate(-50%, -100%)';
@@ -2307,29 +2847,123 @@ export class EditorView {
     barra.style.userSelect = 'none';
 
     barra.innerHTML = `
-      <select class="ath-barra-context-estilo" id="athBarraContextEstilo" style="font-family:var(--glx-font); font-size:11px; font-weight:700; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:2px 8px; background:var(--ath-surface-elevated, #F8FAFC); color:var(--ath-primary, #314F79); cursor:pointer;" title="Aplicar estilo de texto ao trecho selecionado">
+      <select class="ath-barra-context-estilo" id="athBarraContextEstilo" style="font-family:var(--glx-font); font-size:11px; font-weight:700; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:2px 8px; height:28px; background:var(--ath-surface-elevated, #F8FAFC); color:var(--ath-primary, #314F79); cursor:pointer;" title="Aplicar estilo de texto ao trecho selecionado">
         <option value="" disabled selected>Estilo ▾</option>
         ${(this.doc.estilos || []).map(est => `<option value="${est.id}">${est.nome}</option>`).join('')}
       </select>
-      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 3px;"></span>
+      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 2px;"></span>
       <button type="button" class="rm-ic-sm" data-cmd="bold" title="Negrito (Ctrl+B)"><b>B</b></button>
       <button type="button" class="rm-ic-sm" data-cmd="italic" title="Itálico (Ctrl+I)"><i>I</i></button>
       <button type="button" class="rm-ic-sm" data-cmd="underline" title="Sublinhado (Ctrl+U)"><u>U</u></button>
       <button type="button" class="rm-ic-sm" data-cmd="strikeThrough" title="Tachado"><s>S</s></button>
-      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 3px;"></span>
-      <button type="button" class="rm-ic-sm" data-cmd="insertUnorderedList" title="Lista com Marcadores de Ponto (•)">${svgIcone('lista', 13)}</button>
-      <button type="button" class="rm-ic-sm" data-cmd="insertOrderedList" title="Lista Numerada (1.)">${svgIcone('lista_num', 13)}</button>
-      <button type="button" class="rm-ic-sm" data-lista-alinea="true" title="Alínea / Travessão ABNT (–)">${svgIcone('lista_alinea', 13)}</button>
-      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 3px;"></span>
-      <button type="button" class="glx-btn glx-btn-xs ${!this.blocoSelecionado?.alinhamento ? 'glx-btn-primary' : 'glx-btn-soft'}" id="athBtnContextAlinEstilo" title="Usar alinhamento original do estilo de texto" style="font-size:10px; padding:2px 7px; font-weight:700; border-radius:999px;">Do estilo</button>
-      <button type="button" class="rm-ic-sm" data-alin-rapido="esquerda" title="À Esquerda">${svgIcone('alinhamento_esq', 14)}</button>
-      <button type="button" class="rm-ic-sm" data-alin-rapido="centro" title="Centralizado">${svgIcone('alinhamento_cen', 14)}</button>
-      <button type="button" class="rm-ic-sm" data-alin-rapido="direita" title="À Direita">${svgIcone('alinhamento_dir', 14)}</button>
-      <button type="button" class="rm-ic-sm" data-alin-rapido="justificado_esquerda" title="Justificado com última linha à esquerda">${svgIcone('alinhamento_jus_esq', 14)}</button>
-      <button type="button" class="rm-ic-sm" data-alin-rapido="justificado_direita" title="Justificado com última linha à direita">${svgIcone('alinhamento_jus_dir', 14)}</button>
-      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 3px;"></span>
-      <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnContextDividir" title="Dividir este bloco de texto em dois no cursor">${svgIcone('divisor', 13)} Dividir</button>
-      <button type="button" class="glx-btn glx-btn-xs glx-btn-primary" id="athBtnContextCitar" title="Inserir citação Zotero">Citar Zotero</button>
+      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 2px;"></span>
+
+      <!-- Símbolo único de Lista / Marcadores e Numeração com Menu Dropdown (estilo Affinity) -->
+      <div class="ath-ctx-dropdown-wrap" id="athWrapCtxLista">
+        <button type="button" class="ath-ctx-dropdown-btn" id="athBtnContextListaMenu" title="Marcadores e Numeração (escolher tipo e estilo)">
+          <span id="athIconeCtxLista" style="display:inline-flex; align-items:center;">${svgIcone('lista', 14)}</span>
+          <span style="font-size:10px; opacity:0.8;">▾</span>
+        </button>
+        <div class="ath-ctx-dropdown-menu" id="athMenuContextLista" hidden style="width:270px;">
+          <div style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; padding:2px 6px 4px; border-bottom:1px solid #EEF2F6;">
+            Marcadores e Numeração
+          </div>
+          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="nenhum">
+            <span>Nenhuma lista</span>
+            <span class="ath-ctx-menu-simbolo">—</span>
+          </button>
+          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="circulo">
+            <span>Marcador — Ponto</span>
+            <span class="ath-ctx-menu-simbolo">•</span>
+          </button>
+          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="traco">
+            <span>Alínea / Travessão ABNT</span>
+            <span class="ath-ctx-menu-simbolo">–</span>
+          </button>
+          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="quadrado">
+            <span>Marcador — Quadrado</span>
+            <span class="ath-ctx-menu-simbolo">▪</span>
+          </button>
+          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="ponto_traco">
+            <span>Marcador — Ponto-traço</span>
+            <span class="ath-ctx-menu-simbolo">·–</span>
+          </button>
+          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="numero">
+            <span>Lista Numerada</span>
+            <span class="ath-ctx-menu-simbolo">1, a, I</span>
+          </button>
+
+          <!-- Sub-configuração rápida de Numeração estilo Affinity -->
+          <div id="athSubMenuCtxNumerico" style="display:flex; flex-direction:column; gap:6px; margin-top:4px; padding:8px; border-radius:10px; background:#F8FAFC; border:1px solid #E2E8F0;">
+            <span style="font:800 10px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase;">Configuração Numérica</span>
+            <label style="font:700 10.5px var(--glx-font); color:#475569; display:flex; flex-direction:column; gap:2px;">Estilo (Número / Letra / Romano)
+              <select id="athCtxNumEstilo" class="glx-select" style="height:26px; font-size:11px; padding:0 6px; border-radius:7px; border:1px solid #CBD5E1;">
+                <option value="decimal">1, 2, 3… (Número)</option>
+                <option value="decimal_zero">01, 02, 03… (Zero esq.)</option>
+                <option value="lower_alpha">a, b, c… (Minúscula)</option>
+                <option value="upper_alpha">A, B, C… (Maiúscula)</option>
+                <option value="lower_roman">i, ii, iii… (Romano min.)</option>
+                <option value="upper_roman">I, II, III… (Romano mai.)</option>
+              </select>
+            </label>
+            <div style="display:grid; grid-template-columns:1fr 72px; gap:6px; align-items:end;">
+              <label style="font:700 10.5px var(--glx-font); color:#475569; display:flex; flex-direction:column; gap:2px;">Formato
+                <select id="athCtxNumSep" class="glx-select" style="height:26px; font-size:11px; padding:0 6px; border-radius:7px; border:1px solid #CBD5E1;">
+                  <option value="ponto">\#. (1. / a.)</option>
+                  <option value="parentese">\#) (1) / a))</option>
+                  <option value="entre_parenteses">(\#) ((1))</option>
+                  <option value="travessao">\# – (1 –)</option>
+                </select>
+              </label>
+              <label style="font:700 10.5px var(--glx-font); color:#475569; display:flex; flex-direction:column; gap:2px;">Início
+                <input type="number" id="athCtxNumInicio" min="1" max="999" value="1" style="height:26px; font-size:11px; padding:0 6px; border-radius:7px; border:1px solid #CBD5E1; width:100%; box-sizing:border-box;">
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Símbolo único de Alinhamento com Menu Dropdown -->
+      <div class="ath-ctx-dropdown-wrap" id="athWrapCtxAlinhamento">
+        <button type="button" class="ath-ctx-dropdown-btn" id="athBtnContextAlinMenu" title="Alinhamento do Parágrafo">
+          <span id="athIconeCtxAlin" style="display:inline-flex; align-items:center;">${svgIcone('alinhamento_esq', 14)}</span>
+          <span id="athRotuloCtxAlin" style="font-size:10.5px;">Alinhar</span>
+          <span style="font-size:10px; opacity:0.8;">▾</span>
+        </button>
+        <div class="ath-ctx-dropdown-menu" id="athMenuContextAlin" hidden style="width:220px;">
+          <div style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; padding:2px 6px 4px; border-bottom:1px solid #EEF2F6;">
+            Alinhamento do Bloco
+          </div>
+          <button type="button" class="ath-ctx-menu-item" id="athBtnContextAlinEstilo">
+            <span>Do estilo de texto</span>
+            <span class="ath-ctx-menu-simbolo">Auto</span>
+          </button>
+          <button type="button" class="ath-ctx-menu-item" data-alin-rapido="esquerda">
+            <span>À Esquerda</span>
+            <span class="ath-ctx-menu-simbolo">${svgIcone('alinhamento_esq', 13)}</span>
+          </button>
+          <button type="button" class="ath-ctx-menu-item" data-alin-rapido="centro">
+            <span>Centralizado</span>
+            <span class="ath-ctx-menu-simbolo">${svgIcone('alinhamento_cen', 13)}</span>
+          </button>
+          <button type="button" class="ath-ctx-menu-item" data-alin-rapido="direita">
+            <span>À Direita</span>
+            <span class="ath-ctx-menu-simbolo">${svgIcone('alinhamento_dir', 13)}</span>
+          </button>
+          <button type="button" class="ath-ctx-menu-item" data-alin-rapido="justificado_esquerda">
+            <span>Justificado (últ. esq.)</span>
+            <span class="ath-ctx-menu-simbolo">${svgIcone('alinhamento_jus_esq', 13)}</span>
+          </button>
+          <button type="button" class="ath-ctx-menu-item" data-alin-rapido="justificado_direita">
+            <span>Justificado (últ. dir.)</span>
+            <span class="ath-ctx-menu-simbolo">${svgIcone('alinhamento_jus_dir', 13)}</span>
+          </button>
+        </div>
+      </div>
+
+      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 2px;"></span>
+      <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnContextDividir" title="Dividir este bloco de texto em dois no cursor" style="height:28px; display:inline-flex; align-items:center; gap:4px; border-radius:999px;">${svgIcone('divisor', 13)} Dividir</button>
+      <button type="button" class="glx-btn glx-btn-xs glx-btn-primary" id="athBtnContextCitar" title="Inserir citação Zotero" style="height:28px; display:inline-flex; align-items:center; border-radius:999px;">Citar Zotero</button>
     `;
 
     // Pill flutuante para quando o cursor está posicionado no texto (sem seleção prévia)
@@ -2354,6 +2988,111 @@ export class EditorView {
     }
 
     document.body.appendChild(barra);
+
+    const menuLista = barra.querySelector('#athMenuContextLista');
+    const menuAlin = barra.querySelector('#athMenuContextAlin');
+    const btnListaMenu = barra.querySelector('#athBtnContextListaMenu');
+    const btnAlinMenu = barra.querySelector('#athBtnContextAlinMenu');
+
+    const fecharDropdownsCtx = () => {
+      if (menuLista) menuLista.hidden = true;
+      if (menuAlin) menuAlin.hidden = true;
+    };
+
+    btnListaMenu?.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const abrir = menuLista.hidden;
+      fecharDropdownsCtx();
+      menuLista.hidden = !abrir;
+    });
+
+    btnAlinMenu?.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const abrir = menuAlin.hidden;
+      fecharDropdownsCtx();
+      menuAlin.hidden = !abrir;
+    });
+
+    menuLista?.addEventListener('mousedown', e => {
+      if (e.target.closest('select, input, label')) {
+        e.stopPropagation();
+      }
+    });
+
+    const aplicarMarcadorNoBlocoSelecionado = (tipo) => {
+      const b = this.blocoSelecionado;
+      if (!b) return;
+      if (tipo === 'nenhum') {
+        delete b.marcador_tipo;
+        const txt = String(b.texto || '').trim();
+        if (txt.startsWith('<ul') || txt.startsWith('<ol')) {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = txt;
+          const itens = Array.from(tmp.querySelectorAll('li')).map(li => li.innerHTML);
+          if (itens.length > 0) b.texto = itens.join('<br>');
+        }
+      } else {
+        b.marcador_tipo = tipo;
+        if (tipo === 'numero') {
+          b.marcador_estilo_num = barra.querySelector('#athCtxNumEstilo')?.value || b.marcador_estilo_num || 'decimal';
+          b.marcador_separador = barra.querySelector('#athCtxNumSep')?.value || b.marcador_separador || 'ponto';
+          b.marcador_inicio = Math.max(1, parseInt(barra.querySelector('#athCtxNumInicio')?.value, 10) || b.marcador_inicio || 1);
+        }
+        const txt = String(b.texto || '').trim();
+        if (txt.includes('<ul') || txt.includes('<ol')) {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = txt;
+          tmp.querySelectorAll('ul, ol').forEach(listaAntiga => {
+            const tagAlvo = tipo === 'numero' ? 'ol' : 'ul';
+            const novaLista = document.createElement(tagAlvo);
+            novaLista.innerHTML = listaAntiga.innerHTML;
+            listaAntiga.replaceWith(novaLista);
+          });
+          b.texto = tmp.innerHTML;
+        }
+      }
+      this.notificarMudanca();
+      this.renderizar();
+      this.onSelecionarBloco(b, null);
+    };
+
+    barra.querySelectorAll('[data-ctx-marcador]').forEach(btn => {
+      btn.addEventListener('mousedown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const tipo = btn.dataset.ctxMarcador;
+        aplicarMarcadorNoBlocoSelecionado(tipo);
+        if (tipo !== 'numero') {
+          fecharDropdownsCtx();
+        }
+      });
+    });
+
+    barra.querySelector('#athCtxNumEstilo')?.addEventListener('change', e => {
+      if (this.blocoSelecionado) {
+        this.blocoSelecionado.marcador_tipo = 'numero';
+        this.blocoSelecionado.marcador_estilo_num = e.target.value;
+        aplicarMarcadorNoBlocoSelecionado('numero');
+      }
+    });
+
+    barra.querySelector('#athCtxNumSep')?.addEventListener('change', e => {
+      if (this.blocoSelecionado) {
+        this.blocoSelecionado.marcador_tipo = 'numero';
+        this.blocoSelecionado.marcador_separador = e.target.value;
+        aplicarMarcadorNoBlocoSelecionado('numero');
+      }
+    });
+
+    barra.querySelector('#athCtxNumInicio')?.addEventListener('input', e => {
+      if (this.blocoSelecionado) {
+        this.blocoSelecionado.marcador_tipo = 'numero';
+        this.blocoSelecionado.marcador_inicio = Math.max(1, parseInt(e.target.value, 10) || 1);
+        aplicarMarcadorNoBlocoSelecionado('numero');
+      }
+    });
 
     // Eventos da barra flutuante
     const selEstilo = barra.querySelector('#athBarraContextEstilo');
@@ -2389,41 +3128,32 @@ export class EditorView {
       });
     });
 
-    barra.querySelector('[data-lista-alinea]')?.addEventListener('mousedown', e => {
-      e.preventDefault();
-      document.execCommand('insertUnorderedList', false, null);
-      const sel = window.getSelection();
-      if (sel && sel.anchorNode) {
-        const elNode = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
-        const ul = elNode?.closest('ul');
-        if (ul) {
-          ul.classList.toggle('ath-lista-alinea');
-        }
-      }
-      this.notificarMudanca();
-    });
-
     barra.querySelector('#athBtnContextAlinEstilo')?.addEventListener('mousedown', e => {
       e.preventDefault();
+      e.stopPropagation();
       if (this.blocoSelecionado) {
         delete this.blocoSelecionado.alinhamento;
+        fecharDropdownsCtx();
         this.notificarMudanca();
         this.renderizar();
+        this.onSelecionarBloco(this.blocoSelecionado, null);
       }
     });
 
     barra.querySelectorAll('[data-alin-rapido]').forEach(btn => {
       btn.addEventListener('mousedown', e => {
         e.preventDefault();
+        e.stopPropagation();
         if (this.blocoSelecionado) {
           this.blocoSelecionado.alinhamento = btn.dataset.alinRapido;
+          fecharDropdownsCtx();
           this.notificarMudanca();
           this.renderizar();
+          this.onSelecionarBloco(this.blocoSelecionado, null);
         }
       });
     });
 
-    
     const acaoDividirRange = (range, editable) => {
       if (!range || !editable) return;
       const rangeAntes = range.cloneRange();
@@ -2482,9 +3212,15 @@ export class EditorView {
 
     // Monitora seleção de texto e posição do cursor
     const atualizarPosicaoBarra = () => {
+      // Se o foco está dentro de um select/input do menu contextual da própria barra, mantém aberta
+      if (document.activeElement && barra.contains(document.activeElement)) {
+        return;
+      }
+
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0) {
         barra.style.display = 'none';
+        fecharDropdownsCtx();
         if (pillCaret) pillCaret.style.display = 'none';
         return;
       }
@@ -2496,6 +3232,7 @@ export class EditorView {
 
       if (!editable) {
         barra.style.display = 'none';
+        fecharDropdownsCtx();
         if (pillCaret) pillCaret.style.display = 'none';
         return;
       }
@@ -2517,36 +3254,52 @@ export class EditorView {
             selEstilo.value = this.blocoSelecionado.estiloId;
           }
 
-          // Reflete estado do botão "Do estilo"
+          // Reflete estado do menu de Alinhamento
+          const alinAtivo = this.blocoSelecionado?.alinhamento || '';
           const btnCtxAlinEstilo = barra.querySelector('#athBtnContextAlinEstilo');
           if (btnCtxAlinEstilo) {
-            const isDoEstilo = !this.blocoSelecionado?.alinhamento;
-            btnCtxAlinEstilo.classList.toggle('glx-btn-primary', isDoEstilo);
-            btnCtxAlinEstilo.classList.toggle('glx-btn-soft', !isDoEstilo);
+            btnCtxAlinEstilo.classList.toggle('on', !alinAtivo);
+          }
+          barra.querySelectorAll('[data-alin-rapido]').forEach(bt => {
+            bt.classList.toggle('on', bt.dataset.alinRapido === alinAtivo);
+          });
+          const rotuloAlinEl = barra.querySelector('#athRotuloCtxAlin');
+          if (rotuloAlinEl) {
+            const mapaAlin = {
+              '': 'Do estilo',
+              esquerda: 'Esquerda',
+              centro: 'Centro',
+              direita: 'Direita',
+              justificado_esquerda: 'Justif.',
+              justificado_direita: 'Justif. Dir.'
+            };
+            rotuloAlinEl.textContent = mapaAlin[alinAtivo] || 'Alinhar';
           }
 
-          // Reflete estado dos botões de estilo e marcadores
+          // Reflete estado do menu de Lista / Marcadores e Numeração
+          const marcAtivo = this.blocoSelecionado?.marcador_tipo || 'nenhum';
+          barra.querySelectorAll('[data-ctx-marcador]').forEach(bt => {
+            bt.classList.toggle('on', bt.dataset.ctxMarcador === marcAtivo);
+          });
+          btnListaMenu?.classList.toggle('on', marcAtivo !== 'nenhum');
+          const selNumEst = barra.querySelector('#athCtxNumEstilo');
+          const selNumSep = barra.querySelector('#athCtxNumSep');
+          const inpNumIni = barra.querySelector('#athCtxNumInicio');
+          if (selNumEst) selNumEst.value = this.blocoSelecionado?.marcador_estilo_num || 'decimal';
+          if (selNumSep) selNumSep.value = this.blocoSelecionado?.marcador_separador || 'ponto';
+          if (inpNumIni) inpNumIni.value = this.blocoSelecionado?.marcador_inicio ?? 1;
+
+          // Reflete estado dos botões de formatação inline
           try {
             const cmdB = barra.querySelector('[data-cmd="bold"]');
             const cmdI = barra.querySelector('[data-cmd="italic"]');
             const cmdU = barra.querySelector('[data-cmd="underline"]');
             const cmdS = barra.querySelector('[data-cmd="strikeThrough"]');
-            const btnUl = barra.querySelector('[data-cmd="insertUnorderedList"]');
-            const btnOl = barra.querySelector('[data-cmd="insertOrderedList"]');
-            const btnAlinea = barra.querySelector('[data-lista-alinea]');
 
             if (cmdB) cmdB.classList.toggle('on', document.queryCommandState('bold'));
             if (cmdI) cmdI.classList.toggle('on', document.queryCommandState('italic'));
             if (cmdU) cmdU.classList.toggle('on', document.queryCommandState('underline'));
             if (cmdS) cmdS.classList.toggle('on', document.queryCommandState('strikeThrough'));
-
-            const isUl = document.queryCommandState('insertUnorderedList');
-            const isOl = document.queryCommandState('insertOrderedList');
-            const isAlinea = !!elPai?.closest('ul.ath-lista-alinea');
-
-            if (btnUl) btnUl.classList.toggle('on', isUl && !isAlinea);
-            if (btnOl) btnOl.classList.toggle('on', isOl);
-            if (btnAlinea) btnAlinea.classList.toggle('on', isAlinea);
           } catch (_) {}
           return;
         }

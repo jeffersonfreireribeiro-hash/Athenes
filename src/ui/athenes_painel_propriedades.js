@@ -662,24 +662,92 @@ export class PainelPropriedades {
           </div>
         </div>
 
-        <!-- MARCADOR -->
-        <div>
-          <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
-            Marcador
-          </span>
-          <div class="rm-icg" style="display:inline-flex; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:3px; gap:2px;">
-            <button type="button" class="rm-ic-bt ${b.marcador_tipo === 'circulo' ? 'on' : ''}" data-marcador="circulo" title="Círculo sólido">
-              ${svgIcone('marcador_circulo', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${b.marcador_tipo === 'ponto_traco' ? 'on' : ''}" data-marcador="ponto_traco" title="Ponto-traço">
-              ${svgIcone('marcador_ponto_traco', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${b.marcador_tipo === 'traco' ? 'on' : ''}" data-marcador="traco" title="Traço">
-              ${svgIcone('marcador_traco', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${b.marcador_tipo === 'numero' ? 'on' : ''}" data-marcador="numero" title="Numeração">
-              ${svgIcone('marcador_numero', 16)}
-            </button>
+        <!-- MARCADORES E NUMERAÇÃO (Estilo Affinity Publisher) -->
+        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:4px; background:#fff;">
+          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
+            <span>Marcadores e Numeração</span>
+            <span style="font-size:10px; color:var(--glx-muted); text-transform:none; font-weight:600;">Listas & Alíneas</span>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Tipo
+              <select id="rmMarcadorTipo" class="glx-select">
+                <option value="nenhum" ${!b.marcador_tipo || b.marcador_tipo === 'nenhum' ? 'selected' : ''}>Nenhuma lista</option>
+                <option value="circulo" ${b.marcador_tipo === 'circulo' ? 'selected' : ''}>•  Marcador — Ponto (Círculo)</option>
+                <option value="traco" ${b.marcador_tipo === 'traco' ? 'selected' : ''}>–  Marcador — Travessão / Alínea</option>
+                <option value="quadrado" ${b.marcador_tipo === 'quadrado' ? 'selected' : ''}>▪  Marcador — Quadrado</option>
+                <option value="ponto_traco" ${b.marcador_tipo === 'ponto_traco' ? 'selected' : ''}>·– Marcador — Ponto-traço</option>
+                <option value="numero" ${b.marcador_tipo === 'numero' ? 'selected' : ''}>1, 2, 3…  Numérico (Configurável)</option>
+              </select>
+            </label>
+
+            <div id="rmBoxMarcadorConfig" style="display:${b.marcador_tipo && b.marcador_tipo !== 'nenhum' ? 'flex' : 'none'}; flex-direction:column; gap:8px; padding-top:6px; border-top:1px dashed var(--ath-primary-line, #C8D7E6);">
+              <div id="rmBoxMarcadorNumerico" style="display:${b.marcador_tipo === 'numero' ? 'flex' : 'none'}; flex-direction:column; gap:8px;">
+                <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Estilo Numérico
+                  <select id="rmMarcadorEstiloNum" class="glx-select">
+                    <option value="decimal" ${(!b.marcador_estilo_num || b.marcador_estilo_num === 'decimal') ? 'selected' : ''}>1, 2, 3, 4… (Número arábico)</option>
+                    <option value="decimal_zero" ${b.marcador_estilo_num === 'decimal_zero' ? 'selected' : ''}>01, 02, 03… (Zero à esquerda)</option>
+                    <option value="lower_alpha" ${b.marcador_estilo_num === 'lower_alpha' ? 'selected' : ''}>a, b, c, d… (Letra minúscula)</option>
+                    <option value="upper_alpha" ${b.marcador_estilo_num === 'upper_alpha' ? 'selected' : ''}>A, B, C, D… (Letra maiúscula)</option>
+                    <option value="lower_roman" ${b.marcador_estilo_num === 'lower_roman' ? 'selected' : ''}>i, ii, iii, iv… (Romano minúsculo)</option>
+                    <option value="upper_roman" ${b.marcador_estilo_num === 'upper_roman' ? 'selected' : ''}>I, II, III, IV… (Romano maiúsculo)</option>
+                  </select>
+                </label>
+
+                <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end;">
+                  <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Texto / Formato
+                    <select id="rmMarcadorSeparador" class="glx-select" title="Formato de pontuação do número (ex: 1. ou a) ou (1))">
+                      <option value="ponto" ${(!b.marcador_separador || b.marcador_separador === 'ponto') ? 'selected' : ''}>\#.  (1. / a.)</option>
+                      <option value="parentese" ${b.marcador_separador === 'parentese' ? 'selected' : ''}>\#)  (1) / a))</option>
+                      <option value="entre_parenteses" ${b.marcador_separador === 'entre_parenteses' ? 'selected' : ''}>(\#)  ((1) / (a))</option>
+                      <option value="travessao" ${b.marcador_separador === 'travessao' ? 'selected' : ''}>\# –  (1 – / a –)</option>
+                    </select>
+                  </label>
+                  <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Iniciar em
+                    <input type="number" id="rmMarcadorInicio" class="glx-input" min="1" max="999" value="${b.marcador_inicio ?? 1}">
+                  </label>
+                </div>
+              </div>
+
+              <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end;">
+                <label style="font-size:11px; color:var(--glx-muted);">Nível
+                  <input type="number" id="rmMarcadorNivel" class="glx-input" min="1" max="5" value="${b.marcador_nivel ?? 1}">
+                </label>
+                <label style="font-size:11px; color:var(--glx-muted);">Tabulação (mm)
+                  <input type="number" id="rmMarcadorTabMm" class="glx-input" min="3" max="30" step="0.5" value="${b.marcador_tab_mm ?? 7}">
+                </label>
+              </div>
+
+              <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end;">
+                <label style="font-size:11px; color:var(--glx-muted);">Alinhamento
+                  <select id="rmMarcadorAlinhamento" class="glx-select">
+                    <option value="left" ${(!b.marcador_alinhamento || b.marcador_alinhamento === 'left') ? 'selected' : ''}>Esquerda</option>
+                    <option value="center" ${b.marcador_alinhamento === 'center' ? 'selected' : ''}>Centro</option>
+                    <option value="right" ${b.marcador_alinhamento === 'right' ? 'selected' : ''}>Direita</option>
+                  </select>
+                </label>
+                <label style="font-size:11px; color:var(--glx-muted);">Estilo Caractere
+                  <select id="rmMarcadorEstiloId" class="glx-select">
+                    <option value="" ${!b.marcador_estilo_id ? 'selected' : ''}>[Sem Estilo]</option>
+                    ${estilos.map(e => `<option value="${e.id}" ${b.marcador_estilo_id === e.id ? 'selected' : ''}>${e.nome}</option>`).join('')}
+                  </select>
+                </label>
+              </div>
+
+              <div id="rmBoxMarcadorReiniciar" style="display:${b.marcador_tipo === 'numero' ? 'flex' : 'none'}; flex-direction:column; gap:6px;">
+                <label style="font-size:11px; color:var(--glx-muted);">Reiniciar numeração
+                  <select id="rmMarcadorReiniciarModo" class="glx-select">
+                    <option value="qualquer_nao_lista" ${(!b.marcador_reiniciar || b.marcador_reiniciar === 'qualquer_nao_lista') ? 'selected' : ''}>Qualquer não lista</option>
+                    <option value="abaixo_nivel" ${b.marcador_reiniciar === 'abaixo_nivel' ? 'selected' : ''}>Abaixo do nível atual</option>
+                    <option value="manual" ${b.marcador_reiniciar === 'manual' ? 'selected' : ''}>Manualmente</option>
+                  </select>
+                </label>
+                <label class="rm-chk" style="font-size:11.5px; font-weight:600; color:var(--ath-text, #1F2733); cursor:pointer;">
+                  <input type="checkbox" id="rmMarcadorReiniciarAgora" ${b.marcador_reiniciar_agora !== false ? 'checked' : ''} style="accent-color:var(--ath-primary, #314F79);">
+                  <span>Reiniciar numeração agora</span>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -834,17 +902,102 @@ export class PainelPropriedades {
         });
       });
 
-      // Marcadores
+      // Marcadores e Numeração (Estilo Affinity Publisher)
       box.querySelector('#athBtnDividirBlocoProps')?.addEventListener('click', () => {
         this.onDividirBloco(b);
       });
 
-      box.querySelectorAll('[data-marcador]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          b.marcador_tipo = b.marcador_tipo === btn.dataset.marcador ? null : btn.dataset.marcador;
-          this.notificarMudanca();
-          this.renderizar();
-        });
+      const normalizarHtmlListaDoBloco = () => {
+        const tipo = b.marcador_tipo;
+        const txt = String(b.texto || '').trim();
+        if (!tipo || tipo === 'nenhum') {
+          delete b.marcador_tipo;
+          // Se havia lista simples envolvendo o bloco inteiro, desempacota os <li> em parágrafos/linhas
+          if (txt.startsWith('<ul') || txt.startsWith('<ol')) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = txt;
+            const itens = Array.from(tmp.querySelectorAll('li')).map(li => li.innerHTML);
+            if (itens.length > 0) {
+              b.texto = itens.join('<br>');
+            }
+          }
+          return;
+        }
+
+        // Converte entre <ul> e <ol> caso já exista tag de lista no HTML salvo
+        if (txt.includes('<ul') || txt.includes('<ol')) {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = txt;
+          tmp.querySelectorAll('ul, ol').forEach(listaAntiga => {
+            const tagAlvo = tipo === 'numero' ? 'ol' : 'ul';
+            const novaLista = document.createElement(tagAlvo);
+            novaLista.innerHTML = listaAntiga.innerHTML;
+            listaAntiga.replaceWith(novaLista);
+          });
+          b.texto = tmp.innerHTML;
+        }
+      };
+
+      box.querySelector('#rmMarcadorTipo')?.addEventListener('change', e => {
+        const val = e.target.value;
+        if (val === 'nenhum') {
+          delete b.marcador_tipo;
+        } else {
+          b.marcador_tipo = val;
+          if (val === 'numero') {
+            if (!b.marcador_estilo_num) b.marcador_estilo_num = 'decimal';
+            if (!b.marcador_separador) b.marcador_separador = 'ponto';
+            if (!b.marcador_inicio) b.marcador_inicio = 1;
+          }
+        }
+        normalizarHtmlListaDoBloco();
+        this.notificarMudanca();
+        this.renderizar();
+      });
+
+      box.querySelector('#rmMarcadorEstiloNum')?.addEventListener('change', e => {
+        b.marcador_estilo_num = e.target.value;
+        this.notificarMudanca();
+      });
+
+      box.querySelector('#rmMarcadorSeparador')?.addEventListener('change', e => {
+        b.marcador_separador = e.target.value;
+        this.notificarMudanca();
+      });
+
+      box.querySelector('#rmMarcadorInicio')?.addEventListener('input', e => {
+        b.marcador_inicio = Math.max(1, parseInt(e.target.value, 10) || 1);
+        this.notificarMudanca();
+      });
+
+      box.querySelector('#rmMarcadorNivel')?.addEventListener('input', e => {
+        b.marcador_nivel = Math.min(5, Math.max(1, parseInt(e.target.value, 10) || 1));
+        this.notificarMudanca();
+      });
+
+      box.querySelector('#rmMarcadorTabMm')?.addEventListener('input', e => {
+        b.marcador_tab_mm = Math.max(3, parseFloat(e.target.value) || 7);
+        this.notificarMudanca();
+      });
+
+      box.querySelector('#rmMarcadorAlinhamento')?.addEventListener('change', e => {
+        b.marcador_alinhamento = e.target.value;
+        this.notificarMudanca();
+      });
+
+      box.querySelector('#rmMarcadorEstiloId')?.addEventListener('change', e => {
+        b.marcador_estilo_id = e.target.value || null;
+        this.notificarMudanca();
+      });
+
+      box.querySelector('#rmMarcadorReiniciarModo')?.addEventListener('change', e => {
+        b.marcador_reiniciar = e.target.value;
+        this.notificarMudanca();
+      });
+
+      box.querySelector('#rmMarcadorReiniciarAgora')?.addEventListener('change', e => {
+        b.marcador_reiniciar_agora = e.target.checked;
+        this.notificarMudanca();
       });
 
       // Avançado
@@ -998,33 +1151,33 @@ export class PainelPropriedades {
         </label>
 
         <!-- Seleção de Arquivos / Imagens por Campo / Slot -->
-        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px; margin-top:8px; background:#fff;">
+        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:8px; background:#fff;">
           <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
             <span>Campos de Imagem (${qtdSlots})</span>
-            <span style="font-size:10px; color:var(--glx-muted); text-transform:none;">Upload ou URL</span>
+            <span style="font-size:10px; color:var(--glx-muted); text-transform:none; font-weight:600;">Upload ou URL</span>
           </div>
           <div style="display:flex; flex-direction:column; gap:8px;" id="athListaSlotsImagem">
             ${b.itens.slice(0, qtdSlots).map((it, idx) => `
-              <div class="ath-slot-item" style="border:1px solid #E2E8F0; border-radius:8px; padding:8px; background:#F8FAFC; display:flex; flex-direction:column; gap:6px;">
+              <div class="ath-slot-item" style="border:1px solid #E2E8F0; border-radius:10px; padding:8px 10px; background:#F8FAFC; display:flex; flex-direction:column; gap:6px;">
                 <div style="display:flex; align-items:center; justify-content:space-between;">
-                  <strong style="font-size:11px; color:#1F2733;">Slot ${idx + 1} (${String.fromCharCode(97 + idx).toUpperCase()})</strong>
+                  <strong style="font-size:11.5px; color:#1F2733;">Slot ${idx + 1} (${String.fromCharCode(97 + idx).toUpperCase()})</strong>
                   ${it.url ? `<button type="button" class="rm-ic rm-ic-perigo" data-limpar-slot="${idx}" title="Remover imagem deste campo" style="width:20px; height:20px;">${svgIcone('fechar', 12)}</button>` : ''}
                 </div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                  <div style="width:48px; height:48px; border-radius:6px; background:#EFF2F6; border:1px solid #CBD5E1; overflow:hidden; display:grid; place-items:center; flex:none;">
-                    ${it.url ? `<img src="${it.url}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="color:#94A3B8;">${svgIcone('imagem', 20)}</span>`}
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <div style="width:52px; height:52px; border-radius:8px; background:#EFF2F6; border:1px solid #CBD5E1; overflow:hidden; display:grid; place-items:center; flex:none;">
+                    ${it.url ? `<img src="${it.url}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="color:#94A3B8; display:inline-flex;">${svgIcone('imagem', 20)}</span>`}
                   </div>
-                  <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:4px;">
-                    <label class="glx-btn glx-btn-xs glx-btn-soft" style="cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; font-weight:700;">
-                      ${svgIcone('imagem', 13)}
-                      <span>Escolher Imagem...</span>
+                  <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:5px;">
+                    <label class="glx-btn glx-btn-xs glx-btn-soft ath-btn-slot-img" style="cursor:pointer; display:flex !important; flex-direction:row !important; align-items:center !important; justify-content:center !important; gap:6px; height:28px; padding:0 10px; width:100%; box-sizing:border-box; font:700 11.5px var(--glx-font); color:var(--ath-primary, #314F79); border-radius:8px;">
+                      <span style="display:inline-flex; align-items:center; flex:none;">${svgIcone('imagem', 14)}</span>
+                      <span style="white-space:nowrap;">Escolher Imagem...</span>
                       <input type="file" accept="image/*" data-upload-slot="${idx}" hidden>
                     </label>
-                    <input type="text" data-url-slot="${idx}" value="${it.url || ''}" placeholder="Ou cole URL da imagem" style="font-size:11px; padding:3px 6px;">
+                    <input type="text" data-url-slot="${idx}" value="${it.url || ''}" placeholder="Ou cole URL da imagem" style="font-size:11px; height:28px; padding:4px 8px; border-radius:8px; box-sizing:border-box;">
                   </div>
                 </div>
                 ${qtdSlots > 1 ? `
-                  <input type="text" data-subleg-slot="${idx}" value="${it.legenda_sub || ''}" placeholder="Sublegenda deste item (ex: Detalhe B)" style="font-size:11px; padding:3px 6px;">
+                  <input type="text" data-subleg-slot="${idx}" value="${it.legenda_sub || ''}" placeholder="Sublegenda deste item (ex: Detalhe B)" style="font-size:11px; height:28px; padding:4px 8px; border-radius:8px; box-sizing:border-box;">
                 ` : ''}
               </div>
             `).join('')}
@@ -1032,44 +1185,48 @@ export class PainelPropriedades {
         </div>
 
         <!-- Dimensões, Proporção e Enquadramento da Imagem -->
-        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px; margin-top:8px; background:#fff;">
+        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:8px; background:#fff;">
           <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; margin-bottom:8px;">
             Altura, Proporção e Recorte
           </div>
-          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-            <label style="font-size:11px; font-weight:700;">Altura da Imagem
-              <select id="athImgAlturaModo" class="glx-select">
-                <option value="auto" ${(!b.altura_modo || b.altura_modo === 'auto') ? 'selected' : ''}>Automática (Proporcional)</option>
+          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end;">
+            <label style="font-size:11px; font-weight:700; min-width:0;">
+              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Altura da Imagem</span>
+              <select id="athImgAlturaModo" class="glx-select" style="height:32px; font-size:11.5px; padding:0 22px 0 8px;">
+                <option value="auto" ${(!b.altura_modo || b.altura_modo === 'auto') ? 'selected' : ''}>Automática</option>
                 <option value="160px" ${b.altura_modo === '160px' ? 'selected' : ''}>160 px (Compacta)</option>
                 <option value="220px" ${b.altura_modo === '220px' ? 'selected' : ''}>220 px (Normal)</option>
                 <option value="280px" ${b.altura_modo === '280px' ? 'selected' : ''}>280 px (Padrão)</option>
                 <option value="360px" ${b.altura_modo === '360px' ? 'selected' : ''}>360 px (Alta)</option>
-                <option value="450px" ${b.altura_modo === '450px' ? 'selected' : ''}>450 px (Vertical Destaque)</option>
-                <option value="100%" ${b.altura_modo === '100%' ? 'selected' : ''}>100% (Preencher Altura)</option>
+                <option value="450px" ${b.altura_modo === '450px' ? 'selected' : ''}>450 px (Destaque)</option>
+                <option value="100%" ${b.altura_modo === '100%' ? 'selected' : ''}>100% (Total)</option>
               </select>
             </label>
-            <label style="font-size:11px; font-weight:700;">Proporção (Aspect Ratio)
-              <select id="athImgProporcao" class="glx-select">
-                <option value="livre" ${(!b.proporcao_imagem || b.proporcao_imagem === 'livre') ? 'selected' : ''}>Original / Livre</option>
-                <option value="16/9" ${b.proporcao_imagem === '16/9' ? 'selected' : ''}>16:9 (Paisagem Widescreen)</option>
-                <option value="4/3" ${b.proporcao_imagem === '4/3' ? 'selected' : ''}>4:3 (Retangular Padrão)</option>
+            <label style="font-size:11px; font-weight:700; min-width:0;">
+              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Proporção</span>
+              <select id="athImgProporcao" class="glx-select" style="height:32px; font-size:11.5px; padding:0 22px 0 8px;">
+                <option value="livre" ${(!b.proporcao_imagem || b.proporcao_imagem === 'livre') ? 'selected' : ''}>Livre / Original</option>
+                <option value="16/9" ${b.proporcao_imagem === '16/9' ? 'selected' : ''}>16:9 (Paisagem)</option>
+                <option value="4/3" ${b.proporcao_imagem === '4/3' ? 'selected' : ''}>4:3 (Padrão)</option>
                 <option value="1/1" ${b.proporcao_imagem === '1/1' ? 'selected' : ''}>1:1 (Quadrada)</option>
-                <option value="3/4" ${b.proporcao_imagem === '3/4' ? 'selected' : ''}>3:4 (Retrato Vertical)</option>
-                <option value="9/16" ${b.proporcao_imagem === '9/16' ? 'selected' : ''}>9:16 (Vertical Estreita)</option>
+                <option value="3/4" ${b.proporcao_imagem === '3/4' ? 'selected' : ''}>3:4 (Retrato)</option>
+                <option value="9/16" ${b.proporcao_imagem === '9/16' ? 'selected' : ''}>9:16 (Vertical)</option>
               </select>
             </label>
           </div>
-          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
-            <label style="font-size:11px; font-weight:700;">Recorte / Enquadramento
-              <select id="athImgAjuste" class="glx-select">
-                <option value="contain" ${(!b.ajuste_enquadramento || b.ajuste_enquadramento === 'contain') ? 'selected' : ''}>Ajustar sem cortar (contain)</option>
-                <option value="cover" ${b.ajuste_enquadramento === 'cover' ? 'selected' : ''}>Preencher com corte (cover)</option>
-                <option value="scale-down" ${b.ajuste_enquadramento === 'scale-down' ? 'selected' : ''}>Encolher se maior (scale-down)</option>
-                <option value="fill" ${b.ajuste_enquadramento === 'fill' ? 'selected' : ''}>Esticar (fill)</option>
+          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; align-items:end;">
+            <label style="font-size:11px; font-weight:700; min-width:0;">
+              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Enquadramento</span>
+              <select id="athImgAjuste" class="glx-select" style="height:32px; font-size:11.5px; padding:0 22px 0 8px;">
+                <option value="contain" ${(!b.ajuste_enquadramento || b.ajuste_enquadramento === 'contain') ? 'selected' : ''}>Sem corte (Contain)</option>
+                <option value="cover" ${b.ajuste_enquadramento === 'cover' ? 'selected' : ''}>Preencher (Cover)</option>
+                <option value="scale-down" ${b.ajuste_enquadramento === 'scale-down' ? 'selected' : ''}>Reduzir (Scale)</option>
+                <option value="fill" ${b.ajuste_enquadramento === 'fill' ? 'selected' : ''}>Esticar (Fill)</option>
               </select>
             </label>
-            <label style="font-size:11px; font-weight:700;">Alinhamento da Imagem
-              <select id="athImgAlinhamento" class="glx-select">
+            <label style="font-size:11px; font-weight:700; min-width:0;">
+              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Alinhamento</span>
+              <select id="athImgAlinhamento" class="glx-select" style="height:32px; font-size:11.5px; padding:0 22px 0 8px;">
                 <option value="centro" ${(!b.alinhamento_imagem || b.alinhamento_imagem === 'centro') ? 'selected' : ''}>Centralizado</option>
                 <option value="esquerda" ${b.alinhamento_imagem === 'esquerda' ? 'selected' : ''}>À Esquerda</option>
                 <option value="direita" ${b.alinhamento_imagem === 'direita' ? 'selected' : ''}>À Direita</option>
