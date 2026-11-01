@@ -48,6 +48,7 @@ export class AthenesApp {
     this.tela = 'editor';
     this.container.innerHTML = '<div id="athAppEditor"></div>';
     const editorBox = this.container.querySelector('#athAppEditor');
+    this.painelProps = null;
 
     this.editorView = new EditorView(editorBox, this.documentoAtivo, {
       onAlterado: (doc) => {
@@ -56,10 +57,9 @@ export class AthenesApp {
         if (this.painelProps) this.painelProps.setDocumento(doc);
       },
       onSelecionarBloco: (bloco, pagina) => {
-        if (this.painelProps) {
-          this.painelProps.setSelecao(bloco, pagina);
-        }
+        if (this.painelProps) this.painelProps.setSelecao(bloco, pagina);
       },
+      onRenderizado: (inspetorEl) => this.montarPainelProps(inspetorEl),
       onVoltarDashboard: () => {
         this.autoSalvar();
         this.navegarParaDashboard();
@@ -74,25 +74,25 @@ export class AthenesApp {
         this.abrirModalConexoes();
       }
     });
+  }
 
-    // Inicializa régua horizontal
-    const reguaCanvas = editorBox.querySelector('#athReguaH');
-    const stage = editorBox.querySelector('#athCanvasStage');
-    if (reguaCanvas) {
-      this.reguas = new ReguasController(reguaCanvas, stage);
-    }
-
-    // Inicializa painel de propriedades na lateral direita
-    const inspectorContainer = editorBox.querySelector('#athInspectorContainer');
-    if (inspectorContainer) {
-      this.painelProps = new PainelPropriedades(inspectorContainer, this.documentoAtivo, {
-        onAbrirZotero: () => { this.abrirModalZotero(); },
-        onAlterado: () => {
-          this.editorView.renderizarFolhasPaginas();
-          this.autoSalvar();
+  /** O editor recria o DOM a cada redesenho; o inspetor é remontado no novo contêiner. */
+  montarPainelProps(inspetorEl) {
+    if (!inspetorEl) return;
+    const editor = this.editorView;
+    this.painelProps = new PainelPropriedades(inspetorEl, editor ? editor.doc : this.documentoAtivo, {
+      onAlterado: (doc, estrutural) => {
+        if (this.editorView) {
+          this.editorView.aposAlteracaoExterna(!!estrutural);
+          this.documentoAtivo = this.editorView.doc;
         }
-      });
-    }
+        this.autoSalvar();
+      },
+      onAbrirZotero: () => {
+        this.abrirModalZotero();
+      }
+    });
+    if (editor && editor.blocoSelecionado) this.painelProps.setSelecao(editor.blocoSelecionado, null);
   }
 
   abrirModalZotero() {

@@ -94,3 +94,10 @@ No texto dos parágrafos, marcadores interativos no formato `[ref:tipo:id]` (ex.
 - `src/css/athenes_editor.css`: Estilos completos importados do padrão Glaux GIS (`relatorios_modelos.css`) com extensões de folha A4 e blocos compostos.
 - `src/core/athenes_documento.js`: Esquemas de dados, cálculo de alturas, numeração automática e referências cruzadas.
 - `tests/blocos_compostos.test.js`: Suíte de validação de blocos compostos, numeração e referências.
+
+---
+
+## 6. Estilos em lista e mover blocos (01/11/2026)
+
+- **Estilos de texto:** lista vertical selecionável + rascunho com prévia; Salvar estilo / Salvar como novo / Excluir.
+- **Linhas e grupos:** campo `grupo` nos blocos; soltar no centro de outro bloco cria um grupo (até 4 lado a lado, larguras iguais); soltar na borda reordena em linha própria. Funciona na lista de blocos e na folha (alça lateral de seis pontos). Testes em `tests/grupos_blocos.test.js`.

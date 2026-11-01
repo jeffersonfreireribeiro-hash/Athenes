@@ -123,3 +123,11 @@
   - Criado o teste `tests/blocos_compostos.test.js`.
   - Suíte completa com **35 testes em 11 suítes**, 100% aprovados via `npm test` sem dependências externas.
   - Validação real executada gerando `tests/amostra_artigo_athenes.docx` e `tests/amostra_artigo_athenes.html`.
+
+## Lista de estilos, salvar estilo e blocos arrastáveis (01/11/2026)
+
+- **Estilos de texto em lista:** a seção deixou de usar chips; agora é uma lista vertical (amostra Aa, nome, fonte · pt · peso). Edição acontece num rascunho com prévia ao vivo; botões **Salvar estilo**, **Salvar como novo** e **Excluir** (só estilos próprios). Código: `montarSecaoEstilos` em `src/ui/athenes_editor.js`.
+- **Linhas e grupos (mecânica do Clux.js):** blocos vizinhos com o mesmo `grupo` dividem as 12 colunas (máx. 4). `colocarBloco` (antes/depois/grupo), `moverBlocoPorLinha`, `moverParaLinha`, `duplicarBlocoNaSecao`, `calcularLinhas` em `src/core/athenes_documento.js`. A repaginação trata a linha agrupada como unidade.
+- **Arrastar:** na lista de blocos (soltar na borda reordena, no centro agrupa) e na folha, com **alça lateral** (seis pontos) em cada bloco. Inspetor com pills de linha reais e Igualar larguras.
+- **Inspetor remontado** a cada redesenho do editor (antes ficava solto ao inserir blocos); histórico passou a registrar edições de texto e do inspetor.
+- Testes: `tests/grupos_blocos.test.js` (41 testes no total).

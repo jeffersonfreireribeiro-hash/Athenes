@@ -10,7 +10,10 @@
  */
 
 import { FONTES_SISTEMA, PESOS_FONTE } from '../core/athenes_estilos.js';
-import { modeloDaPagina, recalcularNumeracaoAutomatica, resolverReferenciasCruzadas } from '../core/athenes_documento.js';
+import {
+  modeloDaPagina, recalcularNumeracaoAutomatica, resolverReferenciasCruzadas,
+  calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
+} from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
 
 export class PainelPropriedades {
@@ -99,42 +102,58 @@ export class PainelPropriedades {
   }
 
   renderizarControleLinha(wrapper, b) {
+    const info = linhaDoBloco(this.doc, b.id);
+    const secao = this.doc.secoes.find(s => s.blocos.some(x => x.id === b.id));
+    const linhas = calcularLinhas(secao ? secao.blocos : []);
     const secLinha = document.createElement('div');
     secLinha.className = 'rm-linha-ctl';
 
-    const linhaAtual = b.linha_grade || 1;
-    const totalLinhas = Math.max(4, linhaAtual);
-
+    const msg = info.quantidade > 1
+      ? `Este bloco está na linha ${info.numero} de ${info.total}, junto com mais ${info.quantidade - 1}.`
+      : `Este bloco está sozinho na linha ${info.numero} de ${info.total}. Escolha outra linha para colocá-lo lado a lado (até ${LIMITE_BLOCOS_POR_LINHA} por linha).`;
     secLinha.innerHTML = `
       <span class="rm-rot">LINHA</span>
-      <p class="rm-dica" style="margin:0;">Este bloco está posicionado na linha ${linhaAtual} de ${totalLinhas}. Escolha outra linha para colocá-lo lado a lado (até 12 por linha).</p>
-      <div class="rm-lns" id="rmLinhasPills"></div>
+      <p class="rm-dica" style="margin:0;">${msg}</p>
+      <div class="rm-lns"></div>
     `;
 
-    const lnsContainer = secLinha.querySelector('#rmLinhasPills');
-    for (let i = 1; i <= totalLinhas; i++) {
+    const lns = secLinha.querySelector('.rm-lns');
+    for (let i = 1; i <= info.total; i++) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = `rm-ln ${i === linhaAtual ? 'on' : ''}`;
+      btn.className = `rm-ln ${i === info.numero ? 'on' : ''}`;
       btn.textContent = String(i);
+      const cheia = linhas[i - 1].length >= LIMITE_BLOCOS_POR_LINHA && i !== info.numero;
+      btn.disabled = cheia;
+      btn.title = cheia ? 'Esta linha já está cheia' : `Colocar na linha ${i}`;
       btn.addEventListener('click', () => {
-        b.linha_grade = i;
-        this.notificarMudanca();
+        if (moverParaLinha(this.doc, b.id, i)) this.notificarMudanca(true);
       });
-      lnsContainer.appendChild(btn);
+      lns.appendChild(btn);
     }
-
-    // Botão de nova linha (+)
-    const btnMais = document.createElement('button');
-    btnMais.type = 'button';
-    btnMais.className = 'rm-ln rm-ln-nova';
-    btnMais.textContent = '+';
-    btnMais.title = 'Criar nova linha';
-    btnMais.addEventListener('click', () => {
-      b.linha_grade = totalLinhas + 1;
-      this.notificarMudanca();
+    const nova = document.createElement('button');
+    nova.type = 'button';
+    nova.className = 'rm-ln rm-ln-nova';
+    nova.textContent = '+';
+    nova.title = 'Mover para uma linha nova ao final';
+    nova.disabled = info.quantidade === 1;
+    nova.addEventListener('click', () => {
+      if (moverParaLinha(this.doc, b.id, info.total + 1)) this.notificarMudanca(true);
     });
-    lnsContainer.appendChild(btnMais);
+    lns.appendChild(nova);
+
+    if (info.quantidade > 1) {
+      const igual = document.createElement('button');
+      igual.type = 'button';
+      igual.className = 'glx-btn glx-btn-soft glx-btn-sm';
+      igual.textContent = 'Igualar larguras';
+      igual.title = 'Divide as 12 colunas igualmente entre os blocos desta linha';
+      igual.addEventListener('click', () => {
+        igualarLinha(linhas[info.numero - 1]);
+        this.notificarMudanca(true);
+      });
+      secLinha.appendChild(igual);
+    }
 
     wrapper.appendChild(secLinha);
   }
@@ -183,7 +202,7 @@ export class PainelPropriedades {
       btn.addEventListener('click', () => {
         b.col = p.col;
         b.span = p.span;
-        this.notificarMudanca();
+        this.notificarMudanca(true);
       });
 
       presetsBox.appendChild(btn);
@@ -238,7 +257,7 @@ export class PainelPropriedades {
           }
         }
         atualizarTrilhaVisual();
-        this.notificarMudanca();
+        this.notificarMudanca(true);
       });
 
       trilhaBox.appendChild(pt);
@@ -466,8 +485,8 @@ export class PainelPropriedades {
     wrapper.appendChild(ajudanteBox);
   }
 
-  notificarMudanca() {
+  notificarMudanca(estrutural = false) {
     recalcularNumeracaoAutomatica(this.doc);
-    this.onAlterado(this.doc);
+    this.onAlterado(this.doc, estrutural);
   }
 }
