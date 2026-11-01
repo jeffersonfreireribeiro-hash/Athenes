@@ -85,3 +85,41 @@
   - Script `node tests/validacao_real.js` executado: gerou artigo de teste de 4 páginas com capa, sumário dinâmico, introdução, citações, tabelas, fórmulas e referências bibliográficas.
   - O arquivo gerado `tests/amostra_artigo_athenes.docx` (17.9 KB) foi validado e extraído com sucesso pelo PowerShell `Expand-Archive`, confirmando integridade estrutural do pacote ZIP e de todos os esquemas XML do Word.
   - O arquivo gerado `tests/amostra_artigo_athenes.html` (13.8 KB) foi validado com CSS Paged Media.
+
+
+## Adoção do Layout Glaux GIS, Sistema de Páginas Mestras/Fluxo e Blocos Compostos (01/11/2026)
+
+- **Adoção Integral do Layout Glaux GIS (`relatorios_modelos`):**
+  - O Athenes passou a adotar fielmente a arquitetura visual e os componentes do modelador de relatórios do Glaux GIS (`web/pages/relatorios_modelos.html` e `web/css/relatorios_modelos.css`):
+    - **Grade de 3 Colunas:** Coluna esquerda (310 px) para configurações do documento, margens, seções, cabeçalho/rodapé e estilos; Coluna central (`1fr`) com a folha real e barra flutuante; Coluna direita (330 px) para o inspetor de blocos e propriedades avançadas.
+    - **Barra de Blocos Flutuante em Pílula (`.rm-barra-blocos`):** Botão Voltar, botão Salvar em laranja preenchido (`.rm-ic-primario`, `#FF6B2C`), separadores, botões Desfazer/Refazer, botões circulares para todos os blocos (Título, Texto, Campos, Figura, Tabela, Quadro, Mapa, Fórmula, Divisor, Espaçamento, Quebra de página) e botão de ativação da grade de 12 colunas (`.rm-ic-guia`) à direita.
+    - **Miniatura da Folha com Diagrama de Margens (`.rm-folha-mini`, `#rmMDiag`):** Proporção exata A4 (210 × 297 mm retrato ou 297 × 210 mm paisagem) com retângulo interno pontilhado em laranja `#FF6B2C` indicando a área útil, 4 campos numéricos em milímetros com sufixo `mm` e botão de elo (`.rm-ic-elo`) para sincronizar as quatro margens simultaneamente.
+    - **Controles de Linha e Grade de 12 Colunas:** Seletor de linha com botões em pílula numerada `(1)`, `(2)`, `(3)`, `(+)`; 4 cartões de largura pré-definida (Largura toda, Metade esq., Metade dir., Um terço); e trilha interativa de 12 pontos circulares (`.rm-trilha`) permitindo esticar ou encolher o bloco mantendo faixas contínuas.
+    - **Acabamento Visual Glaux:** Caixas de marcar circulares com visto branco em fundo laranja (`.rm-chk`), chips de estilos em pílula (`.rm-est-chip`), seletores segmentados de alinhamento e formato.
+
+- **Sistema de Páginas Mestras Fixas e Progressivas com Fluxo Contínuo:**
+  - Modelagem em `src/core/athenes_documento.js`:
+    - **Mestras Fixas:** Geram páginas pontuais que não se desdobram sozinhas (ex.: Capa, Folha de Rosto, Certificado).
+    - **Mestras Progressivas:** Recebem fluxo contínuo de conteúdo. Quando o espaço útil da página acaba, o motor de repaginação automática cria novas páginas sucessivas com a mesma mestra sem exigir criação manual pelo usuário.
+    - **Sequência de Seções:** O documento é organizado em seções baseadas em mestras (`Capa fixa → Sumário progressivo → Corpo progressivo → Referências progressivas`). A mudança de layout ocorre pela inserção de uma nova seção, impedindo trocas inadvertidas de mestra pela repaginação.
+    - Regra editorial `manterComProximo`: Títulos não ficam órfãos na base da folha, sendo empurrados para a página seguinte com o primeiro parágrafo.
+
+- **Blocos Compostos e Semânticos (Figura, Mapa, Tabela, Quadro e Fórmula):**
+  - **Diferenciação Estrita entre Tabela e Quadro:** Conforme normas acadêmicas e bibliográficas (ABNT NBR 14724 / IBGE), a **Tabela** apresenta dados numéricos/estatísticos com laterais verticais abertas (sem bordas externas), enquanto o **Quadro** apresenta sínteses textuais, conceituais e tipologias com caixa totalmente fechada por bordas em todos os lados.
+  - **Bloco Figura Composto com Multi-Itens:** Suporte a layouts de 1 item, 2 itens (lado a lado ou empilhados), 3 itens (em linha ou misto 1+2), 4 itens (grade 2×2) e 6 itens (grade 2×3), com identificação individual por letras (Figura 3a, Figura 3b), legenda geral e atribuição de fonte.
+  - **Bloco Mapa Cartográfico:** Identificação, área cartográfica com indicador de Norte Verdadeiro (`N ↑`), escala nominal, legenda de convenções cartográficas e fonte institucional (Glaux GIS / SIRGAS 2000).
+  - **Fórmulas Matemáticas em LaTeX:** Editor com expressão LaTeX monoespaçada, numeração de equação automática `(1)` e alinhamento customizável.
+
+- **Numeração Automática, Listas Pré-Textuais e Referências Cruzadas:**
+  - Função `recalcularNumeracaoAutomatica(doc)` mantém sequências de numeração independentes para Figuras, Mapas, Tabelas, Quadros e Equações.
+  - Geradores dinâmicos de listas pré-textuais: `gerarListaFiguras(doc)`, `gerarListaMapas(doc)`, `gerarListaTabelas(doc)`, `gerarListaQuadros(doc)`.
+  - Resolução dinâmica de referências cruzadas: marcadores `[ref:tipo:id]` no texto são resolvidos automaticamente para rótulos atualizados (ex.: `Figura 2`, `Tabela 1`, `Quadro 3`).
+
+- **Exportação Fiel em PDF e DOCX Nativo:**
+  - `athenes_export_pdf.js`: Renderização de quadros fechados, tabelas com bordas abertas, grades de figuras compostas, mapas com escalas e legendas.
+  - `athenes_export_docx.js`: Geração de quebras de seção nativas Word `<w:sectPr>`, tabelas com `<w:insideV w:val="none"/>` (padrão ABNT), quadros com bordas completas, notas e identificações formatadas.
+
+- **Suíte de Testes Automatizados:**
+  - Criado o teste `tests/blocos_compostos.test.js`.
+  - Suíte completa com **35 testes em 11 suítes**, 100% aprovados via `npm test` sem dependências externas.
+  - Validação real executada gerando `tests/amostra_artigo_athenes.docx` e `tests/amostra_artigo_athenes.html`.

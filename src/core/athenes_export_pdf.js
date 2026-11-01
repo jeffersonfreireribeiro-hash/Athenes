@@ -75,6 +75,65 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       </aside>`;
     }
 
+    case 'quadro': {
+      const estLegenda = estilosMap.legenda || estilosMap.corpo;
+      const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
+      const cabHtml = (bloco.colunas || []).map(col => '<th>' + escaparHtml(col) + '</th>').join('');
+      const linhasHtml = (bloco.linhas || []).map(linha => {
+        const celulas = (Array.isArray(linha) ? linha : []).map(cel => '<td>' + (cel || '') + '</td>').join('');
+        return '<tr>' + celulas + '</tr>';
+      }).join('\n');
+
+      return '<div class="ath-bloco ath-quadro-wrap" style="margin:12px 0; break-inside:avoid;" data-id="' + bloco.id + '">' +
+        (bloco.titulo ? '<div class="ath-legenda" style="' + estiloParaCss(estLegenda) + ' font-weight:800; text-align:left; margin-bottom:4px;">' + bloco.titulo + '</div>' : '') +
+        '<table class="ath-quadro" style="width:100%; border-collapse:collapse; border:1.5px solid #1F2733;">' +
+          (bloco.com_cabecalho !== false ? '<thead><tr style="background:#F8FAFC;">' + cabHtml + '</tr></thead>' : '') +
+          '<tbody>' + linhasHtml + '</tbody>' +
+        '</table>' +
+        (bloco.fonte ? '<div class="ath-fonte" style="' + estiloParaCss(estFonte) + ' text-align:left; margin-top:4px;">' + bloco.fonte + '</div>' : '') +
+      '</div>';
+    }
+
+    case 'figura': {
+      const estLegenda = estilosMap.legenda || estilosMap.corpo;
+      const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
+      const itens = Array.isArray(bloco.itens) ? bloco.itens : [{ url: bloco.src || '' }];
+      const layout = bloco.layout || '1';
+      const gridCols = layout === '2_lado' || layout === '4_grade' ? 2 : (layout === '3_linha' || layout === '6_grade' ? 3 : 1);
+      
+      const itensHtml = itens.map((it, idx) => {
+        const sub = it.legenda_sub ? '<figcaption style="font-size:9pt; color:#64748B; font-style:italic;">' + escaparHtml(it.legenda_sub) + '</figcaption>' : '';
+        return '<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">' +
+          '<img src="' + (it.url || 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80') + '" style="max-width:100%; max-height:65mm; object-fit:contain; border-radius:3px;">' +
+          sub +
+        '</div>';
+      }).join('\n');
+
+      return '<figure class="ath-bloco ath-figura-composta" style="margin:12px 0; break-inside:avoid;" data-id="' + bloco.id + '">' +
+        (bloco.titulo ? '<div class="ath-legenda" style="' + estiloParaCss(estLegenda) + ' font-weight:800; margin-bottom:6px;">' + bloco.titulo + '</div>' : '') +
+        '<div style="display:grid; grid-template-columns:repeat(' + gridCols + ', 1fr); gap:8px; padding:6px; background:#F8FAFC; border-radius:6px;">' +
+          itensHtml +
+        '</div>' +
+        (bloco.legenda_geral ? '<div style="font-size:9.5pt; color:#475569; margin-top:4px;">' + bloco.legenda_geral + '</div>' : '') +
+        (bloco.fonte ? '<div class="ath-fonte" style="' + estiloParaCss(estFonte) + ' margin-top:3px;">' + bloco.fonte + '</div>' : '') +
+      '</figure>';
+    }
+
+    case 'mapa': {
+      const estLegenda = estilosMap.legenda || estilosMap.corpo;
+      const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
+      return '<figure class="ath-bloco ath-mapa-wrap" style="margin:12px 0; break-inside:avoid;" data-id="' + bloco.id + '">' +
+        (bloco.titulo ? '<div class="ath-legenda" style="' + estiloParaCss(estLegenda) + ' font-weight:800; margin-bottom:6px;">' + bloco.titulo + '</div>' : '') +
+        '<div style="position:relative; width:100%; height:80mm; background:#F1F5F9; border:1px solid #CBD5E1; border-radius:6px; display:grid; place-items:center;">' +
+          '<span style="font-weight:700; color:#475569;">Área do Mapa Territorial</span>' +
+          (bloco.orientacao_norte ? '<div style="position:absolute; top:8px; right:10px; font-weight:900; color:#FF6B2C;">N ↑</div>' : '') +
+          '<div style="position:absolute; bottom:6px; left:8px; font-size:8pt; background:rgba(255,255,255,0.9); padding:2px 6px; border-radius:3px;">Escala: ' + (bloco.escala || '1:10.000') + '</div>' +
+        '</div>' +
+        (bloco.legenda_cartografica ? '<div style="font-size:9pt; color:#475569; margin-top:4px;">' + bloco.legenda_cartografica + '</div>' : '') +
+        (bloco.fonte ? '<div class="ath-fonte" style="' + estiloParaCss(estFonte) + ' margin-top:3px;">' + bloco.fonte + '</div>' : '') +
+      '</figure>';
+    }
+
     case 'tabela': {
       const estLegenda = estilosMap.legenda || estilosMap.corpo;
       const estFonte = estilosMap.fonte_citada || estilosMap.corpo;

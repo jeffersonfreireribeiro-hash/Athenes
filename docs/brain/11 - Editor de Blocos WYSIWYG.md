@@ -1,89 +1,96 @@
 ---
-tags: [editor, wysiwyg, blocos, athenes]
+tags: [editor, wysiwyg, blocos, athenes, glaux-gis, layout]
 ---
-# 11 - Editor de Blocos WYSIWYG e Escrita Direta na Folha
+# 11 - Editor de Blocos WYSIWYG, Layout Glaux GIS e Blocos Compostos
 
-Esta nota detalha a experiência de escrita do **Athenes**, centrada na folha de papel visual com edição direta dentro de cada bloco (`in-page contenteditable`) e controles flutuantes.
-
----
-
-## 1. O que é
-
-O editor do Athenes elimina a desconexão comum de editores baseados em formulários laterais: **o usuário clica e escreve diretamente sobre a página**, vendo em tempo real as fontes, pesos, tamanhos, entrelinhas e quebras exatamente como sairão no papel impresso ou no documento exportado.
-
-A barra lateral direita permanece reservada para propriedades estruturais (formato da página, colunas, margens, grid e tipografia avançada), sendo opcional durante o fluxo contínuo de escrita.
+Esta nota detalha a experiência de escrita e diagramação do **Athenes**, que adota a arquitetura e a linguagem visual do **Glaux GIS (`relatorios_modelos`)**, centrada na folha de papel visual com edição direta dentro de cada bloco (`in-page contenteditable`), barra de blocos flutuante em pílula e controles avançados de 12 colunas.
 
 ---
 
-## 2. Tipos de Blocos Suportados
+## 1. O que é e Arquitetura de Interface
 
-O catálogo de blocos (`src/core/athenes_documento.js`) abrange todas as necessidades estruturais de relatórios e artigos científicos:
+O editor do Athenes elimina a desconexão comum de editores baseados em formulários laterais: **o usuário clica e escreve diretamente sobre a página**, vendo em tempo real as fontes, pesos, tamanhos, entrelinhas, margens físicas e quebras exatamente como sairão no papel impresso ou no documento exportado.
 
-| Tipo | Descrição Semântica | Representação na Folha | Atributos Específicos |
+A tela segue rigorosamente o layout de 3 colunas do Glaux GIS:
+1. **Coluna Esquerda (`.rm-col-esq`, 310 px):** Configuração do documento, miniatura da folha com diagrama de margens (`.rm-folha-mini`, `#rmMDiag`), seções & páginas mestras, cabeçalho e rodapé, estilos de texto e lista de blocos da seção ativa.
+2. **Coluna Central (`.rm-col-prev`, `1fr`):** Cabeçalho de prévia com dimensões e contagem de páginas, barra de blocos flutuante em pílula (`.rm-barra-blocos`) com botões circulares e o palco de folhas A4 com edição in-page direta.
+3. **Coluna Direita (`.rm-col-dir`, 330 px):** Inspetor de propriedades do bloco selecionado, seletor de linha com pills numeradas `(1)`, `(2)`, `(3)`, `(+)`, 4 presets de largura e trilha interativa de 12 pontos (`.rm-trilha`).
+
+---
+
+## 2. Tipos de Blocos e Blocos Compostos
+
+O catálogo de blocos (`src/core/athenes_documento.js`) distingue entidades semânticas e acadêmicas essenciais:
+
+| Tipo | Descrição Semântica | Padrão Normativo / Visual | Componentes Agrupados |
 | :--- | :--- | :--- | :--- |
-| `titulo` | Título principal de seção ou documento | `<h1>` ou `<h2>` com estilo de título | `nivel: 1`, `estiloId: "titulo_1"` |
-| `subtitulo` | Subseção ou cabeçalho de nível 2/3 | `<h2>` ou `<h3>` com numeração subordinada | `nivel: 2`, `estiloId: "titulo_2"` |
-| `paragrafo` | Corpo de texto principal | `<p>` com recuo de 1ª linha e entrelinhas | `conteudo: "..."`, `estiloId: "corpo"` |
-| `lista` | Lista ordenada ou com marcadores | `<ul>` / `<ol>` com itens em `<li>` | `ordenada: boolean`, `itens: []` |
-| `citacao` | Citação longa direta (ABNT > 3 linhas / APA) | `<blockquote>` com recuo de 4 cm e fonte menor | `conteudo: "..."`, `autor: "..."`, `ano: "..."` |
-| `tabela` | Matriz de dados tabulares | `<table>` formatada sem grades verticais (ABNT) | `colunas: []`, `linhas: [][]`, `alinhamentos: []` |
-| `imagem` | Figura científica ou ilustração | `<img>` responsiva ou placeholder vetorial | `src: "..."`, `legenda: "..."`, `fonte: "..."` |
-| `legenda` | Identificação de figuras e tabelas | `<p>` centralizado com numeração automática | `alvo: "Figura 1"`, `texto: "..."` |
-| `nota` | Nota de rodapé ou nota explicativa | `<div>` com traço separador | `numero: 1`, `conteudo: "..."` |
-| `formula` | Equação matemática ou expressão formal | `<pre>` estilizado com fundo suave | `conteudo: "E = mc²"`, `numero: "(1)"` |
-| `anexo` | Documento vinculado, PDF ou apêndice | Pílula de anexo com ícone de clipe e tamanho | `nome: "...", tipo: "pdf", url: "..."` |
-| `sumario` | Sumário dinâmico pré-textual | Lista de seções com números de página e pontilhado | `geradoAutomaticamente: true` |
-| `referencias`| Lista bibliográfica final do documento | Parágrafos com recuo francês (hanging indent) | `itens: []` sincronizados com Zotero |
+| `titulo` | Título de Seção | H1, H2 ou H3 numerado | Nível, texto editável, estilo |
+| `subtitulo` | Subseção | H2 ou H3 subordinado | Nível, texto editável, estilo |
+| `paragrafo` | Corpo do texto | Recuo de 1ª linha e entrelinhas | Texto editável, alinhamento |
+| `citacao` | Citação direta longa | Recuo de 4 cm, fonte 10 pt (ABNT) | Texto, autor, ano, página |
+| `figura` | Ilustração / Fotografias | Layout de 1 a 6 imagens | Identificação, grid, legenda geral, fonte |
+| `mapa` | Mapa territorial | Indicador de Norte, escala e legenda | Título, canvas, escala, legenda carto, fonte |
+| `tabela` | Matriz de dados numéricos | **Laterais verticais abertas (ABNT/IBGE)** | Título, colunas, linhas, notas, fonte |
+| `quadro` | Síntese textual / conceitual | **Caixa totalmente fechada por bordas** | Título, colunas, linhas, notas, fonte |
+| `formula` | Equação matemática | Expressão LaTeX centralizada + `(1)` | LaTeX, número da equação, alinhamento |
+| `campos` | Rótulo e valor em pílulas | Grid de 2 ou mais colunas | Pares de rótulo e valor |
+| `nota` | Nota de rodapé explicativa | Caixa com traço lateral colorido | Título, texto, tipo (aviso, destaque) |
+| `divisor` | Divisor de seção | Linha horizontal suave | Estilo de traço |
+| `espaco` | Espaçador vertical | Respiro em pontos tipográficos | Altura em pt |
+| `quebra_pagina` | Quebra forçada de página | Ponto de corte na repaginação | Força nova folha |
+
+### Distinção Crucial: Tabela vs. Quadro
+Em conformidade com a ABNT NBR 14724 e normas do IBGE:
+- **Tabela:** Destinada a dados quantitativos, numéricos ou estatísticos. **Não possui grades verticais nas extremidades laterais** (laterais abertas) e possui bordas horizontais apenas no topo, abaixo do cabeçalho e na base inferior.
+- **Quadro:** Destinado a informações textuais, conceituais, classificatórias ou descritivas. **É totalmente delimitado por bordas em todos os lados (caixa fechada)**.
+- Ambos possuem sequências de numeração independentes ("Tabela 1", "Quadro 1") e geram listas pré-textuais distintas.
+
+### Multi-Layouts para Figuras
+O bloco composto `figura` suporta arranjos múltiplos em modelos reutilizáveis:
+- `1`: Imagem individual centralizada.
+- `2_lado`: 2 imagens lado a lado (50% / 50%).
+- `2_empilhado`: 2 imagens empilhadas verticalmente.
+- `3_linha`: 3 imagens em linha (33% cada).
+- `3_misto`: 1 imagem em destaque (66%) e 2 menores empilhadas ao lado.
+- `4_grade`: 4 imagens em grade 2 × 2.
+- `6_grade`: 6 imagens em grade 2 × 3.
+Cada sub-item recebe uma letra sequencial automática (ex.: Figura 3a, Figura 3b).
 
 ---
 
-## 3. Interação, Atalhos e Comportamento de Edição
+## 3. Posicionamento na Folha e Grade de 12 Colunas
 
-### In-Page Contenteditable
-- Cada bloco textual possui o atributo `contenteditable="true"` em seu elemento interior.
-- O evento `input` atualiza a propriedade `bloco.conteudo` do modelo com debounce e dispara o salvamento local.
-
-### Barra de Ferramentas Flutuante (Floating Toolbar)
-- Ao selecionar qualquer trecho de texto dentro de um bloco, surge automaticamente uma barra flutuante adjacente ao cursor com ações imediatas:
-  - **Negrito** (`Ctrl+B`), **Itálico** (`Ctrl+I`), **Sublinhado** (`Ctrl+U`).
-  - **Inserir Citação Zotero**: Abre o seletor rápido para inserir pílula bibliográfica no cursor.
-  - **Transformar Tipo de Bloco**: Converte parágrafo em título, citação ou lista.
-
-### Atalhos de Teclado
-- **Enter**:
-  - Em um bloco de título: cria automaticamente um novo bloco de parágrafo logo abaixo.
-  - Em um item de lista: cria o próximo item de lista. Se o item estiver vazio, finaliza a lista e cria um parágrafo.
-- **Backspace**: Em um bloco vazio, remove o bloco e foca no bloco anterior.
-- **Tab / Shift+Tab**: Aumenta ou diminui a indentação do item em listas.
-- **Ctrl+Z / Ctrl+Y (ou Ctrl+Shift+Z)**: Desfaz e refaz alterações na pilha de histórico imutável.
-
-### Manipulação e Reordenação de Blocos
-- Cada bloco exibe, ao passar o mouse (`:hover`), uma barra lateral de alças:
-  - **Alça de Arrasto (Drag Handle)**: Permite reordenar blocos verticalmente arrastando com o cursor.
-  - **Botões Subir / Descer**: Move o bloco uma posição acima ou abaixo mantendo o foco.
-  - **Duplicar**: Clona o bloco com todos os estilos aplicados.
-  - **Excluir**: Remove o bloco com confirmação se houver conteúdo extenso.
+Na coluna direita do editor, cada bloco pode ser alinhado com precisão:
+- **Linha da folha:** Seletor com pills numeradas `(1)`, `(2)`, `(3)`, `(+)`. Múltiplos blocos na mesma linha dividem o espaço horizontal lado a lado.
+- **Presets Rápidos:**
+  - `Largura toda`: Ocupa colunas 1 a 12 (100%).
+  - `Metade esq.`: Ocupa colunas 1 a 6 (50% à esquerda).
+  - `Metade dir.`: Ocupa colunas 7 a 12 (50% à direita).
+  - `Um terço`: Ocupa colunas 1 a 4 (33% à esquerda).
+- **Trilha de 12 Pontos (`.rm-trilha`):**
+  - Cada bolinha circular representa uma coluna de 1 a 12.
+  - Clicar numa coluna estica ou encolhe a faixa contínua do bloco.
+  - O bloco conecta visualmente as colunas ligadas com uma barra sólida laranja `#FF6B2C`.
 
 ---
 
-## 4. Onde Está no Código
+## 4. Numeração Automática e Referências Cruzadas
 
-- `src/ui/athenes_editor.js`: Classe `AthenesEditor` responsável pela renderização da página, ciclo de vida dos blocos, manipulação do cursor, atalhos de teclado e barra flutuante.
-- `src/css/athenes_editor.css`: Folha de estilo contendo a representação visual da página de papel (`.athenes-pagina-folha`), caixas delimitadoras de blocos (`.athenes-bloco-item`), toolbar flutuante e alças de arrasto.
-- `src/core/athenes_documento.js`: Métodos `criarBloco()`, `reordenarBlocos()`, `adicionarBloco()`, `removerBloco()` e `desfazer()`/`refazer()`.
+O motor `recalcularNumeracaoAutomatica(doc)` varre todas as seções e calcula contadores independentes para:
+- `Figura 1`, `Figura 2`, `Figura 3`...
+- `Mapa 1`, `Mapa 2`...
+- `Tabela 1`, `Tabela 2`...
+- `Quadro 1`, `Quadro 2`...
+- `Equação (1)`, `Equação (2)`...
 
----
-
-## 5. Verificação e Testes
-
-- `tests/documento.test.js`:
-  - Valida criação de todos os tipos de blocos com propriedades semânticas.
-  - Valida inserção, movimentação e remoção sem perda de integridade de dados.
-  - Valida geração automática do sumário a partir dos títulos das páginas.
-  - Valida cálculo dinâmico de estatísticas (palavras, caracteres, tabelas, imagens).
+No texto dos parágrafos, marcadores interativos no formato `[ref:tipo:id]` (ex.: `[ref:figura:b_123]`) são resolvidos em tempo real para "Figura 1" ou "Tabela 2", mantendo-se sempre corretos mesmo após reordenação, inserção ou remoção de blocos anteriores.
 
 ---
 
-## 6. Próximos Passos
-- Implementar seleção múltipla de blocos contíguos (`Shift+Click`) para exclusão ou movimentação em lote.
-- Adicionar renderizador KaTeX em tempo real para blocos de fórmula matemática.
+## 5. Localização no Código
+
+- `src/ui/athenes_editor.js`: Orquestrador da visualização, grade de 3 colunas, barra de blocos e folhas A4.
+- `src/ui/athenes_painel_propriedades.js`: Inspetor do bloco com seletor de linha, presets, trilha de 12 pontos e controles compostos.
+- `src/css/athenes_editor.css`: Estilos completos importados do padrão Glaux GIS (`relatorios_modelos.css`) com extensões de folha A4 e blocos compostos.
+- `src/core/athenes_documento.js`: Esquemas de dados, cálculo de alturas, numeração automática e referências cruzadas.
+- `tests/blocos_compostos.test.js`: Suíte de validação de blocos compostos, numeração e referências.

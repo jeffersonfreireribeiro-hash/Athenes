@@ -1,123 +1,84 @@
 ---
-tags: [grid, paginas, modelos, reguas, snap, athenes]
+tags: [grid, paginas, mestras, fluxo, modelos, reguas, snap, athenes]
 ---
-# 12 - Páginas, Grid Modular e Modelos de Página
+# 12 - Páginas, Grid Modular e Páginas Mestras (Fixas e Progressivas)
 
-Esta nota documenta a engenharia de páginas do **Athenes**, abrangendo formatos físicos de papel, margens milimétricas, sistema de grid modular, réguas interativas, guias arrastáveis e a herança entre modelos de página e conteúdo.
-
----
-
-## 1. O que é
-
-No Athenes, uma página não é um fluxo contínuo indiferenciado, mas uma **folha física de papel com geometria estrita**. O autor tem controle total sobre margens, proporções, cabeçalhos, rodapés e numeração.
-
-O sistema baseia-se em dois pilares:
-1. **Separação Rígida entre Modelo de Página e Conteúdo**: O que é dimensional e estrutural reside no `ModeloPagina`. O que é texto e mídia reside na lista de blocos da `Pagina`.
-2. **Grid Modular Paramétrico**: Uma grade flexível com suporte de 1 a 12 colunas, permitindo tanto a diagramação tradicional de 1 coluna (ABNT/teses) quanto layouts de 2 colunas (IEEE/artigos científicos) ou colunas assimétricas.
+Esta nota documenta a engenharia de páginas e o sistema de fluxo contínuo do **Athenes**, abrangendo formatos físicos de papel, controle milimétrico de margens, sistema de grid modular de 12 colunas, miniatura proporcional com diagrama de margens (`.rm-folha-mini`) e o motor de repaginação automática baseado em páginas mestras fixas e progressivas.
 
 ---
 
-## 2. Modelos de Página Pré-Configurados
+## 1. O que é e Filosofia de Fluxo
 
-O Athenes fornece 5 modelos fundamentais que atendem às convenções editoriais internacionais e à norma ABNT NBR 14724:
+No Athenes, a página é consequência direta do fluxo de escrita:
+- **A escrita acontece diretamente nos blocos na folha.**
+- Ao adicionar texto, imagens, tabelas, quadros ou fórmulas, o motor de repaginação automática calcula a altura dos blocos em pontos tipográficos e gera novas páginas sem que o usuário precise criá-las manualmente.
+- O documento é estruturado em **seções ordenadas**, e cada seção vincula-se a uma **página mestra**.
+- A troca de mestra ocorre exclusivamente quando o usuário insere uma nova seção, impedindo que a paginação mude de modelo visual por conta própria.
+
+---
+
+## 2. Modos de Aplicação da Mestra: Fixa vs. Progressiva
+
+Toda página mestra possui um modo de aplicação bem definido:
 
 ```mermaid
 graph TD
-    subgraph Modelos ["Modelos Reutilizáveis (ModeloPagina)"]
-        M1[Capa - Margens amplas, sem cabeçalho nem número]
-        M2[Corpo do Texto - Margens ABNT 30/20/30/20 mm, numeração no topo direito]
-        M3[Sumário - Layout de página pré-textual]
-        M4[Referências - Margens normais com espaçamento simples]
-        M5[Anexos - Margens compactadas para documentos externos]
+    subgraph Secoes ["Sequência Canônica do Documento"]
+        S1["Seção 1: Capa Inicial<br>(Mestra Fixa)"] --> S2["Seção 2: Sumário<br>(Mestra Progressiva)"]
+        S2 --> S3["Seção 3: Corpo do Texto<br>(Mestra Progressiva)"]
+        S3 --> S4["Seção 4: Referências<br>(Mestra Progressiva)"]
     end
 
-    subgraph Folhas ["Páginas do Documento"]
-        P1[Página 1: Capa] -->|vincula| M1
-        P2[Página 2: Sumário] -->|vincula| M3
-        P3[Página 3: Introdução] -->|vincula| M2
-        P4[Página 4: Metodologia] -->|vincula| M2
-        P5[Página 5: Referências] -->|vincula| M4
+    subgraph Geracao ["Geração Automática de Páginas"]
+        S1 --> P1["Página 1 (Capa Única)"]
+        S2 --> P2["Página 2 (Sumário)"]
+        S3 --> P3["Página 3 (Introdução)"]
+        S3 -.espaço esgota.-> P4["Página 4 (Metodologia)"]
+        S3 -.espaço esgota.-> P5["Página 5 (Resultados)"]
+        S4 --> P6["Página 6 (Referências)"]
     end
 ```
 
-### Detalhamento dos Modelos:
-- **Capa**:
-  - Margens: Superior 30 mm, Inferior 30 mm, Esquerda 30 mm, Direita 30 mm.
-  - Cabeçalho / Rodapé: Desativados.
-  - Numeração: Oculta (contada, mas não impressa).
-- **Corpo do Texto (Padrão ABNT / Acadêmico)**:
-  - Margens: Superior 30 mm, Esquerda 30 mm, Inferior 20 mm, Direita 20 mm.
-  - Cabeçalho: Opcional com título resumido.
-  - Numeração: Ativa no canto superior direito (`@top-right`).
-  - Colunas: 1 coluna padrão (ou 2 colunas para artigos).
-- **Sumário**:
-  - Modelo com espaçamento otimizado para linhas pontilhadas de alinhamento com a margem direita.
-- **Referências**:
-  - Margens idênticas ao corpo, com configuração de parágrafo em espaçamento simples e separação por linha em branco (NBR 6023).
-- **Anexos e Apêndices**:
-  - Margens reduzidas (20 mm em todas as bordas) para acomodação de tabelas extensas ou páginas digitalizadas.
+### 1. Modo Fixo (`modo_aplicacao: 'fixa'`)
+- Adequado para **Capas, Folhas de Rosto, Certificados ou Páginas Especiais**.
+- Gera estritamente uma página individual.
+- Se o usuário desejar uma segunda capa ou página de rosto intermediária, insere uma nova seção com mestra fixa.
+- Não desdobra páginas extras automaticamente, a menos que haja quebra de página manual forçada.
 
-> [!IMPORTANT]
-> **Herança Dinâmica**: Se o autor alterar as margens do modelo `Corpo do Texto` no inspetor lateral (por exemplo, mudando a margem esquerda de 30 mm para 25 mm), **todas as páginas vinculadas** a esse modelo assumem a nova dimensão instantaneamente, sem necessidade de reconfiguração manual e sem alterar os blocos de texto.
+### 2. Modo Progressivo (`modo_aplicacao: 'progressiva'`)
+- Adequado para **Corpo do texto, Sumário, Lista de Figuras, Referências e Anexos**.
+- Recebe o fluxo contínuo de blocos.
+- Conforme o usuário digita ou insere figuras e tabelas, novas páginas surgem automaticamente com a mesma mestra e mantêm o cabeçalho, rodapé e numeração contínua.
 
 ---
 
-## 3. Matemática do Grid e Unidades
+## 3. Miniatura da Folha e Diagrama de Margens (`.rm-folha-mini`)
 
-O módulo `src/core/athenes_grid.js` realiza todos os cálculos geométricos com precisão milimétrica e conversão exata para pontos tipográficos (`pt`), pixels de tela (`px`) e unidades de Word (`dxa`):
-
-- **Fatores de Conversão**:
-  - $1\text{ in} = 25,4\text{ mm} = 72\text{ pt} = 1440\text{ dxa}$
-  - $1\text{ mm} \approx 2,83465\text{ pt} \approx 56,6929\text{ dxa} \approx 3,77953\text{ px}$ (a 96 DPI)
-
-### Cálculo de Colunas:
-Para uma página de largura $L$, margem esquerda $M_e$, margem direita $M_d$, número de colunas $N$ e espaçamento entre colunas (gutter) $G$:
-
-$$\text{Largura Útil} = L - (M_e + M_d)$$
-
-$$\text{Largura de Cada Coluna} = \frac{\text{Largura Útil} - (N - 1) \times G}{N}$$
+Na coluna esquerda do editor, o painel de margens replica o padrão consagrado do Glaux GIS:
+- **Diagrama em Escala (`.rm-folha-mini`, `#rmMDiag`):** Uma miniatura proporcional da página (A4 retrato 210 × 297 mm ou A4 paisagem 297 × 210 mm) exibe em tempo real um retângulo pontilhado em laranja `#FF6B2C` com preenchimento semitransparente, indicando visualmente as proporções da área útil:
+  $$\text{inset} = \frac{\text{topo}}{H} \times 100\% \quad \frac{\text{direita}}{W} \times 100\% \quad \frac{\text{base}}{H} \times 100\% \quad \frac{\text{esquerda}}{W} \times 100\%$$
+- **Campos Numéricos com `mm`:** Quatro entradas numéricas em pílula (`rmMT`, `rmMB`, `rmML`, `rmMR`) com sufixo `mm` estilizado.
+- **Botão de Elo (`.rm-ic-elo`):** Ao ativar o elo de corrente, alterar qualquer uma das quatro margens propaga imediatamente o valor para as outras três, garantindo margens simétricas quando desejado.
 
 ---
 
-## 4. Réguas, Guias e Snap Magnético
+## 4. Regra Editorial: Manter com o Próximo (`manterComProximo`)
 
-### Réguas Milimétricas
-- Implementadas via `<canvas>` de alta resolução (`src/ui/athenes_reguas.js`).
-- Régua horizontal no topo e vertical na lateral esquerda da folha.
-- Marcações a cada 1 mm, traços médios a cada 5 mm e numeração explícita a cada 10 mm (1 cm).
-- Indicador visual em tempo real da posição do cursor do mouse.
-
-### Linhas-Guia (Guides)
-- O usuário pode clicar sobre a régua horizontal ou vertical e arrastar uma linha-guia azul pontilhada para a folha.
-- Posições salvas no estado da página e exibidas durante a diagramação.
-
-### Snap Magnético (Encaixe Automático)
-- O algoritmo `aplicarSnap(valor, pontosAtracao, toleranciaMm = 2)` verifica se a posição de um elemento ou bloco está a menos de 2 mm de:
-  - Margens da folha (esquerda, direita, superior, inferior).
-  - Limites das colunas do grid.
-  - Linhas-guia ativas.
-- Quando a condição é atendida, a coordenada salta automaticamente para o ponto de atração. O recurso pode ser ligado/desligado com um clique no botão de ímã da barra de ferramentas.
+Para assegurar fidelidade visual profissional e evitar defeitos de diagramação:
+- Títulos de seção (`H1`, `H2`, `H3`) possuem por padrão a propriedade `manterComProximo = true`.
+- Durante a repaginação automática, se a altura disponível na folha atual comportar o título mas não comportar o título somado ao bloco seguinte (parágrafo ou figura), o motor empurra o título para o início da página seguinte.
+- Isso impede que títulos fiquem órfãos e solitários na última linha da folha.
 
 ---
 
-## 5. Onde Está no Código
+## 5. Localização no Código
 
-- `src/core/athenes_grid.js`: Funções `obterDimensoesPagina()`, `calcularAreaUtil()`, `calcularGradeColunas()`, `aplicarSnap()` e utilitários de conversão `mmParaPt()`, `ptParaMm()`, `mmParaDxa()`.
-- `src/ui/athenes_reguas.js`: Classe `AthenesReguas` que gerencia o desenho das réguas em canvas e o ciclo de vida das linhas-guia.
-- `src/ui/athenes_painel_propriedades.js`: Painel de controle de modelo de página, formato, orientação, margens e quantidade de colunas.
-
----
-
-## 6. Verificação e Testes
-
-- `tests/grid.test.js`:
-  - Valida dimensões em mm para A4 Retrato (210 × 297 mm), A4 Paisagem (297 × 210 mm), Carta e A3.
-  - Valida cálculo de área útil descontando margens físicas assimétricas (30/20/30/20 mm).
-  - Valida divisão precisa de grade em 2 e 3 colunas com gutter proporcional.
-  - Valida atração magnética do snap dentro do limiar de 2 mm e rejeição fora do limiar.
-
----
-
-## 7. Próximos Passos
-- Adicionar opção de páginas espelhadas (margens interna e externa alternadas para impressão frente e verso).
-- Implementar sangria (bleed) configurável para relatórios com elementos gráficos até a borda do papel.
+- `src/core/athenes_documento.js`:
+  - `criarModelosPaginaPadrao()`: Catálogo de mestras fixas e progressivas.
+  - `repaginarDocumento(doc)`: Motor de fluxo e cálculo de altura em pontos tipográficos.
+  - `adicionarSecao()`, `moverSecao()`, `trocarMestraDaSecao()`: Manipulação estrutural.
+- `src/ui/athenes_editor.js`:
+  - `pintarDiagramaMargens()`: Desenha o inset proporcional do `#rmMDiag`.
+  - Lógica de ativação e sincronização do botão `#rmMElo`.
+  - Renderização das folhas A4 no palco central (`.ath-folha-a4`).
+- `tests/mestras_fluxo.test.js`: Testes automatizados cobrindo fluxo fixo vs progressivo, reordenação e prevenção de títulos órfãos.

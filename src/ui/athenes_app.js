@@ -86,6 +86,7 @@ export class AthenesApp {
     const inspectorContainer = editorBox.querySelector('#athInspectorContainer');
     if (inspectorContainer) {
       this.painelProps = new PainelPropriedades(inspectorContainer, this.documentoAtivo, {
+        onAbrirZotero: () => { this.abrirModalZotero(); },
         onAlterado: () => {
           this.editorView.renderizarFolhasPaginas();
           this.autoSalvar();

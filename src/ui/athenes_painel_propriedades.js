@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
- * Athenes — Painel Inspetor de Propriedades, Tipografia e Modelos de Página.
+ * Athenes — Painel Inspetor de Propriedades do Bloco, Posição na Folha e Modelos.
+ * Segue fielmente o padrão Glaux GIS (relatorios_modelos):
+ * - Seletor de linha com pills numeradas (1, 2, 3, 4, +)
+ * - 4 cartões de largura pré-definida (Largura toda, Metade esq., Metade dir., Um terço)
+ * - Trilha de 12 colunas interativas com pontos lincados (.rm-trilha)
+ * - Controles de blocos compostos (Figura, Mapa, Tabela, Quadro, Fórmula)
+ * - Inserção de referências cruzadas e citações Zotero
  */
 
 import { FONTES_SISTEMA, PESOS_FONTE } from '../core/athenes_estilos.js';
-import { modeloDaPagina } from '../core/athenes_documento.js';
+import { modeloDaPagina, recalcularNumeracaoAutomatica, resolverReferenciasCruzadas } from '../core/athenes_documento.js';
+import { svgIcone } from './athenes_icones.js';
 
 export class PainelPropriedades {
   constructor(containerEl, documento, opcoes = {}) {
@@ -12,8 +19,8 @@ export class PainelPropriedades {
     this.doc = documento;
     this.blocoSelecionado = null;
     this.paginaSelecionada = null;
-    this.abaAtiva = 'bloco'; // 'bloco', 'estilos', 'modelo'
     this.onAlterado = opcoes.onAlterado || (() => {});
+    this.onAbrirZotero = opcoes.onAbrirZotero || (() => {});
 
     this.renderizar();
   }
@@ -33,431 +40,434 @@ export class PainelPropriedades {
     if (!this.container) return;
     this.container.innerHTML = '';
 
-    // Abas do Inspetor
-    const tabsEl = document.createElement('div');
-    tabsEl.className = 'ath-inspector-tabs';
-    tabsEl.innerHTML = `
-      <div class="ath-inspector-tab ${this.abaAtiva === 'bloco' ? 'ativo' : ''}" data-tab="bloco">Bloco</div>
-      <div class="ath-inspector-tab ${this.abaAtiva === 'estilos' ? 'ativo' : ''}" data-tab="estilos">Tipografia</div>
-      <div class="ath-inspector-tab ${this.abaAtiva === 'modelo' ? 'ativo' : ''}" data-tab="modelo">Página</div>
-    `;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'rm-props';
 
-    tabsEl.querySelectorAll('.ath-inspector-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        this.abaAtiva = tab.dataset.tab;
-        this.renderizar();
-      });
-    });
-
-    this.container.appendChild(tabsEl);
-
-    const corpoEl = document.createElement('div');
-    corpoEl.className = 'ath-inspector-corpo';
-
-    if (this.abaAtiva === 'bloco') {
-      this.renderizarAbaBloco(corpoEl);
-    } else if (this.abaAtiva === 'estilos') {
-      this.renderizarAbaEstilos(corpoEl);
-    } else {
-      this.renderizarAbaModelo(corpoEl);
-    }
-
-    this.container.appendChild(corpoEl);
-  }
-
-  renderizarAbaBloco(corpoEl) {
     if (!this.blocoSelecionado) {
-      corpoEl.innerHTML = `
-        <div style="padding:24px 16px; text-align:center; color:var(--ath-muted);">
-          <p style="margin:0 0 8px 0; font-weight:700;">Nenhum bloco selecionado</p>
-          <p style="font-size:12px; margin:0;">Clique em um parágrafo, título, imagem ou tabela na folha para editar suas propriedades.</p>
+      wrapper.innerHTML = `
+        <div class="rm-vazio-cartao" style="padding:28px 16px;">
+          <h3 style="margin:0 0 6px 0; font:800 15px var(--glx-font);">Nenhum bloco selecionado</h3>
+          <p style="margin:0; font-size:12.5px; color:var(--glx-muted);">Clique diretamente em qualquer bloco na folha para ajustar sua linha, largura nas 12 colunas, estilo e conteúdo composto.</p>
         </div>
       `;
+      this.container.appendChild(wrapper);
       return;
     }
 
     const b = this.blocoSelecionado;
-    const estAtual = this.doc.estilos.find(e => e.id === b.estiloId) || this.doc.estilos[0];
+    const tipoNome = {
+      titulo: 'Título da Seção',
+      subtitulo: 'Subtítulo',
+      paragrafo: 'Texto / Parágrafo',
+      citacao: 'Citação Direta Longa',
+      tabela: 'Tabela (ABNT/IBGE)',
+      quadro: 'Quadro Estruturado',
+      figura: 'Figura / Ilustração',
+      mapa: 'Mapa Territorial',
+      formula: 'Fórmula Matemática',
+      campos: 'Campos (rótulo e valor)',
+      nota: 'Nota de Rodapé',
+      divisor: 'Divisor de Seção',
+      espaco: 'Espaçamento Vertical'
+    }[b.tipo] || b.tipo.toUpperCase();
 
-    const secao = document.createElement('div');
-    secao.className = 'ath-inspector-secao';
-    secao.innerHTML = `
-      <h3>Propriedades do Bloco (${b.tipo.toUpperCase()})</h3>
-
-      <div class="ath-prop-grupo">
-        <label>Estilo Vinculado</label>
-        <select class="ath-select" id="athPropEstilo">
-          ${this.doc.estilos.map(e => `<option value="${e.id}" ${e.id === b.estiloId ? 'selected' : ''}>${e.nome}</option>`).join('')}
-        </select>
-      </div>
-
-      ${b.tipo === 'titulo' ? `
-        <div class="ath-prop-grupo">
-          <label>Nível do Título</label>
-          <select class="ath-select" id="athPropNivel">
-            <option value="1" ${b.nivel === 1 ? 'selected' : ''}>Título 1 (Seção Primária)</option>
-            <option value="2" ${b.nivel === 2 ? 'selected' : ''}>Título 2 (Subseção)</option>
-            <option value="3" ${b.nivel === 3 ? 'selected' : ''}>Título 3 (Sub-subseção)</option>
-          </select>
-        </div>
-      ` : ''}
-
-      ${b.tipo === 'citacao' ? `
-        <div class="ath-prop-grupo">
-          <label>Autor / Origem da Citação</label>
-          <input class="ath-input" id="athPropCitAutor" value="${b.autor || ''}" placeholder="Ex.: SILVA, J.">
-        </div>
-        <div class="ath-linha2">
-          <div class="ath-prop-grupo">
-            <label>Ano</label>
-            <input class="ath-input" id="athPropCitAno" value="${b.ano || ''}" placeholder="2024">
-          </div>
-          <div class="ath-prop-grupo">
-            <label>Página</label>
-            <input class="ath-input" id="athPropCitPag" value="${b.pagina_citada || ''}" placeholder="45">
-          </div>
-        </div>
-      ` : ''}
-
-      ${b.tipo === 'imagem' ? `
-        <div class="ath-prop-grupo">
-          <label>Legenda da Figura</label>
-          <input class="ath-input" id="athPropImgLegenda" value="${b.legenda || ''}">
-        </div>
-        <div class="ath-prop-grupo">
-          <label>Fonte da Ilustração</label>
-          <input class="ath-input" id="athPropImgFonte" value="${b.fonte || ''}">
-        </div>
-        <div class="ath-prop-grupo">
-          <label>Largura na Folha (%)</label>
-          <input type="range" min="20" max="100" step="5" class="ath-input" id="athPropImgLargura" value="${b.largura_pct || 80}">
-          <span style="font-size:11px; color:var(--ath-muted);">${b.largura_pct || 80}% da área útil</span>
-        </div>
-      ` : ''}
-
-      <div class="ath-prop-grupo">
-        <label>Colunas da Grade (Span)</label>
-        <select class="ath-select" id="athPropSpan">
-          <option value="1" ${b.span === 1 ? 'selected' : ''}>1 coluna</option>
-          <option value="2" ${b.span === 2 ? 'selected' : ''}>2 colunas</option>
-          <option value="3" ${b.span === 3 ? 'selected' : ''}>3 colunas</option>
-          <option value="4" ${b.span === 4 ? 'selected' : ''}>4 colunas</option>
-          <option value="12" ${b.span === 12 ? 'selected' : ''}>Largura Total (12 cols)</option>
-        </select>
-      </div>
+    // 1. Cabeçalho do Bloco
+    const topo = document.createElement('div');
+    topo.style.display = 'flex';
+    topo.style.justifyContent = 'space-between';
+    topo.style.alignItems = 'center';
+    topo.style.marginBottom = '6px';
+    topo.innerHTML = `
+      <h3 style="margin:0; font:800 15px var(--glx-font);">${tipoNome}</h3>
+      <span class="rm-selo">${b.tipo}</span>
     `;
+    wrapper.appendChild(topo);
 
-    // Eventos
-    const selEstilo = secao.querySelector('#athPropEstilo');
-    if (selEstilo) {
-      selEstilo.addEventListener('change', () => {
-        b.estiloId = selEstilo.value;
-        this.onAlterado();
-      });
-    }
+    // 2. Seção LINHA (Pills 1, 2, 3, 4, +)
+    this.renderizarControleLinha(wrapper, b);
 
-    const selNivel = secao.querySelector('#athPropNivel');
-    if (selNivel) {
-      selNivel.addEventListener('change', () => {
-        b.nivel = Number(selNivel.value);
-        this.onAlterado();
-      });
-    }
+    // 3. Seção POSIÇÃO NA FOLHA (4 Cards de Presets + Trilha de 12 Pontos)
+    this.renderizarControleGrade12(wrapper, b);
 
-    const inCitAutor = secao.querySelector('#athPropCitAutor');
-    if (inCitAutor) {
-      inCitAutor.addEventListener('input', () => {
-        b.autor = inCitAutor.value;
-        this.onAlterado();
-      });
-    }
-    const inCitAno = secao.querySelector('#athPropCitAno');
-    if (inCitAno) {
-      inCitAno.addEventListener('input', () => {
-        b.ano = inCitAno.value;
-        this.onAlterado();
-      });
-    }
-    const inCitPag = secao.querySelector('#athPropCitPag');
-    if (inCitPag) {
-      inCitPag.addEventListener('input', () => {
-        b.pagina_citada = inCitPag.value;
-        this.onAlterado();
-      });
-    }
+    // 4. Controles Específicos do Bloco
+    this.renderizarCamposEspecificos(wrapper, b);
 
-    const inImgLeg = secao.querySelector('#athPropImgLegenda');
-    if (inImgLeg) {
-      inImgLeg.addEventListener('input', () => {
-        b.legenda = inImgLeg.value;
-        this.onAlterado();
-      });
-    }
-    const inImgFonte = secao.querySelector('#athPropImgFonte');
-    if (inImgFonte) {
-      inImgFonte.addEventListener('input', () => {
-        b.fonte = inImgFonte.value;
-        this.onAlterado();
-      });
-    }
-    const inImgLarg = secao.querySelector('#athPropImgLargura');
-    if (inImgLarg) {
-      inImgLarg.addEventListener('input', () => {
-        b.largura_pct = Number(inImgLarg.value);
-        this.onAlterado();
-      });
-    }
+    // 5. Inserção de Referências Cruzadas
+    this.renderizarAjudanteReferencias(wrapper, b);
 
-    const selSpan = secao.querySelector('#athPropSpan');
-    if (selSpan) {
-      selSpan.addEventListener('change', () => {
-        b.span = Number(selSpan.value);
-        this.onAlterado();
-      });
-    }
-
-    corpoEl.appendChild(secao);
+    this.container.appendChild(wrapper);
   }
 
-  renderizarAbaEstilos(corpoEl) {
-    const secao = document.createElement('div');
-    secao.className = 'ath-inspector-secao';
+  renderizarControleLinha(wrapper, b) {
+    const secLinha = document.createElement('div');
+    secLinha.className = 'rm-linha-ctl';
 
-    secao.innerHTML = `
-      <h3>Estilos de Parágrafo</h3>
-      <div class="ath-estilos-chips" id="athListaEstilos">
-        ${this.doc.estilos.map((est, idx) => `
-          <button type="button" class="ath-chip-estilo ${idx === 0 ? 'ativo' : ''}" data-id="${est.id}">${est.nome}</button>
-        `).join('')}
-      </div>
+    const linhaAtual = b.linha_grade || 1;
+    const totalLinhas = Math.max(4, linhaAtual);
 
-      <div id="athEditorEstiloForm"></div>
+    secLinha.innerHTML = `
+      <span class="rm-rot">LINHA</span>
+      <p class="rm-dica" style="margin:0;">Este bloco está posicionado na linha ${linhaAtual} de ${totalLinhas}. Escolha outra linha para colocá-lo lado a lado (até 12 por linha).</p>
+      <div class="rm-lns" id="rmLinhasPills"></div>
     `;
 
-    const chips = secao.querySelectorAll('.ath-chip-estilo');
-    const formBox = secao.querySelector('#athEditorEstiloForm');
+    const lnsContainer = secLinha.querySelector('#rmLinhasPills');
+    for (let i = 1; i <= totalLinhas; i++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `rm-ln ${i === linhaAtual ? 'on' : ''}`;
+      btn.textContent = String(i);
+      btn.addEventListener('click', () => {
+        b.linha_grade = i;
+        this.notificarMudanca();
+      });
+      lnsContainer.appendChild(btn);
+    }
 
-    const carregarEstilo = (estId) => {
-      chips.forEach(c => c.classList.toggle('ativo', c.dataset.id === estId));
-      const est = this.doc.estilos.find(e => e.id === estId);
-      if (!est) return;
+    // Botão de nova linha (+)
+    const btnMais = document.createElement('button');
+    btnMais.type = 'button';
+    btnMais.className = 'rm-ln rm-ln-nova';
+    btnMais.textContent = '+';
+    btnMais.title = 'Criar nova linha';
+    btnMais.addEventListener('click', () => {
+      b.linha_grade = totalLinhas + 1;
+      this.notificarMudanca();
+    });
+    lnsContainer.appendChild(btnMais);
 
-      formBox.innerHTML = `
-        <div class="ath-prop-grupo">
-          <label>Família da Fonte</label>
-          <select class="ath-select" id="athEstFonte">
-            ${Object.values(FONTES_SISTEMA).map(f => `<option value="${f.id}" ${f.id === est.fonte ? 'selected' : ''}>${f.rotulo}</option>`).join('')}
+    wrapper.appendChild(secLinha);
+  }
+
+  renderizarControleGrade12(wrapper, b) {
+    const secGrade = document.createElement('div');
+    secGrade.className = 'rm-grade-sel';
+    secGrade.style.paddingTop = '10px';
+
+    b.col = b.col || 1;
+    b.span = b.span || 12;
+
+    secGrade.innerHTML = `
+      <span class="rm-rot">POSIÇÃO NA FOLHA</span>
+      <div class="rm-pres" id="rmPresetCards"></div>
+      <div class="rm-trilha" role="group" aria-label="Colunas do grid" id="rmTrilhaPontos"></div>
+      <span class="rm-dica" id="rmRotuloTrilha"></span>
+    `;
+
+    // 4 Cards Presets
+    const presetsBox = secGrade.querySelector('#rmPresetCards');
+    const presets = [
+      { nome: 'Largura toda', col: 1, span: 12 },
+      { nome: 'Metade esq.', col: 1, span: 6 },
+      { nome: 'Metade dir.', col: 7, span: 6 },
+      { nome: 'Um terço', col: 1, span: 4 }
+    ];
+
+    presets.forEach(p => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'rm-pre';
+
+      // Desenha mini-barra de 12 colunas
+      let bars = '';
+      for (let i = 1; i <= 12; i++) {
+        const ativo = i >= p.col && i < (p.col + p.span);
+        bars += `<i class="${ativo ? 'on' : ''}"></i>`;
+      }
+
+      btn.innerHTML = `
+        <div class="rm-pre-bar">${bars}</div>
+        <small>${p.nome}</small>
+      `;
+
+      btn.addEventListener('click', () => {
+        b.col = p.col;
+        b.span = p.span;
+        this.notificarMudanca();
+      });
+
+      presetsBox.appendChild(btn);
+    });
+
+    // 12 Pontos interativos da trilha
+    const trilhaBox = secGrade.querySelector('#rmTrilhaPontos');
+    const rotuloTrilha = secGrade.querySelector('#rmRotuloTrilha');
+
+    const atualizarTrilhaVisual = () => {
+      const ini = b.col;
+      const fim = b.col + b.span - 1;
+      rotuloTrilha.textContent = `Colunas ${ini} a ${fim} (${b.span} de 12). Clique numa coluna para ligar ou desligar; o bloco é sempre uma faixa contínua.`;
+
+      trilhaBox.querySelectorAll('.rm-pt').forEach((ptEl, idx) => {
+        const colNum = idx + 1;
+        const noBloco = colNum >= ini && colNum <= fim;
+        const comLigacao = colNum >= ini && colNum < fim;
+        ptEl.classList.toggle('on', noBloco);
+        ptEl.classList.toggle('lig', comLigacao);
+        ptEl.classList.toggle('ancora', colNum === ini);
+        ptEl.setAttribute('aria-pressed', String(noBloco));
+      });
+    };
+
+    for (let c = 1; c <= 12; c++) {
+      const pt = document.createElement('button');
+      pt.type = 'button';
+      pt.className = 'rm-pt';
+      pt.innerHTML = '<i></i>';
+      pt.title = `Coluna ${c}`;
+
+      pt.addEventListener('click', () => {
+        const ini = b.col;
+        const fim = b.col + b.span - 1;
+        if (c < ini) {
+          b.col = c;
+          b.span = fim - c + 1;
+        } else if (c > fim) {
+          b.span = c - ini + 1;
+        } else if (c === ini && b.span > 1) {
+          b.col = ini + 1;
+          b.span--;
+        } else if (c === fim && b.span > 1) {
+          b.span--;
+        } else if (b.span > 1) {
+          if (c - ini < fim - c) {
+            b.col = c + 1;
+            b.span = fim - c;
+          } else {
+            b.span = c - ini;
+          }
+        }
+        atualizarTrilhaVisual();
+        this.notificarMudanca();
+      });
+
+      trilhaBox.appendChild(pt);
+    }
+
+    atualizarTrilhaVisual();
+    wrapper.appendChild(secGrade);
+  }
+
+  renderizarCamposEspecificos(wrapper, b) {
+    const box = document.createElement('div');
+    box.className = 'rm-ctl-texto';
+    box.style.display = 'flex';
+    box.style.flexDirection = 'column';
+    box.style.gap = '10px';
+
+    // 1. TÍTULO / SUBTÍTULO
+    if (b.tipo === 'titulo' || b.tipo === 'subtitulo') {
+      box.innerHTML = `
+        <label>Texto do Título
+          <input type="text" id="rmCampoTexto" value="${b.texto || ''}">
+        </label>
+        <div class="rm-linha2">
+          <label>Nível
+            <select id="rmCampoNivel" class="glx-select">
+              <option value="1" ${b.nivel === 1 ? 'selected' : ''}>1 (Seção Primária)</option>
+              <option value="2" ${b.nivel === 2 ? 'selected' : ''}>2 (Subseção)</option>
+              <option value="3" ${b.nivel === 3 ? 'selected' : ''}>3 (Sub-subseção)</option>
+            </select>
+          </label>
+          <label>Estilo Tipográfico
+            <select id="rmCampoEstilo" class="glx-select">
+              ${this.doc.estilos.map(e => `<option value="${e.id}" ${e.id === b.estiloId ? 'selected' : ''}>${e.nome}</option>`).join('')}
+            </select>
+          </label>
+        </div>
+        <label class="rm-chk">
+          <input type="checkbox" id="rmCampoManter" ${b.manterComProximo ? 'checked' : ''}>
+          Manter título com o parágrafo seguinte (evitar órfão)
+        </label>
+      `;
+
+      box.querySelector('#rmCampoTexto').addEventListener('input', e => { b.texto = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmCampoNivel').addEventListener('change', e => { b.nivel = parseInt(e.target.value, 10); this.notificarMudanca(); });
+      box.querySelector('#rmCampoEstilo').addEventListener('change', e => { b.estiloId = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmCampoManter').addEventListener('change', e => { b.manterComProximo = e.target.checked; this.notificarMudanca(); });
+    }
+
+    // 2. PARÁGRAFO
+    else if (b.tipo === 'paragrafo') {
+      box.innerHTML = `
+        <label>Estilo do Texto
+          <select id="rmCampoEstilo" class="glx-select">
+            ${this.doc.estilos.map(e => `<option value="${e.id}" ${e.id === b.estiloId ? 'selected' : ''}>${e.nome}</option>`).join('')}
           </select>
-        </div>
-
-        <div class="ath-linha2">
-          <div class="ath-prop-grupo">
-            <label>Tamanho (pt)</label>
-            <input type="number" min="6" max="72" step="0.5" class="ath-input" id="athEstTamanho" value="${est.tamanho_pt || 12}">
+        </label>
+        <label>Alinhamento
+          <div class="rm-icg">
+            <button type="button" class="rm-ic-bt ${b.alinhamento === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="À Esquerda">${svgIcone('alinhamento_esq', 16)}</button>
+            <button type="button" class="rm-ic-bt ${b.alinhamento === 'centro' ? 'on' : ''}" data-alin="centro" title="Centralizado">${svgIcone('alinhamento_cen', 16)}</button>
+            <button type="button" class="rm-ic-bt ${b.alinhamento === 'direita' ? 'on' : ''}" data-alin="direita" title="À Direita">${svgIcone('alinhamento_dir', 16)}</button>
+            <button type="button" class="rm-ic-bt ${b.alinhamento === 'justificado' ? 'on' : ''}" data-alin="justificado" title="Justificado">${svgIcone('alinhamento_jus', 16)}</button>
           </div>
-          <div class="ath-prop-grupo">
-            <label>Peso</label>
-            <select class="ath-select" id="athEstPeso">
-              ${PESOS_FONTE.map(p => `<option value="${p.valor}" ${p.valor === est.peso ? 'selected' : ''}>${p.rotulo}</option>`).join('')}
+        </label>
+      `;
+
+      box.querySelector('#rmCampoEstilo').addEventListener('change', e => { b.estiloId = e.target.value; this.notificarMudanca(); });
+      box.querySelectorAll('[data-alin]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          b.alinhamento = btn.dataset.alin;
+          this.notificarMudanca();
+        });
+      });
+    }
+
+    // 3. FIGURA (BLOCO COMPOSTO COM MULTI-ITENS)
+    else if (b.tipo === 'figura' || b.tipo === 'imagem') {
+      box.innerHTML = `
+        <label>Identificação / Título
+          <input type="text" id="rmFigTitulo" value="${b.titulo || ''}">
+        </label>
+        <label>Disposição das Imagens (Layout)
+          <select id="rmFigLayout" class="glx-select">
+            <option value="1" ${b.layout === '1' ? 'selected' : ''}>1 Imagem individual</option>
+            <option value="2_lado" ${b.layout === '2_lado' ? 'selected' : ''}>2 Imagens lado a lado (50% / 50%)</option>
+            <option value="2_empilhado" ${b.layout === '2_empilhado' ? 'selected' : ''}>2 Imagens empilhadas</option>
+            <option value="3_linha" ${b.layout === '3_linha' ? 'selected' : ''}>3 Imagens em linha (33% cada)</option>
+            <option value="3_misto" ${b.layout === '3_misto' ? 'selected' : ''}>3 Imagens (1 destaque + 2 menores)</option>
+            <option value="4_grade" ${b.layout === '4_grade' ? 'selected' : ''}>4 Imagens em grade (2 × 2)</option>
+            <option value="6_grade" ${b.layout === '6_grade' ? 'selected' : ''}>6 Imagens em grade (2 × 3)</option>
+          </select>
+        </label>
+        <label>Legenda Geral
+          <textarea id="rmFigLegenda" rows="2">${b.legenda_geral || b.legenda || ''}</textarea>
+        </label>
+        <label>Fonte / Atribuição
+          <input type="text" id="rmFigFonte" value="${b.fonte || 'Fonte: Autores (2026).'}">
+        </label>
+      `;
+
+      box.querySelector('#rmFigTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmFigLayout').addEventListener('change', e => { b.layout = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmFigLegenda').addEventListener('input', e => { b.legenda_geral = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmFigFonte').addEventListener('input', e => { b.fonte = e.target.value; this.notificarMudanca(); });
+    }
+
+    // 4. MAPA (BLOCO COMPOSTO CARTOGRÁFICO)
+    else if (b.tipo === 'mapa') {
+      box.innerHTML = `
+        <label>Identificação / Título
+          <input type="text" id="rmMapaTitulo" value="${b.titulo || ''}">
+        </label>
+        <div class="rm-linha2">
+          <label>Escala Nominal
+            <input type="text" id="rmMapaEscala" value="${b.escala || '1:10.000'}">
+          </label>
+          <label class="rm-chk" style="margin-top:22px;">
+            <input type="checkbox" id="rmMapaNorte" ${b.orientacao_norte ? 'checked' : ''}>
+            Mostrar Norte
+          </label>
+        </div>
+        <label>Legenda Cartográfica
+          <textarea id="rmMapaLegenda" rows="2">${b.legenda_cartografica || ''}</textarea>
+        </label>
+        <label>Fonte dos Dados
+          <input type="text" id="rmMapaFonte" value="${b.fonte || 'Fonte: Glaux GIS.'}">
+        </label>
+      `;
+
+      box.querySelector('#rmMapaTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmMapaEscala').addEventListener('input', e => { b.escala = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmMapaNorte').addEventListener('change', e => { b.orientacao_norte = e.target.checked; this.notificarMudanca(); });
+      box.querySelector('#rmMapaLegenda').addEventListener('input', e => { b.legenda_cartografica = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmMapaFonte').addEventListener('input', e => { b.fonte = e.target.value; this.notificarMudanca(); });
+    }
+
+    // 5. TABELA (ABNT/IBGE - BORDAS VERTICAIS ABERTAS) OU QUADRO (BORDAS FECHADAS)
+    else if (b.tipo === 'tabela' || b.tipo === 'quadro') {
+      const isQuadro = b.tipo === 'quadro';
+      box.innerHTML = `
+        <label>Identificação / Título
+          <input type="text" id="rmTabTitulo" value="${b.titulo || ''}">
+        </label>
+        <div class="rm-linha2">
+          <label>Colunas
+            <input type="number" id="rmTabCols" min="1" max="10" value="${b.colunas?.length || 3}">
+          </label>
+          <label>Linhas de Dados
+            <input type="number" id="rmTabLins" min="1" max="50" value="${b.linhas?.length || 2}">
+          </label>
+        </div>
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:8px; font-size:11.5px; color:#475569;">
+          <strong>Padrão ${isQuadro ? 'Quadro' : 'Tabela'}:</strong> ${isQuadro ? 'Caixa totalmente fechada por bordas horizontais e verticais.' : 'Norma ABNT/IBGE: laterais verticais abertas (sem bordas nas extremidades).'}
+        </div>
+        <label>Notas Explicativas
+          <textarea id="rmTabNotas" rows="1">${b.notas || ''}</textarea>
+        </label>
+        <label>Fonte / Atribuição
+          <input type="text" id="rmTabFonte" value="${b.fonte || ''}">
+        </label>
+      `;
+
+      box.querySelector('#rmTabTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmTabNotas').addEventListener('input', e => { b.notas = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmTabFonte').addEventListener('input', e => { b.fonte = e.target.value; this.notificarMudanca(); });
+    }
+
+    // 6. FÓRMULA MATEMÁTICA (LATEX)
+    else if (b.tipo === 'formula') {
+      box.innerHTML = `
+        <label>Expressão Matemática (LaTeX)
+          <textarea id="rmFormulaLatex" rows="3" style="font-family:var(--glx-font-mono); font-size:12px;">${b.latex || b.formula || ''}</textarea>
+        </label>
+        <div class="rm-linha2">
+          <label>Número da Equação
+            <input type="text" id="rmFormulaNum" value="${b.numero_equacao || b.numero || '(1)'}">
+          </label>
+          <label>Alinhamento
+            <select id="rmFormulaAlin" class="glx-select">
+              <option value="centro" ${b.alinhamento === 'centro' ? 'selected' : ''}>Centralizado</option>
+              <option value="esquerda" ${b.alinhamento === 'esquerda' ? 'selected' : ''}>À Esquerda</option>
             </select>
-          </div>
-        </div>
-
-        <div class="ath-linha2">
-          <div class="ath-prop-grupo">
-            <label>Entrelinha</label>
-            <select class="ath-select" id="athEstEntrelinha">
-              <option value="1.0" ${est.entrelinha === 1.0 ? 'selected' : ''}>1.0 (Simples)</option>
-              <option value="1.15" ${est.entrelinha === 1.15 ? 'selected' : ''}>1.15 (Padrão Web)</option>
-              <option value="1.5" ${est.entrelinha === 1.5 ? 'selected' : ''}>1.5 (ABNT)</option>
-              <option value="2.0" ${est.entrelinha === 2.0 ? 'selected' : ''}>2.0 (APA Dupla)</option>
-            </select>
-          </div>
-          <div class="ath-prop-grupo">
-            <label>Cor do Texto</label>
-            <input type="color" class="ath-input" style="padding:2px 4px; height:36px;" id="athEstCor" value="${est.cor || '#1F2733'}">
-          </div>
-        </div>
-
-        <div class="ath-linha2">
-          <div class="ath-prop-grupo">
-            <label>Recuo 1ª Linha (mm)</label>
-            <input type="number" min="0" max="50" step="0.5" class="ath-input" id="athEstRecuo1" value="${est.recuo_primeira_linha_mm || 0}">
-          </div>
-          <div class="ath-prop-grupo">
-            <label>Recuo Esquerdo (mm)</label>
-            <input type="number" min="0" max="60" step="1" class="ath-input" id="athEstRecuoEsq" value="${est.recuo_esquerdo_mm || 0}">
-          </div>
-        </div>
-
-        <div class="ath-linha2">
-          <div class="ath-prop-grupo">
-            <label>Espaço Antes (pt)</label>
-            <input type="number" min="0" max="40" step="1" class="ath-input" id="athEstAntes" value="${est.espaco_antes_pt || 0}">
-          </div>
-          <div class="ath-prop-grupo">
-            <label>Espaço Depois (pt)</label>
-            <input type="number" min="0" max="40" step="1" class="ath-input" id="athEstDepois" value="${est.espaco_depois_pt || 0}">
-          </div>
-        </div>
-
-        <div class="ath-prop-grupo">
-          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-            <input type="checkbox" id="athEstKeepNext" ${est.manter_com_proximo ? 'checked' : ''}>
-            <span>Manter com o próximo parágrafo (sem órfãos)</span>
           </label>
         </div>
       `;
 
-      formBox.querySelector('#athEstFonte').addEventListener('change', e => { est.fonte = e.target.value; this.onAlterado(); });
-      formBox.querySelector('#athEstTamanho').addEventListener('input', e => { est.tamanho_pt = Number(e.target.value); this.onAlterado(); });
-      formBox.querySelector('#athEstPeso').addEventListener('change', e => { est.peso = Number(e.target.value); this.onAlterado(); });
-      formBox.querySelector('#athEstEntrelinha').addEventListener('change', e => { est.entrelinha = Number(e.target.value); this.onAlterado(); });
-      formBox.querySelector('#athEstCor').addEventListener('input', e => { est.cor = e.target.value; this.onAlterado(); });
-      formBox.querySelector('#athEstRecuo1').addEventListener('input', e => { est.recuo_primeira_linha_mm = Number(e.target.value); this.onAlterado(); });
-      formBox.querySelector('#athEstRecuoEsq').addEventListener('input', e => { est.recuo_esquerdo_mm = Number(e.target.value); this.onAlterado(); });
-      formBox.querySelector('#athEstAntes').addEventListener('input', e => { est.espaco_antes_pt = Number(e.target.value); this.onAlterado(); });
-      formBox.querySelector('#athEstDepois').addEventListener('input', e => { est.espaco_depois_pt = Number(e.target.value); this.onAlterado(); });
-      formBox.querySelector('#athEstKeepNext').addEventListener('change', e => { est.manter_com_proximo = e.target.checked; this.onAlterado(); });
-    };
+      box.querySelector('#rmFormulaLatex').addEventListener('input', e => {
+        b.latex = e.target.value;
+        b.formula = b.latex;
+        this.notificarMudanca();
+      });
+      box.querySelector('#rmFormulaNum').addEventListener('input', e => {
+        b.numero_equacao = e.target.value;
+        b.numero = b.numero_equacao;
+        this.notificarMudanca();
+      });
+      box.querySelector('#rmFormulaAlin').addEventListener('change', e => {
+        b.alinhamento = e.target.value;
+        this.notificarMudanca();
+      });
+    }
 
-    chips.forEach(c => {
-      c.addEventListener('click', () => carregarEstilo(c.dataset.id));
-    });
-
-    carregarEstilo(this.doc.estilos[0]?.id || 'corpo');
-    corpoEl.appendChild(secao);
+    wrapper.appendChild(box);
   }
 
-  renderizarAbaModelo(corpoEl) {
-    const pag = this.paginaSelecionada || this.doc.paginas[0];
-    const mod = modeloDaPagina(this.doc, pag);
+  renderizarAjudanteReferencias(wrapper, b) {
+    const ajudanteBox = document.createElement('div');
+    ajudanteBox.style.marginTop = '14px';
+    ajudanteBox.style.paddingTop = '12px';
+    ajudanteBox.style.borderTop = '1px solid #E2E8F0';
 
-    const secao = document.createElement('div');
-    secao.className = 'ath-inspector-secao';
-
-    secao.innerHTML = `
-      <h3>Modelo da Página</h3>
-
-      <div class="ath-prop-grupo">
-        <label>Tipo de Modelo Aplicado</label>
-        <select class="ath-select" id="athPagModeloSelect">
-          ${this.doc.modelosPagina.map(m => `<option value="${m.id}" ${m.id === mod.id ? 'selected' : ''}>${m.nome}</option>`).join('')}
-        </select>
-        <p style="font-size:11px; color:var(--ath-muted); margin:4px 0 0 0;">Alterar este modelo atualiza as páginas vinculadas sem apagar os blocos de texto.</p>
-      </div>
-
-      <div class="ath-linha2">
-        <div class="ath-prop-grupo">
-          <label>Formato</label>
-          <select class="ath-select" id="athModFormato">
-            <option value="A4" ${mod.formato === 'A4' ? 'selected' : ''}>A4 (210 × 297 mm)</option>
-            <option value="Letter" ${mod.formato === 'Letter' ? 'selected' : ''}>Carta (Letter)</option>
-            <option value="A3" ${mod.formato === 'A3' ? 'selected' : ''}>A3 (297 × 420 mm)</option>
-          </select>
-        </div>
-        <div class="ath-prop-grupo">
-          <label>Orientação</label>
-          <select class="ath-select" id="athModOrientacao">
-            <option value="retrato" ${mod.orientacao === 'retrato' ? 'selected' : ''}>Retrato</option>
-            <option value="paisagem" ${mod.orientacao === 'paisagem' ? 'selected' : ''}>Paisagem</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="ath-prop-grupo">
-        <label>Margens Físicas (mm)</label>
-        <div class="ath-linha4">
-          <div><span style="font-size:10px; color:var(--ath-muted);">SUP</span><input type="number" class="ath-input" id="athMargT" value="${mod.margens_mm.t}"></div>
-          <div><span style="font-size:10px; color:var(--ath-muted);">DIR</span><input type="number" class="ath-input" id="athMargR" value="${mod.margens_mm.r}"></div>
-          <div><span style="font-size:10px; color:var(--ath-muted);">INF</span><input type="number" class="ath-input" id="athMargB" value="${mod.margens_mm.b}"></div>
-          <div><span style="font-size:10px; color:var(--ath-muted);">ESQ</span><input type="number" class="ath-input" id="athMargL" value="${mod.margens_mm.l}"></div>
-        </div>
-      </div>
-
-      <div class="ath-linha2">
-        <div class="ath-prop-grupo">
-          <label>Colunas da Grade</label>
-          <select class="ath-select" id="athModColunas">
-            <option value="1" ${mod.grade?.colunas === 1 ? 'selected' : ''}>1 Coluna (Texto)</option>
-            <option value="2" ${mod.grade?.colunas === 2 ? 'selected' : ''}>2 Colunas (IEEE)</option>
-            <option value="3" ${mod.grade?.colunas === 3 ? 'selected' : ''}>3 Colunas</option>
-            <option value="12" ${mod.grade?.colunas === 12 ? 'selected' : ''}>12 Colunas (Modular)</option>
-          </select>
-        </div>
-        <div class="ath-prop-grupo">
-          <label>Gutter (mm)</label>
-          <input type="number" min="0" max="20" class="ath-input" id="athModGap" value="${mod.grade?.gap_mm || 4}">
-        </div>
-      </div>
-
-      <div class="ath-prop-grupo">
-        <label>Cabeçalho da Página</label>
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-          <input type="checkbox" id="athModCabAtivo" ${mod.cabecalho?.ativo ? 'checked' : ''}>
-          <span style="font-size:12px;">Ativo nas páginas deste modelo</span>
-        </div>
-        <input class="ath-input" id="athModCabTexto" value="${mod.cabecalho?.texto || ''}" placeholder="{documento.titulo}">
-      </div>
-
-      <div class="ath-prop-grupo">
-        <label>Rodapé e Numeração</label>
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-          <input type="checkbox" id="athModRodNum" ${mod.rodape?.numeracao ? 'checked' : ''}>
-          <span style="font-size:12px;">Exibir número da página</span>
-        </div>
-        <input class="ath-input" id="athModRodTexto" value="${mod.rodape?.texto || ''}" placeholder="{documento.autor_principal}">
+    ajudanteBox.innerHTML = `
+      <span class="rm-rot">REFERÊNCIAS E CITAÇÕES</span>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+        <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="rmBtnInserirZotero" style="width:100%;">
+          ${svgIcone('zotero', 15)} Citar Obra da Biblioteca Zotero...
+        </button>
       </div>
     `;
 
-    // Eventos do Modelo
-    secao.querySelector('#athPagModeloSelect').addEventListener('change', e => {
-      pag.modeloId = e.target.value;
-      this.onAlterado();
-      this.renderizar();
+    ajudanteBox.querySelector('#rmBtnInserirZotero').addEventListener('click', () => {
+      this.onAbrirZotero();
     });
 
-    secao.querySelector('#athModFormato').addEventListener('change', e => {
-      mod.formato = e.target.value;
-      this.onAlterado();
-    });
-    secao.querySelector('#athModOrientacao').addEventListener('change', e => {
-      mod.orientacao = e.target.value;
-      this.onAlterado();
-    });
+    wrapper.appendChild(ajudanteBox);
+  }
 
-    secao.querySelector('#athMargT').addEventListener('input', e => { mod.margens_mm.t = Number(e.target.value); this.onAlterado(); });
-    secao.querySelector('#athMargR').addEventListener('input', e => { mod.margens_mm.r = Number(e.target.value); this.onAlterado(); });
-    secao.querySelector('#athMargB').addEventListener('input', e => { mod.margens_mm.b = Number(e.target.value); this.onAlterado(); });
-    secao.querySelector('#athMargL').addEventListener('input', e => { mod.margens_mm.l = Number(e.target.value); this.onAlterado(); });
-
-    secao.querySelector('#athModColunas').addEventListener('change', e => {
-      mod.grade.colunas = Number(e.target.value);
-      this.onAlterado();
-    });
-    secao.querySelector('#athModGap').addEventListener('input', e => {
-      mod.grade.gap_mm = Number(e.target.value);
-      this.onAlterado();
-    });
-
-    secao.querySelector('#athModCabAtivo').addEventListener('change', e => {
-      mod.cabecalho.ativo = e.target.checked;
-      this.onAlterado();
-    });
-    secao.querySelector('#athModCabTexto').addEventListener('input', e => {
-      mod.cabecalho.texto = e.target.value;
-      this.onAlterado();
-    });
-
-    secao.querySelector('#athModRodNum').addEventListener('change', e => {
-      mod.rodape.numeracao = e.target.checked;
-      this.onAlterado();
-    });
-    secao.querySelector('#athModRodTexto').addEventListener('input', e => {
-      mod.rodape.texto = e.target.value;
-      this.onAlterado();
-    });
-
-    corpoEl.appendChild(secao);
+  notificarMudanca() {
+    recalcularNumeracaoAutomatica(this.doc);
+    this.onAlterado(this.doc);
   }
 }
