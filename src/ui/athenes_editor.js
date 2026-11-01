@@ -1407,6 +1407,15 @@ export class EditorView {
     };
     const cssEstilo = estiloParaCss(estiloMesclado);
 
+    // Espaçamentos e margens verticais entre blocos e entre parágrafos
+    const espacoDepoisPt = b.espaco_depois_pt ?? estiloMesclado.espaco_depois_pt ?? 8;
+    const espacoAntesPt = b.espaco_antes_pt ?? estiloMesclado.espaco_antes_pt ?? 0;
+    el.style.marginTop = `${espacoAntesPt}pt`;
+    el.style.marginBottom = `${espacoDepoisPt}pt`;
+
+    const espacoParagrafosPt = b.espaco_paragrafos_pt ?? estiloMesclado.espaco_paragrafos_pt ?? 6;
+    el.style.setProperty('--ath-paragrafo-gap', `${espacoParagrafosPt}pt`);
+
     // 1. TÍTULO
     if (b.tipo === 'titulo' || b.tipo === 'subtitulo') {
       const tag = b.nivel === 1 ? 'h1' : b.nivel === 2 ? 'h2' : 'h3';
@@ -1425,40 +1434,69 @@ export class EditorView {
 
     // 2. PARÁGRAFO
     else if (b.tipo === 'paragrafo') {
-      const p = document.createElement('p');
+      const p = document.createElement('div');
       p.contentEditable = 'true';
       p.className = 'ath-texto-editable';
-      p.style.cssText = `${cssEstilo}; margin:0; outline:none;`;
+      p.style.cssText = `${cssEstilo}; outline:none;`;
 
-      let prefixoMarcador = '';
-      if (b.marcador_tipo === 'circulo') prefixoMarcador = '<span style="color:var(--ath-primary, #314F79); font-weight:900; margin-right:6px;">•</span>';
-      else if (b.marcador_tipo === 'ponto_traco') prefixoMarcador = '<span style="color:var(--ath-primary, #314F79); font-weight:900; margin-right:6px;">·–</span>';
-      else if (b.marcador_tipo === 'traco') prefixoMarcador = '<span style="color:var(--ath-primary, #314F79); font-weight:900; margin-right:6px;">–</span>';
-      else if (b.marcador_tipo === 'numero') prefixoMarcador = '<span style="color:var(--ath-primary, #314F79); font-weight:900; margin-right:6px;">1.</span>';
+      let conteudoHtml = b.texto || 'Escreva diretamente neste bloco...';
+      if (b.marcador_tipo && !conteudoHtml.includes('<ul') && !conteudoHtml.includes('<ol')) {
+        const clsAlinea = b.marcador_tipo === 'traco' ? ' class="ath-lista-alinea"' : b.marcador_tipo === 'ponto_traco' ? ' class="ath-lista-ponto-traco"' : '';
+        if (b.marcador_tipo === 'numero') {
+          conteudoHtml = `<ol><li>${conteudoHtml}</li></ol>`;
+        } else {
+          conteudoHtml = `<ul${clsAlinea}><li>${conteudoHtml}</li></ul>`;
+        }
+      }
 
-      p.innerHTML = prefixoMarcador + resolverReferenciasCruzadas(b.texto || '', this.doc);
+      p.innerHTML = resolverReferenciasCruzadas(conteudoHtml, this.doc);
 
-            p.addEventListener('keydown', e => {
-        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
+      p.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+              const range = sel.getRangeAt(0);
+              const rangeAntes = range.cloneRange();
+              rangeAntes.selectNodeContents(p);
+              rangeAntes.setEnd(range.startContainer, range.startOffset);
+              const divAntes = document.createElement('div');
+              divAntes.appendChild(rangeAntes.cloneContents());
+
+              const rangeDepois = range.cloneRange();
+              rangeDepois.selectNodeContents(p);
+              rangeDepois.setStart(range.endContainer, range.endOffset);
+              const divDepois = document.createElement('div');
+              divDepois.appendChild(rangeDepois.cloneContents());
+
+              this.dividirBlocoAtual(b.id, { textoAntes: divAntes.innerHTML, textoDepois: divDepois.innerHTML });
+            } else {
+              this.dividirBlocoAtual(b.id);
+            }
+            return;
+          }
+
+          // Enter normal em lista (continuidade do marcador ou saída da lista com Enter em item vazio)
           const sel = window.getSelection();
-          if (sel && sel.rangeCount > 0) {
-            const range = sel.getRangeAt(0);
-            const rangeAntes = range.cloneRange();
-            rangeAntes.selectNodeContents(p);
-            rangeAntes.setEnd(range.startContainer, range.startOffset);
-            const divAntes = document.createElement('div');
-            divAntes.appendChild(rangeAntes.cloneContents());
-
-            const rangeDepois = range.cloneRange();
-            rangeDepois.selectNodeContents(p);
-            rangeDepois.setStart(range.endContainer, range.endOffset);
-            const divDepois = document.createElement('div');
-            divDepois.appendChild(rangeDepois.cloneContents());
-
-            this.dividirBlocoAtual(b.id, { textoAntes: divAntes.innerHTML, textoDepois: divDepois.innerHTML });
-          } else {
-            this.dividirBlocoAtual(b.id);
+          if (sel && sel.anchorNode) {
+            const elNode = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
+            const li = elNode?.closest('li');
+            if (li) {
+              const textoLi = li.textContent.replace(/\u200B/g, '').trim();
+              if (!textoLi) {
+                // Item de lista vazio: sair da lista e voltar a ser parágrafo normal
+                e.preventDefault();
+                const ul = li.closest('ul, ol');
+                document.execCommand('outdent', false, null);
+                if (ul && ul.children.length === 0) {
+                  ul.remove();
+                }
+                this.notificarMudancaRapida();
+                return;
+              }
+              // Se tiver conteúdo no <li>, o Enter nativo gera o próximo <li> com o marcador
+            }
           }
         }
       });
@@ -1469,7 +1507,7 @@ export class EditorView {
       el.appendChild(p);
     }
 
-    // 3. FIGURA COMPOSTA (MULTI-ITENS, LEGENDA E FONTE)
+    // 3. FIGURA COMPOSTA (MULTI-ITENS, SUBGRADE, LEGENDA E FONTE)
     else if (b.tipo === 'figura' || b.tipo === 'imagem') {
       const figBox = document.createElement('div');
       figBox.className = 'ath-composto-figura';
@@ -1481,17 +1519,11 @@ export class EditorView {
       tit.className = 'ath-fig-titulo';
       tit.innerHTML = b.titulo || `${rotuloDaFigura(b)} ${b.numero_sequencial || 1} — Descrição da Ilustração`;
       tit.addEventListener('blur', () => { b.titulo = tit.innerHTML; this.notificarMudancaRapida(); });
-      figBox.appendChild(tit);
 
-      // Grid de Imagens (1 coluna ou subgrade lateral de 2 colunas)
+      // Grid de Imagens
       const grid = document.createElement('div');
       grid.className = 'ath-fig-grid';
       grid.dataset.layout = b.layout || '1';
-      if (b.subgrade_colunas === 2) {
-        grid.style.display = 'grid';
-        grid.style.gridTemplateColumns = '2fr 1fr';
-        grid.style.gap = '10px';
-      }
 
       const itens = Array.isArray(b.itens) ? b.itens : [{ url: b.src || '', legenda_sub: 'Visão Geral' }];
       itens.forEach((it, idx) => {
@@ -1504,26 +1536,55 @@ export class EditorView {
         `;
         grid.appendChild(itEl);
       });
-      figBox.appendChild(grid);
 
       // Legenda Geral
+      let leg = null;
       if (b.mostrar_legenda !== false) {
-        const leg = document.createElement('div');
+        leg = document.createElement('div');
         leg.contentEditable = 'true';
         leg.className = 'ath-fig-legenda-geral';
         leg.innerHTML = b.legenda_geral || b.legenda || 'Legenda explicativa dos elementos representados.';
         leg.addEventListener('blur', () => { b.legenda_geral = leg.innerHTML; this.notificarMudancaRapida(); });
-        figBox.appendChild(leg);
       }
 
       // Fonte
+      let fonte = null;
       if (b.mostrar_fonte !== false) {
-        const fonte = document.createElement('div');
+        fonte = document.createElement('div');
         fonte.contentEditable = 'true';
         fonte.className = 'ath-bloco-fonte';
         fonte.innerHTML = b.fonte || 'Fonte: Autores (2026).';
         fonte.addEventListener('blur', () => { b.fonte = fonte.innerHTML; this.notificarMudancaRapida(); });
-        figBox.appendChild(fonte);
+      }
+
+      // Aplicação da Subgrade estilo Desk (1 coluna vertical ou 2 colunas com legenda/dados ao lado)
+      if (b.subgrade_colunas === 2) {
+        figBox.style.display = 'grid';
+        figBox.style.gridTemplateColumns = '1.35fr 1fr';
+        figBox.style.gap = '14px';
+        figBox.style.alignItems = 'center';
+
+        const colDir = document.createElement('div');
+        colDir.style.display = 'flex';
+        colDir.style.flexDirection = 'column';
+        colDir.style.gap = '6px';
+
+        colDir.appendChild(tit);
+        if (leg) colDir.appendChild(leg);
+        if (fonte) colDir.appendChild(fonte);
+
+        figBox.appendChild(grid);
+        figBox.appendChild(colDir);
+      } else {
+        if (b.posicao_titulo === 'base') {
+          figBox.appendChild(grid);
+          figBox.appendChild(tit);
+        } else {
+          figBox.appendChild(tit);
+          figBox.appendChild(grid);
+        }
+        if (leg) figBox.appendChild(leg);
+        if (fonte) figBox.appendChild(fonte);
       }
 
       el.appendChild(figBox);
@@ -1858,6 +1919,10 @@ export class EditorView {
       <button type="button" class="rm-ic-sm" data-cmd="underline" title="Sublinhado (Ctrl+U)"><u>U</u></button>
       <button type="button" class="rm-ic-sm" data-cmd="strikeThrough" title="Tachado"><s>S</s></button>
       <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 3px;"></span>
+      <button type="button" class="rm-ic-sm" data-cmd="insertUnorderedList" title="Lista com Marcadores de Ponto (•)">${svgIcone('lista', 13)}</button>
+      <button type="button" class="rm-ic-sm" data-cmd="insertOrderedList" title="Lista Numerada (1.)">${svgIcone('lista_num', 13)}</button>
+      <button type="button" class="rm-ic-sm" data-lista-alinea="true" title="Alínea / Travessão ABNT (–)">${svgIcone('lista_alinea', 13)}</button>
+      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 3px;"></span>
       <button type="button" class="rm-ic-sm" data-alin-rapido="esquerda" title="À Esquerda">${svgIcone('alinhamento_esq', 14)}</button>
       <button type="button" class="rm-ic-sm" data-alin-rapido="centro" title="Centralizado">${svgIcone('alinhamento_cen', 14)}</button>
       <button type="button" class="rm-ic-sm" data-alin-rapido="direita" title="À Direita">${svgIcone('alinhamento_dir', 14)}</button>
@@ -1913,6 +1978,20 @@ export class EditorView {
         e.preventDefault();
         document.execCommand(btn.dataset.cmd, false, null);
       });
+    });
+
+    barra.querySelector('[data-lista-alinea]')?.addEventListener('mousedown', e => {
+      e.preventDefault();
+      document.execCommand('insertUnorderedList', false, null);
+      const sel = window.getSelection();
+      if (sel && sel.anchorNode) {
+        const elNode = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
+        const ul = elNode?.closest('ul');
+        if (ul) {
+          ul.classList.toggle('ath-lista-alinea');
+        }
+      }
+      this.notificarMudanca();
     });
 
     barra.querySelectorAll('[data-alin-rapido]').forEach(btn => {
@@ -2011,6 +2090,30 @@ export class EditorView {
           } else if (this.blocoSelecionado?.estiloId) {
             selEstilo.value = this.blocoSelecionado.estiloId;
           }
+
+          // Reflete estado dos botões de estilo e marcadores
+          try {
+            const cmdB = barra.querySelector('[data-cmd="bold"]');
+            const cmdI = barra.querySelector('[data-cmd="italic"]');
+            const cmdU = barra.querySelector('[data-cmd="underline"]');
+            const cmdS = barra.querySelector('[data-cmd="strikeThrough"]');
+            const btnUl = barra.querySelector('[data-cmd="insertUnorderedList"]');
+            const btnOl = barra.querySelector('[data-cmd="insertOrderedList"]');
+            const btnAlinea = barra.querySelector('[data-lista-alinea]');
+
+            if (cmdB) cmdB.classList.toggle('on', document.queryCommandState('bold'));
+            if (cmdI) cmdI.classList.toggle('on', document.queryCommandState('italic'));
+            if (cmdU) cmdU.classList.toggle('on', document.queryCommandState('underline'));
+            if (cmdS) cmdS.classList.toggle('on', document.queryCommandState('strikeThrough'));
+
+            const isUl = document.queryCommandState('insertUnorderedList');
+            const isOl = document.queryCommandState('insertOrderedList');
+            const isAlinea = !!elPai?.closest('ul.ath-lista-alinea');
+
+            if (btnUl) btnUl.classList.toggle('on', isUl && !isAlinea);
+            if (btnOl) btnOl.classList.toggle('on', isOl);
+            if (btnAlinea) btnAlinea.classList.toggle('on', isAlinea);
+          } catch (_) {}
           return;
         }
       }

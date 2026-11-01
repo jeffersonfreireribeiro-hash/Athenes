@@ -2,8 +2,11 @@
 /**
  * Athenes — Modal Editor de Layout e Apresentação de Blocos Compostos
  * Inspirado no editor de composição e objetos de prancha do Glaux Desk:
- * Permite configurar estilo de caixa/moldura (limpo, linha de destaque, linhas topo/base, cartão suave),
- * subgrade interna e posicionamento de variáveis ({formula}, {numero}, {legenda}, {fonte}, {titulo}, {imagem}, {tabela}).
+ * - Subgrade interna 2D (linhas, colunas, slots posicionáveis)
+ * - Posicionamento flexível de variáveis: {formula}, {numero}, {legenda}, {fonte}, {titulo}, {imagem}, {tabela}
+ * - Estilos de moldura: Limpo, Linha Lateral (Reta, Quadriculada/Cantos Retos, Pontilhada, Tracejada, Dupla, Bullet),
+ *   Cartão com Fundo, Borda Completa, Moldura Técnica em Esquadro e SVG Personalizado.
+ * - Paleta rica de símbolos matemáticos e lógicos com inserção ao vivo.
  */
 
 import { svgIcone } from './athenes_icones.js';
@@ -12,8 +15,10 @@ import {
   aplicarModeloLayoutBloco,
   salvarModeloLayoutCustomizado,
   aplicarLayoutATodosBlocos,
-  gerarCssMolduraBloco
+  gerarCssMolduraBloco,
+  rotuloDaFigura
 } from '../core/athenes_documento.js';
+import { criarSeletorSimbolosMatematica } from './athenes_simbolos_matematica.js';
 
 export class ModalLayoutBloco {
   constructor(documento, bloco, opcoes = {}) {
@@ -25,11 +30,14 @@ export class ModalLayoutBloco {
     // Clone profundo para edição no rascunho
     this.rascunho = JSON.parse(JSON.stringify(bloco));
     if (!this.rascunho.moldura_tipo) this.rascunho.moldura_tipo = 'limpo';
+    if (!this.rascunho.linha_estilo) this.rascunho.linha_estilo = 'solida';
     if (this.rascunho.padding_pt === undefined) this.rascunho.padding_pt = 8;
+    if (!this.rascunho.subgrade_colunas) this.rascunho.subgrade_colunas = (this.rascunho.layout === '2_lado' ? 2 : 1);
+    if (!this.rascunho.subgrade_linhas) this.rascunho.subgrade_linhas = 3;
+
     if (this.rascunho.tipo === 'formula') {
       if (!this.rascunho.posicao_numero) this.rascunho.posicao_numero = 'direita';
     } else if (this.rascunho.tipo === 'figura' || this.rascunho.tipo === 'imagem') {
-      if (!this.rascunho.subgrade_colunas) this.rascunho.subgrade_colunas = 1;
       if (!this.rascunho.posicao_titulo) this.rascunho.posicao_titulo = 'topo';
     } else if (this.rascunho.tipo === 'tabela' || this.rascunho.tipo === 'quadro') {
       if (!this.rascunho.posicao_titulo) this.rascunho.posicao_titulo = 'topo';
@@ -47,16 +55,17 @@ export class ModalLayoutBloco {
 
     const modal = document.createElement('div');
     modal.className = 'ath-modal';
-    modal.style.maxWidth = '1000px';
+    modal.style.maxWidth = '1060px';
     modal.style.width = '96%';
-    modal.style.height = '88vh';
+    modal.style.height = '90vh';
     modal.style.display = 'flex';
     modal.style.flexDirection = 'column';
 
     const tipoNome = this.rascunho.tipo === 'formula' ? 'Fórmula Matemática'
-      : (this.rascunho.tipo === 'figura' || this.rascunho.tipo === 'imagem') ? 'Figura / Ilustração'
+      : (this.rascunho.tipo === 'figura' || this.rascunho.tipo === 'imagem') ? (rotuloDaFigura(this.rascunho) + ' / Ilustração')
       : this.rascunho.tipo === 'tabela' ? 'Tabela'
-      : this.rascunho.tipo === 'quadro' ? 'Quadro' : 'Bloco Composto';
+      : this.rascunho.tipo === 'quadro' ? 'Quadro'
+      : this.rascunho.tipo === 'mapa' ? 'Mapa Cartográfico' : 'Bloco Composto';
 
     modal.innerHTML = `
       <div class="ath-modal-head" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--ath-primary-line, #C8D7E6); padding:14px 20px; flex:none;">
@@ -65,17 +74,17 @@ export class ModalLayoutBloco {
             ${svgIcone('grade', 18)}
           </div>
           <div>
-            <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--ath-text, #1F2733);">Layout e Apresentação do Bloco (${tipoNome})</h3>
-            <span style="font-size:11.5px; color:var(--glx-muted, #6B7585);">Configure a moldura, subgrade de partes e variáveis na página (estilo Glaux Desk)</span>
+            <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--ath-text, #1F2733);">Layout, Subgrade e Moldura (${tipoNome})</h3>
+            <span style="font-size:11.5px; color:var(--glx-muted, #6B7585);">Subgrade paramétrica estilo Glaux Desk: configure caixas, variáveis, traços e SVG</span>
           </div>
         </div>
         <button type="button" class="rm-ic" id="athModalFechar" title="Fechar">${svgIcone('fechar', 14)}</button>
       </div>
 
-      <div class="ath-modal-body" style="flex:1; min-height:0; display:grid; grid-template-columns:420px 1fr; gap:16px; padding:16px 20px; background:#F8FAFC;">
-        <!-- Painel Esquerdo: Controles, Presets e Variáveis -->
+      <div class="ath-modal-body" style="flex:1; min-height:0; display:grid; grid-template-columns:440px 1fr; gap:16px; padding:16px 20px; background:#F8FAFC;">
+        <!-- Painel Esquerdo: Controles, Presets, Molduras e Subgrade -->
         <div style="display:flex; flex-direction:column; gap:12px; overflow-y:auto; padding-right:8px;" id="athModalControles">
-          <!-- Modelos Prontos estilo Desk -->
+          <!-- Modelos Prontos estilo Desk em Caixa com Lista Selecionável -->
           <div style="background:#fff; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:12px; padding:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
               <span class="rm-rot" style="margin:0;">Modelos de Apresentação</span>
@@ -83,19 +92,36 @@ export class ModalLayoutBloco {
                 + Salvar Modelo
               </button>
             </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;" id="athListaPresetsBloco"></div>
+            <div class="ath-lista-selecionavel" id="athListaPresetsBloco" style="max-height:135px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; padding-right:2px; scrollbar-width:thin;"></div>
           </div>
 
-          <!-- Moldura e Estilo da Caixa -->
-          <div style="background:#fff; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:10px;">
-            <span class="rm-rot">Estilo da Caixa / Moldura</span>
-            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;">
-              <button type="button" class="glx-btn glx-btn-xs ${this.rascunho.moldura_tipo === 'limpo' ? 'glx-btn-primary' : 'glx-btn-soft'}" data-moldura="limpo">Limpo (Sem caixa)</button>
-              <button type="button" class="glx-btn glx-btn-xs ${this.rascunho.moldura_tipo === 'linha_esquerda' ? 'glx-btn-primary' : 'glx-btn-soft'}" data-moldura="linha_esquerda">Linha Lateral</button>
-              <button type="button" class="glx-btn glx-btn-xs ${this.rascunho.moldura_tipo === 'linhas_topo_base' ? 'glx-btn-primary' : 'glx-btn-soft'}" data-moldura="linhas_topo_base">Topo e Base</button>
-              <button type="button" class="glx-btn glx-btn-xs ${this.rascunho.moldura_tipo === 'cartao_suave' ? 'glx-btn-primary' : 'glx-btn-soft'}" data-moldura="cartao_suave">Cartão com Fundo</button>
-              <button type="button" class="glx-btn glx-btn-xs ${this.rascunho.moldura_tipo === 'caixa_borda' ? 'glx-btn-primary' : 'glx-btn-soft'}" data-moldura="caixa_borda">Borda Completa</button>
-              <button type="button" class="glx-btn glx-btn-xs ${this.rascunho.moldura_tipo === 'personalizado' ? 'glx-btn-primary' : 'glx-btn-soft'}" data-moldura="personalizado">Personalizado</button>
+          <!-- Estilos de Caixa e Moldura em Caixa com Lista Selecionável -->
+          <div style="background:#fff; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="rm-rot" style="margin:0;">Estilos de Caixa e Moldura</span>
+              <span style="font-size:10px; color:var(--glx-muted);">Selecione na lista</span>
+            </div>
+            <div class="ath-lista-selecionavel" id="athListaMoldurasBox" style="max-height:140px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; padding-right:2px; scrollbar-width:thin;"></div>
+
+            <!-- Estilo do Traço / Cantos (Reta, Quadriculada, Pontilhada, Tracejada, Dupla) -->
+            <div id="athBoxLinhaEstilo" style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
+              <label style="font-size:11.5px; font-weight:700; color:#475569;">Estilo do Traço e Cantos
+                <select id="athLinhaEstilo" class="glx-select" style="height:30px; font-size:11.5px; padding:0 8px; margin-top:2px;">
+                  <option value="solida" ${(!this.rascunho.linha_estilo || this.rascunho.linha_estilo === 'solida') ? 'selected' : ''}>Reta Contínua</option>
+                  <option value="quadriculada_reta" ${this.rascunho.linha_estilo === 'quadriculada_reta' ? 'selected' : ''}>Quadriculada (Cantos Retos 0 px)</option>
+                  <option value="pontilhada" ${this.rascunho.linha_estilo === 'pontilhada' ? 'selected' : ''}>Pontilhada (Dotted)</option>
+                  <option value="tracejada" ${this.rascunho.linha_estilo === 'tracejada' ? 'selected' : ''}>Tracejada (Dashed)</option>
+                  <option value="dupla" ${this.rascunho.linha_estilo === 'dupla' ? 'selected' : ''}>Linha Dupla Técnica (Double)</option>
+                  <option value="ponto_destaque" ${this.rascunho.linha_estilo === 'ponto_destaque' ? 'selected' : ''}>Com Marcador / Ponto no Topo</option>
+                </select>
+              </label>
+            </div>
+
+            <!-- Editor de SVG Personalizado -->
+            <div id="athBoxSvgCustom" style="display:${this.rascunho.moldura_tipo === 'personalizado' ? 'flex' : 'none'}; flex-direction:column; gap:4px;">
+              <label style="font-size:11px; font-weight:700; color:#475569;">Desenho ou Código SVG da Moldura
+                <textarea id="athTxtSvgCustom" rows="2" placeholder="<svg ...>...</svg>" style="font-family:var(--glx-font-mono); font-size:11px; width:100%;">${this.rascunho.svg_custom || ''}</textarea>
+              </label>
             </div>
 
             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:2px;">
@@ -115,7 +141,7 @@ export class ModalLayoutBloco {
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
               <label style="font-size:11.5px; font-weight:700; color:#475569;">Cantos Arredondados
                 <select id="athRaioBorda" class="glx-select" style="height:30px; font-size:11.5px; padding:0 8px;">
-                  <option value="0" ${this.rascunho.raio_borda_px === 0 ? 'selected' : ''}>0 px (Reto)</option>
+                  <option value="0" ${this.rascunho.raio_borda_px === 0 ? 'selected' : ''}>0 px (Reto / Quadriculado)</option>
                   <option value="4" ${this.rascunho.raio_borda_px === 4 ? 'selected' : ''}>4 px (Sutil)</option>
                   <option value="8" ${(this.rascunho.raio_borda_px === 8 || this.rascunho.raio_borda_px === undefined) ? 'selected' : ''}>8 px (Padrão)</option>
                   <option value="12" ${this.rascunho.raio_borda_px === 12 ? 'selected' : ''}>12 px (Arredondado)</option>
@@ -132,7 +158,7 @@ export class ModalLayoutBloco {
             </div>
           </div>
 
-          <!-- Subgrade e Variáveis do Bloco -->
+          <!-- Subgrade e Variáveis do Bloco (Estilo Glaux Desk) -->
           <div style="background:#fff; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;" id="athSecVariaveis"></div>
         </div>
 
@@ -143,7 +169,7 @@ export class ModalLayoutBloco {
             <span style="font-size:11px; color:#6B7585;">Fidelidade exata do layout aplicado</span>
           </div>
           <div style="flex:1; min-height:0; background:#EFF2F6; border-radius:10px; border:1px solid #CBD5E1; padding:24px; display:flex; align-items:center; justify-content:center; overflow:auto;">
-            <div id="athPreviaFolhaSlot" style="width:100%; max-width:520px; background:#fff; border-radius:4px; box-shadow:0 3px 12px rgba(0,0,0,0.08); padding:20px;"></div>
+            <div id="athPreviaFolhaSlot" style="width:100%; max-width:540px; background:#fff; border-radius:4px; box-shadow:0 3px 12px rgba(0,0,0,0.08); padding:20px;"></div>
           </div>
         </div>
       </div>
@@ -163,6 +189,7 @@ export class ModalLayoutBloco {
     document.body.appendChild(this.backdrop);
 
     this.renderizarPresets();
+    this.renderizarListaMolduras();
     this.renderizarSecaoVariaveis();
     this.atualizarPrevia();
     this.ligarEventos();
@@ -175,25 +202,110 @@ export class ModalLayoutBloco {
     const presets = obterModelosLayoutBloco(this.rascunho.tipo, this.doc);
 
     presets.forEach(p => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `glx-btn glx-btn-xs ${this.rascunho.modelo_layout_id === p.id ? 'glx-btn-primary' : 'glx-btn-soft'}`;
-      btn.style.justifyContent = 'flex-start';
-      btn.style.height = 'auto';
-      btn.style.padding = '6px 8px';
-      btn.style.textAlign = 'left';
-      btn.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:1px; width:100%;">
-          <strong style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.nome}</strong>
-          <small style="font-size:9.5px; opacity:0.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.moldura_tipo}</small>
-        </div>
+      const isSel = this.rascunho.modelo_layout_id === p.id;
+      const row = document.createElement('div');
+      row.className = `ath-item-lista-sel ${isSel ? 'ativo' : ''}`;
+      row.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid ${isSel ? 'var(--ath-primary, #314F79)' : 'var(--ath-primary-line, #E2E8F0)'};
+        background: ${isSel ? 'var(--ath-primary-soft, #EEF4FA)' : '#FFFFFF'};
+        cursor: pointer;
+        transition: all .12s ease;
       `;
-      btn.addEventListener('click', () => {
+      row.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:1px; min-width:0; flex:1;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <strong style="font-size:11.5px; color:${isSel ? 'var(--ath-primary, #314F79)' : '#1F2733'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.nome}</strong>
+            <span class="rm-selo" style="font-size:9px; padding:1px 5px; flex:none;">${p.moldura_tipo}</span>
+          </div>
+          <span style="font-size:10px; color:#64748B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.descricao || 'Modelo de apresentação'}</span>
+        </div>
+        ${isSel ? `<div style="color:var(--ath-primary, #314F79); display:flex; align-items:center; margin-left:8px;">${svgIcone('check', 14)}</div>` : ''}
+      `;
+      row.addEventListener('click', () => {
         aplicarModeloLayoutBloco(this.rascunho, p.id, this.doc);
         this.atualizarTodosControles();
         this.atualizarPrevia();
       });
-      box.appendChild(btn);
+      box.appendChild(row);
+    });
+  }
+
+  renderizarListaMolduras() {
+    const box = this.backdrop.querySelector('#athListaMoldurasBox');
+    if (!box) return;
+    box.innerHTML = '';
+
+    const estilosMoldura = [
+      { id: 'limpo', nome: 'Limpo (Sem caixa / Padrão ABNT)', desc: 'Sem moldura, bordas ou fundo decorativo' },
+      { id: 'linha_esquerda', nome: 'Linha Lateral de Destaque', desc: 'Faixa técnica na lateral esquerda' },
+      { id: 'linhas_topo_base', nome: 'Linhas no Topo e Base', desc: 'Linhas horizontais superior e inferior (estilo IBGE)' },
+      { id: 'cartao_suave', nome: 'Cartão com Fundo Integrado', desc: 'Preenchimento suave com cantos arredondados' },
+      { id: 'caixa_borda', nome: 'Borda Completa (Moldura)', desc: 'Contorno retangular completo contínuo ou estilizado' },
+      { id: 'moldura_tecnica', nome: 'Moldura Técnica / Prancha', desc: 'Esquadros de precisão técnica nos 4 cantos' },
+      { id: 'personalizado', nome: 'Desenho SVG / Personalizado', desc: 'Vetor customizado ou código SVG importado' }
+    ];
+
+    estilosMoldura.forEach(m => {
+      const isSel = this.rascunho.moldura_tipo === m.id;
+      const item = document.createElement('div');
+      item.className = `ath-item-lista-sel ${isSel ? 'ativo' : ''}`;
+      item.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid ${isSel ? 'var(--ath-primary, #314F79)' : 'var(--ath-primary-line, #E2E8F0)'};
+        background: ${isSel ? 'var(--ath-primary-soft, #EEF4FA)' : '#FFFFFF'};
+        cursor: pointer;
+        transition: all .12s ease;
+      `;
+      item.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:1px; min-width:0; flex:1;">
+          <strong style="font-size:11.5px; color:${isSel ? 'var(--ath-primary, #314F79)' : '#1F2733'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.nome}</strong>
+          <span style="font-size:10px; color:#64748B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.desc}</span>
+        </div>
+        ${isSel ? `<div style="color:var(--ath-primary, #314F79); display:flex; align-items:center; margin-left:8px;">${svgIcone('check', 14)}</div>` : ''}
+      `;
+      item.addEventListener('click', () => {
+        this.rascunho.moldura_tipo = m.id;
+        if (m.id === 'limpo') {
+          this.rascunho.fundo_ativo = false;
+          this.rascunho.borda_ativa = false;
+        } else if (m.id === 'linha_esquerda') {
+          this.rascunho.fundo_ativo = true;
+          this.rascunho.fundo_cor = '#F4F7FB';
+          this.rascunho.borda_ativa = true;
+          this.rascunho.borda_cor = '#314F79';
+        } else if (m.id === 'linhas_topo_base') {
+          this.rascunho.fundo_ativo = false;
+          this.rascunho.borda_ativa = true;
+          this.rascunho.borda_cor = '#CBD5E1';
+        } else if (m.id === 'cartao_suave') {
+          this.rascunho.fundo_ativo = true;
+          this.rascunho.fundo_cor = '#EEF4FA';
+          this.rascunho.borda_ativa = true;
+          this.rascunho.borda_cor = '#C8D7E6';
+          this.rascunho.raio_borda_px = 8;
+        } else if (m.id === 'caixa_borda') {
+          this.rascunho.fundo_ativo = false;
+          this.rascunho.borda_ativa = true;
+          this.rascunho.borda_cor = '#CBD5E1';
+        } else if (m.id === 'moldura_tecnica') {
+          this.rascunho.fundo_ativo = false;
+          this.rascunho.borda_ativa = true;
+          this.rascunho.borda_cor = '#314F79';
+          this.rascunho.raio_borda_px = 0;
+        }
+        this.atualizarTodosControles();
+        this.atualizarPrevia();
+      });
+      box.appendChild(item);
     });
   }
 
@@ -202,16 +314,88 @@ export class ModalLayoutBloco {
     if (!sec) return;
     sec.innerHTML = '';
 
-    if (this.rascunho.tipo === 'formula') {
-      sec.innerHTML = `
-        <span class="rm-rot">Variáveis e Slots da Equação</span>
-        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:4px;">
-          <span class="rm-selo" style="font-size:10px;">{formula} Expressão</span>
-          <span class="rm-selo" style="font-size:10px;">{numero} Numeração</span>
-          <span class="rm-selo" style="font-size:10px;">{legenda} Explicativa</span>
-          <span class="rm-selo" style="font-size:10px;">{fonte} Citação Zotero</span>
-        </div>
+    // Cabeçalho da Subgrade estilo Desk
+    sec.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <span class="rm-rot" style="margin:0;">Subgrade do Bloco (Estilo Glaux Desk)</span>
+        <span style="font-size:10px; color:var(--glx-muted);">Posicionamento interno</span>
+      </div>
 
+      <!-- Seletor de Colunas da Subgrade -->
+      <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <label style="font-size:11.5px; font-weight:700; color:#475569;">Colunas da Subgrade
+          <select id="athSubgradeCols" class="glx-select" style="height:30px; font-size:11.5px;">
+            <option value="1" ${this.rascunho.subgrade_colunas === 1 ? 'selected' : ''}>1 Coluna (Vertical)</option>
+            <option value="2" ${this.rascunho.subgrade_colunas === 2 ? 'selected' : ''}>2 Colunas (Lado a Lado)</option>
+          </select>
+        </label>
+        <label style="font-size:11.5px; font-weight:700; color:#475569;">Posição do Título {titulo}
+          <select id="athPosTitulo" class="glx-select" style="height:30px; font-size:11.5px;">
+            <option value="topo" ${this.rascunho.posicao_titulo === 'topo' ? 'selected' : ''}>No Topo (Acima)</option>
+            <option value="base" ${this.rascunho.posicao_titulo === 'base' ? 'selected' : ''}>Na Base (Abaixo)</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- Visualizador Interativo da Matriz do Subgrid -->
+      <div style="background:#F1F5F9; border:1px dashed #CBD5E1; border-radius:8px; padding:8px; margin:4px 0;">
+        <div style="font-size:10.5px; font-weight:800; color:#314F79; margin-bottom:6px; text-transform:uppercase;">
+          Células da Subgrade Interna (${this.rascunho.subgrade_colunas || 1} colunas)
+        </div>
+        <div id="athMatrizSubgrid" style="display:grid; grid-template-columns:${this.rascunho.subgrade_colunas === 2 ? '1fr 1fr' : '1fr'}; gap:6px;"></div>
+      </div>
+    `;
+
+    // Renderiza matriz das células do subgrid
+    const matrizBox = sec.querySelector('#athMatrizSubgrid');
+    if (matrizBox) {
+      if (this.rascunho.tipo === 'formula') {
+        matrizBox.innerHTML = `
+          <div style="background:#fff; border:1px solid #CBD5E1; border-radius:6px; padding:6px; font-size:11px;">
+            <strong>Slot 1:</strong> {formula} Expressão LaTeX
+          </div>
+          <div style="background:#fff; border:1px solid #CBD5E1; border-radius:6px; padding:6px; font-size:11px;">
+            <strong>Slot 2:</strong> {numero} Numeração ${this.rascunho.posicao_numero || 'direita'}
+          </div>
+        `;
+      } else {
+        const is2Col = this.rascunho.subgrade_colunas === 2;
+        if (is2Col) {
+          matrizBox.innerHTML = `
+            <div style="background:#fff; border:1px solid #CBD5E1; border-radius:6px; padding:8px; font-size:11px;">
+              <strong>Coluna 1 (60%):</strong><br>
+              <span class="rm-selo" style="font-size:9.5px; margin-top:4px;">{conteudo} Objeto Principal</span>
+            </div>
+            <div style="background:#fff; border:1px solid #CBD5E1; border-radius:6px; padding:8px; font-size:11px;">
+              <strong>Coluna 2 (40%):</strong><br>
+              <div style="display:flex; flex-direction:column; gap:3px; margin-top:4px;">
+                <span class="rm-selo" style="font-size:9.5px;">{titulo} Título / Número</span>
+                <span class="rm-selo" style="font-size:9.5px;">{legenda} Legenda</span>
+                <span class="rm-selo" style="font-size:9.5px;">{fonte} Fonte</span>
+              </div>
+            </div>
+          `;
+        } else {
+          matrizBox.innerHTML = `
+            <div style="background:#fff; border:1px solid #CBD5E1; border-radius:6px; padding:6px; font-size:11px; display:flex; flex-direction:column; gap:4px;">
+              <div><strong>Linha 1:</strong> ${this.rascunho.posicao_titulo === 'topo' ? '{titulo} Título / Número' : '{conteudo} Imagem / Tabela'}</div>
+              <div><strong>Linha 2:</strong> ${this.rascunho.posicao_titulo === 'topo' ? '{conteudo} Imagem / Tabela' : '{titulo} Título / Número'}</div>
+              <div><strong>Linha 3:</strong> {legenda} Legenda explicativa + {fonte} Fonte</div>
+            </div>
+          `;
+        }
+      }
+    }
+
+    // Variáveis específicas por tipo
+    if (this.rascunho.tipo === 'formula') {
+      const formBox = document.createElement('div');
+      formBox.style.display = 'flex';
+      formBox.style.flexDirection = 'column';
+      formBox.style.gap = '8px';
+      formBox.style.marginTop = '6px';
+
+      formBox.innerHTML = `
         <label style="font-size:11.5px; font-weight:700; color:#475569;">Posição da Numeração da Equação {numero}
           <select id="athPosNumero" class="glx-select" style="height:32px; font-size:12px; margin-top:2px;">
             <option value="direita" ${this.rascunho.posicao_numero === 'direita' ? 'selected' : ''}>À Direita na mesma linha (Padrão Acadêmico)</option>
@@ -221,26 +405,62 @@ export class ModalLayoutBloco {
           </select>
         </label>
 
-        <label class="rm-chk" style="font-size:12px; margin-top:4px;">
+        <!-- Paleta de Símbolos Matemáticos embutida no modal -->
+        <div>
+          <span style="font-size:11px; font-weight:700; color:#475569;">Paleta de Símbolos Especiais (Clique para Inserir)</span>
+          <div id="athModalPaletaSimbolos"></div>
+        </div>
+
+        <label style="font-size:11.5px; font-weight:700; color:#475569;">Expressão LaTeX
+          <textarea id="athTxtLatexModal" rows="2" style="font-family:var(--glx-font-mono); font-size:11.5px; width:100%;">${this.rascunho.latex || this.rascunho.formula || ''}</textarea>
+        </label>
+
+        <label class="rm-chk" style="font-size:12px; margin-top:2px;">
           <input type="checkbox" id="athCheckLegenda" ${this.rascunho.mostrar_legenda ? 'checked' : ''}>
           Exibir texto explicativo das variáveis {legenda}
         </label>
-        <textarea id="athTxtLegenda" rows="2" placeholder="Ex: onde E é a energia, m é a massa em repouso e c é a velocidade da luz..." style="font-size:11.5px; display:${this.rascunho.mostrar_legenda ? 'block' : 'none'};">${this.rascunho.legenda_formula || ''}</textarea>
+        <textarea id="athTxtLegenda" rows="2" placeholder="Ex: onde E é a energia e m é a massa..." style="font-size:11.5px; display:${this.rascunho.mostrar_legenda ? 'block' : 'none'};">${this.rascunho.legenda_formula || ''}</textarea>
 
-        <label class="rm-chk" style="font-size:12px; margin-top:4px;">
+        <label class="rm-chk" style="font-size:12px; margin-top:2px;">
           <input type="checkbox" id="athCheckFonte" ${this.rascunho.mostrar_fonte ? 'checked' : ''}>
           Exibir atribuição ou fonte bibliográfica {fonte}
         </label>
         <input type="text" id="athTxtFonte" placeholder="Ex: Fonte: Einstein (1905)." value="${this.rascunho.fonte_formula || ''}" style="font-size:12px; display:${this.rascunho.mostrar_fonte ? 'block' : 'none'};">
       `;
 
-      sec.querySelector('#athPosNumero').addEventListener('change', e => {
+      sec.appendChild(formBox);
+
+      // Paleta de símbolos
+      const txtLatexModal = formBox.querySelector('#athTxtLatexModal');
+      const boxPaleta = formBox.querySelector('#athModalPaletaSimbolos');
+      if (boxPaleta) {
+        const paleta = criarSeletorSimbolosMatematica(snippet => {
+          const start = txtLatexModal.selectionStart || 0;
+          const end = txtLatexModal.selectionEnd || 0;
+          const val = txtLatexModal.value;
+          txtLatexModal.value = val.substring(0, start) + snippet + val.substring(end);
+          txtLatexModal.selectionStart = txtLatexModal.selectionEnd = start + snippet.length;
+          txtLatexModal.focus();
+          this.rascunho.latex = txtLatexModal.value;
+          this.rascunho.formula = this.rascunho.latex;
+          this.atualizarPrevia();
+        });
+        boxPaleta.appendChild(paleta);
+      }
+
+      txtLatexModal.addEventListener('input', e => {
+        this.rascunho.latex = e.target.value;
+        this.rascunho.formula = this.rascunho.latex;
+        this.atualizarPrevia();
+      });
+
+      formBox.querySelector('#athPosNumero').addEventListener('change', e => {
         this.rascunho.posicao_numero = e.target.value;
         this.atualizarPrevia();
       });
 
-      const chkLeg = sec.querySelector('#athCheckLegenda');
-      const txtLeg = sec.querySelector('#athTxtLegenda');
+      const chkLeg = formBox.querySelector('#athCheckLegenda');
+      const txtLeg = formBox.querySelector('#athTxtLegenda');
       chkLeg.addEventListener('change', e => {
         this.rascunho.mostrar_legenda = e.target.checked;
         txtLeg.style.display = e.target.checked ? 'block' : 'none';
@@ -255,8 +475,8 @@ export class ModalLayoutBloco {
         this.atualizarPrevia();
       });
 
-      const chkFonte = sec.querySelector('#athCheckFonte');
-      const txtFonte = sec.querySelector('#athTxtFonte');
+      const chkFonte = formBox.querySelector('#athCheckFonte');
+      const txtFonte = formBox.querySelector('#athTxtFonte');
       chkFonte.addEventListener('change', e => {
         this.rascunho.mostrar_fonte = e.target.checked;
         txtFonte.style.display = e.target.checked ? 'block' : 'none';
@@ -270,58 +490,30 @@ export class ModalLayoutBloco {
         this.rascunho.fonte_formula = e.target.value;
         this.atualizarPrevia();
       });
-    } else if (this.rascunho.tipo === 'figura' || this.rascunho.tipo === 'imagem') {
-      sec.innerHTML = `
-        <span class="rm-rot">Subgrade e Disposição ({imagem}, {titulo}, {legenda}, {fonte})</span>
-        <label style="font-size:11.5px; font-weight:700; color:#475569;">Arranjo de Subgrade
-          <select id="athSubgradeCols" class="glx-select" style="height:32px; font-size:12px; margin-top:2px;">
-            <option value="1" ${this.rascunho.subgrade_colunas === 1 ? 'selected' : ''}>1 Coluna Vertical (Padrão ABNT Clássico)</option>
-            <option value="2" ${this.rascunho.subgrade_colunas === 2 ? 'selected' : ''}>2 Colunas (Imagem à esquerda 60% e Legenda à direita 40%)</option>
-          </select>
-        </label>
-        <label style="font-size:11.5px; font-weight:700; color:#475569; margin-top:6px;">Posição do Título {titulo}
-          <select id="athPosTitulo" class="glx-select" style="height:32px; font-size:12px; margin-top:2px;">
-            <option value="topo" ${this.rascunho.posicao_titulo === 'topo' ? 'selected' : ''}>Acima da Imagem (Recomendado ABNT)</option>
-            <option value="base" ${this.rascunho.posicao_titulo === 'base' ? 'selected' : ''}>Abaixo da Imagem</option>
-          </select>
-        </label>
-      `;
-
-      sec.querySelector('#athSubgradeCols').addEventListener('change', e => {
-        this.rascunho.subgrade_colunas = parseInt(e.target.value, 10);
-        this.atualizarPrevia();
-      });
-      sec.querySelector('#athPosTitulo').addEventListener('change', e => {
-        this.rascunho.posicao_titulo = e.target.value;
-        this.atualizarPrevia();
-      });
-    } else if (this.rascunho.tipo === 'tabela' || this.rascunho.tipo === 'quadro') {
-      sec.innerHTML = `
-        <span class="rm-rot">Posicionamento de Título e Variáveis</span>
-        <label style="font-size:11.5px; font-weight:700; color:#475569;">Posição do Título {titulo}
-          <select id="athPosTituloTab" class="glx-select" style="height:32px; font-size:12px; margin-top:2px;">
-            <option value="topo" ${this.rascunho.posicao_titulo === 'topo' ? 'selected' : ''}>No Topo (Acima da Tabela — Padrão ABNT/IBGE)</option>
-            <option value="base" ${this.rascunho.posicao_titulo === 'base' ? 'selected' : ''}>Na Base (Abaixo da Tabela)</option>
-          </select>
-        </label>
-      `;
-      sec.querySelector('#athPosTituloTab').addEventListener('change', e => {
-        this.rascunho.posicao_titulo = e.target.value;
-        this.atualizarPrevia();
-      });
     }
+
+    sec.querySelector('#athSubgradeCols')?.addEventListener('change', e => {
+      this.rascunho.subgrade_colunas = parseInt(e.target.value, 10);
+      this.renderizarSecaoVariaveis();
+      this.atualizarPrevia();
+    });
+    sec.querySelector('#athPosTitulo')?.addEventListener('change', e => {
+      this.rascunho.posicao_titulo = e.target.value;
+      this.renderizarSecaoVariaveis();
+      this.atualizarPrevia();
+    });
   }
 
   atualizarTodosControles() {
     this.renderizarPresets();
+    this.renderizarListaMolduras();
     this.renderizarSecaoVariaveis();
 
-    // Atualiza botões de moldura
-    const bts = this.backdrop.querySelectorAll('[data-moldura]');
-    bts.forEach(b => {
-      const match = b.dataset.moldura === this.rascunho.moldura_tipo;
-      b.className = `glx-btn glx-btn-xs ${match ? 'glx-btn-primary' : 'glx-btn-soft'}`;
-    });
+    const selLinhaEstilo = this.backdrop.querySelector('#athLinhaEstilo');
+    if (selLinhaEstilo) selLinhaEstilo.value = this.rascunho.linha_estilo || 'solida';
+
+    const boxSvg = this.backdrop.querySelector('#athBoxSvgCustom');
+    if (boxSvg) boxSvg.style.display = this.rascunho.moldura_tipo === 'personalizado' ? 'flex' : 'none';
 
     const chkFundo = this.backdrop.querySelector('#athFundoAtivo');
     if (chkFundo) chkFundo.checked = !!this.rascunho.fundo_ativo;
@@ -342,6 +534,18 @@ export class ModalLayoutBloco {
     const cssCaixa = gerarCssMolduraBloco(this.rascunho);
     const box = document.createElement('div');
     Object.assign(box.style, cssCaixa);
+
+    // Se for moldura técnica, desenha esquadros nos 4 cantos
+    if (this.rascunho.moldura_tipo === 'moldura_tecnica') {
+      box.style.position = 'relative';
+      const cantosHtml = `
+        <div style="position:absolute; top:2px; left:2px; width:8px; height:8px; border-top:2px solid #314F79; border-left:2px solid #314F79;"></div>
+        <div style="position:absolute; top:2px; right:2px; width:8px; height:8px; border-top:2px solid #314F79; border-right:2px solid #314F79;"></div>
+        <div style="position:absolute; bottom:2px; left:2px; width:8px; height:8px; border-bottom:2px solid #314F79; border-left:2px solid #314F79;"></div>
+        <div style="position:absolute; bottom:2px; right:2px; width:8px; height:8px; border-bottom:2px solid #314F79; border-right:2px solid #314F79;"></div>
+      `;
+      box.innerHTML = cantosHtml;
+    }
 
     if (this.rascunho.tipo === 'formula') {
       const alin = this.rascunho.alinhamento || 'centro';
@@ -390,12 +594,13 @@ export class ModalLayoutBloco {
         inner += `<div style="font-size:10.5px; color:#64748B; margin-top:3px;">${this.rascunho.fonte_formula}</div>`;
       }
 
-      box.innerHTML = inner;
+      box.innerHTML += inner;
     } else if (this.rascunho.tipo === 'figura' || this.rascunho.tipo === 'imagem') {
       const isSubgrade2Col = this.rascunho.subgrade_colunas === 2;
       const posTit = this.rascunho.posicao_titulo || 'topo';
 
-      const titHtml = `<strong style="display:block; font-size:12px; font-weight:800; color:#1F2733; margin-bottom:4px;">${this.rascunho.titulo || 'Figura 1 — Ilustração Técnica'}</strong>`;
+      const rotulo = rotuloDaFigura(this.rascunho);
+      const titHtml = `<strong style="display:block; font-size:12px; font-weight:800; color:#1F2733; margin-bottom:4px;">${this.rascunho.titulo || `${rotulo} 1 — Ilustração Técnica`}</strong>`;
       const imgHtml = `
         <div style="background:#F1F5F9; border-radius:4px; height:90px; display:grid; place-items:center; color:#64748B;">
           ${svgIcone('imagem', 28)}
@@ -406,7 +611,7 @@ export class ModalLayoutBloco {
       const fonteHtml = `<small style="font-size:10px; color:#64748B; margin-top:2px; display:block;">${this.rascunho.fonte || 'Fonte: Autores (2026).'}</small>`;
 
       if (isSubgrade2Col) {
-        box.innerHTML = `
+        box.innerHTML += `
           <div style="display:grid; grid-template-columns:1.4fr 1fr; gap:12px; align-items:center;">
             <div>${imgHtml}</div>
             <div>
@@ -418,14 +623,16 @@ export class ModalLayoutBloco {
         `;
       } else {
         if (posTit === 'topo') {
-          box.innerHTML = `<div>${titHtml}${imgHtml}${legHtml}${fonteHtml}</div>`;
+          box.innerHTML += `<div>${titHtml}${imgHtml}${legHtml}${fonteHtml}</div>`;
         } else {
-          box.innerHTML = `<div>${imgHtml}${titHtml}${legHtml}${fonteHtml}</div>`;
+          box.innerHTML += `<div>${imgHtml}${titHtml}${legHtml}${fonteHtml}</div>`;
         }
       }
     } else if (this.rascunho.tipo === 'tabela' || this.rascunho.tipo === 'quadro') {
+      const isQuadro = this.rascunho.tipo === 'quadro';
+      const rotuloTab = isQuadro ? 'Quadro' : 'Tabela';
       const posTit = this.rascunho.posicao_titulo || 'topo';
-      const titHtml = `<strong style="display:block; font-size:12px; font-weight:800; color:#1F2733; margin-bottom:4px;">${this.rascunho.titulo || 'Tabela 1 — Dados Apresentados'}</strong>`;
+      const titHtml = `<strong style="display:block; font-size:12px; font-weight:800; color:#1F2733; margin-bottom:4px;">${this.rascunho.titulo || `${rotuloTab} 1 — Dados Apresentados`}</strong>`;
       const tabHtml = `
         <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">
           <thead>
@@ -444,9 +651,9 @@ export class ModalLayoutBloco {
       const fonteHtml = `<small style="font-size:10px; color:#64748B; margin-top:4px; display:block;">${this.rascunho.fonte || 'Fonte: IBGE / Autores.'}</small>`;
 
       if (posTit === 'topo') {
-        box.innerHTML = `<div>${titHtml}${tabHtml}${fonteHtml}</div>`;
+        box.innerHTML += `<div>${titHtml}${tabHtml}${fonteHtml}</div>`;
       } else {
-        box.innerHTML = `<div>${tabHtml}${titHtml}${fonteHtml}</div>`;
+        box.innerHTML += `<div>${tabHtml}${titHtml}${fonteHtml}</div>`;
       }
     }
 
@@ -457,44 +664,24 @@ export class ModalLayoutBloco {
     this.backdrop.querySelector('#athModalFechar').addEventListener('click', () => this.fechar());
     this.backdrop.querySelector('#athBtnCancelar').addEventListener('click', () => this.fechar());
 
-    // Botões de estilo de moldura
-    const molduraBts = this.backdrop.querySelectorAll('[data-moldura]');
-    molduraBts.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tipo = btn.dataset.moldura;
-        this.rascunho.moldura_tipo = tipo;
-        if (tipo === 'limpo') {
-          this.rascunho.fundo_ativo = false;
-          this.rascunho.borda_ativa = false;
-        } else if (tipo === 'linha_esquerda') {
-          this.rascunho.fundo_ativo = true;
-          this.rascunho.fundo_cor = '#F4F7FB';
-          this.rascunho.borda_ativa = true;
-          this.rascunho.borda_cor = '#314F79';
-        } else if (tipo === 'linhas_topo_base') {
-          this.rascunho.fundo_ativo = false;
-          this.rascunho.borda_ativa = true;
-          this.rascunho.borda_cor = '#CBD5E1';
-        } else if (tipo === 'cartao_suave') {
-          this.rascunho.fundo_ativo = true;
-          this.rascunho.fundo_cor = '#EEF4FA';
-          this.rascunho.borda_ativa = true;
-          this.rascunho.borda_cor = '#C8D7E6';
-          this.rascunho.raio_borda_px = 8;
-        } else if (tipo === 'caixa_borda') {
-          this.rascunho.fundo_ativo = false;
-          this.rascunho.borda_ativa = true;
-          this.rascunho.borda_cor = '#CBD5E1';
-        }
-        this.atualizarTodosControles();
-        this.atualizarPrevia();
-      });
+    // Seletor de estilo de traço (reta, quadriculada, pontilhada, tracejada, dupla)
+    this.backdrop.querySelector('#athLinhaEstilo')?.addEventListener('change', e => {
+      this.rascunho.linha_estilo = e.target.value;
+      if (this.rascunho.linha_estilo === 'quadriculada_reta') {
+        this.rascunho.raio_borda_px = 0;
+      }
+      this.atualizarPrevia();
+    });
+
+    // SVG Personalizado
+    this.backdrop.querySelector('#athTxtSvgCustom')?.addEventListener('input', e => {
+      this.rascunho.svg_custom = e.target.value;
+      this.atualizarPrevia();
     });
 
     // Fundo e borda diretos
     this.backdrop.querySelector('#athFundoAtivo')?.addEventListener('change', e => {
       this.rascunho.fundo_ativo = e.target.checked;
-      this.rascunho.moldura_tipo = 'personalizado';
       this.atualizarPrevia();
     });
     this.backdrop.querySelector('#athFundoCor')?.addEventListener('input', e => {
@@ -506,7 +693,6 @@ export class ModalLayoutBloco {
 
     this.backdrop.querySelector('#athBordaAtiva')?.addEventListener('change', e => {
       this.rascunho.borda_ativa = e.target.checked;
-      this.rascunho.moldura_tipo = 'personalizado';
       this.atualizarPrevia();
     });
     this.backdrop.querySelector('#athBordaCor')?.addEventListener('input', e => {

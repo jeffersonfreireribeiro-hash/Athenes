@@ -499,7 +499,8 @@ export function estiloParaCss(estilo, fontesDisponiveis = FONTES_SISTEMA) {
 
   // Espaçamentos verticais
   if (estilo.espaco_antes_pt) props.push(`margin-top: ${estilo.espaco_antes_pt}pt;`);
-  if (estilo.espaco_depois_pt) props.push(`margin-bottom: ${estilo.espaco_depois_pt}pt;`);
+  if (estilo.espaco_depois_pt) { props.push(`margin-bottom: ${estilo.espaco_depois_pt}pt;`); props.push(`--ath-bloco-gap: ${estilo.espaco_depois_pt}pt;`); }
+  if (estilo.espaco_paragrafos_pt !== undefined) { props.push(`--ath-paragrafo-gap: ${estilo.espaco_paragrafos_pt}pt;`); }
 
   // Recuos horizontais
   if (estilo.recuo_primeira_linha_mm) {

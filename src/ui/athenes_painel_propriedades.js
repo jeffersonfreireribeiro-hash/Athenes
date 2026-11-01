@@ -12,10 +12,11 @@
 import { FONTES_SISTEMA, PESOS_FONTE } from '../core/athenes_estilos.js';
 import {
   modeloDaPagina, recalcularNumeracaoAutomatica, resolverReferenciasCruzadas,
-  ROTULOS_FIGURA, calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
+  ROTULOS_FIGURA, rotuloDaFigura, aplicarNumeracaoNoTitulo, calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
+import { criarSeletorSimbolosMatematica } from './athenes_simbolos_matematica.js';
 
 export class PainelPropriedades {
   constructor(containerEl, documento, opcoes = {}) {
@@ -538,26 +539,27 @@ export class PainelPropriedades {
           </button>
         </div>
 
-        <!-- Avançado: Entrelinha, Espaçamentos e Recuos -->
-        <details class="rm-sec" style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:8px; padding:8px 10px; margin-top:4px;">
-          <summary style="font:700 11.5px var(--glx-font); cursor:pointer; color:var(--ath-primary, #314F79);">
-            Espaçamentos e Recuos do Parágrafo
-          </summary>
-          <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+        <!-- Espaçamentos e Distâncias: Entre Blocos e Parágrafos (Enter) -->
+        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:6px; background:#fff;">
+          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
+            <span>Distâncias e Espaçamentos</span>
+            <span style="font-size:10px; color:var(--glx-muted); text-transform:none; font-weight:600;">Blocos & Parágrafos</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
             <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <label style="font-size:11px; color:var(--glx-muted);">Entrelinha
-                <input type="number" id="rmCampoEntrelinha" class="glx-input" style="width:100%;" min="0.8" max="3.0" step="0.05" value="${b.entrelinha || estiloAtivo.entrelinha || 1.5}">
+              <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Distância entre Blocos (pt)
+                <input type="number" id="rmCampoEspacoDepois" class="glx-input" style="width:100%;" min="0" max="72" value="${b.espaco_depois_pt ?? estiloAtivo.espaco_depois_pt ?? 8}" title="Margem de afastamento para o próximo bloco">
               </label>
-              <label style="font-size:11px; color:var(--glx-muted);">Tracking (letras em)
-                <input type="number" id="rmCampoTracking" class="glx-input" style="width:100%;" min="-0.1" max="0.5" step="0.01" value="${b.espacamento_letras_em || estiloAtivo.espacamento_letras_em || 0}">
+              <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Distância Parágrafos Enter (pt)
+                <input type="number" id="rmCampoDistanciaParagrafos" class="glx-input" style="width:100%;" min="0" max="48" value="${b.espaco_paragrafos_pt ?? estiloAtivo.espaco_paragrafos_pt ?? 6}" title="Espaço entre parágrafos criados com Enter no mesmo bloco">
               </label>
             </div>
             <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <label style="font-size:11px; color:var(--glx-muted);">Espaço antes (pt)
-                <input type="number" id="rmCampoEspacoAntes" class="glx-input" style="width:100%;" min="0" max="72" value="${b.espaco_antes_pt ?? estiloAtivo.espaco_antes_pt ?? 0}">
+              <label style="font-size:11px; color:var(--glx-muted);">Entrelinha (linhas)
+                <input type="number" id="rmCampoEntrelinha" class="glx-input" style="width:100%;" min="0.8" max="3.0" step="0.05" value="${b.entrelinha || estiloAtivo.entrelinha || 1.5}">
               </label>
-              <label style="font-size:11px; color:var(--glx-muted);">Espaço depois (pt)
-                <input type="number" id="rmCampoEspacoDepois" class="glx-input" style="width:100%;" min="0" max="72" value="${b.espaco_depois_pt ?? estiloAtivo.espaco_depois_pt ?? 6}">
+              <label style="font-size:11px; color:var(--glx-muted);">Espaço antes do bloco (pt)
+                <input type="number" id="rmCampoEspacoAntes" class="glx-input" style="width:100%;" min="0" max="72" value="${b.espaco_antes_pt ?? estiloAtivo.espaco_antes_pt ?? 0}">
               </label>
             </div>
             <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
@@ -568,8 +570,11 @@ export class PainelPropriedades {
                 <input type="number" id="rmCampoRecuoEsq" class="glx-input" style="width:100%;" min="0" max="100" value="${b.recuo_esquerdo_mm ?? estiloAtivo.recuo_esquerdo_mm ?? 0}">
               </label>
             </div>
+            <div style="display:none;">
+              <input type="number" id="rmCampoTracking" value="${b.espacamento_letras_em || estiloAtivo.espacamento_letras_em || 0}">
+            </div>
           </div>
-        </details>
+        </div>
 
         <!-- Indicador de Override Local e Redefinição do Estilo -->
         <div id="rmBoxOverrideStatus" style="display:${temOverride ? 'flex' : 'none'}; flex-direction:column; gap:6px; padding:10px; border-radius:8px; background:var(--ath-primary-soft, #EEF4FA); border:1px solid var(--ath-primary-line, #C8D7E6); margin-top:4px;">
@@ -685,6 +690,10 @@ export class PainelPropriedades {
         b.espaco_depois_pt = parseFloat(e.target.value) || 0;
         this.notificarMudanca();
       });
+      box.querySelector('#rmCampoDistanciaParagrafos')?.addEventListener('input', e => {
+        b.espaco_paragrafos_pt = parseFloat(e.target.value) || 0;
+        this.notificarMudanca();
+      });
       box.querySelector('#rmCampoRecuo1').addEventListener('input', e => {
         b.recuo_primeira_linha_mm = parseFloat(e.target.value) || 0;
         this.notificarMudanca();
@@ -752,6 +761,7 @@ export class PainelPropriedades {
 
     // 3. FIGURA (BLOCO COMPOSTO COM MULTI-ITENS)
     else if (b.tipo === 'figura' || b.tipo === 'imagem') {
+      const rotuloAtual = rotuloDaFigura(b);
       box.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--ath-primary-line, #C8D7E6);">
           <span style="font-size:11px; font-weight:800; color:var(--ath-primary, #314F79); text-transform:uppercase;">Apresentação e Moldura</span>
@@ -759,9 +769,32 @@ export class PainelPropriedades {
             ${svgIcone('quadro', 12)} Personalizar...
           </button>
         </div>
-        <label>Identificação / Título
-          <input type="text" id="rmFigTitulo" value="${b.titulo || ''}">
+
+        <div class="rm-linha2">
+          <label>Categoria / Rótulo
+            <select id="rmFigSubtipo" class="glx-select">
+              <option value="figura" ${(!b.subtipo || b.subtipo === 'figura') ? 'selected' : ''}>Figura (Geral)</option>
+              <option value="grafico" ${b.subtipo === 'grafico' ? 'selected' : ''}>Gráfico (Estatístico)</option>
+              <option value="fotografia" ${b.subtipo === 'fotografia' ? 'selected' : ''}>Fotografia</option>
+              <option value="diagrama" ${b.subtipo === 'diagrama' ? 'selected' : ''}>Diagrama</option>
+              <option value="fluxograma" ${b.subtipo === 'fluxograma' ? 'selected' : ''}>Fluxograma</option>
+            </select>
+          </label>
+          <div style="display:flex; flex-direction:column; justify-content:flex-end;">
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-secondary" id="rmBtnFigAtualizarNum" style="height:34px; font-weight:700; white-space:nowrap;" title="Insere ou atualiza a numeração automática no nome da figura">
+              + Numeração no Nome
+            </button>
+          </div>
+        </div>
+
+        <label style="margin-top:6px;">Identificação / Título
+          <input type="text" id="rmFigTitulo" value="${b.titulo || ''}" placeholder="Ex: ${rotuloAtual} 1 — Descrição">
         </label>
+        <label class="rm-chk" style="font-size:11.5px; margin-top:2px; margin-bottom:6px;">
+          <input type="checkbox" id="rmFigNumAuto" ${b.numeracao_automatica !== false ? 'checked' : ''}>
+          Manter numeração automática no nome (${rotuloAtual} #${b.numero_sequencial || 1})
+        </label>
+
         <label>Disposição das Imagens (Layout)
           <select id="rmFigLayout" class="glx-select">
             <option value="1" ${b.layout === '1' ? 'selected' : ''}>1 Imagem individual</option>
@@ -789,6 +822,31 @@ export class PainelPropriedades {
           }
         });
       });
+      box.querySelector('#rmFigSubtipo').addEventListener('change', e => {
+        b.subtipo = e.target.value;
+        if (b.numeracao_automatica !== false) {
+          aplicarNumeracaoNoTitulo(b, this.doc);
+        } else {
+          recalcularNumeracaoAutomatica(this.doc);
+        }
+        this.notificarMudanca();
+        this.renderizar();
+      });
+      box.querySelector('#rmBtnFigAtualizarNum').addEventListener('click', () => {
+        b.numeracao_automatica = true;
+        aplicarNumeracaoNoTitulo(b, this.doc);
+        box.querySelector('#rmFigTitulo').value = b.titulo;
+        this.notificarMudanca();
+        this.renderizar();
+      });
+      box.querySelector('#rmFigNumAuto').addEventListener('change', e => {
+        b.numeracao_automatica = e.target.checked;
+        if (b.numeracao_automatica) {
+          aplicarNumeracaoNoTitulo(b, this.doc);
+          box.querySelector('#rmFigTitulo').value = b.titulo;
+        }
+        this.notificarMudanca();
+      });
       box.querySelector('#rmFigTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmFigLayout').addEventListener('change', e => { b.layout = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmFigLegenda').addEventListener('input', e => { b.legenda_geral = e.target.value; this.notificarMudanca(); });
@@ -798,9 +856,20 @@ export class PainelPropriedades {
     // 4. MAPA (BLOCO COMPOSTO CARTOGRÁFICO)
     else if (b.tipo === 'mapa') {
       box.innerHTML = `
-        <label>Identificação / Título
-          <input type="text" id="rmMapaTitulo" value="${b.titulo || ''}">
-        </label>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--ath-primary-line, #C8D7E6);">
+          <span style="font-size:11px; font-weight:800; color:var(--ath-primary, #314F79); text-transform:uppercase;">Apresentação e Moldura</span>
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnConfigLayoutBloco" style="display:flex; align-items:center; gap:4px; font-size:11px; white-space:nowrap;">
+            ${svgIcone('quadro', 12)} Personalizar...
+          </button>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label style="flex:1;">Identificação / Título
+            <input type="text" id="rmMapaTitulo" value="${b.titulo || ''}">
+          </label>
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-secondary" id="rmBtnMapaAtualizarNum" style="height:32px; margin-top:14px; margin-left:6px; font-weight:700;" title="Prefixar numeração automática">
+            + Mapa #
+          </button>
+        </div>
         <div class="rm-linha2">
           <label>Escala Nominal
             <input type="text" id="rmMapaEscala" value="${b.escala || '1:10.000'}">
@@ -818,6 +887,21 @@ export class PainelPropriedades {
         </label>
       `;
 
+      box.querySelector('#athBtnConfigLayoutBloco')?.addEventListener('click', () => {
+        new ModalLayoutBloco(this.doc, b, {
+          onSalvar: () => {
+            this.notificarMudanca();
+            this.notificarMudancaEstrutural();
+          }
+        });
+      });
+      box.querySelector('#rmBtnMapaAtualizarNum').addEventListener('click', () => {
+        b.numeracao_automatica = true;
+        aplicarNumeracaoNoTitulo(b, this.doc);
+        box.querySelector('#rmMapaTitulo').value = b.titulo;
+        this.notificarMudanca();
+        this.renderizar();
+      });
       box.querySelector('#rmMapaTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmMapaEscala').addEventListener('input', e => { b.escala = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmMapaNorte').addEventListener('change', e => { b.orientacao_norte = e.target.checked; this.notificarMudanca(); });
@@ -828,6 +912,7 @@ export class PainelPropriedades {
     // 5. TABELA (ABNT/IBGE - BORDAS VERTICAIS ABERTAS) OU QUADRO (BORDAS FECHADAS)
     else if (b.tipo === 'tabela' || b.tipo === 'quadro') {
       const isQuadro = b.tipo === 'quadro';
+      const rotuloTab = isQuadro ? 'Quadro' : 'Tabela';
       box.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--ath-primary-line, #C8D7E6);">
           <span style="font-size:11px; font-weight:800; color:var(--ath-primary, #314F79); text-transform:uppercase;">Apresentação e Moldura</span>
@@ -835,8 +920,17 @@ export class PainelPropriedades {
             ${svgIcone('quadro', 12)} Personalizar...
           </button>
         </div>
-        <label>Identificação / Título
-          <input type="text" id="rmTabTitulo" value="${b.titulo || ''}">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label style="flex:1;">Identificação / Título
+            <input type="text" id="rmTabTitulo" value="${b.titulo || ''}" placeholder="Ex: ${rotuloTab} 1 — Título da tabela">
+          </label>
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-secondary" id="rmBtnTabAtualizarNum" style="height:32px; margin-top:14px; margin-left:6px; font-weight:700;" title="Prefixar numeração automática">
+            + ${rotuloTab} #
+          </button>
+        </div>
+        <label class="rm-chk" style="font-size:11.5px; margin-top:2px; margin-bottom:6px;">
+          <input type="checkbox" id="rmTabNumAuto" ${b.numeracao_automatica !== false ? 'checked' : ''}>
+          Manter numeração automática no nome (${rotuloTab} #${b.numero_sequencial || 1})
         </label>
         <div class="rm-linha2">
           <label>Colunas
@@ -865,12 +959,27 @@ export class PainelPropriedades {
           }
         });
       });
+      box.querySelector('#rmBtnTabAtualizarNum').addEventListener('click', () => {
+        b.numeracao_automatica = true;
+        aplicarNumeracaoNoTitulo(b, this.doc);
+        box.querySelector('#rmTabTitulo').value = b.titulo;
+        this.notificarMudanca();
+        this.renderizar();
+      });
+      box.querySelector('#rmTabNumAuto').addEventListener('change', e => {
+        b.numeracao_automatica = e.target.checked;
+        if (b.numeracao_automatica) {
+          aplicarNumeracaoNoTitulo(b, this.doc);
+          box.querySelector('#rmTabTitulo').value = b.titulo;
+        }
+        this.notificarMudanca();
+      });
       box.querySelector('#rmTabTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmTabNotas').addEventListener('input', e => { b.notas = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmTabFonte').addEventListener('input', e => { b.fonte = e.target.value; this.notificarMudanca(); });
     }
 
-    // 6. FÓRMULA MATEMÁTICA (LATEX E SLOTS)
+    // 6. FÓRMULA MATEMÁTICA (LATEX, PALETA DE SÍMBOLOS E SLOTS)
     else if (b.tipo === 'formula') {
       box.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--ath-primary-line, #C8D7E6);">
@@ -879,10 +988,18 @@ export class PainelPropriedades {
             ${svgIcone('quadro', 12)} Personalizar...
           </button>
         </div>
-        <label>Expressão Matemática (LaTeX)
-          <textarea id="rmFormulaLatex" rows="3" style="font-family:var(--glx-font-mono); font-size:12px;">${b.latex || b.formula || ''}</textarea>
-        </label>
-        <div class="rm-linha2">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <label style="font-weight:700; margin:0;">Expressão Matemática (LaTeX)</label>
+          <span style="font-size:10.5px; color:var(--glx-muted);">Símbolos e Operadores Especiais</span>
+        </div>
+
+        <!-- Seletor Rico de Símbolos Especiais Matemáticos e Lógicos -->
+        <div id="athBoxPaletaSimbolosMat"></div>
+
+        <textarea id="rmFormulaLatex" rows="3" style="font-family:var(--glx-font-mono); font-size:12px;" placeholder="Ex: E = m \\cdot c^2">${b.latex || b.formula || ''}</textarea>
+
+        <div class="rm-linha2" style="margin-top:8px;">
           <label>Número da Equação
             <input type="text" id="rmFormulaNum" value="${b.numero_equacao || b.numero || '(1)'}">
           </label>
@@ -900,6 +1017,23 @@ export class PainelPropriedades {
         </label>
       `;
 
+      const txtLatex = box.querySelector('#rmFormulaLatex');
+      const boxPaleta = box.querySelector('#athBoxPaletaSimbolosMat');
+      if (boxPaleta) {
+        const paleta = criarSeletorSimbolosMatematica(snippet => {
+          const start = txtLatex.selectionStart || 0;
+          const end = txtLatex.selectionEnd || 0;
+          const val = txtLatex.value;
+          txtLatex.value = val.substring(0, start) + snippet + val.substring(end);
+          txtLatex.selectionStart = txtLatex.selectionEnd = start + snippet.length;
+          txtLatex.focus();
+          b.latex = txtLatex.value;
+          b.formula = b.latex;
+          this.notificarMudanca();
+        });
+        boxPaleta.appendChild(paleta);
+      }
+
       box.querySelector('#athBtnConfigLayoutBloco')?.addEventListener('click', () => {
         new ModalLayoutBloco(this.doc, b, {
           onSalvar: () => {
@@ -908,7 +1042,7 @@ export class PainelPropriedades {
           }
         });
       });
-      box.querySelector('#rmFormulaLatex').addEventListener('input', e => {
+      txtLatex.addEventListener('input', e => {
         b.latex = e.target.value;
         b.formula = b.latex;
         this.notificarMudanca();

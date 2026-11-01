@@ -1052,27 +1052,32 @@ export function recalcularNumeracaoAutomatica(doc) {
   const porSubtipo = {};
   const nomes = Object.values(ROTULOS_FIGURA).join('|');
   const prefixoFigura = new RegExp('^(' + nomes + ')\\s+\\d+\\s*[-—]', 'i');
-  const renumerar = (texto, rotulo, n, regex) =>
-    texto && regex.test(texto) ? texto.replace(regex, rotulo + ' ' + n + ' —') : texto;
+  const renumerar = (texto, rotulo, n, regex, forcarAuto = false) => {
+    if (!texto) return forcarAuto ? `${rotulo} ${n} —` : texto;
+    if (regex.test(texto)) return texto.replace(regex, `${rotulo} ${n} —`);
+    if (forcarAuto) return `${rotulo} ${n} — ${texto}`;
+    return texto;
+  };
 
   for (const sec of doc.secoes) {
     for (const b of sec.blocos || []) {
+      const forcarAuto = b.numeracao_automatica === true;
       if (b.tipo === 'figura' || b.tipo === 'imagem') {
         const sub = b.tipo === 'imagem' ? 'figura' : (ROTULOS_FIGURA[b.subtipo] ? b.subtipo : 'figura');
         porSubtipo[sub] = (porSubtipo[sub] || 0) + 1;
         b.numero_sequencial = porSubtipo[sub];
         const rotulo = ROTULOS_FIGURA[sub];
-        b.titulo = renumerar(b.titulo, rotulo, b.numero_sequencial, prefixoFigura);
-        b.legenda = renumerar(b.legenda, rotulo, b.numero_sequencial, prefixoFigura);
+        b.titulo = renumerar(b.titulo, rotulo, b.numero_sequencial, prefixoFigura, forcarAuto);
+        b.legenda = renumerar(b.legenda, rotulo, b.numero_sequencial, prefixoFigura, forcarAuto && !b.titulo);
       } else if (b.tipo === 'mapa') {
         b.numero_sequencial = ++cont.mapa;
-        b.titulo = renumerar(b.titulo, 'Mapa', cont.mapa, /^Mapa\s+\d+\s*[-—]/i);
+        b.titulo = renumerar(b.titulo, 'Mapa', cont.mapa, /^Mapa\s+\d+\s*[-—]/i, forcarAuto);
       } else if (b.tipo === 'tabela') {
         b.numero_sequencial = ++cont.tabela;
-        b.titulo = renumerar(b.titulo, 'Tabela', cont.tabela, /^Tabela\s+\d+\s*[-—]/i);
+        b.titulo = renumerar(b.titulo, 'Tabela', cont.tabela, /^Tabela\s+\d+\s*[-—]/i, forcarAuto);
       } else if (b.tipo === 'quadro') {
         b.numero_sequencial = ++cont.quadro;
-        b.titulo = renumerar(b.titulo, 'Quadro', cont.quadro, /^Quadro\s+\d+\s*[-—]/i);
+        b.titulo = renumerar(b.titulo, 'Quadro', cont.quadro, /^Quadro\s+\d+\s*[-—]/i, forcarAuto);
       } else if (b.tipo === 'formula') {
         b.numero_sequencial = ++cont.formula;
         b.numero_equacao = '(' + cont.formula + ')';
@@ -1089,6 +1094,42 @@ export function recalcularNumeracaoAutomatica(doc) {
     formulas: cont.formula,
     porSubtipo
   };
+}
+
+/**
+ * Aplica explicitamente o prefixo da numeração automática independente no título de um bloco
+ */
+export function aplicarNumeracaoNoTitulo(bloco, doc) {
+  if (!bloco) return '';
+  recalcularNumeracaoAutomatica(doc);
+  const tipo = bloco.tipo;
+  let rotulo = 'Figura';
+  let regex = /^Figura\s+\d+\s*[-—]\s*/i;
+  let num = bloco.numero_sequencial || 1;
+
+  if (tipo === 'figura' || tipo === 'imagem') {
+    const sub = ROTULOS_FIGURA[bloco.subtipo] ? bloco.subtipo : 'figura';
+    rotulo = ROTULOS_FIGURA[sub];
+    regex = new RegExp('^(' + Object.values(ROTULOS_FIGURA).join('|') + ')\\s+\\d+\\s*[-—]\\s*', 'i');
+  } else if (tipo === 'tabela') {
+    rotulo = 'Tabela';
+    regex = /^Tabela\s+\d+\s*[-—]\s*/i;
+  } else if (tipo === 'quadro') {
+    rotulo = 'Quadro';
+    regex = /^Quadro\s+\d+\s*[-—]\s*/i;
+  } else if (tipo === 'mapa') {
+    rotulo = 'Mapa';
+    regex = /^Mapa\s+\d+\s*[-—]\s*/i;
+  } else if (tipo === 'formula') {
+    bloco.numero_equacao = `(${num})`;
+    bloco.numero = bloco.numero_equacao;
+    return bloco.numero_equacao;
+  }
+
+  const baseTexto = (bloco.titulo || '').replace(regex, '').trim();
+  bloco.titulo = baseTexto ? `${rotulo} ${num} — ${baseTexto}` : `${rotulo} ${num} —`;
+  bloco.numeracao_automatica = true;
+  return bloco.titulo;
 }
 
 /**
@@ -1523,6 +1564,35 @@ export const MODELOS_LAYOUT_BLOCO = {
       mostrar_legenda: true,
       mostrar_fonte: true,
       padding_pt: 8
+    },
+    {
+      id: 'formula_pontilhada',
+      nome: 'Linha Lateral Pontilhada',
+      descricao: 'Barra lateral pontilhada discreta com fundo limpo.',
+      moldura_tipo: 'linha_esquerda',
+      linha_estilo: 'pontilhada',
+      borda_estilo: 'pontilhada',
+      fundo_ativo: false,
+      borda_ativa: true,
+      borda_cor: '#314F79',
+      borda_largura_px: 3,
+      posicao_numero: 'direita',
+      padding_pt: 6
+    },
+    {
+      id: 'formula_quadriculada',
+      nome: 'Borda Retinha / Cantos Vivos',
+      descricao: 'Contorno retangular fino com cantos vivos (0 px) estilo desenho técnico.',
+      moldura_tipo: 'caixa_borda',
+      linha_estilo: 'quadriculada_reta',
+      borda_estilo: 'solida',
+      fundo_ativo: true,
+      fundo_cor: '#F8FAFC',
+      borda_ativa: true,
+      borda_cor: '#CBD5E1',
+      raio_borda_px: 0,
+      posicao_numero: 'direita',
+      padding_pt: 8
     }
   ],
   figura: [
@@ -1572,6 +1642,31 @@ export const MODELOS_LAYOUT_BLOCO = {
       raio_borda_px: 6,
       fundo_ativo: false,
       padding_pt: 8
+    },
+    {
+      id: 'figura_linha_lateral',
+      nome: 'Linha Lateral de Destaque',
+      descricao: 'Barra lateral à esquerda com cantos retos vivos para pranchas e relatórios.',
+      moldura_tipo: 'linha_esquerda',
+      linha_estilo: 'quadriculada_reta',
+      fundo_ativo: true,
+      fundo_cor: '#F8FAFC',
+      borda_ativa: true,
+      borda_cor: '#314F79',
+      borda_largura_px: 3.5,
+      raio_borda_px: 0,
+      padding_pt: 10
+    },
+    {
+      id: 'figura_tecnica',
+      nome: 'Moldura Técnica / Prancha',
+      descricao: 'Borda com contorno em esquadro estilo prancha técnica.',
+      moldura_tipo: 'moldura_tecnica',
+      fundo_ativo: false,
+      borda_ativa: true,
+      borda_cor: '#314F79',
+      raio_borda_px: 0,
+      padding_pt: 10
     }
   ],
   tabela: [
@@ -1664,6 +1759,11 @@ export function aplicarModeloLayoutBloco(bloco, modeloIdOuConfig, doc = null) {
   if (cfg.mostrar_fonte !== undefined) bloco.mostrar_fonte = cfg.mostrar_fonte;
   if (cfg.posicao_titulo) bloco.posicao_titulo = cfg.posicao_titulo;
   if (cfg.subgrade_colunas) bloco.subgrade_colunas = cfg.subgrade_colunas;
+  if (cfg.subgrade_linhas) bloco.subgrade_linhas = cfg.subgrade_linhas;
+  if (cfg.subgrade_slots) bloco.subgrade_slots = JSON.parse(JSON.stringify(cfg.subgrade_slots));
+  if (cfg.subgrade_gap_pt !== undefined) bloco.subgrade_gap_pt = cfg.subgrade_gap_pt;
+  if (cfg.linha_estilo) bloco.linha_estilo = cfg.linha_estilo;
+  if (cfg.svg_custom) bloco.svg_custom = cfg.svg_custom;
 
   return true;
 }
@@ -1689,13 +1789,18 @@ export function salvarModeloLayoutCustomizado(doc, nome, bloco) {
     borda_largura_px: bloco.borda_largura_px || 1,
     borda_posicao: bloco.borda_posicao || 'todas',
     borda_estilo: bloco.borda_estilo || 'solida',
+    linha_estilo: bloco.linha_estilo || 'solida',
     raio_borda_px: bloco.raio_borda_px !== undefined ? bloco.raio_borda_px : 0,
     padding_pt: bloco.padding_pt !== undefined ? bloco.padding_pt : 8,
     posicao_numero: bloco.posicao_numero,
     mostrar_legenda: bloco.mostrar_legenda,
     mostrar_fonte: bloco.mostrar_fonte,
     posicao_titulo: bloco.posicao_titulo,
-    subgrade_colunas: bloco.subgrade_colunas
+    subgrade_colunas: bloco.subgrade_colunas,
+    subgrade_linhas: bloco.subgrade_linhas,
+    subgrade_slots: bloco.subgrade_slots ? JSON.parse(JSON.stringify(bloco.subgrade_slots)) : null,
+    subgrade_gap_pt: bloco.subgrade_gap_pt,
+    svg_custom: bloco.svg_custom || ''
   };
   doc.modelos_blocos.push(modelo);
   return modelo;
@@ -1726,34 +1831,49 @@ export function aplicarLayoutATodosBlocos(doc, tipo, config) {
 export function gerarCssMolduraBloco(b) {
   if (!b) return {};
   const tipo = b.moldura_tipo || 'limpo';
-  const pad = b.padding_pt !== undefined ? b.padding_pt : (tipo === 'limpo' ? 4 : tipo === 'linha_esquerda' ? 8 : 10);
-  const raio = b.raio_borda_px !== undefined ? b.raio_borda_px : (tipo === 'cartao_suave' ? 8 : 0);
-  const corBorda = b.borda_cor || (tipo === 'linha_esquerda' ? '#314F79' : '#CBD5E1');
-  const corFundo = b.fundo_cor || (tipo === 'cartao_suave' ? '#F8FAFC' : tipo === 'linha_esquerda' ? '#F4F7FB' : 'transparent');
-  const fundoAtivo = b.fundo_ativo !== undefined ? b.fundo_ativo : (tipo === 'cartao_suave' || (tipo === 'linha_esquerda' && b.fundo_ativo));
+  const pad = b.padding_pt !== undefined ? b.padding_pt : (tipo === 'limpo' ? 4 : (tipo === 'linha_esquerda' || tipo === 'linha_lateral') ? 8 : 10);
+  const linhaEstilo = b.linha_estilo || b.borda_estilo || 'solida';
+  const raio = b.raio_borda_px !== undefined ? b.raio_borda_px : (tipo === 'cartao_suave' ? 8 : (linhaEstilo === 'quadriculada_reta' || tipo === 'quadriculada_reta') ? 0 : 0);
+  const corBorda = b.borda_cor || ((tipo === 'linha_esquerda' || tipo === 'linha_lateral') ? '#314F79' : '#CBD5E1');
+  const corFundo = b.fundo_cor || (tipo === 'cartao_suave' ? '#F8FAFC' : (tipo === 'linha_esquerda' || tipo === 'linha_lateral') ? '#F4F7FB' : 'transparent');
+  const fundoAtivo = b.fundo_ativo !== undefined ? b.fundo_ativo : (tipo === 'cartao_suave' || ((tipo === 'linha_esquerda' || tipo === 'linha_lateral') && b.fundo_ativo));
 
   let border = 'none';
   let borderLeft = 'none';
   let borderTop = 'none';
   let borderBottom = 'none';
+  let extraCss = {};
 
-  if (tipo === 'linha_esquerda') {
-    borderLeft = `3.5px solid ${corBorda}`;
+  const largLinha = b.borda_largura_px || ((tipo === 'linha_esquerda' || tipo === 'linha_lateral') ? 3.5 : 1);
+  const cssEstilo = (linhaEstilo === 'tracejada' || linhaEstilo === 'dashed') ? 'dashed'
+    : (linhaEstilo === 'pontilhada' || linhaEstilo === 'dotted') ? 'dotted'
+    : (linhaEstilo === 'dupla' || linhaEstilo === 'double') ? 'double'
+    : 'solid';
+
+  if (tipo === 'linha_esquerda' || tipo === 'linha_lateral') {
+    borderLeft = `${largLinha}px ${cssEstilo} ${corBorda}`;
+    if (linhaEstilo === 'quadriculada_reta') {
+      extraCss.borderRadius = '0px';
+    }
   } else if (tipo === 'linhas_topo_base') {
-    borderTop = `1px solid ${corBorda}`;
-    borderBottom = `1px solid ${corBorda}`;
+    borderTop = `${largLinha}px ${cssEstilo} ${corBorda}`;
+    borderBottom = `${largLinha}px ${cssEstilo} ${corBorda}`;
   } else if (tipo === 'caixa_borda' || (tipo === 'cartao_suave' && b.borda_ativa !== false)) {
-    border = `1px solid ${corBorda}`;
+    border = `${largLinha}px ${cssEstilo} ${corBorda}`;
+  } else if (tipo === 'moldura_tecnica') {
+    border = `1.5px solid ${corBorda}`;
+    extraCss.outline = '1px dashed #CBD5E1';
+    extraCss.outlineOffset = '3px';
   } else if (tipo === 'personalizado') {
     if (b.borda_ativa) {
       const estilo = b.borda_estilo || 'solida';
-      const cssEstilo = estilo === 'tracejada' ? 'dashed' : estilo === 'pontilhada' ? 'dotted' : 'solid';
+      const cssEstiloP = estilo === 'tracejada' ? 'dashed' : estilo === 'pontilhada' ? 'dotted' : estilo === 'dupla' ? 'double' : 'solid';
       const larg = b.borda_largura_px || 1;
       const pos = b.borda_posicao || 'todas';
-      if (pos === 'esquerda') borderLeft = `${larg}px ${cssEstilo} ${corBorda}`;
-      else if (pos === 'topo_base') { borderTop = `${larg}px ${cssEstilo} ${corBorda}`; borderBottom = `${larg}px ${cssEstilo} ${corBorda}`; }
-      else if (pos === 'topo') { borderTop = `${larg}px ${cssEstilo} ${corBorda}`; }
-      else border = `${larg}px ${cssEstilo} ${corBorda}`;
+      if (pos === 'esquerda') borderLeft = `${larg}px ${cssEstiloP} ${corBorda}`;
+      else if (pos === 'topo_base') { borderTop = `${larg}px ${cssEstiloP} ${corBorda}`; borderBottom = `${larg}px ${cssEstiloP} ${corBorda}`; }
+      else if (pos === 'topo') { borderTop = `${larg}px ${cssEstiloP} ${corBorda}`; }
+      else border = `${larg}px ${cssEstiloP} ${corBorda}`;
     }
   }
 
@@ -1766,7 +1886,8 @@ export function gerarCssMolduraBloco(b) {
     borderRadius: `${raio}px`,
     padding: `${pad}px`,
     margin: '6px 0',
-    boxSizing: 'border-box'
+    boxSizing: 'border-box',
+    ...extraCss
   };
 }
 
