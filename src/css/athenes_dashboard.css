@@ -1,24 +1,156 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Athenes — Estilos da Área Inicial / Dashboard de Documentos */
+/* Athenes — Estilos da Área Inicial / Dashboard (Escrita + Estúdio de Artigos Zotero & PDF estilo Samsung Notes) */
 
 .ath-dashboard {
-  max-width: 1400px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: 20px 24px 36px 24px;
+}
+
+/* Barra Superior: Marca + Abas (Escrita vs Artigos Zotero/PDF) + Identificação/Login */
+.ath-dash-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #FFFFFF;
+  border: 1px solid var(--ath-primary-line, #C8D7E6);
+  border-radius: 16px;
+  padding: 10px 18px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 16px rgba(24, 39, 75, 0.04);
+  flex-wrap: wrap;
+}
+
+.ath-dash-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ath-dash-brand-nome {
+  display: block;
+  font-weight: 900;
+  font-size: 16px;
+  color: #314F79;
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+}
+
+.ath-dash-brand-sub {
+  display: block;
+  font-size: 11px;
+  color: #64748B;
+  font-weight: 600;
+}
+
+/* Seletor das Duas Páginas Principais */
+.ath-dash-nav-paginas {
+  display: inline-flex;
+  align-items: center;
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.ath-dash-aba-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-family: var(--glx-font, 'Nunito', sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  padding: 7px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ath-dash-aba-btn:hover {
+  color: #1F2733;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.ath-dash-aba-btn.on {
+  background: #314F79;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(49, 79, 121, 0.25);
+}
+
+/* Identificação / Login do Usuário no Topo */
+.ath-dash-user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  border-radius: 999px;
+  padding: 5px 12px 5px 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.ath-dash-user-pill:hover {
+  border-color: #314F79;
+  background: #EEF4FA;
+}
+
+.ath-dash-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ath-dash-user-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.ath-dash-user-info strong {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #1F2733;
+}
+
+.ath-dash-user-info small {
+  font-size: 10.5px;
+  color: #64748B;
+}
+
+.ath-dash-user-edit {
+  color: #314F79;
+  display: inline-flex;
+  padding-left: 4px;
 }
 
 .ath-dash-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 28px;
-  padding-bottom: 20px;
+  margin-bottom: 24px;
+  padding-bottom: 18px;
   border-bottom: 1.5px solid var(--ath-line);
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .ath-dash-titulo h1 {
   margin: 0 0 6px 0;
-  font-size: 26px;
+  font-size: 25px;
   font-weight: 800;
   color: var(--ath-text);
   letter-spacing: -0.015em;
@@ -162,4 +294,620 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* ==========================================================================
+   PÁGINA 2: ESTÚDIO DE ARTIGOS ZOTERO + LEITOR/RISCADOR DE PDF (SAMSUNG NOTES)
+   ========================================================================== */
+
+.ath-estudo-barra-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.ath-estudo-aviso-arquitetura {
+  background: linear-gradient(90deg, #EEF4FA 0%, #F8FAFC 100%);
+  border: 1px solid #C8D7E6;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 12.5px;
+  color: #1E293B;
+  line-height: 1.45;
+}
+
+.ath-estudo-icone-destaque {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #314F79;
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ath-artigos-zotero-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
+}
+
+.ath-artigo-zotero-card {
+  background: #FFFFFF;
+  border: 1px solid #DCE4EE;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.ath-artigo-zotero-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  border-color: #94A3B8;
+}
+
+.ath-artigo-capa-pdf {
+  background: #F1F5F9;
+  padding: 14px 16px;
+  border-bottom: 1px solid #E2E8F0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ath-artigo-capa-folha {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ath-artigo-capa-periodico {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #64748B;
+  letter-spacing: 0.04em;
+}
+
+.ath-artigo-capa-titulo {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #1F2733;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ath-artigo-capa-autores {
+  font-size: 10px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.ath-artigo-capa-linhas {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.ath-artigo-capa-linhas span {
+  height: 4px;
+  border-radius: 2px;
+  background: #E2E8F0;
+  width: 100%;
+}
+
+.ath-artigo-capa-linhas span.hl {
+  background: #FDE047;
+  width: 78%;
+}
+
+.ath-artigo-capa-badges {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ath-selo-zotero,
+.ath-selo-drive {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.ath-selo-zotero {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.ath-selo-drive {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.ath-artigo-card-corpo {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+}
+
+.ath-artigo-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ath-tag-chip {
+  font-size: 10px;
+  font-weight: 700;
+  background: #EEF4FA;
+  color: #314F79;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.ath-artigo-titulo {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #1F2733;
+  line-height: 1.3;
+}
+
+.ath-artigo-autores {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.ath-artigo-resumo-curto {
+  margin: 0;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.45;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ath-artigo-estatisticas {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #64748B;
+  padding-top: 8px;
+  border-top: 1px dashed #E2E8F0;
+  flex-wrap: wrap;
+}
+
+.ath-artigo-card-rodape {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+/* Estúdio de Leitura e Risco de PDF (Samsung Notes + Zotero) */
+.ath-estudio-pdf-shell {
+  background: #FFFFFF;
+  border: 1px solid #C8D7E6;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  min-height: 78vh;
+}
+
+.ath-estudio-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #F8FAFC;
+  border-bottom: 1px solid #CBD5E1;
+  flex-wrap: wrap;
+}
+
+.ath-estudio-topo-esq {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ath-estudio-doc-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ath-estudio-doc-info strong {
+  font-size: 13px;
+  font-weight: 800;
+  color: #1F2733;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+.ath-estudio-doc-info span {
+  font-size: 11px;
+  color: #64748B;
+}
+
+.ath-samsung-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 999px;
+  padding: 4px 10px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  flex-wrap: wrap;
+}
+
+.ath-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: #334155;
+  font-family: var(--glx-font, 'Nunito', sans-serif);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ath-tool-btn:hover {
+  background: #F1F5F9;
+}
+
+.ath-tool-btn.on {
+  background: #314F79;
+  color: #FFFFFF;
+}
+
+.ath-toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: #E2E8F0;
+  margin: 0 2px;
+}
+
+.ath-cores-tinta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ath-cor-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  padding: 0;
+}
+
+.ath-cor-dot.on {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 2px #1F2733;
+}
+
+.ath-estudio-topo-dir {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ath-estudio-corpo {
+  display: grid;
+  grid-template-columns: 1fr 370px;
+  flex: 1;
+  min-height: 680px;
+}
+
+.ath-estudio-pdf-area {
+  background: #E2E8F0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #CBD5E1;
+}
+
+.ath-estudio-paginador {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #F1F5F9;
+  border-bottom: 1px solid #CBD5E1;
+}
+
+.ath-pdf-palco-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.ath-pdf-folha-container {
+  position: relative;
+  width: 794px;
+  min-height: 1040px;
+  background: #FFFFFF;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ath-pdf-folha-texto {
+  padding: 56px 64px;
+  color: #1E293B;
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1.68;
+  font-size: 15px;
+  user-select: text;
+}
+
+.ath-pdf-folha-cabecalho {
+  font-family: 'Nunito', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748B;
+  border-bottom: 1.5px solid #CBD5E1;
+  padding-bottom: 8px;
+  margin-bottom: 24px;
+  letter-spacing: 0.04em;
+}
+
+.ath-pdf-folha-titulo {
+  font-family: 'Nunito', sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: #0F172A;
+  line-height: 1.3;
+  margin: 0 0 10px 0;
+}
+
+.ath-pdf-folha-autores {
+  font-family: 'Nunito', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #314F79;
+  margin-bottom: 24px;
+}
+
+.ath-pdf-folha-colunas p {
+  margin: 0 0 16px 0;
+  text-align: justify;
+}
+
+.ath-pdf-folha-rodape {
+  margin-top: 48px;
+  padding-top: 12px;
+  border-top: 1px solid #E2E8F0;
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Nunito', sans-serif;
+  font-size: 11px;
+  color: #64748B;
+}
+
+.ath-pdf-embed-nativo {
+  width: 794px;
+  height: 1040px;
+  border: none;
+}
+
+.ath-pdf-ink-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  touch-action: none;
+}
+
+.ath-pdf-pins-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.ath-pdf-pin-balao {
+  position: absolute;
+  width: 220px;
+  background: #FFFBEB;
+  border: 2px solid #F59E0B;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  pointer-events: auto;
+  overflow: hidden;
+  font-family: 'Nunito', sans-serif;
+}
+
+.ath-pdf-pin-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  color: #FFFFFF;
+  font-size: 11px;
+}
+
+.ath-pin-del {
+  border: none;
+  background: transparent;
+  color: #FFFFFF;
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 11px;
+}
+
+.ath-pdf-pin-txt {
+  padding: 8px 10px;
+  font-size: 11.5px;
+  color: #1F2733;
+  line-height: 1.35;
+}
+
+/* Painel Lateral Direito do Estúdio */
+.ath-estudio-painel-dir {
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+}
+
+.ath-estudio-abas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid #CBD5E1;
+  background: #F8FAFC;
+}
+
+.ath-estudio-aba {
+  border: none;
+  background: transparent;
+  padding: 11px 6px;
+  font-family: var(--glx-font, 'Nunito', sans-serif);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #64748B;
+  cursor: pointer;
+  border-bottom: 2.5px solid transparent;
+}
+
+.ath-estudio-aba.on {
+  color: #314F79;
+  border-bottom-color: #314F79;
+  background: #FFFFFF;
+}
+
+.ath-estudio-painel-corpo {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.ath-fichamento-rotulo {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #314F79;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.ath-fichamento-resumo-orig {
+  font-size: 12px;
+  color: #475569;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  line-height: 1.45;
+}
+
+.ath-fichamento-dica {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #EEF4FA;
+  border: 1px solid #C8D7E6;
+  font-size: 11.5px;
+  color: #1E293B;
+  line-height: 1.4;
+}
+
+.ath-lista-citacoes-pdf {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ath-citacao-pdf-card {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.ath-citacao-pdf-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.ath-citacao-pag-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  background: #EEF4FA;
+  color: #314F79;
+  padding: 2px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ath-citacao-pdf-texto {
+  margin: 0 0 6px 0;
+  font-size: 12px;
+  font-style: italic;
+  color: #1F2733;
+  line-height: 1.4;
+}
+
+.ath-citacao-pdf-ref {
+  font-size: 11px;
+  font-weight: 800;
+  color: #475569;
+}
+
+.ath-citacao-pdf-nota {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #CBD5E1;
+  font-size: 11px;
+  color: #334155;
 }

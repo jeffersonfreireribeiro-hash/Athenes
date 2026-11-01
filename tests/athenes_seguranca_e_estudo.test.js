@@ -1,0 +1,88 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {
+  escapeHtml,
+  sanitizarHtmlEditorial,
+  sanitizarDocumentoImportado,
+  obterOuRestaurarSelecaoDoBloco
+} from '../src/core/athenes_seguranca.js';
+import {
+  criarArtigosEstudoExemplo,
+  formatarCitacaoAbntDoArtigo,
+  gerarHtmlNotaZoteroDoArtigo
+} from '../src/ui/athenes_estudo_artigos.js';
+import { ZoteroClient } from '../src/core/athenes_zotero.js';
+
+test('escapeHtml e sanitizarHtmlEditorial bloqueiam vetores XSS preservando formatação editorial', () => {
+  const sujo = `<p onclick="alert(1)">Texto <b>negrito</b> <script>evil()</script> <a href="javascript:alert(2)">link</a></p>`;
+  const limpo = sanitizarHtmlEditorial(sujo);
+  assert.equal(limpo.includes('<script'), false);
+  assert.equal(limpo.includes('onclick='), false);
+  assert.equal(limpo.includes('javascript:'), false);
+  assert.equal(limpo.includes('<b>negrito</b>'), true);
+
+  const attr = escapeHtml(`"Título" <script>&'`);
+  assert.equal(attr, '&quot;Título&quot; &lt;script&gt;&amp;&#39;');
+});
+
+test('sanitizarDocumentoImportado higieniza títulos e blocos de documentos externos', () => {
+  const doc = {
+    titulo: 'Artigo <script>alert(1)</script>',
+    subtitulo: 'Sub',
+    secoes: [
+      {
+        id: 's1',
+        nome: 'Capa',
+        blocos: [
+          { id: 'b1', tipo: 'paragrafo', texto: 'Olá <img src=x onerror="alert(1)"> <i>mundo</i>' }
+        ]
+      }
+    ]
+  };
+  const limpo = sanitizarDocumentoImportado(doc);
+  assert.equal(limpo.titulo.includes('<script>'), false);
+  assert.equal(limpo.secoes[0].blocos[0].texto.includes('onerror='), false);
+  assert.equal(limpo.secoes[0].blocos[0].texto.includes('<i>mundo</i>'), true);
+});
+
+test('Estúdio de Artigos Zotero & PDF gera citações ABNT com página e nota HTML para Zotero', () => {
+  const artigos = criarArtigosEstudoExemplo();
+  assert.equal(artigos.length >= 3, true);
+
+  const art = artigos[0];
+  const citAbnt = formatarCitacaoAbntDoArtigo(art, 115);
+  assert.equal(citAbnt, '(SANTOS; RIBEIRO, 2025, p. 115)');
+
+  const htmlNota = gerarHtmlNotaZoteroDoArtigo(art);
+  assert.equal(htmlNota.includes('Fichamento Athenes'), true);
+  assert.equal(htmlNota.includes('Google Drive'), true);
+  assert.equal(htmlNota.includes('Citações Marcadas no PDF'), true);
+});
+
+test('PainelPropriedades define estilos e cobre todos os tipos de blocos sem ReferenceError', () => {
+  const codigoProps = fs.readFileSync(path.resolve('src/ui/athenes_painel_propriedades.js'), 'utf8');
+  assert.equal(codigoProps.includes('const estilos = this.doc.estilos || [];'), true);
+  assert.equal(codigoProps.includes("b.tipo === 'campos'"), true);
+  assert.equal(codigoProps.includes("b.tipo === 'divisor'"), true);
+  assert.equal(codigoProps.includes("b.tipo === 'espaco'"), true);
+  assert.equal(codigoProps.includes('ath-props-aviso-diagnostico'), true);
+});
+
+test('obterOuRestaurarSelecaoDoBloco opera com segurança em ambiente sem DOM', () => {
+  const res = obterOuRestaurarSelecaoDoBloco('b_inexistente');
+  assert.equal(res.ok, false);
+  assert.equal(res.range, null);
+});
+
+test('ZoteroClient.sincronizarNotaFilhaNoZotero retorna fallback local quando sem credenciais', async () => {
+  const client = new ZoteroClient();
+  const res = await client.sincronizarNotaFilhaNoZotero({
+    parentItemKey: 'ZOT123',
+    htmlNota: '<p>Resumo</p>'
+  });
+  assert.equal(res.ok, false);
+  assert.equal(res.modo, 'local');
+});

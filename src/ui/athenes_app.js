@@ -5,6 +5,7 @@
 
 import { DashboardView } from './athenes_dashboard.js';
 import { criarDocumento } from '../core/athenes_documento.js';
+import { sanitizarDocumentoImportado } from '../core/athenes_seguranca.js';
 import { EditorView } from './athenes_editor.js';
 import { PainelPropriedades } from './athenes_painel_propriedades.js';
 import { PainelZotero } from './athenes_painel_zotero.js';
@@ -28,7 +29,7 @@ export class AthenesApp {
     this.iniciar();
   }
 
-    iniciar() {
+  iniciar() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('tela') === 'editor' || params.get('editor') === '1') {
       try {
@@ -37,6 +38,7 @@ export class AthenesApp {
         if (lista.length > 0) {
           const docSalvo = localStorage.getItem(`athenes_doc_${lista[0].id}`);
           if (docSalvo) this.documentoAtivo = JSON.parse(docSalvo);
+          else this.documentoAtivo = lista[0];
         }
       } catch (_) {}
       if (!this.documentoAtivo) {
@@ -55,7 +57,7 @@ export class AthenesApp {
 
     this.dashboardView = new DashboardView(dashBox, {
       onAbrirDocumento: (doc) => {
-        this.documentoAtivo = doc;
+        this.documentoAtivo = sanitizarDocumentoImportado(doc);
         this.navegarParaEditor();
       }
     });
@@ -71,7 +73,9 @@ export class AthenesApp {
       onAlterado: (doc) => {
         this.documentoAtivo = doc;
         this.autoSalvar();
-        if (this.painelProps) this.painelProps.setDocumento(doc);
+        if (this.painelProps) {
+          this.painelProps.doc = doc;
+        }
       },
       onSelecionarBloco: (bloco, pagina) => {
         if (this.painelProps) this.painelProps.setSelecao(bloco, pagina);
@@ -111,11 +115,16 @@ export class AthenesApp {
         }
         this.autoSalvar();
       },
+      onDividirBloco: (bloco) => {
+        if (this.editorView) this.editorView.dividirBlocoAtual(bloco?.id);
+      },
       onAbrirZotero: () => {
         this.abrirModalZotero();
       }
     });
-    if (editor && editor.blocoSelecionado) this.painelProps.setSelecao(editor.blocoSelecionado, null);
+    if (editor && editor.blocoSelecionado) {
+      this.painelProps.setSelecao(editor.blocoSelecionado, null);
+    }
   }
 
   abrirModalZotero() {

@@ -141,6 +141,10 @@ export class EditorView {
     repaginarDocumento(this.doc);
     this.normalizarBlocosLegados();
     repaginarDocumento(this.doc);
+    if (!this.blocoSelecionado) {
+      const secIni = this.obterSecaoAtiva();
+      this.blocoSelecionado = secIni?.blocos?.[0] || null;
+    }
     this.salvarSnapshot();
     this.renderizar();
     this.inicializarBarraContextualTexto();
@@ -517,10 +521,23 @@ export class EditorView {
       const sec = this.obterSecaoAtiva();
       if (!sec) return;
       const b = criarNovoBloco(tipo, dados);
-      adicionarBlocoNaSecao(this.doc, sec.id, b);
+      const idxSel = this.blocoSelecionado ? (sec.blocos || []).findIndex(x => x.id === this.blocoSelecionado.id) : -1;
+      if (idxSel >= 0 && Array.isArray(sec.blocos)) {
+        sec.blocos.splice(idxSel + 1, 0, b);
+        repaginarDocumento(this.doc);
+      } else {
+        adicionarBlocoNaSecao(this.doc, sec.id, b);
+      }
       this.blocoSelecionado = b;
       this.notificarMudanca();
       this.renderizar();
+      this.onSelecionarBloco(b, null);
+      requestAnimationFrame(() => {
+        const elFolha = this.container?.querySelector(`.ath-bloco-folha[data-bloco-id="${b.id}"]`);
+        if (elFolha) {
+          try { elFolha.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+        }
+      });
     };
 
     root.querySelector('#rmAddTitulo').addEventListener('click', () => adicionar('titulo', { texto: 'Novo Título' }));
@@ -1329,13 +1346,26 @@ export class EditorView {
       item.addEventListener('click', (e) => {
         if (e.target.closest('button')) return;
         this.secaoAtivaId = sec.id;
+        this.blocoSelecionado = sec.blocos?.[0] || null;
         this.renderizar();
+        this.onSelecionarBloco(this.blocoSelecionado, null);
+        requestAnimationFrame(() => {
+          const pagSec = (this.doc.paginas || []).find(p => p.secaoId === sec.id);
+          if (pagSec) {
+            const folhaEl = this.container?.querySelector(`.ath-folha-a4[data-pagina-id="${pagSec.id}"]`);
+            if (folhaEl) {
+              try { folhaEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+            }
+          }
+        });
       });
 
       item.querySelector('[data-acao="subir-secao"]')?.addEventListener('click', e => {
         e.stopPropagation();
         if (ehPrimeira) return;
+        this.secaoAtivaId = sec.id;
         moverSecao(this.doc, sec.id, -1);
+        repaginarDocumento(this.doc);
         this.notificarMudanca();
         this.renderizar();
       });
@@ -1343,7 +1373,9 @@ export class EditorView {
       item.querySelector('[data-acao="descer-secao"]')?.addEventListener('click', e => {
         e.stopPropagation();
         if (ehUltima) return;
+        this.secaoAtivaId = sec.id;
         moverSecao(this.doc, sec.id, 1);
+        repaginarDocumento(this.doc);
         this.notificarMudanca();
         this.renderizar();
       });
@@ -1365,16 +1397,14 @@ export class EditorView {
           alert('O documento precisa conter pelo menos uma seção de página mestra.');
           return;
         }
-        if (sec.blocos?.length > 0) {
-          const temTexto = sec.blocos.some(b => (b.texto && b.texto.trim().length > 0));
-          if (temTexto && window.confirm && !window.confirm(`Esta seção contém ${sec.blocos.length} bloco(s). Deseja realmente removê-la da sequência do documento?`)) {
-            return;
-          }
-        }
+        this.salvarSnapshot();
         removerSecao(this.doc, sec.id);
-        this.secaoAtivaId = this.doc.secoes[0]?.id;
+        const novaSec = this.doc.secoes.find(s => s.id === this.secaoAtivaId) || this.doc.secoes[0];
+        this.secaoAtivaId = novaSec?.id || null;
+        this.blocoSelecionado = novaSec?.blocos?.[0] || null;
         this.notificarMudanca();
         this.renderizar();
+        this.onSelecionarBloco(this.blocoSelecionado, null);
       });
 
       listaEmUsoBox.appendChild(item);
@@ -1387,9 +1417,24 @@ export class EditorView {
       const mestra = (this.doc.mestras || []).find(m => m.id === mestraId) || this.doc.mestras?.[0];
       if (!mestra) return;
       const nova = adicionarSecao(this.doc, mestra.nome, mestra.id);
+      if (!nova.blocos || nova.blocos.length === 0) {
+        nova.blocos = [criarNovoBloco('paragrafo', { texto: 'Escreva diretamente neste bloco...' })];
+      }
       this.secaoAtivaId = nova.id;
+      this.blocoSelecionado = nova.blocos[0] || null;
+      repaginarDocumento(this.doc);
       this.notificarMudanca();
       this.renderizar();
+      this.onSelecionarBloco(this.blocoSelecionado, null);
+      requestAnimationFrame(() => {
+        const pagSec = (this.doc.paginas || []).find(p => p.secaoId === nova.id);
+        if (pagSec) {
+          const folhaEl = this.container?.querySelector(`.ath-folha-a4[data-pagina-id="${pagSec.id}"]`);
+          if (folhaEl) {
+            try { folhaEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+          }
+        }
+      });
     });
 
     cardMestras.querySelector('#athBtnEditarMestraCatalogo').addEventListener('click', () => {
@@ -1708,8 +1753,13 @@ export class EditorView {
     acao('remover', () => {
       const secReal = buscarSecaoDoBloco(this.doc, b.id) || secAtiva;
       if (secReal) {
+        const idxAntigo = (secReal.blocos || []).findIndex(x => x.id === b.id);
         removerBlocoDaSecao(this.doc, secReal.id, b.id);
-        const novoSel = (this.blocoSelecionado?.id === b.id) ? null : this.blocoSelecionado;
+        let novoSel = this.blocoSelecionado;
+        if (this.blocoSelecionado?.id === b.id) {
+          const rest = secReal.blocos || [];
+          novoSel = rest[Math.min(Math.max(0, idxAntigo), rest.length - 1)] || null;
+        }
         this.aposEstrutura(novoSel);
       }
     });
@@ -1745,11 +1795,16 @@ export class EditorView {
 
   selecionarBloco(b, pag = null, opcoes = {}) {
     this.blocoSelecionado = b;
+    let mudouSecao = false;
     if (b) {
       const secReal = buscarSecaoDoBloco(this.doc, b.id);
       if (secReal && secReal.id !== this.secaoAtivaId) {
         this.secaoAtivaId = secReal.id;
+        mudouSecao = true;
       }
+    }
+    if (mudouSecao) {
+      this.redesenharColunaEsquerda();
     }
     this.atualizarSelecaoVisualBloco(b?.id);
     this.onSelecionarBloco(b, pag);

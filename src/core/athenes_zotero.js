@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Athenes — Cliente de Integração com Zotero Web API v3 e Biblioteca de Leitura.
- * Gerencia coleções sincronizadas, metadados, busca em tempo real e fichamento pessoal.
+ * Gerencia coleções sincronizadas, metadados, busca em tempo real, notas filhas e fichamento pessoal.
  */
 
 import { parseBibTeX } from './athenes_bibliografia.js';
@@ -21,10 +21,11 @@ export class ZoteroClient {
   /**
    * Cabeçalhos HTTP padrão para chamadas à API do Zotero
    */
-  getHeaders() {
+  getHeaders(extra = {}) {
     const headers = {
       'Zotero-API-Version': '3',
-      'Accept': 'application/json'
+      'Accept': 'application/json',
+      ...extra
     };
     if (this.apiKey) {
       headers['Zotero-API-Key'] = this.apiKey;
@@ -105,7 +106,7 @@ export class ZoteroClient {
         limit: String(limite),
         sort: 'dateModified',
         direction: 'desc',
-        itemType: '-attachment || -note' // exclui notas soltas e anexos brutos
+        itemType: '-attachment || -note'
       });
 
       if (termo) params.set('q', termo);
@@ -116,7 +117,6 @@ export class ZoteroClient {
       const dados = await res.json();
       const itensNormalizados = dados.map(d => this.normalizarItemZotero(d)).filter(Boolean);
 
-      // Atualiza o cache local
       for (const item of itensNormalizados) {
         this.cacheItens.set(item.id, item);
       }
@@ -126,6 +126,59 @@ export class ZoteroClient {
     } catch (err) {
       console.warn('Athenes Zotero — busca com falha ou offline:', err);
       return Array.from(this.cacheItens.values());
+    }
+  }
+
+  /**
+   * Sincroniza (cria ou atualiza) uma Nota Filha (itemType: 'note') vinculada ao artigo no Zotero
+   * contendo o resumo, as citações marcadas no PDF e o link do PDF no Google Drive
+   * (sem enviar o arquivo binário do PDF para o armazenamento do Zotero).
+   */
+  async sincronizarNotaFilhaNoZotero({ parentItemKey, noteKey = null, htmlNota, tags = ['Athenes', 'Fichamento PDF'] } = {}) {
+    if (!this.userId || !this.apiKey) {
+      return {
+        ok: false,
+        modo: 'local',
+        mensagem: 'Credenciais Zotero não configuradas; fichamento salvo localmente e na nuvem Athenes.'
+      };
+    }
+
+    try {
+      const payloadItem = {
+        itemType: 'note',
+        parentItem: parentItemKey || undefined,
+        note: String(htmlNota || '<p>Fichamento Athenes</p>'),
+        tags: (tags || []).map(t => ({ tag: String(t) }))
+      };
+      if (noteKey) {
+        payloadItem.key = noteKey;
+      }
+
+      const res = await fetch(`${this.getBaseUrl()}/items`, {
+        method: 'POST',
+        headers: this.getHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify([payloadItem])
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        return { ok: false, status: res.status, mensagem: `Zotero respondeu ${res.status}: ${txt.slice(0, 120)}` };
+      }
+
+      const resultado = await res.json().catch(() => ({}));
+      const criadoKey = resultado?.successful?.['0']?.key || noteKey || null;
+      return {
+        ok: true,
+        modo: 'zotero_api',
+        noteKey: criadoKey,
+        mensagem: 'Fichamento e citações sincronizados diretamente no item do Zotero!'
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        modo: 'offline',
+        mensagem: `Não foi possível contatar a API do Zotero agora (${err.message}). Dados salvos no Athenes.`
+      };
     }
   }
 

@@ -18,6 +18,7 @@ import {
 import { svgIcone } from './athenes_icones.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 import { criarSeletorSimbolosMatematica } from './athenes_simbolos_matematica.js';
+import { escapeHtml, registrarListenerSelecaoSegura, obterOuRestaurarSelecaoDoBloco } from '../core/athenes_seguranca.js';
 
 function rotuloAlinhamento(id) {
   const map = {
@@ -43,6 +44,7 @@ export class PainelPropriedades {
     this.onAbrirZotero = opcoes.onAbrirZotero || (() => {});
     this.onDividirBloco = opcoes.onDividirBloco || (() => {});
 
+    registrarListenerSelecaoSegura();
     this.renderizar();
   }
 
@@ -94,17 +96,23 @@ export class PainelPropriedades {
       titulo: 'Título da Seção',
       subtitulo: 'Subtítulo',
       paragrafo: 'Texto / Parágrafo',
+      texto: 'Texto / Parágrafo',
       citacao: 'Citação Direta Longa',
+      lista: 'Lista Estruturada',
       tabela: 'Tabela (ABNT/IBGE)',
       quadro: 'Quadro Estruturado',
       figura: `${ROTULOS_FIGURA[b.subtipo] || 'Figura'} (ilustração)`,
+      imagem: 'Figura / Imagem',
       mapa: 'Mapa Territorial',
       formula: 'Fórmula Matemática',
       campos: 'Campos (rótulo e valor)',
       nota: 'Nota de Rodapé',
       divisor: 'Divisor de Seção',
-      espaco: 'Espaçamento Vertical'
-    }[b.tipo] || b.tipo.toUpperCase();
+      espaco: 'Espaçamento Vertical',
+      quebra_pagina: 'Quebra de Página',
+      sumario: 'Sumário Automático',
+      referencias: 'Referências Bibliográficas'
+    }[b.tipo] || String(b.tipo || 'BLOCO').toUpperCase();
 
     // 1. Cabeçalho do Bloco
     const topo = document.createElement('div');
@@ -113,22 +121,48 @@ export class PainelPropriedades {
     topo.style.alignItems = 'center';
     topo.style.marginBottom = '6px';
     topo.innerHTML = `
-      <h3 style="margin:0; font:800 15px var(--glx-font);">${tipoNome}</h3>
-      <span class="rm-selo">${b.tipo}</span>
+      <h3 style="margin:0; font:800 15px var(--glx-font);">${escapeHtml(tipoNome)}</h3>
+      <span class="rm-selo">${escapeHtml(b.tipo)}</span>
     `;
     wrapper.appendChild(topo);
 
+    const avisosDiagnostico = [];
+
     // 2. Seção LINHA (Pills 1, 2, 3, 4, +)
-    this.renderizarControleLinha(wrapper, b);
+    try {
+      this.renderizarControleLinha(wrapper, b);
+    } catch (err) {
+      avisosDiagnostico.push(`Linha (${b.tipo}): ${err.message}`);
+    }
 
     // 3. Seção POSIÇÃO NA FOLHA (4 Cards de Presets + Trilha de 12 Pontos)
-    this.renderizarControleGrade12(wrapper, b);
+    try {
+      this.renderizarControleGrade12(wrapper, b);
+    } catch (err) {
+      avisosDiagnostico.push(`Grade 12 (${b.tipo}): ${err.message}`);
+    }
 
     // 4. Controles Específicos do Bloco
-    this.renderizarCamposEspecificos(wrapper, b);
+    try {
+      this.renderizarCamposEspecificos(wrapper, b);
+    } catch (err) {
+      avisosDiagnostico.push(`Propriedades (${b.tipo}): ${err.message}`);
+    }
 
     // 5. Inserção de Referências Cruzadas
-    this.renderizarAjudanteReferencias(wrapper, b);
+    try {
+      this.renderizarAjudanteReferencias(wrapper, b);
+    } catch (err) {
+      avisosDiagnostico.push(`Referências (${b.tipo}): ${err.message}`);
+    }
+
+    if (avisosDiagnostico.length > 0) {
+      const toastAviso = document.createElement('div');
+      toastAviso.className = 'ath-props-aviso-diagnostico';
+      toastAviso.style.cssText = 'padding:8px 10px; border-radius:8px; background:#FEF3C7; border:1px solid #F59E0B; color:#92400E; font-size:11px; margin-top:8px;';
+      toastAviso.innerHTML = `<strong>Aviso de diagnóstico (${escapeHtml(b.tipo)}):</strong> ${escapeHtml(avisosDiagnostico.join(' | '))}`;
+      wrapper.appendChild(toastAviso);
+    }
 
     this.container.appendChild(wrapper);
   }
@@ -306,7 +340,8 @@ export class PainelPropriedades {
     box.style.flexDirection = 'column';
     box.style.gap = '12px';
 
-    const estiloAtivo = (this.doc.estilos || []).find(e => e.id === b.estiloId) || this.doc.estilos?.[0] || {};
+    const estilos = this.doc.estilos || [];
+    const estiloAtivo = estilos.find(e => e.id === b.estiloId) || estilos[0] || {};
 
     // 1. TÍTULO / SUBTÍTULO
     if (b.tipo === 'titulo' || b.tipo === 'subtitulo') {
@@ -316,7 +351,7 @@ export class PainelPropriedades {
 
       box.innerHTML = `
         <label style="font:700 12px var(--glx-font); width:100%; display:block;">Texto
-          <textarea id="rmCampoTexto" class="glx-input" rows="2" style="width:100%; min-height:48px; margin-top:4px; resize:vertical; font-family:var(--glx-font); font-size:12.5px; line-height:1.45; padding:8px 12px; border-radius:12px; box-sizing:border-box;">${b.texto || ''}</textarea>
+          <textarea id="rmCampoTexto" class="glx-input" rows="2" style="width:100%; min-height:48px; margin-top:4px; resize:vertical; font-family:var(--glx-font); font-size:12.5px; line-height:1.45; padding:8px 12px; border-radius:12px; box-sizing:border-box;">${escapeHtml(b.texto || '')}</textarea>
         </label>
         <div class="rm-linha2">
           <label style="font:700 12px var(--glx-font);">Nível
@@ -536,7 +571,7 @@ export class PainelPropriedades {
     }
 
     // 2. PARÁGRAFO / TEXTO CORPO COM CONTROLES COMPLETOS (DESIGN SOFT UI)
-    else if (b.tipo === 'paragrafo' || b.tipo === 'citacao') {
+    else if (b.tipo === 'paragrafo' || b.tipo === 'citacao' || b.tipo === 'texto' || b.tipo === 'nota' || b.tipo === 'lista') {
       const alinAtivo = b.alinhamento || estiloAtivo.alinhamento || 'esquerda';
       const corAtiva = b.cor || estiloAtivo.cor || '#1F2733';
       const fonteAtiva = b.fonte || '';
@@ -550,7 +585,7 @@ export class PainelPropriedades {
 
       box.innerHTML = `
         <label style="font:700 12px var(--glx-font); width:100%; display:block;">Texto
-          <textarea id="rmCampoTexto" class="glx-input" rows="3" style="width:100%; min-height:56px; margin-top:4px; resize:vertical; font-family:var(--glx-font); font-size:12.5px; line-height:1.45; padding:8px 12px; border-radius:12px; box-sizing:border-box;">${b.texto || ''}</textarea>
+          <textarea id="rmCampoTexto" class="glx-input" rows="3" style="width:100%; min-height:56px; margin-top:4px; resize:vertical; font-family:var(--glx-font); font-size:12.5px; line-height:1.45; padding:8px 12px; border-radius:12px; box-sizing:border-box;">${escapeHtml(b.texto || '')}</textarea>
         </label>
 
         <!-- Estilo de texto -->
@@ -813,10 +848,42 @@ export class PainelPropriedades {
       `;
 
       // Event Listeners
+      box.querySelector('#rmCampoTexto')?.addEventListener('input', e => {
+        b.texto = e.target.value;
+        this.notificarMudanca();
+      });
+
       box.querySelector('#rmCampoEstilo').addEventListener('change', e => {
         b.estiloId = e.target.value;
         this.notificarMudanca();
         this.renderizar();
+      });
+
+      box.querySelector('#athBtnAplicarEstiloBloco')?.addEventListener('click', () => {
+        const selId = box.querySelector('#rmCampoEstilo')?.value;
+        if (selId) b.estiloId = selId;
+        delete b.alinhamento;
+        delete b.fonte;
+        delete b.cor;
+        this.notificarMudanca(true);
+        this.renderizar();
+      });
+
+      box.querySelector('#athBtnAplicarEstiloTrecho')?.addEventListener('click', () => {
+        const selId = box.querySelector('#rmCampoEstilo')?.value || b.estiloId;
+        const est = estilos.find(e => e.id === selId) || estiloAtivo;
+        const selInfo = obterOuRestaurarSelecaoDoBloco(b.id);
+        if (selInfo.ok && selInfo.texto.trim() && est) {
+          const cssInline = `font-family:${FONTES_SISTEMA[est.fonte]?.familia || 'inherit'}; font-size:${est.tamanho_pt || 12}pt; font-weight:${est.peso || 400}; color:${est.cor || '#1F2733'};`;
+          document.execCommand('insertHTML', false, `<span style="${cssInline}">${escapeHtml(selInfo.texto)}</span>`);
+          const elBlocoEditable = document.querySelector(`.ath-bloco-folha[data-bloco-id="${b.id}"] .ath-texto-editable`);
+          if (elBlocoEditable) b.texto = elBlocoEditable.innerHTML;
+          this.notificarMudanca();
+        } else if (selId) {
+          b.estiloId = selId;
+          this.notificarMudanca(true);
+          this.renderizar();
+        }
       });
 
       // Alinhamento
@@ -1437,7 +1504,7 @@ export class PainelPropriedades {
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <label style="flex:1;">Identificação / Título
-            <input type="text" id="rmMapaTitulo" value="${b.titulo || ''}">
+            <input type="text" id="rmMapaTitulo" value="${escapeHtml(b.titulo || '')}">
           </label>
           <button type="button" class="glx-btn glx-btn-xs glx-btn-secondary" id="rmBtnMapaAtualizarNum" style="height:32px; margin-top:14px; margin-left:6px; font-weight:700;" title="Prefixar numeração automática">
             + Mapa #
@@ -1445,7 +1512,7 @@ export class PainelPropriedades {
         </div>
         <div class="rm-linha2">
           <label>Escala Nominal
-            <input type="text" id="rmMapaEscala" value="${b.escala || '1:10.000'}">
+            <input type="text" id="rmMapaEscala" value="${escapeHtml(b.escala || '1:10.000')}">
           </label>
           <label class="rm-chk" style="margin-top:22px;">
             <input type="checkbox" id="rmMapaNorte" ${b.orientacao_norte ? 'checked' : ''}>
@@ -1453,10 +1520,10 @@ export class PainelPropriedades {
           </label>
         </div>
         <label>Legenda Cartográfica
-          <textarea id="rmMapaLegenda" rows="2">${b.legenda_cartografica || ''}</textarea>
+          <textarea id="rmMapaLegenda" rows="2">${escapeHtml(b.legenda_cartografica || '')}</textarea>
         </label>
         <label>Fonte dos Dados
-          <input type="text" id="rmMapaFonte" value="${b.fonte || 'Fonte: Glaux GIS.'}">
+          <input type="text" id="rmMapaFonte" value="${escapeHtml(b.fonte || 'Fonte: Glaux GIS.')}">
         </label>
       `;
 
@@ -1495,7 +1562,7 @@ export class PainelPropriedades {
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <label style="flex:1;">Identificação / Título
-            <input type="text" id="rmTabTitulo" value="${b.titulo || ''}" placeholder="Ex: ${rotuloTab} 1 — Título da tabela">
+            <input type="text" id="rmTabTitulo" value="${escapeHtml(b.titulo || '')}" placeholder="Ex: ${rotuloTab} 1 — Título da tabela">
           </label>
           <button type="button" class="glx-btn glx-btn-xs glx-btn-secondary" id="rmBtnTabAtualizarNum" style="height:32px; margin-top:14px; margin-left:6px; font-weight:700;" title="Prefixar numeração automática">
             + ${rotuloTab} #
@@ -1517,10 +1584,10 @@ export class PainelPropriedades {
           <strong>Padrão ${isQuadro ? 'Quadro' : 'Tabela'}:</strong> ${isQuadro ? 'Caixa totalmente fechada por bordas horizontais e verticais.' : 'Norma ABNT/IBGE: laterais verticais abertas (sem bordas nas extremidades).'}
         </div>
         <label>Notas Explicativas
-          <textarea id="rmTabNotas" rows="1">${b.notas || ''}</textarea>
+          <textarea id="rmTabNotas" rows="1">${escapeHtml(b.notas || '')}</textarea>
         </label>
         <label>Fonte / Atribuição
-          <input type="text" id="rmTabFonte" value="${b.fonte || ''}">
+          <input type="text" id="rmTabFonte" value="${escapeHtml(b.fonte || '')}">
         </label>
       `;
 
@@ -1548,6 +1615,28 @@ export class PainelPropriedades {
         this.notificarMudanca();
       });
       box.querySelector('#rmTabTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmTabCols')?.addEventListener('change', e => {
+        const nCols = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 2));
+        if (!Array.isArray(b.colunas)) b.colunas = ['Coluna 1', 'Coluna 2'];
+        while (b.colunas.length < nCols) b.colunas.push(`Coluna ${b.colunas.length + 1}`);
+        if (b.colunas.length > nCols) b.colunas.length = nCols;
+        if (!Array.isArray(b.linhas)) b.linhas = [];
+        b.linhas.forEach(row => {
+          while (row.length < nCols) row.push('—');
+          if (row.length > nCols) row.length = nCols;
+        });
+        this.notificarMudanca();
+      });
+      box.querySelector('#rmTabLins')?.addEventListener('change', e => {
+        const nLins = Math.max(1, Math.min(50, parseInt(e.target.value, 10) || 2));
+        const nCols = b.colunas?.length || 2;
+        if (!Array.isArray(b.linhas)) b.linhas = [];
+        while (b.linhas.length < nLins) {
+          b.linhas.push(Array.from({ length: nCols }, (_, i) => `Dado ${b.linhas.length + 1}.${i + 1}`));
+        }
+        if (b.linhas.length > nLins) b.linhas.length = nLins;
+        this.notificarMudanca();
+      });
       box.querySelector('#rmTabNotas').addEventListener('input', e => { b.notas = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmTabFonte').addEventListener('input', e => { b.fonte = e.target.value; this.notificarMudanca(); });
     }
@@ -1570,11 +1659,11 @@ export class PainelPropriedades {
         <!-- Seletor Rico de Símbolos Especiais Matemáticos e Lógicos -->
         <div id="athBoxPaletaSimbolosMat"></div>
 
-        <textarea id="rmFormulaLatex" rows="3" style="font-family:var(--glx-font-mono); font-size:12px;" placeholder="Ex: E = m \\cdot c^2">${b.latex || b.formula || ''}</textarea>
+        <textarea id="rmFormulaLatex" rows="3" style="font-family:var(--glx-font-mono); font-size:12px;" placeholder="Ex: E = m \\cdot c^2">${escapeHtml(b.latex || b.formula || '')}</textarea>
 
         <div class="rm-linha2" style="margin-top:8px;">
           <label>Número da Equação
-            <input type="text" id="rmFormulaNum" value="${b.numero_equacao || b.numero || '(1)'}">
+            <input type="text" id="rmFormulaNum" value="${escapeHtml(b.numero_equacao || b.numero || '(1)')}">
           </label>
           <label>Posição do Número
             <select id="rmFormulaPosNum" class="glx-select">
@@ -1586,7 +1675,7 @@ export class PainelPropriedades {
           </label>
         </div>
         <label>Legenda Explicativa ("onde:")
-          <textarea id="rmFormulaLegenda" rows="2" placeholder="Ex: onde x é o deslocamento e t é o tempo">${b.legenda_formula || b.legenda || ''}</textarea>
+          <textarea id="rmFormulaLegenda" rows="2" placeholder="Ex: onde x é o deslocamento e t é o tempo">${escapeHtml(b.legenda_formula || b.legenda || '')}</textarea>
         </label>
       `;
 
@@ -1634,6 +1723,119 @@ export class PainelPropriedades {
         b.legenda = b.legenda_formula;
         this.notificarMudanca();
       });
+    }
+
+    // 7. CAMPOS (RÓTULO E VALOR EM COLUNAS)
+    else if (b.tipo === 'campos') {
+      if (!Array.isArray(b.itens)) b.itens = [{ rotulo: 'Campo 1', valor: 'Valor 1' }];
+      box.innerHTML = `
+        <div class="rm-linha2">
+          <label>Título do Grupo
+            <input type="text" id="rmCamposRotulo" value="${b.rotulo || 'Identificação e Parâmetros'}">
+          </label>
+          <label>Colunas
+            <select id="rmCamposColunas" class="glx-select">
+              <option value="1" ${b.colunas === 1 ? 'selected' : ''}>1 Coluna</option>
+              <option value="2" ${(!b.colunas || b.colunas === 2) ? 'selected' : ''}>2 Colunas</option>
+              <option value="3" ${b.colunas === 3 ? 'selected' : ''}>3 Colunas</option>
+              <option value="4" ${b.colunas === 4 ? 'selected' : ''}>4 Colunas</option>
+            </select>
+          </label>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong style="font:800 11px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase;">Itens (${b.itens.length})</strong>
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="rmBtnAddCampoItem">+ Novo Campo</button>
+          </div>
+          <div id="rmListaCamposItens" style="display:flex; flex-direction:column; gap:6px;">
+            ${b.itens.map((it, idx) => `
+              <div style="display:grid; grid-template-columns:1fr 1.2fr 24px; gap:6px; align-items:center;">
+                <input type="text" data-campo-rot="${idx}" value="${it.rotulo || ''}" placeholder="Rótulo" style="height:28px; font-size:11.5px; padding:2px 8px;">
+                <input type="text" data-campo-val="${idx}" value="${it.valor || ''}" placeholder="Valor" style="height:28px; font-size:11.5px; padding:2px 8px;">
+                <button type="button" class="rm-ic rm-ic-perigo" data-rem-campo="${idx}" title="Remover item" style="width:22px; height:22px;">${svgIcone('fechar', 12)}</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      box.querySelector('#rmCamposRotulo')?.addEventListener('input', e => {
+        b.rotulo = e.target.value;
+        this.notificarMudanca();
+      });
+      box.querySelector('#rmCamposColunas')?.addEventListener('change', e => {
+        b.colunas = parseInt(e.target.value, 10) || 2;
+        this.notificarMudanca();
+      });
+      box.querySelector('#rmBtnAddCampoItem')?.addEventListener('click', () => {
+        b.itens.push({ rotulo: `Campo ${b.itens.length + 1}`, valor: '—' });
+        this.notificarMudanca();
+        this.renderizar();
+      });
+      box.querySelectorAll('[data-campo-rot]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const i = parseInt(inp.dataset.campoRot, 10);
+          if (b.itens[i]) b.itens[i].rotulo = inp.value;
+          this.notificarMudanca();
+        });
+      });
+      box.querySelectorAll('[data-campo-val]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const i = parseInt(inp.dataset.campoVal, 10);
+          if (b.itens[i]) b.itens[i].valor = inp.value;
+          this.notificarMudanca();
+        });
+      });
+      box.querySelectorAll('[data-rem-campo]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const i = parseInt(btn.dataset.remCampo, 10);
+          b.itens.splice(i, 1);
+          this.notificarMudanca();
+          this.renderizar();
+        });
+      });
+    }
+
+    // 8. DIVISOR OU ESPAÇAMENTO OU QUEBRA DE PÁGINA
+    else if (b.tipo === 'divisor') {
+      box.innerHTML = `
+        <label>Estilo da Linha Divisória
+          <select id="rmDivisorEstilo" class="glx-select">
+            <option value="solida" ${(!b.estilo_linha || b.estilo_linha === 'solida') ? 'selected' : ''}>Linha Sólida Contínua</option>
+            <option value="tracejada" ${b.estilo_linha === 'tracejada' ? 'selected' : ''}>Linha Tracejada</option>
+            <option value="pontilhada" ${b.estilo_linha === 'pontilhada' ? 'selected' : ''}>Linha Pontilhada</option>
+            <option value="dupla" ${b.estilo_linha === 'dupla' ? 'selected' : ''}>Linha Dupla Editorial</option>
+          </select>
+        </label>
+        <label>Espaço Depois (pt)
+          <input type="number" id="rmDivisorEspaco" min="0" max="72" value="${b.espaco_depois_pt ?? 8}">
+        </label>
+      `;
+      box.querySelector('#rmDivisorEstilo')?.addEventListener('change', e => {
+        b.estilo_linha = e.target.value;
+        this.notificarMudanca();
+      });
+      box.querySelector('#rmDivisorEspaco')?.addEventListener('input', e => {
+        b.espaco_depois_pt = parseFloat(e.target.value) || 0;
+        this.notificarMudanca();
+      });
+    }
+    else if (b.tipo === 'espaco') {
+      box.innerHTML = `
+        <label>Altura do Espaçamento Vertical (pt)
+          <input type="number" id="rmEspacoAltura" min="4" max="240" step="2" value="${b.altura_pt || 24}">
+        </label>
+      `;
+      box.querySelector('#rmEspacoAltura')?.addEventListener('input', e => {
+        b.altura_pt = Math.max(4, parseFloat(e.target.value) || 24);
+        this.notificarMudanca();
+      });
+    }
+    else if (b.tipo === 'quebra_pagina') {
+      box.innerHTML = `
+        <div style="padding:10px 12px; border-radius:10px; background:#EEF4FA; border:1px solid #C8D7E6; font-size:12px; color:#1B2D47;">
+          <strong>Quebra de Página Explícita:</strong> força os blocos seguintes desta seção a iniciarem na próxima folha física.
+        </div>
+      `;
     }
 
     wrapper.appendChild(box);
