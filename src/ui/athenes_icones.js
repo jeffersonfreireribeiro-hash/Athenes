@@ -63,6 +63,13 @@ export const ICONES = Object.freeze({
   alinhamento_cen: '<line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/>',
   alinhamento_dir: '<line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/>',
   alinhamento_jus: '<line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>',
+  lapis: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>',
+  alinhamento_jus_esq: '<line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="12" y1="18" x2="3" y2="18"/>',
+  alinhamento_jus_cen: '<line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="16" y1="18" x2="8" y2="18"/>',
+  alinhamento_jus_dir: '<line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="12" y2="18"/>',
+  borda_sem: '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 3"/>',
+  borda_tachado: '<rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/>',
+  borda_inferior: '<rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="19" x2="20" y2="19" stroke-width="2.5"/>',
 
   // Ferramentas e navegação
   zotero: '<circle cx="12" cy="12" r="9"/><path d="M8 8h8l-8 8h8"/>',

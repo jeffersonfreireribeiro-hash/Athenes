@@ -4,6 +4,7 @@
  */
 
 import { DashboardView } from './athenes_dashboard.js';
+import { criarDocumento } from '../core/athenes_documento.js';
 import { EditorView } from './athenes_editor.js';
 import { PainelPropriedades } from './athenes_painel_propriedades.js';
 import { PainelZotero } from './athenes_painel_zotero.js';
@@ -27,7 +28,23 @@ export class AthenesApp {
     this.iniciar();
   }
 
-  iniciar() {
+    iniciar() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tela') === 'editor' || params.get('editor') === '1') {
+      try {
+        const salvo = localStorage.getItem('athenes_docs_indice');
+        const lista = salvo ? JSON.parse(salvo) : [];
+        if (lista.length > 0) {
+          const docSalvo = localStorage.getItem(`athenes_doc_${lista[0].id}`);
+          if (docSalvo) this.documentoAtivo = JSON.parse(docSalvo);
+        }
+      } catch (_) {}
+      if (!this.documentoAtivo) {
+        this.documentoAtivo = criarDocumento();
+      }
+      this.navegarParaEditor();
+      return;
+    }
     this.navegarParaDashboard();
   }
 

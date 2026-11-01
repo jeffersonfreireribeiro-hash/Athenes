@@ -30,16 +30,16 @@
   --ath-input-border: #E2E8F0;
 
   /* Cores de Marca e Acentos */
-  --ath-primary: #FF6B2C;          /* Laranja canônico Clux / Athenes */
-  --ath-primary-hover: #FA5A1E;
-  --ath-primary-soft: #FFF1EB;
-  --ath-primary-line: #FFD9C7;
-  --ath-primary-ink: #D9531E;
+  --ath-primary: #314F79;          /* Laranja canônico Clux / Athenes */
+  --ath-primary-hover: #243C5E;
+  --ath-primary-soft: #EEF4FA;
+  --ath-primary-line: #C8D7E6;
+  --ath-primary-ink: #1B2D47;
 
   /* Tokens compatíveis com o Glaux GIS */
   --glx-font: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --glx-font-mono: 'Nunito', system-ui, sans-serif;
-  --glx-primary: #FF6B2C;
+  --glx-primary: #314F79;
   --glx-text: #1F2733;
   --glx-text-secondary: #475569;
   --glx-muted: #6B7585;

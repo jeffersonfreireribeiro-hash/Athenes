@@ -34,7 +34,7 @@ export class PainelConexoes {
     root.innerHTML = `
       <canvas class="ath-grafo-canvas" id="athGrafoCanvas" width="900" height="520"></canvas>
       <div class="ath-grafo-legenda">
-        <div class="ath-grafo-legenda-item"><span class="ath-grafo-cor-dot" style="background:#FF6B2C;"></span><span>Obras (${refs.length})</span></div>
+        <div class="ath-grafo-legenda-item"><span class="ath-grafo-cor-dot" style="background:#314F79;"></span><span>Obras (${refs.length})</span></div>
         <div class="ath-grafo-legenda-item"><span class="ath-grafo-cor-dot" style="background:#3B82F6;"></span><span>Autores</span></div>
         <div class="ath-grafo-legenda-item"><span class="ath-grafo-cor-dot" style="background:#10B981;"></span><span>Temas</span></div>
         <div class="ath-grafo-legenda-item"><span class="ath-grafo-cor-dot" style="background:#F59E0B;"></span><span>Anos</span></div>
@@ -115,7 +115,7 @@ export class PainelConexoes {
           ctx.lineWidth = 1.5;
           ctx.stroke();
         } else if (n.tipo === 'obra') {
-          ctx.fillStyle = '#FF6B2C';
+          ctx.fillStyle = '#314F79';
         } else if (n.tipo === 'autor') {
           ctx.fillStyle = '#3B82F6';
         } else if (n.tipo === 'tema') {

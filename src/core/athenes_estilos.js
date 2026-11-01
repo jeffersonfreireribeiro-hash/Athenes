@@ -76,8 +76,10 @@ export const ALINHAMENTOS = Object.freeze([
   { id: 'esquerda', rotulo: 'À esquerda' },
   { id: 'centro', rotulo: 'Centralizado' },
   { id: 'direita', rotulo: 'À direita' },
-  { id: 'justificado', rotulo: 'Justificado' },
-  { id: 'justificado_esquerda', rotulo: 'Justificado (última linha à esquerda)' }
+  { id: 'justificado', rotulo: 'Justificado total' },
+  { id: 'justificado_esquerda', rotulo: 'Justificado (última linha à esquerda)' },
+  { id: 'justificado_centro', rotulo: 'Justificado (última linha centralizada)' },
+  { id: 'justificado_direita', rotulo: 'Justificado (última linha à direita)' }
 ]);
 
 /**
@@ -475,17 +477,21 @@ export function estiloParaCss(estilo, fontesDisponiveis = FONTES_SISTEMA) {
   if (estilo.sublinhado) props.push('text-decoration: underline;');
   if (estilo.caixa_alta) props.push('text-transform: uppercase;');
 
-  // Alinhamento
+    // Alinhamento
   if (estilo.alinhamento === 'centro') {
-    props.push('text-align: center;');
+    props.push('text-align: center; text-align-last: center;');
   } else if (estilo.alinhamento === 'direita') {
-    props.push('text-align: right;');
+    props.push('text-align: right; text-align-last: right;');
   } else if (estilo.alinhamento === 'justificado') {
-    props.push('text-align: justify; text-align-last: left;');
+    props.push('text-align: justify; text-align-last: auto;');
   } else if (estilo.alinhamento === 'justificado_esquerda') {
     props.push('text-align: justify; text-align-last: left;');
+  } else if (estilo.alinhamento === 'justificado_centro') {
+    props.push('text-align: justify; text-align-last: center;');
+  } else if (estilo.alinhamento === 'justificado_direita') {
+    props.push('text-align: justify; text-align-last: right;');
   } else {
-    props.push('text-align: left;');
+    props.push('text-align: left; text-align-last: left;');
   }
 
   // Entrelinha
@@ -509,6 +515,19 @@ export function estiloParaCss(estilo, fontesDisponiveis = FONTES_SISTEMA) {
 
   // Kerning / Tracking
   if (estilo.espacamento_letras_em) {
+  if (estilo.espacamento_palavras_em) {
+    props.push(`word-spacing: ${estilo.espacamento_palavras_em}em;`);
+  }
+  if (estilo.fundo_cor) {
+    props.push(`background-color: ${estilo.fundo_cor};`);
+  }
+  if (estilo.borda_tipo === 'tachado') {
+    props.push('text-decoration: line-through;');
+  } else if (estilo.borda_tipo === 'inferior') {
+    props.push('border-bottom: 2px solid currentColor; padding-bottom: 2px;');
+  } else if (estilo.borda_tipo === 'caixa') {
+    props.push('border: 1px solid var(--ath-primary-line, #C8D7E6); padding: 4px 8px; border-radius: 4px;');
+  }
     props.push(`letter-spacing: ${estilo.espacamento_letras_em}em;`);
   }
 

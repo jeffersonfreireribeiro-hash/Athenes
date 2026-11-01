@@ -246,7 +246,21 @@ export function criarNovoBloco(tipo, dados = {}) {
     estiloId: dados.estiloId || (tipo === 'titulo' ? 'titulo1' : tipo === 'subtitulo' ? 'subtitulo' : 'corpo'),
     alinhamento: dados.alinhamento || 'esquerda',
     manterComProximo: dados.manterComProximo !== undefined ? dados.manterComProximo : (tipo === 'titulo' || tipo === 'subtitulo'),
-    quebra_antes: !!dados.quebra_antes
+    quebra_antes: !!dados.quebra_antes,
+    ...(dados.fonte ? { fonte: dados.fonte } : {}),
+    ...(dados.cor ? { cor: dados.cor } : {}),
+    ...(dados.fundo_ativo ? { fundo_ativo: dados.fundo_ativo, fundo_cor: dados.fundo_cor } : {}),
+    ...(dados.borda_tipo ? { borda_tipo: dados.borda_tipo } : {}),
+    ...(dados.marcador_tipo ? { marcador_tipo: dados.marcador_tipo } : {}),
+    ...(dados.entrelinha ? { entrelinha: dados.entrelinha } : {}),
+    ...(dados.espaco_antes_pt !== undefined ? { espaco_antes_pt: dados.espaco_antes_pt } : {}),
+    ...(dados.espaco_depois_pt !== undefined ? { espaco_depois_pt: dados.espaco_depois_pt } : {}),
+    ...(dados.recuo_primeira_linha_mm !== undefined ? { recuo_primeira_linha_mm: dados.recuo_primeira_linha_mm } : {}),
+    ...(dados.recuo_esquerdo_mm !== undefined ? { recuo_esquerdo_mm: dados.recuo_esquerdo_mm } : {}),
+    ...(dados.recuo_direito_mm !== undefined ? { recuo_direito_mm: dados.recuo_direito_mm } : {}),
+    ...(dados.espacamento_letras_em !== undefined ? { espacamento_letras_em: dados.espacamento_letras_em } : {}),
+    ...(dados.espacamento_palavras_em !== undefined ? { espacamento_palavras_em: dados.espacamento_palavras_em } : {}),
+    ...(dados.grade_2d ? { grade_2d: dados.grade_2d } : {})
   };
 
   switch (tipo) {

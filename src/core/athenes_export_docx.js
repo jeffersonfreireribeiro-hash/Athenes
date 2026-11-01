@@ -407,7 +407,25 @@ export async function exportarParaDocx(documento) {
         bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr>${runs.join('')}</w:p>`);
       } else if (b.tipo === 'paragrafo') {
         const runs = htmlParaRunsDocx(b.texto);
-        bodyXmlParts.push(`<w:p><w:pPr><w:ind w:firstLine="709"/><w:jc w:val="both"/><w:spacing w:line="360" w:lineRule="auto" w:after="0"/></w:pPr>${runs.join('')}</w:p>`);
+        let jcVal = 'both';
+        if (b.alinhamento === 'esquerda') jcVal = 'left';
+        else if (b.alinhamento === 'centro') jcVal = 'center';
+        else if (b.alinhamento === 'direita') jcVal = 'right';
+        else if (b.alinhamento === 'justificado' || b.alinhamento === 'justificado_esquerda') jcVal = 'both';
+        else if (b.alinhamento === 'justificado_centro') jcVal = 'center';
+        else if (b.alinhamento === 'justificado_direita') jcVal = 'right';
+
+        const recuo1 = b.recuo_primeira_linha_mm !== undefined ? Math.round(b.recuo_primeira_linha_mm * 56.7) : 709;
+        const recuoEsq = b.recuo_esquerdo_mm !== undefined ? ` w:left="${Math.round(b.recuo_esquerdo_mm * 56.7)}"` : '';
+        const recuoDir = b.recuo_direito_mm !== undefined ? ` w:right="${Math.round(b.recuo_direito_mm * 56.7)}"` : '';
+        const indXml = `<w:ind w:firstLine="${recuo1}"${recuoEsq}${recuoDir}/>`;
+
+        const antes = b.espaco_antes_pt !== undefined ? Math.round(b.espaco_antes_pt * 20) : 0;
+        const depois = b.espaco_depois_pt !== undefined ? Math.round(b.espaco_depois_pt * 20) : 0;
+        const linha = b.entrelinha ? Math.round(b.entrelinha * 240) : 360;
+        const spacingXml = `<w:spacing w:line="${linha}" w:lineRule="auto" w:before="${antes}" w:after="${depois}"/>`;
+
+        bodyXmlParts.push(`<w:p><w:pPr>${indXml}<w:jc w:val="${jcVal}"/>${spacingXml}</w:pPr>${runs.join('')}</w:p>`);
       } else if (b.tipo === 'citacao') {
         const refTexto = ` (${b.autor || 'AUTOR'}, ${b.ano || 's.d.'}${b.pagina_citada ? ', p. ' + b.pagina_citada : ''})`;
         const textoCompleto = `${b.texto || ''}${refTexto}`;
@@ -423,7 +441,7 @@ export async function exportarParaDocx(documento) {
         }
       } else if (b.tipo === 'nota') {
         const runs = htmlParaRunsDocx(`${b.titulo ? '<strong>' + b.titulo + ':</strong> ' : ''}${b.texto || ''}`, { tamanhoPt: 10 });
-        bodyXmlParts.push(`<w:p><w:pPr><w:pBdr><w:left w:val="single" w:sz="24" w:space="12" w:color="FF6B2C"/></w:pPr><w:shd w:val="clear" w:color="auto" w:fill="FFF1EB"/><w:ind w:left="360" w:right="360"/><w:spacing w:before="120" w:after="120"/></w:pPr>${runs.join('')}</w:p>`);
+        bodyXmlParts.push(`<w:p><w:pPr><w:pBdr><w:left w:val="single" w:sz="24" w:space="12" w:color="314F79"/></w:pPr><w:shd w:val="clear" w:color="auto" w:fill="EEF4FA"/><w:ind w:left="360" w:right="360"/><w:spacing w:before="120" w:after="120"/></w:pPr>${runs.join('')}</w:p>`);
       } else if (b.tipo === 'quadro') {
         const cols = b.colunas || [];
         const linhas = b.linhas || [];
