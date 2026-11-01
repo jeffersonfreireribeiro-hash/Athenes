@@ -140,4 +140,52 @@ test('Athenes — Sistema de Páginas Mestras (Fixa com Grade 2D vs Progressiva 
     assert.strictEqual(modeloRecuperado.margens_mm.t, 35);
     assert.strictEqual(modeloRecuperado.cabecalho.texto, 'Cabeçalho Customizado Athenes');
   });
+
+  await t.test('bloco de título e subtítulo suportam os 7 alinhamentos e cores customizadas', () => {
+    const doc = criarDocumento();
+    const titulo = criarNovoBloco('titulo', {
+      texto: 'Título de Diagnóstico Urbano',
+      alinhamento: 'justificado_centro',
+      cor: '#314F79'
+    });
+    const subtitulo = criarNovoBloco('subtitulo', {
+      texto: 'Subtítulo com alinhamento justificado à esquerda',
+      alinhamento: 'justificado_esquerda',
+      cor: '#1F2733'
+    });
+
+    const htmlTitulo = renderizarBlocoHtml(titulo, Object.fromEntries(doc.estilos.map(e => [e.id, e])), doc);
+    assert.match(htmlTitulo, /text-align:\s*justify/);
+    assert.match(htmlTitulo, /text-align-last:\s*center/);
+    assert.match(htmlTitulo, /color:\s*#314F79/i);
+
+    const htmlSub = renderizarBlocoHtml(subtitulo, Object.fromEntries(doc.estilos.map(e => [e.id, e])), doc);
+    assert.match(htmlSub, /text-align:\s*justify/);
+    assert.match(htmlSub, /text-align-last:\s*left/);
+  });
+
+  await t.test('exportação PDF renderiza elementos recorrentes da página mestra (tarja, marca d\'água, rótulo)', () => {
+    const doc = criarDocumento();
+    const mestraCapa = doc.mestras.find(m => m.id === 'capa');
+    mestraCapa.elementos_recorrentes = [
+      { id: 'e1', tipo: 'tarja', posicao: 'topo', altura_mm: 10, cor: '#314F79' },
+      { id: 'e2', tipo: 'marca_dagua', texto: 'CONFIDENCIAL', cor: '#314F79', opacidade: 0.15 },
+      { id: 'e3', tipo: 'rotulo_estatico', texto: 'UNIVERSIDADE FEDERAL', y_mm: 15, cor: '#314F79' }
+    ];
+
+    repaginarDocumento(doc);
+    const htmlPdf = gerarDocumentoHtmlPdf(doc);
+
+    assert.match(htmlPdf, /height:10mm; background:#314F79/);
+    assert.match(htmlPdf, /CONFIDENCIAL/);
+    assert.match(htmlPdf, /UNIVERSIDADE FEDERAL/);
+  });
+
+  await t.test('CSS do editor tem botões de menu com classe rm-seta-dropdown-icone e sem rgba quebrado', () => {
+    const cssEditor = fs.readFileSync('src/css/athenes_editor.css', 'utf8');
+    assert.ok(!cssEditor.includes('rgba(49, 79, 121, )'), 'Não deve haver rgba incompleto');
+    assert.match(cssEditor, /\.rm-seta-dropdown-icone/);
+    assert.match(cssEditor, /\.rm-cor-linha-badge/);
+  });
+
 });

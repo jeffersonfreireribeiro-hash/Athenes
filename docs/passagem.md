@@ -175,3 +175,41 @@
 - **Figura ▾:** menu com Figura, Gráfico, Fotografia, Diagrama e Fluxograma. Todos são o bloco `figura` com `subtipo`; cada subtipo tem rótulo, numeração, lista (`gerarListaIlustracoes`) e referência cruzada próprios (Gráfico 1, Figura 1).
 - **Quadro ▾:** menu com Quadro e Campos (rótulo e valor); o botão Campos avulso saiu da barra.
 - Código: `MENUS_BLOCO` e `ligarMenusDeBlocos` em `src/ui/athenes_editor.js`; `ROTULOS_FIGURA` em `src/core/athenes_documento.js`; testes em `tests/ilustracoes.test.js` (43 no total).
+
+## 01/11/2026 — Refinamento Visual de Setas de Menu, Alinhamento de Títulos, Lista Unificada de Mestras e Editor Nível Affinity
+
+- **Setas para baixo (Dropdown de ferramentas):**
+  - Substituído pseudo-elemento triangular CSS serrilhado por chevron SVG vetorial nítido (`.rm-seta-dropdown-icone`) em `Figura` e `Quadro`.
+  - Ícone base reposicionado sutilmente para nunca colidir com a seta indicadora.
+- **Alinhamento e Formato para Títulos e Subtítulos:**
+  - Adicionado painel `FORMATO` com os 7 modos de alinhamento com dicas de última linha nos blocos de `titulo` e `subtitulo`.
+  - Seletor de fontes e cor de texto integrados.
+- **Layout Horizontal Estrito (Linha Única) na Cor do Texto:**
+  - Corrigido empilhamento vertical do swatch com "do estilo" através de `.rm-cor-linha-badge` (`display: inline-flex !important; flex-direction: row !important;`).
+- **Lista Unificada de Páginas Mestras:**
+  - Unificados os acordiões "Seções" e "Catálogo de Mestras" em uma única seção: `PÁGINAS MESTRAS`.
+  - Cada item exibe nome, modo (`Fixa · Grade 2D` ou `Progressiva · Fluxo`), orientação, selo de uso (`● Em uso` ou `Disponível`), botão lápis ✏️ funcional e botão `+ Usar`.
+  - Removido botão duplicado de "+ Adicionar".
+- **Editor de Páginas Mestras Nível Affinity Publisher / InDesign:**
+  - Implementado painel de Elementos Recorrentes da Mestra (`tarja`, `caixa_grade`, `rotulo_estatico`, `marca_dagua`).
+  - Prévia visual interativa com seleção em canvas e propagação para as páginas do documento e exportação PDF.
+- **Barra Contextual Flutuante com Dropdown de Estilo:**
+  - Seletor de estilos tipográficos inline (`#athBarraContextEstilo`) para aplicar múltiplos estilos a trechos de texto no mesmo bloco.
+- **Correções CSS:**
+  - Normalizadas 17 ocorrências de `rgba(49, 79, 121, )` incompletas no arquivo `src/css/athenes_editor.css`.
+- **Testes:** 56 testes automatizados passando (`npm test`).
+
+## 01/11/2026 — Ajuste Fino das Caixas de Texto (Páginas Mestras e Filtro dos Documentos)
+
+- **Reestruturação do Card de Páginas Mestras (`.rm-mestra-card`):**
+  - **Linha 1 (Cabeçalho):** Título completo da mestra à esquerda com largura total e truncamento suave por reticências apenas em nomes muito extensos (`title` nativo mantido); botão lápis ✏️ dedicado e estilizado no canto superior direito.
+  - **Linha 2 (Metadados e Selos):** Linha dedicada ocupando 100% da largura útil do card para os selos (`Fixa · Grade 2D` / `Progressiva · Fluxo`, orientação `Retrato` / `Paisagem` e status `● Em uso (...)` / `Disponível`). Selos com `white-space: nowrap !important; flex: none;`, eliminando quebras verticais de palavras dentro das pílulas.
+  - **Linha 3 (Ações):** Rodapé com separador tracejado sutil (`rgba(49, 79, 121, 0.16)`), botão `+ Usar` à esquerda e botões de reordenação/remoção (`^`, `v`, `X`) à direita.
+- **Ajuste do Cabeçalho de Filtro dos Documentos (`.rm-filtro-doc-topo`):**
+  - Título `Filtro dos documentos` mantido em linha única sem quebra (`white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`).
+  - Botão `+ Filtro` em pílula compacta (`.glx-btn-xs`), com `white-space: nowrap !important; flex-shrink: 0;`, eliminando a quebra em duas linhas (`+` e `Filtro`).
+- **Ajuste na Cor do Texto do Painel de Propriedades:**
+  - Rótulo `Usar do estilo` compacto e alinhado perfeitamente na mesma linha horizontal com o badge de cor ativa.
+- **Validação Visual:**
+  - Capturadas evidências em alta resolução (`captura_caixas_texto_ajustadas.png` e `captura_painel_direito_ajustado.png`), comprovando estabilidade e espaçamento profissional.
+- **Testes:** 56 testes 100% aprovados (`npm test`).

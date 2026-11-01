@@ -34,6 +34,7 @@ import {
   resolverReferenciasCruzadas
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
+import { ModalEditorMestra } from './athenes_editor_mestra.js';
 
 const TIPO_ROTULO = {
   titulo: 'Título', subtitulo: 'Subtítulo', paragrafo: 'Texto', citacao: 'Citação', tabela: 'Tabela',
@@ -234,12 +235,22 @@ export class EditorView {
             <button type="button" class="rm-ic-bt" id="rmAddTitulo" data-tip="Título" title="Inserir Título">${svgIcone('titulo', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddTexto" data-tip="Texto" title="Inserir Parágrafo">${svgIcone('paragrafo', 16)}</button>
             <div class="rm-grupo-bt" data-grupo="figura">
-              <button type="button" class="rm-ic-bt tem-menu" id="rmAddFigura" data-tip="Figura" title="Figura, gráfico, fotografia, diagrama…" aria-haspopup="menu" aria-expanded="false">${svgIcone('imagem', 16)}</button>
+              <button type="button" class="rm-ic-bt tem-menu" id="rmAddFigura" data-tip="Figura" title="Figura, gráfico, fotografia, diagrama…" aria-haspopup="menu" aria-expanded="false">
+                ${svgIcone('imagem', 15)}
+                <svg class="rm-seta-dropdown-icone" viewBox="0 0 7 5" width="7" height="5" aria-hidden="true">
+                  <path d="M1 1.2L3.5 3.7L6 1.2" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
               <div class="rm-menu-bloco" role="menu" hidden></div>
             </div>
             <button type="button" class="rm-ic-bt" id="rmAddTabela" data-tip="Tabela" title="Inserir Tabela (ABNT/IBGE)">${svgIcone('tabela', 16)}</button>
             <div class="rm-grupo-bt" data-grupo="quadro">
-              <button type="button" class="rm-ic-bt tem-menu" id="rmAddQuadro" data-tip="Quadro" title="Quadro ou campos (rótulo e valor)" aria-haspopup="menu" aria-expanded="false">${svgIcone('quadro', 16)}</button>
+              <button type="button" class="rm-ic-bt tem-menu" id="rmAddQuadro" data-tip="Quadro" title="Quadro ou campos (rótulo e valor)" aria-haspopup="menu" aria-expanded="false">
+                ${svgIcone('quadro', 15)}
+                <svg class="rm-seta-dropdown-icone" viewBox="0 0 7 5" width="7" height="5" aria-hidden="true">
+                  <path d="M1 1.2L3.5 3.7L6 1.2" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
               <div class="rm-menu-bloco" role="menu" hidden></div>
             </div>
             <button type="button" class="rm-ic-bt" id="rmAddMapa" data-tip="Mapa" title="Inserir Mapa Territorial">${svgIcone('mapa', 16)}</button>
@@ -375,9 +386,9 @@ export class EditorView {
         </label>
       </div>
 
-      <div class="rm-filtro-doc-topo" style="margin-top:2px;">
-        <span class="rm-rot">Filtro dos documentos (opcional)</span>
-        <button type="button" class="glx-btn glx-btn-soft glx-btn-sm">+ Filtro</button>
+      <div class="rm-filtro-doc-topo" style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:4px; width:100%; box-sizing:border-box;">
+        <span class="rm-rot" style="margin:0; font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;" title="Filtro dos documentos (opcional)">Filtro dos documentos</span>
+        <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" style="white-space:nowrap !important; flex:none !important; flex-shrink:0 !important; height:24px; padding:0 10px; font-size:11px;">+ Filtro</button>
       </div>
 
       <span class="rm-rot" style="margin-top:6px;">Margens da folha</span>
@@ -468,120 +479,74 @@ export class EditorView {
 
     colEsq.appendChild(cardCfg);
 
-        // 2. Accordion SEÇÕES & PÁGINAS MESTRAS
+    // 2. Accordion PÁGINAS MESTRAS (Lista Unificada com Edição e Aplicação)
     const secMestras = document.createElement('details');
     secMestras.className = 'rm-sec';
     secMestras.open = true;
     secMestras.innerHTML = `
-      <summary>SEÇÕES & PÁGINAS MESTRAS <span class="rm-contagem">(${this.doc.secoes?.length || 1})</span></summary>
+      <summary>PÁGINAS MESTRAS <span class="rm-contagem">(${this.doc.mestras?.length || 0})</span></summary>
       
-      <!-- Lista de Seções Ativas do Documento -->
-      <div style="display:flex; flex-direction:column; gap:6px;" id="rmListaSecoes"></div>
+      <!-- Lista Única de Todas as Páginas Mestras -->
+      <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;" id="rmListaMestrasUnificada"></div>
       
-      <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="rmBtnAddMestraAoDoc" style="margin-top:8px; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
-        ${svgIcone('mais', 14)} + Adicionar Mestra ao Documento
+      <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="rmBtnNovaMestra" style="margin-top:10px; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
+        ${svgIcone('mais', 14)} + Nova Página Mestra
       </button>
-
-      <!-- Catálogo de Páginas Mestras Reutilizáveis -->
-      <details style="margin-top:10px; border-top:1px dashed var(--ath-primary-line, #C8D7E6); padding-top:8px;" open>
-        <summary style="font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); cursor:pointer; margin-bottom:6px;">
-          Catálogo de Mestras (${this.doc.mestras?.length || 0})
-        </summary>
-        <div style="display:flex; flex-direction:column; gap:5px;" id="rmCatalogoMestrasBox"></div>
-      </details>
     `;
 
-    const listaSecBox = secMestras.querySelector('#rmListaSecoes');
-    (this.doc.secoes || []).forEach((sec, idx) => {
+    const listaMestrasBox = secMestras.querySelector('#rmListaMestrasUnificada');
+    (this.doc.mestras || []).forEach(mestra => {
+      const secoesQueUsam = (this.doc.secoes || []).filter(s => s.mestraId === mestra.id);
+      const emUso = secoesQueUsam.length > 0;
+      const ehSecaoAtiva = secoesQueUsam.some(s => s.id === this.secaoAtivaId);
+
       const item = document.createElement('div');
-      item.className = `rm-bl ${sec.id === this.secaoAtivaId ? 'sel' : ''}`;
-      const mestraObj = (this.doc.mestras || []).find(m => m.id === sec.mestraId) || {};
-      const modo = mestraObj.modo_aplicacao || 'progressiva';
+      item.className = `rm-mestra-card ${ehSecaoAtiva ? 'sel' : ''}`;
+      item.style.display = 'flex';
+      item.style.flexDirection = 'column';
+      item.style.gap = '4px';
+      item.style.padding = '8px 10px';
+      item.style.borderRadius = '10px';
+      item.style.border = `1px solid ${ehSecaoAtiva ? 'var(--ath-primary, #314F79)' : 'var(--ath-primary-line, #C8D7E6)'}`;
+      item.style.background = ehSecaoAtiva ? 'var(--ath-primary-soft, #EEF4FA)' : '#fff';
+      item.style.boxSizing = 'border-box';
+      item.style.width = '100%';
+
+      const rotuloUso = emUso 
+        ? `<span class="rm-selo" style="font-size:9.5px; padding:2px 7px; background:#E8F5E9; color:#2E7D32; font-weight:700; white-space:nowrap !important; flex:none;">● Em uso (${secoesQueUsam.map(s => s.nome).join(', ')})</span>`
+        : `<span class="rm-selo" style="font-size:9.5px; padding:2px 7px; background:#F1F5F9; color:#64748B; white-space:nowrap !important; flex:none;">Disponível</span>`;
 
       item.innerHTML = `
-        <div class="rm-bl-nome" style="cursor:pointer; flex:1;">
-          <strong>${sec.nome}</strong>
-          <span>${mestraObj.nome || sec.mestraId} · <span class="rm-selo" style="font-size:9.5px; padding:1px 6px;">${modo === 'fixa' ? 'Fixa · Grade 2D' : 'Progressiva · Fluxo'}</span></span>
+        <div class="rm-mestra-card-topo" style="display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%;">
+          <strong class="rm-mestra-titulo" style="font-size:12.5px; font-weight:800; color:var(--ath-text, #1F2733); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; cursor:pointer;" title="${mestra.nome}">${mestra.nome}</strong>
+          <button type="button" class="rm-ic" data-acao="editar-mestra" title="Editar Página Mestra (${mestra.nome})" style="flex:none; width:26px; height:26px; border-radius:6px; border:1px solid #CBD5E1; background:#fff;">${svgIcone('lapis', 13)}</button>
         </div>
-        <div class="rm-bl-acoes">
-          <button type="button" class="rm-ic" data-acao="editar-mestra" title="Editar Página Mestra (${mestraObj.nome || ''})">${svgIcone('lapis', 14)}</button>
-          <button type="button" class="rm-ic" data-acao="subir" title="Mover seção para cima">${svgIcone('cima', 14)}</button>
-          <button type="button" class="rm-ic" data-acao="descer" title="Mover seção para baixo">${svgIcone('baixo', 14)}</button>
-          <button type="button" class="rm-ic rm-ic-perigo" data-acao="remover" title="Remover seção">${svgIcone('fechar', 14)}</button>
+        <div class="rm-mestra-card-meta" style="display:flex; align-items:center; gap:5px; flex-wrap:wrap; width:100%; margin-top:2px;">
+          <span class="rm-selo" style="font-size:9.5px; padding:2px 7px; white-space:nowrap !important; flex:none;">${mestra.modo_aplicacao === 'fixa' ? 'Fixa · Grade 2D' : 'Progressiva · Fluxo'}</span>
+          <span style="font-size:10.5px; color:var(--glx-muted, #6B7585); white-space:nowrap; flex:none;">${mestra.orientacao === 'paisagem' ? 'Paisagem' : 'Retrato'}</span>
+          ${rotuloUso}
+        </div>
+        <div class="rm-mestra-card-acoes" style="display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; margin-top:5px; padding-top:5px; border-top:1px dashed rgba(49, 79, 121, 0.16);">
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" data-acao="usar-mestra" title="Adicionar seção usando esta mestra ao documento" style="white-space:nowrap !important; flex:none; height:24px; font-size:11px; padding:0 10px;">+ Usar</button>
+          ${emUso ? `
+            <div style="display:flex; align-items:center; gap:3px; flex:none;">
+              <button type="button" class="rm-ic" data-acao="subir-secao" title="Mover para cima" style="width:24px; height:24px;">${svgIcone('cima', 12)}</button>
+              <button type="button" class="rm-ic" data-acao="descer-secao" title="Mover para baixo" style="width:24px; height:24px;">${svgIcone('baixo', 12)}</button>
+              <button type="button" class="rm-ic rm-ic-perigo" data-acao="remover-secao" title="Remover seção do documento" style="width:24px; height:24px;">${svgIcone('fechar', 12)}</button>
+            </div>
+          ` : ''}
         </div>
       `;
 
-      item.querySelector('.rm-bl-nome').addEventListener('click', () => {
-        this.secaoAtivaId = sec.id;
-        this.renderizar();
-      });
-
-      item.querySelector('[data-acao="editar-mestra"]').addEventListener('click', e => {
-        e.stopPropagation();
-        new ModalEditorMestra(this.doc, sec.mestraId, {
-          onSalvar: () => {
-            this.notificarMudanca();
-            this.renderizar();
-          }
-        });
-      });
-
-      item.querySelector('[data-acao="subir"]').addEventListener('click', e => {
-        e.stopPropagation();
-        moverSecao(this.doc, sec.id, -1);
-        this.notificarMudanca();
-        this.renderizar();
-      });
-
-      item.querySelector('[data-acao="descer"]').addEventListener('click', e => {
-        e.stopPropagation();
-        moverSecao(this.doc, sec.id, 1);
-        this.notificarMudanca();
-        this.renderizar();
-      });
-
-      item.querySelector('[data-acao="remover"]').addEventListener('click', e => {
-        e.stopPropagation();
-        if (this.doc.secoes.length > 1) {
-          removerSecao(this.doc, sec.id);
-          this.secaoAtivaId = this.doc.secoes[0]?.id;
-          this.notificarMudanca();
+      item.querySelector('.rm-mestra-titulo').addEventListener('click', () => {
+        if (emUso) {
+          this.secaoAtivaId = secoesQueUsam[0].id;
           this.renderizar();
         }
       });
 
-      listaSecBox.appendChild(item);
-    });
-
-    // Catálogo de Páginas Mestras (com lápis e botão Usar)
-    const catalogoBox = secMestras.querySelector('#rmCatalogoMestrasBox');
-    (this.doc.mestras || []).forEach(mestra => {
-      const cItem = document.createElement('div');
-      cItem.className = 'rm-opcao';
-      cItem.style.display = 'flex';
-      cItem.style.justifyContent = 'space-between';
-      cItem.style.alignItems = 'center';
-      cItem.style.padding = '6px 8px';
-      cItem.style.borderRadius = '6px';
-      cItem.style.border = '1px solid var(--ath-primary-line, #C8D7E6)';
-      cItem.style.background = 'var(--ath-surface, #fff)';
-
-      cItem.innerHTML = `
-        <div style="flex:1; overflow:hidden;">
-          <div style="font:700 12px var(--glx-font); color:var(--ath-text, #1F2733); white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">
-            ${mestra.nome}
-          </div>
-          <div style="font-size:10.5px; color:var(--glx-muted, #6B7585);">
-            ${mestra.modo_aplicacao === 'fixa' ? 'Fixa · Grade 2D' : 'Progressiva · Fluxo'} · ${mestra.orientacao === 'paisagem' ? 'Paisagem' : 'Retrato'}
-          </div>
-        </div>
-        <div style="display:flex; align-items:center; gap:4px;">
-          <button type="button" class="rm-ic" data-acao="editar-catalogo" title="Editar Página Mestra">${svgIcone('lapis', 14)}</button>
-          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" data-acao="usar-catalogo" title="Adicionar seção usando esta mestra">+ Usar</button>
-        </div>
-      `;
-
-      cItem.querySelector('[data-acao="editar-catalogo"]').addEventListener('click', () => {
+      item.querySelector('[data-acao="editar-mestra"]').addEventListener('click', e => {
+        e.stopPropagation();
         new ModalEditorMestra(this.doc, mestra.id, {
           onSalvar: () => {
             this.notificarMudanca();
@@ -590,19 +555,65 @@ export class EditorView {
         });
       });
 
-      cItem.querySelector('[data-acao="usar-catalogo"]').addEventListener('click', () => {
+      item.querySelector('[data-acao="usar-mestra"]').addEventListener('click', e => {
+        e.stopPropagation();
         const nova = adicionarSecao(this.doc, mestra.nome, mestra.id);
         this.secaoAtivaId = nova.id;
         this.notificarMudanca();
         this.renderizar();
       });
 
-      catalogoBox.appendChild(cItem);
+      if (emUso) {
+        const primSec = secoesQueUsam[0];
+        item.querySelector('[data-acao="subir-secao"]')?.addEventListener('click', e => {
+          e.stopPropagation();
+          moverSecao(this.doc, primSec.id, -1);
+          this.notificarMudanca();
+          this.renderizar();
+        });
+        item.querySelector('[data-acao="descer-secao"]')?.addEventListener('click', e => {
+          e.stopPropagation();
+          moverSecao(this.doc, primSec.id, 1);
+          this.notificarMudanca();
+          this.renderizar();
+        });
+        item.querySelector('[data-acao="remover-secao"]')?.addEventListener('click', e => {
+          e.stopPropagation();
+          if (this.doc.secoes.length > 1) {
+            removerSecao(this.doc, primSec.id);
+            this.secaoAtivaId = this.doc.secoes[0]?.id;
+            this.notificarMudanca();
+            this.renderizar();
+          }
+        });
+      }
+
+      listaMestrasBox.appendChild(item);
     });
 
-    // Botão Adicionar Mestra ao Documento com Diálogo de Inserção Completo
-    secMestras.querySelector('#rmBtnAddMestraAoDoc').addEventListener('click', () => {
-      this.abrirModalAdicionarMestraAoDoc();
+    secMestras.querySelector('#rmBtnNovaMestra').addEventListener('click', () => {
+      const novoId = 'mestra_' + Date.now().toString(36);
+      const novaMestra = {
+        id: novoId,
+        nome: 'Nova Página Mestra',
+        tipo: 'personalizada',
+        modo_aplicacao: 'progressiva',
+        formato: 'a4',
+        orientacao: 'retrato',
+        margens_mm: { t: 25, r: 20, b: 20, l: 25 },
+        grade: { colunas: 1, gap_mm: 4 },
+        grade_2d: { linhas: 3, colunas: 3, gap_mm: 4 },
+        cabecalho: { ativo: false, texto: '', alinhamento: 'direita', linha_divisoria: true },
+        rodape: { ativo: true, texto: 'Athenes', numeracao: true, posicao_numero: 'direita' },
+        elementos_recorrentes: []
+      };
+      this.doc.mestras.push(novaMestra);
+      new ModalEditorMestra(this.doc, novoId, {
+        onSalvar: () => {
+          this.notificarMudanca();
+          this.renderizar();
+        }
+      });
     });
 
     colEsq.appendChild(secMestras);
@@ -1108,6 +1119,84 @@ export class EditorView {
       guiaMargem.style.inset = `${padTop}px ${padRight}px ${padBottom}px ${padLeft}px`;
       folha.appendChild(guiaMargem);
 
+      // Elementos Recorrentes da Página Mestra (Affinity / InDesign level)
+      if (Array.isArray(mestraPag?.elementos_recorrentes) && mestraPag.elementos_recorrentes.length > 0) {
+        const wrapElemMestra = document.createElement('div');
+        wrapElemMestra.className = 'ath-folha-elementos-mestra';
+        wrapElemMestra.style.position = 'absolute';
+        wrapElemMestra.style.inset = '0';
+        wrapElemMestra.style.pointerEvents = 'none';
+        wrapElemMestra.style.zIndex = '0';
+
+        mestraPag.elementos_recorrentes.forEach(elem => {
+          if (elem.tipo === 'tarja') {
+            const altPx = (elem.altura_mm || 8) * pxPorMm;
+            const tarjaEl = document.createElement('div');
+            tarjaEl.style.position = 'absolute';
+            tarjaEl.style.background = elem.cor || '#314F79';
+            if (elem.posicao === 'topo') {
+              tarjaEl.style.top = '0'; tarjaEl.style.left = '0'; tarjaEl.style.right = '0'; tarjaEl.style.height = `${altPx}px`;
+            } else if (elem.posicao === 'base') {
+              tarjaEl.style.bottom = '0'; tarjaEl.style.left = '0'; tarjaEl.style.right = '0'; tarjaEl.style.height = `${altPx}px`;
+            } else {
+              tarjaEl.style.top = '0'; tarjaEl.style.bottom = '0'; tarjaEl.style.left = '0'; tarjaEl.style.width = `${altPx}px`;
+            }
+            wrapElemMestra.appendChild(tarjaEl);
+          } else if (elem.tipo === 'marca_dagua') {
+            const marcaEl = document.createElement('div');
+            marcaEl.style.position = 'absolute';
+            marcaEl.style.top = '50%';
+            marcaEl.style.left = '50%';
+            marcaEl.style.transform = 'translate(-50%, -50%) rotate(-35deg)';
+            marcaEl.style.fontSize = '48px';
+            marcaEl.style.fontWeight = '900';
+            marcaEl.style.letterSpacing = '8px';
+            marcaEl.style.color = elem.cor || '#314F79';
+            marcaEl.style.opacity = String(elem.opacidade || 0.12);
+            marcaEl.style.textTransform = 'uppercase';
+            marcaEl.style.whiteSpace = 'nowrap';
+            marcaEl.textContent = elem.texto || 'VERSÃO PRELIMINAR';
+            wrapElemMestra.appendChild(marcaEl);
+          } else if (elem.tipo === 'rotulo_estatico') {
+            const rotEl = document.createElement('div');
+            rotEl.style.position = 'absolute';
+            rotEl.style.top = `${(elem.y_mm || 12) * pxPorMm}px`;
+            rotEl.style.left = `${padLeft}px`;
+            rotEl.style.right = `${padRight}px`;
+            rotEl.style.textAlign = 'center';
+            rotEl.style.fontSize = `${(elem.tamanho_pt || 11) * 1.33}px`;
+            rotEl.style.fontWeight = '800';
+            rotEl.style.color = elem.cor || '#314F79';
+            rotEl.textContent = elem.texto || '';
+            wrapElemMestra.appendChild(rotEl);
+          } else if (elem.tipo === 'caixa_grade') {
+            const molduraEl = document.createElement('div');
+            molduraEl.style.position = 'absolute';
+            molduraEl.style.border = elem.borda || '1px solid #314F79';
+            molduraEl.style.background = elem.fundo || 'rgba(49, 79, 121, 0.04)';
+            molduraEl.style.borderRadius = '4px';
+            molduraEl.style.padding = '8px';
+            molduraEl.style.fontSize = '11px';
+            molduraEl.style.fontWeight = '700';
+            molduraEl.style.color = elem.cor || '#314F79';
+            const lin = mestraPag.grade_2d?.linhas || 3;
+            const col = mestraPag.grade_2d?.colunas || 3;
+            const alturaUtil = (paisagem ? 210 : 297) * pxPorMm - padTop - padBottom;
+            const larguraUtil = (paisagem ? 297 : 210) * pxPorMm - padLeft - padRight;
+            const cellH = alturaUtil / lin;
+            const cellW = larguraUtil / col;
+            molduraEl.style.top = `${padTop + ((elem.linha || 1) - 1) * cellH}px`;
+            molduraEl.style.left = `${padLeft + ((elem.coluna || 1) - 1) * cellW}px`;
+            molduraEl.style.width = `${Math.max(cellW * (elem.spanColunas || 1) - 8, 40)}px`;
+            molduraEl.style.height = `${Math.max(cellH * (elem.spanLinhas || 1) - 8, 40)}px`;
+            molduraEl.innerHTML = `<span>${elem.titulo || 'Quadro'}</span>`;
+            wrapElemMestra.appendChild(molduraEl);
+          }
+        });
+
+        folha.appendChild(wrapElemMestra);
+      }
+
       // Grade de 12 Colunas (se ativada na barra)
       if (this.guiasVisiveis) {
         const gradeOverlay = document.createElement('div');
@@ -1600,6 +1689,11 @@ export class EditorView {
     barra.style.userSelect = 'none';
 
     barra.innerHTML = `
+      <select class="ath-barra-context-estilo" id="athBarraContextEstilo" style="font-family:var(--glx-font); font-size:11px; font-weight:700; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:2px 8px; background:var(--ath-surface-elevated, #F8FAFC); color:var(--ath-primary, #314F79); cursor:pointer;" title="Aplicar estilo de texto ao trecho selecionado">
+        <option value="" disabled selected>Estilo ▾</option>
+        ${(this.doc.estilos || []).map(est => `<option value="${est.id}">${est.nome}</option>`).join('')}
+      </select>
+      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 3px;"></span>
       <button type="button" class="rm-ic-sm" data-cmd="bold" title="Negrito (Ctrl+B)"><b>B</b></button>
       <button type="button" class="rm-ic-sm" data-cmd="italic" title="Itálico (Ctrl+I)"><i>I</i></button>
       <button type="button" class="rm-ic-sm" data-cmd="underline" title="Sublinhado (Ctrl+U)"><u>U</u></button>
@@ -1617,6 +1711,32 @@ export class EditorView {
     document.body.appendChild(barra);
 
     // Eventos da barra flutuante
+    const selEstilo = barra.querySelector('#athBarraContextEstilo');
+    selEstilo.addEventListener('change', () => {
+      const estiloId = selEstilo.value;
+      const estilo = (this.doc.estilos || []).find(e => e.id === estiloId);
+      if (!estilo) return;
+
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+      const range = sel.getRangeAt(0);
+
+      const span = document.createElement('span');
+      span.className = 'ath-estilo-span';
+      span.dataset.estiloId = estilo.id;
+      span.style.fontFamily = FONTES_SISTEMA[estilo.fonte]?.familia || 'Nunito, sans-serif';
+      span.style.fontSize = `${estilo.tamanho_pt || 12}pt`;
+      span.style.fontWeight = estilo.peso || '400';
+      if (estilo.cor) span.style.color = estilo.cor;
+      if (estilo.italico) span.style.fontStyle = 'italic';
+
+      const contents = range.extractContents();
+      span.appendChild(contents);
+      range.insertNode(span);
+
+      selEstilo.value = '';
+      this.notificarMudanca();
+    });
     barra.querySelectorAll('[data-cmd]').forEach(btn => {
       btn.addEventListener('mousedown', e => {
         e.preventDefault();

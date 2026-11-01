@@ -278,25 +278,85 @@ export class PainelPropriedades {
 
     // 1. TÍTULO / SUBTÍTULO
     if (b.tipo === 'titulo' || b.tipo === 'subtitulo') {
+      const alinAtivo = b.alinhamento || estiloAtivo.alinhamento || 'esquerda';
+      const corAtiva = b.cor || estiloAtivo.cor || '#1F2733';
+      const fonteAtiva = b.fonte || '';
+
       box.innerHTML = `
-        <label>Texto do Título
-          <input type="text" id="rmCampoTexto" value="${b.texto || ''}">
+        <label style="font:700 12px var(--glx-font);">Texto do Título
+          <input type="text" id="rmCampoTexto" class="glx-input" style="width:100%; margin-top:4px;" value="${b.texto || ''}">
         </label>
         <div class="rm-linha2">
-          <label>Nível
-            <select id="rmCampoNivel" class="glx-select">
+          <label style="font:700 12px var(--glx-font);">Nível
+            <select id="rmCampoNivel" class="glx-select" style="width:100%; margin-top:4px;">
               <option value="1" ${b.nivel === 1 ? 'selected' : ''}>1 (Seção Primária)</option>
               <option value="2" ${b.nivel === 2 ? 'selected' : ''}>2 (Subseção)</option>
               <option value="3" ${b.nivel === 3 ? 'selected' : ''}>3 (Sub-subseção)</option>
             </select>
           </label>
-          <label>Estilo Tipográfico
-            <select id="rmCampoEstilo" class="glx-select">
+          <label style="font:700 12px var(--glx-font);">Estilo Tipográfico
+            <select id="rmCampoEstilo" class="glx-select" style="width:100%; margin-top:4px;">
               ${this.doc.estilos.map(e => `<option value="${e.id}" ${e.id === b.estiloId ? 'selected' : ''}>${e.nome}</option>`).join('')}
             </select>
           </label>
         </div>
-        <label class="rm-chk">
+
+        <!-- FORMATO: 7 Modos de Alinhamento com Ícones e Dicas da Última Linha -->
+        <div>
+          <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
+            Formato
+          </span>
+          <div class="rm-icg" style="display:flex; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:3px; gap:2px; justify-content:space-between;">
+            <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Alinhar à esquerda: primeira e última linhas à esquerda">
+              ${svgIcone('alinhamento_esq', 16)}
+            </button>
+            <button type="button" class="rm-ic-bt ${alinAtivo === 'centro' ? 'on' : ''}" data-alin="centro" title="Centralizado: todo o texto centralizado">
+              ${svgIcone('alinhamento_cen', 16)}
+            </button>
+            <button type="button" class="rm-ic-bt ${alinAtivo === 'direita' ? 'on' : ''}" data-alin="direita" title="Alinhar à direita: todo o texto alinhado à direita">
+              ${svgIcone('alinhamento_dir', 16)}
+            </button>
+            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado' ? 'on' : ''}" data-alin="justificado" title="Justificado total: todas as linhas preenchem toda a largura">
+              ${svgIcone('alinhamento_jus', 16)}
+            </button>
+            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_esquerda' ? 'on' : ''}" data-alin="justificado_esquerda" title="Justificado com a última linha à esquerda (padrão editorial)">
+              ${svgIcone('alinhamento_jus_esq', 16)}
+            </button>
+            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_centro' ? 'on' : ''}" data-alin="justificado_centro" title="Justificado com a última linha centralizada">
+              ${svgIcone('alinhamento_jus_cen', 16)}
+            </button>
+            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_direita' ? 'on' : ''}" data-alin="justificado_direita" title="Justificado com a última linha à direita">
+              ${svgIcone('alinhamento_jus_dir', 16)}
+            </button>
+          </div>
+        </div>
+
+        <!-- Fonte -->
+        <label style="font:700 12px var(--glx-font);">Fonte
+          <select id="rmCampoFonte" class="glx-select" style="width:100%; margin-top:4px;">
+            <option value="" ${!fonteAtiva ? 'selected' : ''}>Do estilo (${FONTES_SISTEMA[estiloAtivo.fonte]?.rotulo || 'Nunito'})</option>
+            ${Object.values(FONTES_SISTEMA).map(f => `<option value="${f.id}" ${fonteAtiva === f.id ? 'selected' : ''}>${f.rotulo}</option>`).join('')}
+          </select>
+        </label>
+
+        <!-- COR DO TEXTO (Linha única estrita) -->
+        <div>
+          <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
+            Cor do texto
+          </span>
+          <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
+            <label class="rm-cor-linha-badge" style="position:relative; cursor:pointer; padding:4px 10px; border-radius:999px; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); margin:0;">
+              <span id="rmCorSwatch" style="width:18px; height:18px; border-radius:50%; background:${corAtiva}; border:1px solid rgba(0,0,0,0.18); display:inline-block; flex:none;"></span>
+              <span style="font-size:11.5px; font-weight:700; color:var(--ath-text, #1F2733);" id="rmCorStatus">${b.cor ? 'personalizada' : 'do estilo'}</span>
+              <input type="color" id="rmCampoCor" value="${corAtiva.startsWith('#') ? corAtiva : '#1F2733'}" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
+            </label>
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="rmBtnCorEstilo" style="white-space:nowrap !important; flex:none !important; flex-shrink:0 !important; font-size:11px;" title="Restaurar cor padrão do estilo">
+              Usar do estilo
+            </button>
+          </div>
+        </div>
+
+        <label class="rm-chk" style="font-size:12px; margin-top:4px;">
           <input type="checkbox" id="rmCampoManter" ${b.manterComProximo ? 'checked' : ''}>
           Manter título com o parágrafo seguinte (evitar órfão)
         </label>
@@ -305,7 +365,38 @@ export class PainelPropriedades {
       box.querySelector('#rmCampoTexto').addEventListener('input', e => { b.texto = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmCampoNivel').addEventListener('change', e => { b.nivel = parseInt(e.target.value, 10); this.notificarMudanca(); });
       box.querySelector('#rmCampoEstilo').addEventListener('change', e => { b.estiloId = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmCampoFonte').addEventListener('change', e => { b.fonte = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmCampoManter').addEventListener('change', e => { b.manterComProximo = e.target.checked; this.notificarMudanca(); });
+
+      box.querySelectorAll('[data-alin]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          b.alinhamento = btn.dataset.alin;
+          box.querySelectorAll('[data-alin]').forEach(el => el.classList.remove('on'));
+          btn.classList.add('on');
+          this.notificarMudanca();
+        });
+      });
+
+      const inpCor = box.querySelector('#rmCampoCor');
+      const swatchCor = box.querySelector('#rmCorSwatch');
+      const statusCor = box.querySelector('#rmCorStatus');
+      const btnCorEstilo = box.querySelector('#rmBtnCorEstilo');
+
+      inpCor.addEventListener('input', e => {
+        b.cor = e.target.value;
+        swatchCor.style.background = b.cor;
+        statusCor.textContent = 'personalizada';
+        this.notificarMudanca();
+      });
+
+      btnCorEstilo.addEventListener('click', () => {
+        delete b.cor;
+        const cEst = estiloAtivo.cor || '#1F2733';
+        swatchCor.style.background = cEst;
+        inpCor.value = cEst.startsWith('#') ? cEst : '#1F2733';
+        statusCor.textContent = 'do estilo';
+        this.notificarMudanca();
+      });
     }
 
     // 2. PARÁGRAFO / TEXTO CORPO COM CONTROLES COMPLETOS (DESIGN SOFT UI)
@@ -328,6 +419,14 @@ export class PainelPropriedades {
             ${this.doc.estilos.map(e => `<option value="${e.id}" ${e.id === b.estiloId ? 'selected' : ''}>${e.nome}</option>`).join('')}
           </select>
         </label>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:-6px; margin-bottom:2px;">
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnAplicarEstiloBloco" style="flex:1;" title="Aplicar este estilo a todo o texto do bloco">
+            Aplicar ao bloco todo
+          </button>
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnAplicarEstiloTrecho" style="flex:1;" title="Aplicar estilo apenas ao trecho selecionado">
+            Aplicar ao trecho
+          </button>
+        </div>
 
         <!-- FORMATO: 7 Modos de Alinhamento com Ícones e Dicas da Última Linha -->
         <div>
@@ -367,19 +466,19 @@ export class PainelPropriedades {
           </select>
         </label>
 
-        <!-- COR DO TEXTO -->
+        <!-- COR DO TEXTO (Linha única estrita) -->
         <div>
           <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
             Cor do texto
           </span>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <label style="position:relative; cursor:pointer; display:flex; align-items:center; gap:8px; padding:4px 10px; border-radius:999px; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6);">
-              <span id="rmCorSwatch" style="width:20px; height:20px; border-radius:50%; background:${corAtiva}; border:1px solid rgba(0,0,0,0.15); display:inline-block;"></span>
-              <span style="font-size:12px; color:var(--ath-text, #1F2733);" id="rmCorStatus">${b.cor ? 'personalizada' : 'do estilo'}</span>
+          <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
+            <label class="rm-cor-linha-badge" style="position:relative; cursor:pointer; padding:4px 10px; border-radius:999px; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); margin:0;">
+              <span id="rmCorSwatch" style="width:18px; height:18px; border-radius:50%; background:${corAtiva}; border:1px solid rgba(0,0,0,0.18); display:inline-block; flex:none;"></span>
+              <span style="font-size:11.5px; font-weight:700; color:var(--ath-text, #1F2733);" id="rmCorStatus">${b.cor ? 'personalizada' : 'do estilo'}</span>
               <input type="color" id="rmCampoCor" value="${corAtiva.startsWith('#') ? corAtiva : '#1F2733'}" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
             </label>
-            <button type="button" class="glx-btn glx-btn-sm glx-btn-soft" id="rmBtnCorEstilo" style="white-space:nowrap;">
-              Usar a cor do estilo
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="rmBtnCorEstilo" style="white-space:nowrap !important; flex:none !important; flex-shrink:0 !important; font-size:11px;" title="Restaurar cor padrão do estilo">
+              Usar do estilo
             </button>
           </div>
         </div>

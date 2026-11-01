@@ -300,8 +300,28 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
 
     const { largura_mm, altura_mm } = dimensoesPapelMm(modelo.formato, modelo.orientacao);
 
-    return `<section class="ath-pagina" style="width:${largura_mm}mm; min-height:${altura_mm}mm; padding:${m.t}mm ${m.r}mm ${m.b}mm ${m.l}mm;" data-pagina="${index + 1}">
-      <div class="ath-folha-corpo" style="display:flex; flex-direction:column; min-height:${altura_mm - m.t - m.b}mm;">
+    // Elementos recorrentes da página mestra (tarjas, marcas d'água, molduras)
+    let elemRecHtml = '';
+    if (Array.isArray(modelo.elementos_recorrentes) && modelo.elementos_recorrentes.length > 0) {
+      elemRecHtml = modelo.elementos_recorrentes.map(elem => {
+        if (elem.tipo === 'tarja') {
+          if (elem.posicao === 'topo') return '<div style="position:absolute; top:0; left:0; right:0; height:' + (elem.altura_mm || 8) + 'mm; background:' + (elem.cor || '#314F79') + '; pointer-events:none;"></div>';
+          if (elem.posicao === 'base') return '<div style="position:absolute; bottom:0; left:0; right:0; height:' + (elem.altura_mm || 8) + 'mm; background:' + (elem.cor || '#314F79') + '; pointer-events:none;"></div>';
+          return '<div style="position:absolute; top:0; bottom:0; left:0; width:' + (elem.altura_mm || 8) + 'mm; background:' + (elem.cor || '#314F79') + '; pointer-events:none;"></div>';
+        }
+        if (elem.tipo === 'marca_dagua') {
+          return '<div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%) rotate(-35deg); font-size:36pt; font-weight:900; letter-spacing:5mm; color:' + (elem.cor || '#314F79') + '; opacity:' + (elem.opacidade || 0.12) + '; text-transform:uppercase; white-space:nowrap; pointer-events:none; z-index:0;">' + escaparHtml(elem.texto || 'PRELIMINAR') + '</div>';
+        }
+        if (elem.tipo === 'rotulo_estatico') {
+          return '<div style="position:absolute; top:' + (elem.y_mm || 12) + 'mm; left:' + m.l + 'mm; right:' + m.r + 'mm; text-align:center; font-size:' + (elem.tamanho_pt || 11) + 'pt; font-weight:800; color:' + (elem.cor || '#314F79') + '; pointer-events:none;">' + escaparHtml(elem.texto || '') + '</div>';
+        }
+        return '';
+      }).join('\n');
+    }
+
+    return `<section class="ath-pagina" style="position:relative; width:${largura_mm}mm; min-height:${altura_mm}mm; padding:${m.t}mm ${m.r}mm ${m.b}mm ${m.l}mm;" data-pagina="${index + 1}">
+      ${elemRecHtml}
+      <div class="ath-folha-corpo" style="position:relative; z-index:1; display:flex; flex-direction:column; min-height:${altura_mm - m.t - m.b}mm;">
         ${cabHtml}
         <div class="ath-grid" style="display:grid; grid-template-columns:repeat(${cols}, minmax(0, 1fr)); column-gap:${gap}mm; flex:1;">
           ${blocosHtml}
