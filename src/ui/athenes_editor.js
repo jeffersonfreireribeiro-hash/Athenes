@@ -34,7 +34,9 @@ import {
   recalcularNumeracaoAutomatica,
   resolverReferenciasCruzadas,
   formatarNumeroPagina,
-  gerarCssMolduraBloco
+  gerarCssMolduraBloco,
+  buscarSecaoDoBloco,
+  removerPrefixoNumeracaoTitulo
 } from '../core/athenes_documento.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
@@ -494,7 +496,7 @@ export class EditorView {
       <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;" id="rmListaMestrasUnificada"></div>
       
       <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="rmBtnNovaMestra" style="margin-top:10px; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
-        ${svgIcone('mais', 14)} + Nova Página Mestra
+        ${svgIcone('mais', 14)} Nova Página Mestra
       </button>
     `;
 
@@ -800,6 +802,14 @@ export class EditorView {
           </div>
         </label>
       </div>
+      <div class="rm-linha2">
+        <label>Distância entre Blocos (pt)
+          <input type="number" id="rmEstEspacoDepois" min="0" max="72" step="1" title="Margem de afastamento para o próximo bloco">
+        </label>
+        <label>Distância Parágrafos Enter (pt)
+          <input type="number" id="rmEstEspacoParagrafos" min="0" max="48" step="1" title="Espaço entre parágrafos gerados com Enter">
+        </label>
+      </div>
       <div class="rm-icg" id="rmEstAlin"></div>
       <label class="rm-chk"><input type="checkbox" id="rmEstItalico"> Itálico</label>
       <label class="rm-chk"><input type="checkbox" id="rmEstCaixaAlta"> Tudo em caixa-alta</label>
@@ -841,7 +851,7 @@ export class EditorView {
     const alin = sec.querySelector('#rmEstAlin');
 
     const atualizar = () => {
-      previa.style.cssText = `${estiloParaCss(rasc)} margin:0; max-height:84px; overflow:hidden; text-align:${alinhamentoCss(rasc.alinhamento, 'left')}; text-align-last:auto;`;
+      previa.style.cssText = `${estiloParaCss(rasc)} margin-top:16px; margin-bottom:16px; max-height:84px; overflow:hidden; text-align:${alinhamentoCss(rasc.alinhamento, 'left')}; text-align-last:auto;`;
       sec.querySelector('#rmEstCorHex').textContent = rasc.cor || '#1F2733';
       btnSalvar.disabled = !modificado();
       alin.querySelectorAll('button').forEach(b => {
@@ -856,6 +866,8 @@ export class EditorView {
     sec.querySelector('#rmEstTamanho').value = rasc.tamanho_pt || 12;
     sec.querySelector('#rmEstPeso').value = String(rasc.peso || 400);
     sec.querySelector('#rmEstEntrelinha').value = rasc.entrelinha || 1.5;
+    sec.querySelector('#rmEstEspacoDepois').value = rasc.espaco_depois_pt ?? 8;
+    sec.querySelector('#rmEstEspacoParagrafos').value = rasc.espaco_paragrafos_pt ?? 6;
     sec.querySelector('#rmEstCor').value = /^#[0-9a-f]{6}$/i.test(rasc.cor || '') ? rasc.cor : '#1F2733';
     sec.querySelector('#rmEstItalico').checked = !!rasc.italico;
     sec.querySelector('#rmEstCaixaAlta').checked = !!rasc.caixa_alta;
@@ -876,6 +888,8 @@ export class EditorView {
     sec.querySelector('#rmEstTamanho').addEventListener('input', e => { rasc.tamanho_pt = parseFloat(e.target.value) || 12; atualizar(); });
     sec.querySelector('#rmEstPeso').addEventListener('change', e => { rasc.peso = parseInt(e.target.value, 10); atualizar(); });
     sec.querySelector('#rmEstEntrelinha').addEventListener('input', e => { rasc.entrelinha = parseFloat(e.target.value) || 1.5; atualizar(); });
+    sec.querySelector('#rmEstEspacoDepois').addEventListener('input', e => { rasc.espaco_depois_pt = parseFloat(e.target.value) || 0; atualizar(); });
+    sec.querySelector('#rmEstEspacoParagrafos').addEventListener('input', e => { rasc.espaco_paragrafos_pt = parseFloat(e.target.value) || 0; atualizar(); });
     sec.querySelector('#rmEstCor').addEventListener('input', e => { rasc.cor = e.target.value; atualizar(); });
     sec.querySelector('#rmEstItalico').addEventListener('change', e => { rasc.italico = e.target.checked; atualizar(); });
     sec.querySelector('#rmEstCaixaAlta').addEventListener('change', e => { rasc.caixa_alta = e.target.checked; atualizar(); });
@@ -969,46 +983,101 @@ export class EditorView {
   criarItemBloco(b, secAtiva) {
     const li = document.createElement('li');
     li.className = `rm-bl ${b.id === this.blocoSelecionado?.id ? 'sel' : ''}`;
+    li.dataset.blocoId = b.id;
     li.draggable = true;
     li.innerHTML = `
       <button type="button" class="rm-bl-nome">
         <strong>${rotuloDoBloco(b)}</strong>
         <span>${resumoBloco(b)}</span>
       </button>
-      <div class="rm-bl-acoes">
-        <button type="button" class="rm-ic" data-acao="subir" title="Subir uma linha">${svgIcone('cima', 14)}</button>
-        <button type="button" class="rm-ic" data-acao="descer" title="Descer uma linha">${svgIcone('baixo', 14)}</button>
-        <button type="button" class="rm-ic" data-acao="duplicar" title="Duplicar">${svgIcone('copiar', 14)}</button>
-        <button type="button" class="rm-ic" data-acao="dividir" title="Dividir este bloco em dois">${svgIcone('divisor', 14)}</button>
-        <button type="button" class="rm-ic rm-ic-perigo" data-acao="remover" title="Excluir">${svgIcone('fechar', 14)}</button>
+      <div class="rm-bl-acoes" draggable="false">
+        <button type="button" class="rm-ic" data-acao="subir" draggable="false" title="Subir uma linha">${svgIcone('cima', 14)}</button>
+        <button type="button" class="rm-ic" data-acao="descer" draggable="false" title="Descer uma linha">${svgIcone('baixo', 14)}</button>
+        <button type="button" class="rm-ic" data-acao="duplicar" draggable="false" title="Duplicar">${svgIcone('copiar', 14)}</button>
+        <button type="button" class="rm-ic" data-acao="dividir" draggable="false" title="Dividir este bloco em dois">${svgIcone('divisor', 14)}</button>
+        <button type="button" class="rm-ic rm-ic-perigo" data-acao="remover" draggable="false" title="Excluir">${svgIcone('fechar', 14)}</button>
       </div>
     `;
 
-    li.querySelector('.rm-bl-nome').addEventListener('click', () => this.selecionarBloco(b));
+    const boxAcoes = li.querySelector('.rm-bl-acoes');
+    boxAcoes.addEventListener('mousedown', e => e.stopPropagation());
+    boxAcoes.addEventListener('pointerdown', e => e.stopPropagation());
 
-    const acao = (nome, fn) => li.querySelector(`[data-acao="${nome}"]`).addEventListener('click', e => {
-      e.stopPropagation();
-      fn();
+    li.querySelector('.rm-bl-nome').addEventListener('click', () => {
+      this.selecionarBloco(b, null, { scrollPage: true });
     });
+
+    const acao = (nome, fn) => {
+      const btn = li.querySelector(`[data-acao="${nome}"]`);
+      if (!btn) return;
+      btn.addEventListener('mousedown', e => e.stopPropagation());
+      btn.addEventListener('pointerdown', e => e.stopPropagation());
+      btn.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        fn();
+      });
+    };
+
     acao('subir', () => { if (moverBlocoPorLinha(this.doc, b.id, -1)) this.aposEstrutura(b); });
     acao('descer', () => { if (moverBlocoPorLinha(this.doc, b.id, 1)) this.aposEstrutura(b); });
     acao('duplicar', () => { const c = duplicarBlocoNaSecao(this.doc, b.id); if (c) this.aposEstrutura(c); });
     acao('dividir', () => { this.dividirBlocoAtual(b.id); });
     acao('remover', () => {
-      removerBlocoDaSecao(this.doc, secAtiva.id, b.id);
-      this.aposEstrutura(this.blocoSelecionado?.id === b.id ? null : this.blocoSelecionado);
+      const secReal = buscarSecaoDoBloco(this.doc, b.id) || secAtiva;
+      if (secReal) {
+        removerBlocoDaSecao(this.doc, secReal.id, b.id);
+        const novoSel = (this.blocoSelecionado?.id === b.id) ? null : this.blocoSelecionado;
+        this.aposEstrutura(novoSel);
+      }
     });
 
-    li.addEventListener('dragstart', ev => this.iniciarArrasto(ev, b, li));
+    li.addEventListener('dragstart', ev => {
+      if (ev.target.closest('.rm-bl-acoes')) {
+        ev.preventDefault();
+        return false;
+      }
+      this.iniciarArrasto(ev, b, li);
+    });
     li.addEventListener('dragend', () => this.encerrarArrasto());
     this.ligarAlvoDeSolta(li, b);
     return li;
   }
 
-  selecionarBloco(b) {
+  atualizarSelecaoVisualBloco(blocoId) {
+    if (!this.container) return;
+    // 1. Atualiza nos blocos da folha na área de prévia
+    this.container.querySelectorAll('.ath-bloco-folha').forEach(node => {
+      const match = node.dataset.blocoId === blocoId;
+      node.classList.toggle('sel', match);
+    });
+    // 2. Atualiza na lista de blocos da barra lateral esquerda
+    this.container.querySelectorAll('.rm-bl').forEach(node => {
+      const match = node.dataset.blocoId === blocoId;
+      node.classList.toggle('sel', match);
+      if (match) {
+        try { node.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {}
+      }
+    });
+  }
+
+  selecionarBloco(b, pag = null, opcoes = {}) {
     this.blocoSelecionado = b;
-    this.renderizar();
-    this.onSelecionarBloco(b, null);
+    if (b) {
+      const secReal = buscarSecaoDoBloco(this.doc, b.id);
+      if (secReal && secReal.id !== this.secaoAtivaId) {
+        this.secaoAtivaId = secReal.id;
+      }
+    }
+    this.atualizarSelecaoVisualBloco(b?.id);
+    this.onSelecionarBloco(b, pag);
+
+    if (opcoes.scrollPage && b && this.container) {
+      const elFolha = this.container.querySelector(`.ath-bloco-folha[data-bloco-id="${b.id}"]`);
+      if (elFolha) {
+        try { elFolha.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {}
+      }
+    }
   }
 
   
@@ -1147,11 +1216,12 @@ export class EditorView {
         mestraPag.elementos_recorrentes.forEach(elem => {
           if (elem.tipo === 'foto_capa') {
             const sangria = !!elem.sangria;
+            const respRecuo = !sangria && !!elem.respeitar_recuo;
             const folhaW = (paisagem ? 297 : 210) * pxPorMm;
             const folhaH = (paisagem ? 210 : 297) * pxPorMm;
-            const topPx = sangria ? 0 : (elem.y_mm || 0) * pxPorMm;
-            const leftPx = sangria ? 0 : (elem.x_mm || 0) * pxPorMm;
-            const wPx = sangria ? folhaW : (elem.largura_mm || 210) * pxPorMm;
+            const topPx = sangria ? 0 : (respRecuo ? padTop + (elem.y_mm || 0) * pxPorMm : (elem.y_mm || 0) * pxPorMm);
+            const leftPx = sangria ? 0 : (respRecuo ? padLeft + (elem.x_mm || 0) * pxPorMm : (elem.x_mm || 0) * pxPorMm);
+            const wPx = sangria ? folhaW : (respRecuo ? (folhaW - padLeft - padRight) : (elem.largura_mm || 210) * pxPorMm);
             const hPx = sangria ? folhaH : (elem.altura_mm || 140) * pxPorMm;
 
             const fotoEl = document.createElement('div');
@@ -1362,6 +1432,7 @@ export class EditorView {
   renderizarBlocoNaFolha(b, pag) {
     const el = document.createElement('div');
     el.className = `ath-bloco-folha ${b.id === this.blocoSelecionado?.id ? 'sel' : ''}`;
+    el.dataset.blocoId = b.id;
     el.style.gridColumn = `${b.col || 1} / span ${b.span || 12}`;
 
     // Crachá do Bloco
@@ -1370,13 +1441,17 @@ export class EditorView {
     cracha.textContent = b.tipo;
     el.appendChild(cracha);
 
-    // Seleção ao clicar no bloco
+    // Seleção dinâmica bidirecional ao clicar no bloco na página
     el.addEventListener('click', e => {
       e.stopPropagation();
-      this.blocoSelecionado = b;
-      this.container.querySelectorAll('.ath-bloco-folha').forEach(node => node.classList.remove('sel'));
-      el.classList.add('sel');
-      this.onSelecionarBloco(b, pag);
+      this.selecionarBloco(b, pag);
+    });
+
+    // Foco ao clicar dentro do texto para digitar: sincroniza imediatamente a lista lateral
+    el.addEventListener('focusin', () => {
+      if (this.blocoSelecionado?.id !== b.id) {
+        this.selecionarBloco(b, pag);
+      }
     });
 
     const estilo = (this.doc.estilos || []).find(e => e.id === b.estiloId) || {};
@@ -1513,11 +1588,25 @@ export class EditorView {
       figBox.className = 'ath-composto-figura';
       Object.assign(figBox.style, gerarCssMolduraBloco(b));
 
+      // Estilos tipográficos aplicados
+      const estTit = (this.doc.estilos || []).find(e => e.id === b.titulo_estilo_id);
+      const estLeg = (this.doc.estilos || []).find(e => e.id === b.legenda_estilo_id);
+      const estFonte = (this.doc.estilos || []).find(e => e.id === b.fonte_estilo_id);
+
       // Título da Figura
       const tit = document.createElement('div');
       tit.contentEditable = 'true';
       tit.className = 'ath-fig-titulo';
       tit.innerHTML = b.titulo || `${rotuloDaFigura(b)} ${b.numero_sequencial || 1} — Descrição da Ilustração`;
+      if (estTit) {
+        tit.style.fontFamily = FONTES_SISTEMA[estTit.fonte]?.familia || 'inherit';
+        tit.style.fontSize = `${estTit.tamanho_pt || 12}pt`;
+        tit.style.fontWeight = estTit.peso || '700';
+        if (estTit.cor) tit.style.color = estTit.cor;
+      }
+      if (b.titulo_alinhamento && b.titulo_alinhamento !== 'estilo') {
+        tit.style.textAlign = b.titulo_alinhamento;
+      }
       tit.addEventListener('blur', () => { b.titulo = tit.innerHTML; this.notificarMudancaRapida(); });
 
       // Grid de Imagens
@@ -1525,14 +1614,39 @@ export class EditorView {
       grid.className = 'ath-fig-grid';
       grid.dataset.layout = b.layout || '1';
 
+      // Dimensionamento, proporção e recorte da imagem
+      const imgStyleArr = [];
+      if (b.altura_modo && b.altura_modo !== 'auto') {
+        imgStyleArr.push(`height:${b.altura_modo}; max-height:none;`);
+      } else if (b.altura_imagem_px) {
+        imgStyleArr.push(`height:${b.altura_imagem_px}px; max-height:none;`);
+      }
+      if (b.proporcao_imagem && b.proporcao_imagem !== 'livre') {
+        imgStyleArr.push(`aspect-ratio:${b.proporcao_imagem};`);
+      }
+      if (b.ajuste_enquadramento) {
+        imgStyleArr.push(`object-fit:${b.ajuste_enquadramento};`);
+      }
+      const inlineImgStyle = imgStyleArr.join(' ');
+
       const itens = Array.isArray(b.itens) ? b.itens : [{ url: b.src || '', legenda_sub: 'Visão Geral' }];
       itens.forEach((it, idx) => {
         const itEl = document.createElement('div');
         itEl.className = 'ath-fig-item';
+
+        const alinImg = b.alinhamento_imagem || 'centro';
+        if (alinImg === 'esquerda') itEl.style.alignItems = 'flex-start';
+        else if (alinImg === 'direita') itEl.style.alignItems = 'flex-end';
+        else itEl.style.alignItems = 'center';
+
         const imgUrl = it.url || b.src || 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80';
+        const subLegHtml = (itens.length > 1 && it.legenda_sub) 
+          ? `<span class="ath-fig-sublegenda">${rotuloDaFigura(b)} ${b.numero_sequencial || 1}${String.fromCharCode(97 + idx)} — ${it.legenda_sub}</span>`
+          : '';
+
         itEl.innerHTML = `
-          <img src="${imgUrl}" alt="Ilustração">
-          <span class="ath-fig-sublegenda">${rotuloDaFigura(b)} ${b.numero_sequencial || 1}${String.fromCharCode(97 + idx)} — ${it.legenda_sub || ''}</span>
+          <img src="${imgUrl}" alt="Ilustração" ${inlineImgStyle ? `style="${inlineImgStyle}"` : ''}>
+          ${subLegHtml}
         `;
         grid.appendChild(itEl);
       });
@@ -1544,6 +1658,15 @@ export class EditorView {
         leg.contentEditable = 'true';
         leg.className = 'ath-fig-legenda-geral';
         leg.innerHTML = b.legenda_geral || b.legenda || 'Legenda explicativa dos elementos representados.';
+        if (estLeg) {
+          leg.style.fontFamily = FONTES_SISTEMA[estLeg.fonte]?.familia || 'inherit';
+          leg.style.fontSize = `${estLeg.tamanho_pt || 11}pt`;
+          leg.style.fontWeight = estLeg.peso || '400';
+          if (estLeg.cor) leg.style.color = estLeg.cor;
+        }
+        if (b.legenda_alinhamento && b.legenda_alinhamento !== 'estilo') {
+          leg.style.textAlign = b.legenda_alinhamento === 'justificado_esquerda' ? 'justify' : b.legenda_alinhamento;
+        }
         leg.addEventListener('blur', () => { b.legenda_geral = leg.innerHTML; this.notificarMudancaRapida(); });
       }
 
@@ -1554,6 +1677,15 @@ export class EditorView {
         fonte.contentEditable = 'true';
         fonte.className = 'ath-bloco-fonte';
         fonte.innerHTML = b.fonte || 'Fonte: Autores (2026).';
+        if (estFonte) {
+          fonte.style.fontFamily = FONTES_SISTEMA[estFonte.fonte]?.familia || 'inherit';
+          fonte.style.fontSize = `${estFonte.tamanho_pt || 10.5}pt`;
+          fonte.style.fontWeight = estFonte.peso || '400';
+          if (estFonte.cor) fonte.style.color = estFonte.cor;
+        }
+        if (b.fonte_alinhamento && b.fonte_alinhamento !== 'estilo') {
+          fonte.style.textAlign = b.fonte_alinhamento;
+        }
         fonte.addEventListener('blur', () => { b.fonte = fonte.innerHTML; this.notificarMudancaRapida(); });
       }
 
@@ -1923,6 +2055,7 @@ export class EditorView {
       <button type="button" class="rm-ic-sm" data-cmd="insertOrderedList" title="Lista Numerada (1.)">${svgIcone('lista_num', 13)}</button>
       <button type="button" class="rm-ic-sm" data-lista-alinea="true" title="Alínea / Travessão ABNT (–)">${svgIcone('lista_alinea', 13)}</button>
       <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 3px;"></span>
+      <button type="button" class="glx-btn glx-btn-xs ${!this.blocoSelecionado?.alinhamento ? 'glx-btn-primary' : 'glx-btn-soft'}" id="athBtnContextAlinEstilo" title="Usar alinhamento original do estilo de texto" style="font-size:10px; padding:2px 7px; font-weight:700; border-radius:999px;">Do estilo</button>
       <button type="button" class="rm-ic-sm" data-alin-rapido="esquerda" title="À Esquerda">${svgIcone('alinhamento_esq', 14)}</button>
       <button type="button" class="rm-ic-sm" data-alin-rapido="centro" title="Centralizado">${svgIcone('alinhamento_cen', 14)}</button>
       <button type="button" class="rm-ic-sm" data-alin-rapido="direita" title="À Direita">${svgIcone('alinhamento_dir', 14)}</button>
@@ -1933,14 +2066,24 @@ export class EditorView {
       <button type="button" class="glx-btn glx-btn-xs glx-btn-primary" id="athBtnContextCitar" title="Inserir citação Zotero">Citar Zotero</button>
     `;
 
-    // Pill flutuante para quando o cursor está posicionado sem seleção
-    let pillCaret = document.getElementById('athPillDividirCaret');
+    // Pill flutuante para quando o cursor está posicionado no texto (sem seleção prévia)
+    let pillCaret = document.getElementById('athPillAcoesCursor');
     if (!pillCaret) {
       pillCaret = document.createElement('div');
-      pillCaret.id = 'athPillDividirCaret';
-      pillCaret.className = 'ath-pill-dividir';
+      pillCaret.id = 'athPillAcoesCursor';
+      pillCaret.className = 'ath-pill-cursor-acoes';
       pillCaret.style.display = 'none';
-      pillCaret.innerHTML = `${svgIcone('divisor', 12)} Dividir Bloco Aqui`;
+      pillCaret.style.position = 'fixed';
+      pillCaret.style.zIndex = '9100';
+      pillCaret.innerHTML = `
+        <button type="button" class="ath-pill-bt" id="athBtnPillDividir" title="Dividir este bloco de texto em dois no cursor">
+          ${svgIcone('divisor', 13)} <span>Dividir Bloco Aqui</span>
+        </button>
+        <span class="ath-pill-sep"></span>
+        <button type="button" class="ath-pill-bt ath-pill-bt-zotero" id="athBtnPillCitar" title="Inserir citação bibliográfica do Zotero no cursor">
+          ${svgIcone('zotero', 14)} <span>Citar Zotero</span>
+        </button>
+      `;
       document.body.appendChild(pillCaret);
     }
 
@@ -1994,6 +2137,15 @@ export class EditorView {
       this.notificarMudanca();
     });
 
+    barra.querySelector('#athBtnContextAlinEstilo')?.addEventListener('mousedown', e => {
+      e.preventDefault();
+      if (this.blocoSelecionado) {
+        delete this.blocoSelecionado.alinhamento;
+        this.notificarMudanca();
+        this.renderizar();
+      }
+    });
+
     barra.querySelectorAll('[data-alin-rapido]').forEach(btn => {
       btn.addEventListener('mousedown', e => {
         e.preventDefault();
@@ -2037,8 +2189,9 @@ export class EditorView {
       acaoDividirRange(range, editable);
     });
 
-    pillCaret?.addEventListener('mousedown', e => {
+    pillCaret.querySelector('#athBtnPillDividir')?.addEventListener('mousedown', e => {
       e.preventDefault();
+      e.stopPropagation();
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0) return;
       const range = sel.getRangeAt(0);
@@ -2047,6 +2200,13 @@ export class EditorView {
       const editable = elPai?.closest('.ath-texto-editable, .ath-titulo-editable, [contenteditable="true"]');
       pillCaret.style.display = 'none';
       acaoDividirRange(range, editable);
+    });
+
+    pillCaret.querySelector('#athBtnPillCitar')?.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      pillCaret.style.display = 'none';
+      this.abrirPainelZotero();
     });
 
     barra.querySelector('#athBtnContextCitar').addEventListener('mousedown', e => {
@@ -2091,6 +2251,14 @@ export class EditorView {
             selEstilo.value = this.blocoSelecionado.estiloId;
           }
 
+          // Reflete estado do botão "Do estilo"
+          const btnCtxAlinEstilo = barra.querySelector('#athBtnContextAlinEstilo');
+          if (btnCtxAlinEstilo) {
+            const isDoEstilo = !this.blocoSelecionado?.alinhamento;
+            btnCtxAlinEstilo.classList.toggle('glx-btn-primary', isDoEstilo);
+            btnCtxAlinEstilo.classList.toggle('glx-btn-soft', !isDoEstilo);
+          }
+
           // Reflete estado dos botões de estilo e marcadores
           try {
             const cmdB = barra.querySelector('[data-cmd="bold"]');
@@ -2118,15 +2286,29 @@ export class EditorView {
         }
       }
 
-      // Se é apenas o cursor piscando (sem seleção), exibe o pill discreto "Dividir Bloco Aqui"
+      // Se é apenas o cursor posicionado no texto (sem seleção), exibe a pílula [Dividir Bloco Aqui] [Citar Zotero]
       barra.style.display = 'none';
-      if (sel.isCollapsed && document.activeElement === editable) {
+      if (sel.isCollapsed && editable) {
+        let r = null;
         const rects = range.getClientRects();
-        const r = rects.length > 0 ? rects[0] : editable.getBoundingClientRect();
+        if (rects.length > 0) {
+          r = rects[0];
+        } else {
+          r = editable.getBoundingClientRect();
+        }
         if (r && pillCaret) {
           pillCaret.style.display = 'flex';
-          pillCaret.style.left = `${r.left}px`;
-          pillCaret.style.top = `${r.top}px`;
+          const left = Math.max(140, Math.min(window.innerWidth - 140, r.left + (r.width || 0) / 2));
+          pillCaret.style.left = `${left}px`;
+          if (r.top < 55) {
+            pillCaret.style.top = `${r.bottom}px`;
+            pillCaret.style.transform = 'translate(-50%, 0)';
+            pillCaret.style.marginTop = '8px';
+          } else {
+            pillCaret.style.top = `${r.top}px`;
+            pillCaret.style.transform = 'translate(-50%, -100%)';
+            pillCaret.style.marginTop = '-10px';
+          }
         }
       } else if (pillCaret) {
         pillCaret.style.display = 'none';
@@ -2134,6 +2316,8 @@ export class EditorView {
     };
 
     document.addEventListener('selectionchange', atualizarPosicaoBarra);
+    document.addEventListener('click', () => setTimeout(atualizarPosicaoBarra, 50));
+    document.addEventListener('keyup', () => setTimeout(atualizarPosicaoBarra, 50));
     window.addEventListener('scroll', atualizarPosicaoBarra, true);
   }
 }

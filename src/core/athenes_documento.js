@@ -1133,6 +1133,27 @@ export function aplicarNumeracaoNoTitulo(bloco, doc) {
 }
 
 /**
+ * Remove qualquer prefixo de numeração automática do título, restaurando o texto limpo
+ */
+export function removerPrefixoNumeracaoTitulo(titulo, tipo = 'figura', subtipo = 'figura') {
+  if (!titulo) return '';
+  const todosRotulos = ['Figura', 'Gráfico', 'Fotografia', 'Diagrama', 'Fluxograma', 'Ilustração', 'Foto', 'Tabela', 'Quadro', 'Mapa', 'Fórmula'];
+  const regex = new RegExp(`^(${todosRotulos.join('|')})\\s+\\d+\\s*[-—:]\\s*`, 'i');
+  return titulo.replace(regex, '').trim();
+}
+
+/**
+ * Busca a seção que contém o bloco pelo ID
+ */
+export function buscarSecaoDoBloco(doc, blocoId) {
+  if (!doc || !blocoId) return null;
+  for (const s of doc.secoes || []) {
+    if ((s.blocos || []).some(b => b.id === blocoId)) return s;
+  }
+  return null;
+}
+
+/**
  * Localiza o número da página de um bloco no documento
  */
 function encontrarPaginaDoBloco(doc, blocoId) {
@@ -1714,6 +1735,75 @@ export const MODELOS_LAYOUT_BLOCO = {
       borda_largura_px: 3,
       padding_pt: 8
     }
+  ],
+  quadro: [
+    {
+      id: 'quadro_fechado',
+      nome: 'Quadro Fechado (Padrão ABNT)',
+      descricao: 'Caixa retangular fechada em todos os lados com linhas divisórias.',
+      moldura_tipo: 'caixa_borda',
+      borda_ativa: true,
+      borda_cor: '#1F2733',
+      posicao_titulo: 'topo',
+      padding_pt: 6
+    },
+    {
+      id: 'quadro_cartao',
+      nome: 'Cartão Suave com Fundo',
+      descricao: 'Fundo acolchoado suave com cantos arredondados.',
+      moldura_tipo: 'cartao_suave',
+      fundo_ativo: true,
+      fundo_cor: '#F8FAFC',
+      borda_ativa: true,
+      borda_cor: '#CBD5E1',
+      raio_borda_px: 8,
+      posicao_titulo: 'topo',
+      padding_pt: 8
+    },
+    {
+      id: 'quadro_limpo',
+      nome: 'Quadro Limpo Acadêmico',
+      descricao: 'Sem borda externa decorativa, foco na tipografia tabular.',
+      moldura_tipo: 'limpo',
+      posicao_titulo: 'topo',
+      fundo_ativo: false,
+      borda_ativa: false,
+      padding_pt: 4
+    }
+  ],
+  mapa: [
+    {
+      id: 'mapa_abnt',
+      nome: 'Padrão Cartográfico ABNT',
+      descricao: 'Título no topo, área cartográfica delimitada e fonte na base.',
+      moldura_tipo: 'caixa_borda',
+      borda_ativa: true,
+      borda_cor: '#CBD5E1',
+      raio_borda_px: 4,
+      posicao_titulo: 'topo',
+      padding_pt: 6
+    },
+    {
+      id: 'mapa_prancha',
+      nome: 'Moldura Técnica de Prancha',
+      descricao: 'Esquadros técnicos nos cantos vivos (0 px) estilo prancha de engenharia.',
+      moldura_tipo: 'moldura_tecnica',
+      borda_ativa: true,
+      borda_cor: '#314F79',
+      raio_borda_px: 0,
+      padding_pt: 8
+    },
+    {
+      id: 'mapa_lateral',
+      nome: 'Linha Lateral de Destaque',
+      descricao: 'Faixa técnica na lateral esquerda na cor institucional (#314F79).',
+      moldura_tipo: 'linha_esquerda',
+      fundo_ativo: true,
+      fundo_cor: '#F8FAFC',
+      borda_ativa: true,
+      borda_cor: '#314F79',
+      padding_pt: 8
+    }
   ]
 };
 
@@ -1721,9 +1811,14 @@ export const MODELOS_LAYOUT_BLOCO = {
  * Retorna os modelos pré-definidos e customizados para o tipo de bloco
  */
 export function obterModelosLayoutBloco(tipo, doc = null) {
-  const chave = (tipo === 'imagem' ? 'figura' : tipo);
+  let chave = (tipo === 'imagem' ? 'figura' : tipo);
+  if (!MODELOS_LAYOUT_BLOCO[chave]) {
+    if (chave === 'quadro') chave = 'tabela';
+    else if (chave === 'mapa') chave = 'figura';
+    else chave = 'figura';
+  }
   const padroes = MODELOS_LAYOUT_BLOCO[chave] || [];
-  const customizados = (doc?.modelos_blocos || []).filter(m => m.tipo === chave);
+  const customizados = (doc?.modelos_blocos || []).filter(m => m.tipo === chave || m.tipo === tipo);
   return [...padroes, ...customizados];
 }
 
@@ -1764,6 +1859,26 @@ export function aplicarModeloLayoutBloco(bloco, modeloIdOuConfig, doc = null) {
   if (cfg.subgrade_gap_pt !== undefined) bloco.subgrade_gap_pt = cfg.subgrade_gap_pt;
   if (cfg.linha_estilo) bloco.linha_estilo = cfg.linha_estilo;
   if (cfg.svg_custom) bloco.svg_custom = cfg.svg_custom;
+
+  // Imagem: altura, proporção e enquadramento
+  if (cfg.altura_imagem_px !== undefined) bloco.altura_imagem_px = cfg.altura_imagem_px;
+  if (cfg.altura_modo) bloco.altura_modo = cfg.altura_modo;
+  if (cfg.proporcao_imagem) bloco.proporcao_imagem = cfg.proporcao_imagem;
+  if (cfg.ajuste_enquadramento) bloco.ajuste_enquadramento = cfg.ajuste_enquadramento;
+  if (cfg.alinhamento_imagem) bloco.alinhamento_imagem = cfg.alinhamento_imagem;
+
+  // Tipografia e Alinhamentos dos textos da caixa/figura
+  if (cfg.legenda_estilo_id) bloco.legenda_estilo_id = cfg.legenda_estilo_id;
+  if (cfg.legenda_usar_alinhamento_estilo !== undefined) bloco.legenda_usar_alinhamento_estilo = cfg.legenda_usar_alinhamento_estilo;
+  if (cfg.legenda_alinhamento) bloco.legenda_alinhamento = cfg.legenda_alinhamento;
+
+  if (cfg.titulo_estilo_id) bloco.titulo_estilo_id = cfg.titulo_estilo_id;
+  if (cfg.titulo_usar_alinhamento_estilo !== undefined) bloco.titulo_usar_alinhamento_estilo = cfg.titulo_usar_alinhamento_estilo;
+  if (cfg.titulo_alinhamento) bloco.titulo_alinhamento = cfg.titulo_alinhamento;
+
+  if (cfg.fonte_estilo_id) bloco.fonte_estilo_id = cfg.fonte_estilo_id;
+  if (cfg.fonte_usar_alinhamento_estilo !== undefined) bloco.fonte_usar_alinhamento_estilo = cfg.fonte_usar_alinhamento_estilo;
+  if (cfg.fonte_alinhamento) bloco.fonte_alinhamento = cfg.fonte_alinhamento;
 
   return true;
 }

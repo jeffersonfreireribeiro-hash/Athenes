@@ -69,6 +69,10 @@ export class DashboardView {
     root.innerHTML = `
       <header class="ath-dash-head">
         <div class="ath-dash-titulo">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            ${svgLogo(28)}
+            <span style="font-weight:800; font-size:16px; color:#314F79; letter-spacing:0.04em;">ATHENES</span>
+          </div>
           <h1>Meus Documentos e Artigos</h1>
           <p>Ambiente de escrita e diagramação acadêmica em blocos baseado no Clux.js.</p>
         </div>

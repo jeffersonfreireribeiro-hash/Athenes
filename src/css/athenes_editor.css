@@ -45,7 +45,9 @@
 .rm-bl-nome { flex: 1; min-width: 0; display: flex; flex-direction: column; text-align: left; background: none; border: 0; padding: 6px 10px; cursor: pointer; font-family: var(--glx-font); }
 .rm-bl-nome strong { font-size: 12.5px; font-weight: 800; }
 .rm-bl-nome span { font-size: 11.5px; color: var(--glx-muted, #6B7585); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rm-bl-acoes { display: flex; gap: 2px; }
+.rm-bl-acoes { display: flex; gap: 2px; user-select: none; -webkit-user-drag: none; }
+.rm-bl-acoes button { user-select: none; -webkit-user-drag: none; }
+.rm-bl-acoes svg, .rm-bl-acoes path, .rm-ic svg, .rm-ic path { pointer-events: none; }
 .rm-ic { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: transparent; color: #64748B; cursor: pointer; }
 .rm-ic:hover { background: #F1F5F9; color: var(--glx-text, #1F2733); }
 .rm-ic-perigo:hover { background: #FDE8E6; color: #B42318; }
@@ -920,7 +922,7 @@ html, body, button, input, select, textarea, option, summary, label, table,
 /* =========================================================================
    Estilos de texto em lista, salvar estilo e arrastar blocos
    ========================================================================= */
-.rm-lista-estilos { list-style: none; margin: 0 0 12px 0; padding: 2px 2px 6px 2px; display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow-y: auto; scrollbar-width: thin; }
+.rm-lista-estilos { list-style: none; margin: 0 0 14px 0; padding: 2px 2px 6px 2px; display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow-y: auto; scrollbar-width: thin; }
 .rm-estilo-item { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 7px 12px 7px 8px; border: 1px solid #E6E9EF; border-radius: 14px; background: #fff; cursor: pointer; font-family: var(--glx-font); transition: border-color .12s, background .12s; }
 .rm-estilo-item:hover { border-color: #314F79; background: #EEF4FA; }
 .rm-estilo-item.on { border-color: #314F79; background: #EEF4FA; box-shadow: 0 0 0 2px rgba(49, 79, 121, 0.16); }
@@ -930,7 +932,7 @@ html, body, button, input, select, textarea, option, summary, label, table,
 .rm-estilo-nome strong { font-size: 12.5px; font-weight: 800; color: #1F2733; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rm-estilo-nome small { font-size: 11px; color: #6B7585; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rm-estilo-tag { font-style: normal; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: 2px 8px; border-radius: 999px; background: #EEF4FA; color: #1B2D47; }
-.rm-estilo-previa { margin: 12px 0 14px 0; padding: 10px 14px; border: 1px dashed #CBD5E1; border-radius: 14px; background: #fff; }
+.rm-estilo-previa { margin: 16px 0 16px 0 !important; padding: 10px 14px; border: 1px dashed #CBD5E1; border-radius: 14px; background: #fff; }
 .rm-estilo-acoes { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
 .rm-estilo-acoes .glx-btn:disabled { opacity: .45; cursor: not-allowed; }
 .rm-estilo-acoes .rm-perigo { color: #B42318; }
@@ -1077,7 +1079,7 @@ html, body, button, input, select, textarea, option, summary, label, table,
   align-items: center;
   gap: 5px;
   transform: translate(-50%, -100%);
-  margin-top: -6px;
+  margin-top: -10px;
   user-select: none;
   transition: transform .12s, box-shadow .12s, background .12s;
 }
@@ -1086,6 +1088,65 @@ html, body, button, input, select, textarea, option, summary, label, table,
   border-color: var(--ath-primary, #314F79);
   transform: translate(-50%, -105%) scale(1.03);
   box-shadow: 0 6px 18px rgba(49, 79, 121, 0.25);
+}
+
+/* Pílula flutuante de ações rápidas no cursor (Dividir Bloco + Citar Zotero) - Fica ACIMA da linha de texto */
+.ath-pill-cursor-acoes {
+  position: fixed;
+  z-index: 9100;
+  background: #FFFFFF;
+  border: 1px solid var(--ath-primary-line, #C8D7E6);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(49, 79, 121, 0.20);
+  padding: 3px 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transform: translate(-50%, -100%);
+  margin-top: -10px;
+  user-select: none;
+  pointer-events: auto;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.ath-pill-cursor-acoes:hover {
+  box-shadow: 0 6px 20px rgba(49, 79, 121, 0.26);
+}
+.ath-pill-bt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  font-family: var(--glx-font, 'Nunito', sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  color: #1F2733;
+  cursor: pointer;
+  transition: background .12s, color .12s, transform .12s;
+  white-space: nowrap;
+}
+.ath-pill-bt:hover {
+  background: var(--ath-primary-soft, #EEF4FA);
+  color: var(--ath-primary, #314F79);
+}
+.ath-pill-bt:active {
+  transform: scale(0.97);
+}
+.ath-pill-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--ath-primary-line, #CBD5E1);
+  margin: 0 2px;
+}
+.ath-pill-bt-zotero {
+  background: var(--ath-primary-soft, #EEF4FA);
+  color: var(--ath-primary, #314F79);
+}
+.ath-pill-bt-zotero:hover {
+  background: var(--ath-primary, #314F79);
+  color: #FFFFFF;
 }
 
 /* Forçar azul da marca em botões selecionados/ativos */

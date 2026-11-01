@@ -337,9 +337,11 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
       elemRecHtml = modelo.elementos_recorrentes.map(elem => {
         if (elem.tipo === 'foto_capa') {
           const sangria = !!elem.sangria;
-          const topMm = sangria ? 0 : (elem.y_mm || 0);
-          const leftMm = sangria ? 0 : (elem.x_mm || 0);
-          const wMm = sangria ? largura_mm : (elem.largura_mm || largura_mm);
+          const respRecuo = !sangria && !!elem.respeitar_recuo;
+          const topMm = sangria ? 0 : (respRecuo ? m.t + (elem.y_mm || 0) : (elem.y_mm || 0));
+          const leftMm = sangria ? 0 : (respRecuo ? m.l + (elem.x_mm || 0) : (elem.x_mm || 0));
+          const wMm = sangria ? largura_mm : (respRecuo ? (largura_mm - m.l - m.r) : (elem.largura_mm || largura_mm));
+          
           const hMm = sangria ? altura_mm : (elem.altura_mm || 140);
           const imgUrl = elem.url || '';
           const zIdx = elem.camada === 'frente' ? 5 : 0;

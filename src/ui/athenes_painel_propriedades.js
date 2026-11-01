@@ -12,11 +12,25 @@
 import { FONTES_SISTEMA, PESOS_FONTE } from '../core/athenes_estilos.js';
 import {
   modeloDaPagina, recalcularNumeracaoAutomatica, resolverReferenciasCruzadas,
-  ROTULOS_FIGURA, rotuloDaFigura, aplicarNumeracaoNoTitulo, calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
+  ROTULOS_FIGURA, rotuloDaFigura, aplicarNumeracaoNoTitulo, removerPrefixoNumeracaoTitulo,
+  calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 import { criarSeletorSimbolosMatematica } from './athenes_simbolos_matematica.js';
+
+function rotuloAlinhamento(id) {
+  const map = {
+    esquerda: 'Esquerda',
+    centro: 'Centro',
+    direita: 'Direita',
+    justificado: 'Justificado',
+    justificado_esquerda: 'Justificado Esq',
+    justificado_centro: 'Justificado Cen',
+    justificado_direita: 'Justificado Dir'
+  };
+  return map[id] || 'Esquerda';
+}
 
 export class PainelPropriedades {
   constructor(containerEl, documento, opcoes = {}) {
@@ -304,11 +318,16 @@ export class PainelPropriedades {
           </label>
         </div>
 
-        <!-- FORMATO: 7 Modos de Alinhamento com Ícones e Dicas da Última Linha -->
+        <!-- FORMATO: 7 Modos de Alinhamento com Opção Do Estilo -->
         <div>
-          <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
-            Formato
-          </span>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585);">
+              Formato
+            </span>
+            <button type="button" class="glx-btn glx-btn-xs ${!b.alinhamento ? 'glx-btn-primary' : 'glx-btn-soft'}" id="rmBtnAlinEstilo" style="font-size:10px; padding:2px 8px; font-weight:700;" title="Usar alinhamento herdado do estilo tipográfico">
+              Do estilo (${rotuloAlinhamento(estiloAtivo.alinhamento)})
+            </button>
+          </div>
           <div class="rm-icg" style="display:flex; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:3px; gap:2px; justify-content:space-between;">
             <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Alinhar à esquerda: primeira e última linhas à esquerda">
               ${svgIcone('alinhamento_esq', 16)}
@@ -371,6 +390,12 @@ export class PainelPropriedades {
       box.querySelector('#rmCampoFonte').addEventListener('change', e => { b.fonte = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmCampoManter').addEventListener('change', e => { b.manterComProximo = e.target.checked; this.notificarMudanca(); });
 
+      box.querySelector('#rmBtnAlinEstilo')?.addEventListener('click', () => {
+        delete b.alinhamento;
+        this.notificarMudanca();
+        this.renderizar();
+      });
+
       box.querySelectorAll('[data-alin]').forEach(btn => {
         btn.addEventListener('click', () => {
           b.alinhamento = btn.dataset.alin;
@@ -431,11 +456,16 @@ export class PainelPropriedades {
           </button>
         </div>
 
-        <!-- FORMATO: 7 Modos de Alinhamento com Ícones e Dicas da Última Linha -->
+        <!-- FORMATO: 7 Modos de Alinhamento com Opção Do Estilo -->
         <div>
-          <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
-            Formato
-          </span>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585);">
+              Formato
+            </span>
+            <button type="button" class="glx-btn glx-btn-xs ${!b.alinhamento ? 'glx-btn-primary' : 'glx-btn-soft'}" id="rmBtnAlinEstilo" style="font-size:10px; padding:2px 8px; font-weight:700;" title="Usar alinhamento herdado do estilo tipográfico">
+              Do estilo (${rotuloAlinhamento(estiloAtivo.alinhamento)})
+            </button>
+          </div>
           <div class="rm-icg" style="display:flex; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:3px; gap:2px; justify-content:space-between;">
             <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Alinhar à esquerda: primeira e última linhas à esquerda">
               ${svgIcone('alinhamento_esq', 16)}
@@ -600,6 +630,12 @@ export class PainelPropriedades {
       });
 
       // Alinhamento
+      box.querySelector('#rmBtnAlinEstilo')?.addEventListener('click', () => {
+        delete b.alinhamento;
+        this.notificarMudanca();
+        this.renderizar();
+      });
+
       box.querySelectorAll('[data-alin]').forEach(btn => {
         btn.addEventListener('click', () => {
           b.alinhamento = btn.dataset.alin;
@@ -759,43 +795,59 @@ export class PainelPropriedades {
       }
     }
 
-    // 3. FIGURA (BLOCO COMPOSTO COM MULTI-ITENS)
+    // 3. FIGURA (BLOCO COMPOSTO COM MULTI-ITENS, SLOTS, ENQUADRAMENTO E TIPOGRAFIA)
     else if (b.tipo === 'figura' || b.tipo === 'imagem') {
       const rotuloAtual = rotuloDaFigura(b);
+      const isNumAuto = b.numeracao_automatica !== false;
+
+      // Garante lista de itens de imagem
+      if (!Array.isArray(b.itens) || b.itens.length === 0) {
+        b.itens = [{ url: b.src || '', legenda_sub: 'Visão Geral' }];
+      }
+      const qtdSlots = (b.layout === '2_lado' || b.layout === '2_empilhado') ? 2
+        : (b.layout === '3_linha' || b.layout === '3_misto') ? 3
+        : (b.layout === '4_grade') ? 4
+        : (b.layout === '6_grade') ? 6 : 1;
+
+      while (b.itens.length < qtdSlots) {
+        b.itens.push({ url: '', legenda_sub: `Item ${String.fromCharCode(97 + b.itens.length).toUpperCase()}` });
+      }
+
+      const estilosTexto = this.doc.estilos || [];
+
       box.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--ath-primary-line, #C8D7E6);">
           <span style="font-size:11px; font-weight:800; color:var(--ath-primary, #314F79); text-transform:uppercase;">Apresentação e Moldura</span>
           <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnConfigLayoutBloco" style="display:flex; align-items:center; gap:4px; font-size:11px; white-space:nowrap;">
-            ${svgIcone('quadro', 12)} Personalizar...
+            ${svgIcone('quadro', 12)} Moldura / Subgrade...
           </button>
         </div>
 
-        <div class="rm-linha2">
-          <label>Categoria / Rótulo
-            <select id="rmFigSubtipo" class="glx-select">
-              <option value="figura" ${(!b.subtipo || b.subtipo === 'figura') ? 'selected' : ''}>Figura (Geral)</option>
-              <option value="grafico" ${b.subtipo === 'grafico' ? 'selected' : ''}>Gráfico (Estatístico)</option>
-              <option value="fotografia" ${b.subtipo === 'fotografia' ? 'selected' : ''}>Fotografia</option>
-              <option value="diagrama" ${b.subtipo === 'diagrama' ? 'selected' : ''}>Diagrama</option>
-              <option value="fluxograma" ${b.subtipo === 'fluxograma' ? 'selected' : ''}>Fluxograma</option>
-            </select>
-          </label>
-          <div style="display:flex; flex-direction:column; justify-content:flex-end;">
-            <button type="button" class="glx-btn glx-btn-xs glx-btn-secondary" id="rmBtnFigAtualizarNum" style="height:34px; font-weight:700; white-space:nowrap;" title="Insere ou atualiza a numeração automática no nome da figura">
-              + Numeração no Nome
-            </button>
-          </div>
+        <!-- Categoria / Subtipo -->
+        <label>Categoria / Rótulo
+          <select id="rmFigSubtipo" class="glx-select">
+            <option value="figura" ${(!b.subtipo || b.subtipo === 'figura') ? 'selected' : ''}>Figura (Geral)</option>
+            <option value="grafico" ${b.subtipo === 'grafico' ? 'selected' : ''}>Gráfico (Estatístico)</option>
+            <option value="fotografia" ${b.subtipo === 'fotografia' ? 'selected' : ''}>Fotografia</option>
+            <option value="diagrama" ${b.subtipo === 'diagrama' ? 'selected' : ''}>Diagrama</option>
+            <option value="fluxograma" ${b.subtipo === 'fluxograma' ? 'selected' : ''}>Fluxograma</option>
+          </select>
+        </label>
+
+        <!-- Botão Booleano (Toggle Switch) de Numeração no Nome -->
+        <div style="margin-top:6px; margin-bottom:8px;">
+          <button type="button" class="glx-btn glx-btn-sm ${isNumAuto ? 'glx-btn-primary' : 'glx-btn-soft'}" id="athToggleFigNumAuto" style="font-weight:700; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;" title="Clique para ativar ou desativar a numeração automática no nome">
+            ${isNumAuto ? svgIcone('check', 14) : svgIcone('fechar', 14)}
+            <span>Numeração no Nome: ${isNumAuto ? 'Ativada (Automática)' : 'Desativada (Livre)'}</span>
+          </button>
         </div>
 
-        <label style="margin-top:6px;">Identificação / Título
+        <label>Identificação / Título
           <input type="text" id="rmFigTitulo" value="${b.titulo || ''}" placeholder="Ex: ${rotuloAtual} 1 — Descrição">
         </label>
-        <label class="rm-chk" style="font-size:11.5px; margin-top:2px; margin-bottom:6px;">
-          <input type="checkbox" id="rmFigNumAuto" ${b.numeracao_automatica !== false ? 'checked' : ''}>
-          Manter numeração automática no nome (${rotuloAtual} #${b.numero_sequencial || 1})
-        </label>
 
-        <label>Disposição das Imagens (Layout)
+        <!-- Configuração de Disposição (Layout de Grade) -->
+        <label style="margin-top:6px;">Disposição das Imagens (Layout)
           <select id="rmFigLayout" class="glx-select">
             <option value="1" ${b.layout === '1' ? 'selected' : ''}>1 Imagem individual</option>
             <option value="2_lado" ${b.layout === '2_lado' ? 'selected' : ''}>2 Imagens lado a lado (50% / 50%)</option>
@@ -806,12 +858,137 @@ export class PainelPropriedades {
             <option value="6_grade" ${b.layout === '6_grade' ? 'selected' : ''}>6 Imagens em grade (2 × 3)</option>
           </select>
         </label>
-        <label>Legenda Geral
-          <textarea id="rmFigLegenda" rows="2">${b.legenda_geral || b.legenda || ''}</textarea>
-        </label>
-        <label>Fonte / Atribuição
-          <input type="text" id="rmFigFonte" value="${b.fonte || 'Fonte: Autores (2026).'}">
-        </label>
+
+        <!-- Seleção de Arquivos / Imagens por Campo / Slot -->
+        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px; margin-top:8px; background:#fff;">
+          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span>Campos de Imagem (${qtdSlots})</span>
+            <span style="font-size:10px; color:var(--glx-muted); text-transform:none;">Upload ou URL</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;" id="athListaSlotsImagem">
+            ${b.itens.slice(0, qtdSlots).map((it, idx) => `
+              <div class="ath-slot-item" style="border:1px solid #E2E8F0; border-radius:8px; padding:8px; background:#F8FAFC; display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                  <strong style="font-size:11px; color:#1F2733;">Slot ${idx + 1} (${String.fromCharCode(97 + idx).toUpperCase()})</strong>
+                  ${it.url ? `<button type="button" class="rm-ic rm-ic-perigo" data-limpar-slot="${idx}" title="Remover imagem deste campo" style="width:20px; height:20px;">${svgIcone('fechar', 12)}</button>` : ''}
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <div style="width:48px; height:48px; border-radius:6px; background:#EFF2F6; border:1px solid #CBD5E1; overflow:hidden; display:grid; place-items:center; flex:none;">
+                    ${it.url ? `<img src="${it.url}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="color:#94A3B8;">${svgIcone('imagem', 20)}</span>`}
+                  </div>
+                  <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:4px;">
+                    <label class="glx-btn glx-btn-xs glx-btn-soft" style="cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; font-weight:700;">
+                      ${svgIcone('imagem', 13)}
+                      <span>Escolher Imagem...</span>
+                      <input type="file" accept="image/*" data-upload-slot="${idx}" hidden>
+                    </label>
+                    <input type="text" data-url-slot="${idx}" value="${it.url || ''}" placeholder="Ou cole URL da imagem" style="font-size:11px; padding:3px 6px;">
+                  </div>
+                </div>
+                ${qtdSlots > 1 ? `
+                  <input type="text" data-subleg-slot="${idx}" value="${it.legenda_sub || ''}" placeholder="Sublegenda deste item (ex: Detalhe B)" style="font-size:11px; padding:3px 6px;">
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Dimensões, Proporção e Enquadramento da Imagem -->
+        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px; margin-top:8px; background:#fff;">
+          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; margin-bottom:8px;">
+            Altura, Proporção e Recorte
+          </div>
+          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <label style="font-size:11px; font-weight:700;">Altura da Imagem
+              <select id="athImgAlturaModo" class="glx-select">
+                <option value="auto" ${(!b.altura_modo || b.altura_modo === 'auto') ? 'selected' : ''}>Automática (Proporcional)</option>
+                <option value="160px" ${b.altura_modo === '160px' ? 'selected' : ''}>160 px (Compacta)</option>
+                <option value="220px" ${b.altura_modo === '220px' ? 'selected' : ''}>220 px (Normal)</option>
+                <option value="280px" ${b.altura_modo === '280px' ? 'selected' : ''}>280 px (Padrão)</option>
+                <option value="360px" ${b.altura_modo === '360px' ? 'selected' : ''}>360 px (Alta)</option>
+                <option value="450px" ${b.altura_modo === '450px' ? 'selected' : ''}>450 px (Vertical Destaque)</option>
+                <option value="100%" ${b.altura_modo === '100%' ? 'selected' : ''}>100% (Preencher Altura)</option>
+              </select>
+            </label>
+            <label style="font-size:11px; font-weight:700;">Proporção (Aspect Ratio)
+              <select id="athImgProporcao" class="glx-select">
+                <option value="livre" ${(!b.proporcao_imagem || b.proporcao_imagem === 'livre') ? 'selected' : ''}>Original / Livre</option>
+                <option value="16/9" ${b.proporcao_imagem === '16/9' ? 'selected' : ''}>16:9 (Paisagem Widescreen)</option>
+                <option value="4/3" ${b.proporcao_imagem === '4/3' ? 'selected' : ''}>4:3 (Retangular Padrão)</option>
+                <option value="1/1" ${b.proporcao_imagem === '1/1' ? 'selected' : ''}>1:1 (Quadrada)</option>
+                <option value="3/4" ${b.proporcao_imagem === '3/4' ? 'selected' : ''}>3:4 (Retrato Vertical)</option>
+                <option value="9/16" ${b.proporcao_imagem === '9/16' ? 'selected' : ''}>9:16 (Vertical Estreita)</option>
+              </select>
+            </label>
+          </div>
+          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
+            <label style="font-size:11px; font-weight:700;">Recorte / Enquadramento
+              <select id="athImgAjuste" class="glx-select">
+                <option value="contain" ${(!b.ajuste_enquadramento || b.ajuste_enquadramento === 'contain') ? 'selected' : ''}>Ajustar sem cortar (contain)</option>
+                <option value="cover" ${b.ajuste_enquadramento === 'cover' ? 'selected' : ''}>Preencher com corte (cover)</option>
+                <option value="scale-down" ${b.ajuste_enquadramento === 'scale-down' ? 'selected' : ''}>Encolher se maior (scale-down)</option>
+                <option value="fill" ${b.ajuste_enquadramento === 'fill' ? 'selected' : ''}>Esticar (fill)</option>
+              </select>
+            </label>
+            <label style="font-size:11px; font-weight:700;">Alinhamento da Imagem
+              <select id="athImgAlinhamento" class="glx-select">
+                <option value="centro" ${(!b.alinhamento_imagem || b.alinhamento_imagem === 'centro') ? 'selected' : ''}>Centralizado</option>
+                <option value="esquerda" ${b.alinhamento_imagem === 'esquerda' ? 'selected' : ''}>À Esquerda</option>
+                <option value="direita" ${b.alinhamento_imagem === 'direita' ? 'selected' : ''}>À Direita</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <!-- Textos: Legenda Geral e Fonte com Estilos de Texto e Alinhamento -->
+        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px; margin-top:8px; background:#fff;">
+          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; margin-bottom:8px;">
+            Legenda, Fonte e Tipografia
+          </div>
+
+          <!-- Legenda Geral -->
+          <label style="font-weight:700;">Legenda Geral
+            <textarea id="rmFigLegenda" rows="2">${b.legenda_geral || b.legenda || ''}</textarea>
+          </label>
+          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px; margin-bottom:8px;">
+            <label style="font-size:10.5px;">Estilo da Legenda
+              <select id="athFigLegEstilo" class="glx-select" style="height:28px; font-size:11px;">
+                <option value="">Padrão (Legenda)</option>
+                ${estilosTexto.map(est => `<option value="${est.id}" ${b.legenda_estilo_id === est.id ? 'selected' : ''}>${est.nome}</option>`).join('')}
+              </select>
+            </label>
+            <label style="font-size:10.5px;">Alinhamento da Legenda
+              <select id="athFigLegAlinhamento" class="glx-select" style="height:28px; font-size:11px;">
+                <option value="estilo" ${(!b.legenda_alinhamento || b.legenda_alinhamento === 'estilo') ? 'selected' : ''}>Do Estilo de Texto</option>
+                <option value="esquerda" ${b.legenda_alinhamento === 'esquerda' ? 'selected' : ''}>Esquerda</option>
+                <option value="centro" ${b.legenda_alinhamento === 'centro' ? 'selected' : ''}>Centralizado</option>
+                <option value="direita" ${b.legenda_alinhamento === 'direita' ? 'selected' : ''}>Direita</option>
+                <option value="justificado_esquerda" ${b.legenda_alinhamento === 'justificado_esquerda' ? 'selected' : ''}>Justificado</option>
+              </select>
+            </label>
+          </div>
+
+          <!-- Fonte / Atribuição -->
+          <label style="font-weight:700;">Fonte / Atribuição
+            <input type="text" id="rmFigFonte" value="${b.fonte || 'Fonte: Autores (2026).'}">
+          </label>
+          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;">
+            <label style="font-size:10.5px;">Estilo da Fonte
+              <select id="athFigFonteEstilo" class="glx-select" style="height:28px; font-size:11px;">
+                <option value="">Padrão (Notas/Fonte)</option>
+                ${estilosTexto.map(est => `<option value="${est.id}" ${b.fonte_estilo_id === est.id ? 'selected' : ''}>${est.nome}</option>`).join('')}
+              </select>
+            </label>
+            <label style="font-size:10.5px;">Alinhamento da Fonte
+              <select id="athFigFonteAlinhamento" class="glx-select" style="height:28px; font-size:11px;">
+                <option value="estilo" ${(!b.fonte_alinhamento || b.fonte_alinhamento === 'estilo') ? 'selected' : ''}>Do Estilo de Texto</option>
+                <option value="esquerda" ${b.fonte_alinhamento === 'esquerda' ? 'selected' : ''}>Esquerda</option>
+                <option value="centro" ${b.fonte_alinhamento === 'centro' ? 'selected' : ''}>Centralizado</option>
+                <option value="direita" ${b.fonte_alinhamento === 'direita' ? 'selected' : ''}>Direita</option>
+              </select>
+            </label>
+          </div>
+        </div>
       `;
 
       box.querySelector('#athBtnConfigLayoutBloco')?.addEventListener('click', () => {
@@ -822,6 +999,19 @@ export class PainelPropriedades {
           }
         });
       });
+
+      // Alternar Booleano Numeração Automática (Ativada / Desativada)
+      box.querySelector('#athToggleFigNumAuto')?.addEventListener('click', () => {
+        b.numeracao_automatica = (b.numeracao_automatica === false);
+        if (b.numeracao_automatica) {
+          aplicarNumeracaoNoTitulo(b, this.doc);
+        } else {
+          b.titulo = removerPrefixoNumeracaoTitulo(b.titulo, b.tipo, b.subtipo);
+        }
+        this.notificarMudanca();
+        this.renderizar();
+      });
+
       box.querySelector('#rmFigSubtipo').addEventListener('change', e => {
         b.subtipo = e.target.value;
         if (b.numeracao_automatica !== false) {
@@ -832,25 +1022,113 @@ export class PainelPropriedades {
         this.notificarMudanca();
         this.renderizar();
       });
-      box.querySelector('#rmBtnFigAtualizarNum').addEventListener('click', () => {
-        b.numeracao_automatica = true;
-        aplicarNumeracaoNoTitulo(b, this.doc);
-        box.querySelector('#rmFigTitulo').value = b.titulo;
+
+      box.querySelector('#rmFigTitulo').addEventListener('input', e => {
+        b.titulo = e.target.value;
+        this.notificarMudanca();
+      });
+
+      box.querySelector('#rmFigLayout').addEventListener('change', e => {
+        b.layout = e.target.value;
+        const q = (b.layout === '2_lado' || b.layout === '2_empilhado') ? 2
+          : (b.layout === '3_linha' || b.layout === '3_misto') ? 3
+          : (b.layout === '4_grade') ? 4
+          : (b.layout === '6_grade') ? 6 : 1;
+        while (b.itens.length < q) {
+          b.itens.push({ url: '', legenda_sub: `Item ${String.fromCharCode(97 + b.itens.length).toUpperCase()}` });
+        }
         this.notificarMudanca();
         this.renderizar();
       });
-      box.querySelector('#rmFigNumAuto').addEventListener('change', e => {
-        b.numeracao_automatica = e.target.checked;
-        if (b.numeracao_automatica) {
-          aplicarNumeracaoNoTitulo(b, this.doc);
-          box.querySelector('#rmFigTitulo').value = b.titulo;
-        }
+
+      // Uploads e URLs de Imagem por Slot
+      box.querySelectorAll('[data-upload-slot]').forEach(inp => {
+        inp.addEventListener('change', e => {
+          const idx = parseInt(inp.dataset.uploadSlot, 10);
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = ev => {
+            b.itens[idx].url = ev.target.result;
+            b.src = b.itens[0]?.url || '';
+            this.notificarMudanca();
+            this.renderizar();
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
+      box.querySelectorAll('[data-url-slot]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const idx = parseInt(inp.dataset.urlSlot, 10);
+          b.itens[idx].url = inp.value;
+          b.src = b.itens[0]?.url || '';
+          this.notificarMudanca();
+        });
+      });
+
+      box.querySelectorAll('[data-subleg-slot]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const idx = parseInt(inp.dataset.sublegSlot, 10);
+          b.itens[idx].legenda_sub = inp.value;
+          this.notificarMudanca();
+        });
+      });
+
+      box.querySelectorAll('[data-limpar-slot]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.limparSlot, 10);
+          b.itens[idx].url = '';
+          b.src = b.itens[0]?.url || '';
+          this.notificarMudanca();
+          this.renderizar();
+        });
+      });
+
+      // Dimensões, Proporção e Enquadramento
+      box.querySelector('#athImgAlturaModo')?.addEventListener('change', e => {
+        b.altura_modo = e.target.value;
         this.notificarMudanca();
       });
-      box.querySelector('#rmFigTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
-      box.querySelector('#rmFigLayout').addEventListener('change', e => { b.layout = e.target.value; this.notificarMudanca(); });
-      box.querySelector('#rmFigLegenda').addEventListener('input', e => { b.legenda_geral = e.target.value; this.notificarMudanca(); });
-      box.querySelector('#rmFigFonte').addEventListener('input', e => { b.fonte = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#athImgProporcao')?.addEventListener('change', e => {
+        b.proporcao_imagem = e.target.value;
+        this.notificarMudanca();
+      });
+      box.querySelector('#athImgAjuste')?.addEventListener('change', e => {
+        b.ajuste_enquadramento = e.target.value;
+        this.notificarMudanca();
+      });
+      box.querySelector('#athImgAlinhamento')?.addEventListener('change', e => {
+        b.alinhamento_imagem = e.target.value;
+        this.notificarMudanca();
+      });
+
+      // Legenda e Fonte
+      box.querySelector('#rmFigLegenda')?.addEventListener('input', e => {
+        b.legenda_geral = e.target.value;
+        this.notificarMudanca();
+      });
+      box.querySelector('#athFigLegEstilo')?.addEventListener('change', e => {
+        b.legenda_estilo_id = e.target.value;
+        this.notificarMudanca();
+      });
+      box.querySelector('#athFigLegAlinhamento')?.addEventListener('change', e => {
+        b.legenda_alinhamento = e.target.value;
+        this.notificarMudanca();
+      });
+
+      box.querySelector('#rmFigFonte')?.addEventListener('input', e => {
+        b.fonte = e.target.value;
+        this.notificarMudanca();
+      });
+      box.querySelector('#athFigFonteEstilo')?.addEventListener('change', e => {
+        b.fonte_estilo_id = e.target.value;
+        this.notificarMudanca();
+      });
+      box.querySelector('#athFigFonteAlinhamento')?.addEventListener('change', e => {
+        b.fonte_alinhamento = e.target.value;
+        this.notificarMudanca();
+      });
     }
 
     // 4. MAPA (BLOCO COMPOSTO CARTOGRÁFICO)

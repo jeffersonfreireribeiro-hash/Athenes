@@ -226,11 +226,17 @@ export class ModalLayoutBloco {
         </div>
         ${isSel ? `<div style="color:var(--ath-primary, #314F79); display:flex; align-items:center; margin-left:8px;">${svgIcone('check', 14)}</div>` : ''}
       `;
-      row.addEventListener('click', () => {
+      const selecionar = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         aplicarModeloLayoutBloco(this.rascunho, p.id, this.doc);
+        this.rascunho.modelo_layout_id = p.id;
         this.atualizarTodosControles();
         this.atualizarPrevia();
-      });
+      };
+      row.addEventListener('click', selecionar);
       box.appendChild(row);
     });
   }
@@ -272,7 +278,11 @@ export class ModalLayoutBloco {
         </div>
         ${isSel ? `<div style="color:var(--ath-primary, #314F79); display:flex; align-items:center; margin-left:8px;">${svgIcone('check', 14)}</div>` : ''}
       `;
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         this.rascunho.moldura_tipo = m.id;
         if (m.id === 'limpo') {
           this.rascunho.fundo_ativo = false;
@@ -490,6 +500,130 @@ export class ModalLayoutBloco {
         this.rascunho.fonte_formula = e.target.value;
         this.atualizarPrevia();
       });
+    } else if (this.rascunho.tipo === 'figura' || this.rascunho.tipo === 'imagem') {
+      const figBox = document.createElement('div');
+      figBox.style.display = 'flex';
+      figBox.style.flexDirection = 'column';
+      figBox.style.gap = '8px';
+      figBox.style.marginTop = '6px';
+      figBox.style.paddingTop = '6px';
+      figBox.style.borderTop = '1px dashed #CBD5E1';
+
+      const estilos = this.doc.estilos || [];
+
+      figBox.innerHTML = `
+        <div style="font-size:11px; font-weight:800; color:#314F79; text-transform:uppercase;">Enquadramento e Dimensões da Imagem</div>
+        <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <label style="font-size:11.5px; font-weight:700; color:#475569;">Altura da Imagem
+            <select id="athModalImgAltura" class="glx-select" style="height:30px; font-size:11.5px;">
+              <option value="auto" ${(!this.rascunho.altura_modo || this.rascunho.altura_modo === 'auto') ? 'selected' : ''}>Auto (Proporcional)</option>
+              <option value="160px" ${this.rascunho.altura_modo === '160px' ? 'selected' : ''}>160 px (Compacta)</option>
+              <option value="220px" ${this.rascunho.altura_modo === '220px' ? 'selected' : ''}>220 px (Média)</option>
+              <option value="280px" ${this.rascunho.altura_modo === '280px' ? 'selected' : ''}>280 px (Padrão)</option>
+              <option value="360px" ${this.rascunho.altura_modo === '360px' ? 'selected' : ''}>360 px (Grande)</option>
+              <option value="450px" ${this.rascunho.altura_modo === '450px' ? 'selected' : ''}>450 px (Ampla)</option>
+              <option value="100%" ${this.rascunho.altura_modo === '100%' ? 'selected' : ''}>100% (Ocupar Altura)</option>
+            </select>
+          </label>
+          <label style="font-size:11.5px; font-weight:700; color:#475569;">Proporção (Aspect Ratio)
+            <select id="athModalImgProporcao" class="glx-select" style="height:30px; font-size:11.5px;">
+              <option value="livre" ${(!this.rascunho.proporcao_imagem || this.rascunho.proporcao_imagem === 'livre') ? 'selected' : ''}>Livre (Natural)</option>
+              <option value="16/9" ${this.rascunho.proporcao_imagem === '16/9' ? 'selected' : ''}>16:9 (Widescreen)</option>
+              <option value="4/3" ${this.rascunho.proporcao_imagem === '4/3' ? 'selected' : ''}>4:3 (Clássica)</option>
+              <option value="1/1" ${this.rascunho.proporcao_imagem === '1/1' ? 'selected' : ''}>1:1 (Quadrada)</option>
+              <option value="3/4" ${this.rascunho.proporcao_imagem === '3/4' ? 'selected' : ''}>3:4 (Retrato)</option>
+              <option value="9/16" ${this.rascunho.proporcao_imagem === '9/16' ? 'selected' : ''}>9:16 (Vertical)</option>
+            </select>
+          </label>
+        </div>
+        <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <label style="font-size:11.5px; font-weight:700; color:#475569;">Recorte / Enquadramento
+            <select id="athModalImgAjuste" class="glx-select" style="height:30px; font-size:11.5px;">
+              <option value="contain" ${(!this.rascunho.ajuste_enquadramento || this.rascunho.ajuste_enquadramento === 'contain') ? 'selected' : ''}>Conter sem cortar (Contain)</option>
+              <option value="cover" ${this.rascunho.ajuste_enquadramento === 'cover' ? 'selected' : ''}>Cobrir cortando bordas (Cover)</option>
+              <option value="scale-down" ${this.rascunho.ajuste_enquadramento === 'scale-down' ? 'selected' : ''}>Reduzir se necessário</option>
+              <option value="fill" ${this.rascunho.ajuste_enquadramento === 'fill' ? 'selected' : ''}>Esticar (Fill)</option>
+            </select>
+          </label>
+          <label style="font-size:11.5px; font-weight:700; color:#475569;">Alinhamento da Imagem
+            <select id="athModalImgAlinhamento" class="glx-select" style="height:30px; font-size:11.5px;">
+              <option value="center" ${(!this.rascunho.alinhamento_imagem || this.rascunho.alinhamento_imagem === 'center') ? 'selected' : ''}>Centralizado</option>
+              <option value="left" ${this.rascunho.alinhamento_imagem === 'left' ? 'selected' : ''}>À Esquerda</option>
+              <option value="right" ${this.rascunho.alinhamento_imagem === 'right' ? 'selected' : ''}>À Direita</option>
+            </select>
+          </label>
+        </div>
+
+        <div style="font-size:11px; font-weight:800; color:#314F79; text-transform:uppercase; margin-top:4px;">Tipografia e Alinhamento de Legenda e Título</div>
+        <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <label style="font-size:11.5px; font-weight:700; color:#475569;">Estilo da Legenda
+            <select id="athModalLegEstilo" class="glx-select" style="height:30px; font-size:11.5px;">
+              <option value="">Padrão do Bloco</option>
+              ${estilos.map(e => `<option value="${e.id}" ${this.rascunho.legenda_estilo_id === e.id ? 'selected' : ''}>${e.nome}</option>`).join('')}
+            </select>
+          </label>
+          <label style="font-size:11.5px; font-weight:700; color:#475569;">Alinhamento da Legenda
+            <select id="athModalLegAlin" class="glx-select" style="height:30px; font-size:11.5px;">
+              <option value="estilo" ${(!this.rascunho.legenda_alinhamento || this.rascunho.legenda_alinhamento === 'estilo') ? 'selected' : ''}>Do estilo de texto</option>
+              <option value="center" ${this.rascunho.legenda_alinhamento === 'center' ? 'selected' : ''}>Centralizado</option>
+              <option value="left" ${this.rascunho.legenda_alinhamento === 'left' ? 'selected' : ''}>À Esquerda</option>
+              <option value="right" ${this.rascunho.legenda_alinhamento === 'right' ? 'selected' : ''}>À Direita</option>
+              <option value="justify" ${this.rascunho.legenda_alinhamento === 'justify' ? 'selected' : ''}>Justificado</option>
+            </select>
+          </label>
+        </div>
+        <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <label style="font-size:11.5px; font-weight:700; color:#475569;">Estilo do Título
+            <select id="athModalTitEstilo" class="glx-select" style="height:30px; font-size:11.5px;">
+              <option value="">Padrão do Bloco</option>
+              ${estilos.map(e => `<option value="${e.id}" ${this.rascunho.titulo_estilo_id === e.id ? 'selected' : ''}>${e.nome}</option>`).join('')}
+            </select>
+          </label>
+          <label style="font-size:11.5px; font-weight:700; color:#475569;">Alinhamento do Título
+            <select id="athModalTitAlin" class="glx-select" style="height:30px; font-size:11.5px;">
+              <option value="estilo" ${(!this.rascunho.titulo_alinhamento || this.rascunho.titulo_alinhamento === 'estilo') ? 'selected' : ''}>Do estilo de texto</option>
+              <option value="center" ${this.rascunho.titulo_alinhamento === 'center' ? 'selected' : ''}>Centralizado</option>
+              <option value="left" ${this.rascunho.titulo_alinhamento === 'left' ? 'selected' : ''}>À Esquerda</option>
+              <option value="right" ${this.rascunho.titulo_alinhamento === 'right' ? 'selected' : ''}>À Direita</option>
+            </select>
+          </label>
+        </div>
+      `;
+
+      sec.appendChild(figBox);
+
+      figBox.querySelector('#athModalImgAltura')?.addEventListener('change', e => {
+        this.rascunho.altura_modo = e.target.value;
+        this.atualizarPrevia();
+      });
+      figBox.querySelector('#athModalImgProporcao')?.addEventListener('change', e => {
+        this.rascunho.proporcao_imagem = e.target.value;
+        this.atualizarPrevia();
+      });
+      figBox.querySelector('#athModalImgAjuste')?.addEventListener('change', e => {
+        this.rascunho.ajuste_enquadramento = e.target.value;
+        this.atualizarPrevia();
+      });
+      figBox.querySelector('#athModalImgAlinhamento')?.addEventListener('change', e => {
+        this.rascunho.alinhamento_imagem = e.target.value;
+        this.atualizarPrevia();
+      });
+      figBox.querySelector('#athModalLegEstilo')?.addEventListener('change', e => {
+        this.rascunho.legenda_estilo_id = e.target.value;
+        this.atualizarPrevia();
+      });
+      figBox.querySelector('#athModalLegAlin')?.addEventListener('change', e => {
+        this.rascunho.legenda_alinhamento = e.target.value;
+        this.atualizarPrevia();
+      });
+      figBox.querySelector('#athModalTitEstilo')?.addEventListener('change', e => {
+        this.rascunho.titulo_estilo_id = e.target.value;
+        this.atualizarPrevia();
+      });
+      figBox.querySelector('#athModalTitAlin')?.addEventListener('change', e => {
+        this.rascunho.titulo_alinhamento = e.target.value;
+        this.atualizarPrevia();
+      });
     }
 
     sec.querySelector('#athSubgradeCols')?.addEventListener('change', e => {
@@ -600,15 +734,26 @@ export class ModalLayoutBloco {
       const posTit = this.rascunho.posicao_titulo || 'topo';
 
       const rotulo = rotuloDaFigura(this.rascunho);
-      const titHtml = `<strong style="display:block; font-size:12px; font-weight:800; color:#1F2733; margin-bottom:4px;">${this.rascunho.titulo || `${rotulo} 1 — Ilustração Técnica`}</strong>`;
+      const estTit = (this.doc.estilos || []).find(e => e.id === this.rascunho.titulo_estilo_id);
+      const estLeg = (this.doc.estilos || []).find(e => e.id === this.rascunho.legenda_estilo_id);
+
+      const titAlin = (this.rascunho.titulo_alinhamento && this.rascunho.titulo_alinhamento !== 'estilo') ? this.rascunho.titulo_alinhamento : (estTit?.alinhamento || 'left');
+      const legAlin = (this.rascunho.legenda_alinhamento && this.rascunho.legenda_alinhamento !== 'estilo') ? this.rascunho.legenda_alinhamento : (estLeg?.alinhamento || 'left');
+
+      const hVal = this.rascunho.altura_modo && this.rascunho.altura_modo !== 'auto' ? (this.rascunho.altura_modo === '100%' ? '100%' : this.rascunho.altura_modo) : '90px';
+      const aspRatio = this.rascunho.proporcao_imagem && this.rascunho.proporcao_imagem !== 'livre' ? `aspect-ratio: ${this.rascunho.proporcao_imagem};` : '';
+      const objFit = this.rascunho.ajuste_enquadramento || 'contain';
+      const imgAlin = this.rascunho.alinhamento_imagem || 'center';
+
+      const titHtml = `<strong style="display:block; font-size:12px; font-weight:800; color:#1F2733; margin-bottom:4px; text-align:${titAlin};">${this.rascunho.titulo || `${rotulo} 1 — Ilustração Técnica`}</strong>`;
       const imgHtml = `
-        <div style="background:#F1F5F9; border-radius:4px; height:90px; display:grid; place-items:center; color:#64748B;">
+        <div style="background:#F1F5F9; border-radius:4px; height:${hVal}; ${aspRatio} display:grid; place-items:center; color:#64748B; object-fit:${objFit}; margin:${imgAlin === 'center' ? '0 auto' : imgAlin === 'right' ? '0 0 0 auto' : '0 auto 0 0'};">
           ${svgIcone('imagem', 28)}
           <span style="font-size:10px; font-weight:700;">Área da Ilustração / Imagem</span>
         </div>
       `;
-      const legHtml = `<p style="margin:4px 0 0 0; font-size:11px; color:#475569;">${this.rascunho.legenda_geral || this.rascunho.legenda || 'Legenda descritiva dos elementos.'}</p>`;
-      const fonteHtml = `<small style="font-size:10px; color:#64748B; margin-top:2px; display:block;">${this.rascunho.fonte || 'Fonte: Autores (2026).'}</small>`;
+      const legHtml = `<p style="margin:4px 0 0 0; font-size:11px; color:#475569; text-align:${legAlin};">${this.rascunho.legenda_geral || this.rascunho.legenda || 'Legenda descritiva dos elementos.'}</p>`;
+      const fonteHtml = `<small style="font-size:10px; color:#64748B; margin-top:2px; display:block; text-align:${legAlin};">${this.rascunho.fonte || 'Fonte: Autores (2026).'}</small>`;
 
       if (isSubgrade2Col) {
         box.innerHTML += `

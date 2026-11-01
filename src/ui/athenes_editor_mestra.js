@@ -402,6 +402,11 @@ export class ModalEditorMestra {
               </label>
             </div>
             ${elem.sangria === false ? `
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin:2px 0;">
+                <button type="button" class="glx-btn glx-btn-xs ${elem.respeitar_recuo ? 'glx-btn-primary' : 'glx-btn-soft'}" data-toggle-recuo style="display:flex; align-items:center; gap:5px; font-weight:700; width:100%; justify-content:center;" title="Alinha este elemento às margens da folha (recuo)">
+                  <span>${svgIcone('margem', 12)} Respeitar Recuo da Página: <strong>${elem.respeitar_recuo ? 'Ativado (Margens)' : 'Desativado (Livre)'}</strong></span>
+                </button>
+              </div>
               <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:4px;">
                 <label>X: <input type="number" class="glx-input" data-prop="x_mm" value="${elem.x_mm || 0}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
                 <label>Y: <input type="number" class="glx-input" data-prop="y_mm" value="${elem.y_mm || 0}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
@@ -463,6 +468,11 @@ export class ModalEditorMestra {
                 <input type="color" data-prop="cor" value="${elem.cor || '#314F79'}" style="width:24px; height:20px; border:none; background:none; cursor:pointer;" title="Cor da Borda">
               </div>
               ${!elem.sangria ? `
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin:2px 0;">
+                  <button type="button" class="glx-btn glx-btn-xs ${elem.respeitar_recuo ? 'glx-btn-primary' : 'glx-btn-soft'}" data-toggle-recuo style="display:flex; align-items:center; gap:5px; font-weight:700; width:100%; justify-content:center;" title="Alinha este quadro às margens da folha (recuo)">
+                    <span>${svgIcone('margem', 12)} Respeitar Recuo da Página: <strong>${elem.respeitar_recuo ? 'Ativado (Margens)' : 'Desativado (Livre)'}</strong></span>
+                  </button>
+                </div>
                 <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:4px;">
                   <label>X: <input type="number" class="glx-input" data-prop="x_mm" value="${elem.x_mm || 20}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
                   <label>Y: <input type="number" class="glx-input" data-prop="y_mm" value="${elem.y_mm || 20}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
@@ -525,6 +535,16 @@ export class ModalEditorMestra {
         chk.addEventListener('change', () => {
           const prop = chk.dataset.propChk;
           elem[prop] = chk.checked;
+          this.renderizarListaElementos(modal);
+          this.atualizarPreviaVisual();
+        });
+      });
+
+      item.querySelectorAll('[data-toggle-recuo]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          elem.respeitar_recuo = !elem.respeitar_recuo;
           this.renderizarListaElementos(modal);
           this.atualizarPreviaVisual();
         });
@@ -872,9 +892,10 @@ export class ModalEditorMestra {
 
       if (elem.tipo === 'foto_capa') {
         const sangria = !!elem.sangria;
-        const topPx = sangria ? 0 : (elem.y_mm || 0) * escala;
-        const leftPx = sangria ? 0 : (elem.x_mm || 0) * escala;
-        const wPx = sangria ? larguraPx : (elem.largura_mm || 210) * escala;
+        const respRecuo = !sangria && !!elem.respeitar_recuo;
+        const topPx = sangria ? 0 : (respRecuo ? mT + (elem.y_mm || 0) * escala : (elem.y_mm || 0) * escala);
+        const leftPx = sangria ? 0 : (respRecuo ? mL + (elem.x_mm || 0) * escala : (elem.x_mm || 0) * escala);
+        const wPx = sangria ? larguraPx : (respRecuo ? larguraPx - mL - mR : (elem.largura_mm || 210) * escala);
         const hPx = sangria ? alturaPx : (elem.altura_mm || 140) * escala;
         const imgUrl = elem.url || '';
 
