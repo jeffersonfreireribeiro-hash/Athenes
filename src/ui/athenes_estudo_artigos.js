@@ -249,6 +249,20 @@ export function criarArtigosEstudoExemplo() {
 
 let _timerDebounceSalvarArtigos = null;
 
+const PDFJS_VERSAO = '4.10.38';
+let _pdfjsPromise = null;
+/** Carrega o pdf.js (renderizador oficial de PDF da Mozilla) sob demanda. */
+function carregarPdfJs() {
+  if (!_pdfjsPromise) {
+    const base = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSAO}/build`;
+    _pdfjsPromise = import(`${base}/pdf.min.mjs`).then(m => {
+      m.GlobalWorkerOptions.workerSrc = `${base}/pdf.worker.min.mjs`;
+      return m;
+    }).catch(err => { _pdfjsPromise = null; throw err; });
+  }
+  return _pdfjsPromise;
+}
+
 /* ==========================================================================
    PDFs LOCAIS PERSISTENTES (IndexedDB) + DOWNLOAD DO GOOGLE DRIVE
    O PDF nunca vai para o Zotero: fica no computador (IndexedDB) ou no Drive.
@@ -1141,13 +1155,26 @@ export class EstudoArtigosView {
     if (!stack) return;
     stack.innerHTML = '';
 
+    // PDF real: renderiza cada página do arquivo como uma folha própria (no formato original)
+    const pdfInfo = art.pdfBlobUrl ? this._pdfDocs?.get(art.pdfBlobUrl) : null;
+    if (art.pdfBlobUrl && !pdfInfo && !this._pdfFalhou?.has(art.pdfBlobUrl)) {
+      stack.innerHTML = '<div class="ath-pdf-carregando">Carregando as páginas do PDF...</div>';
+      this.carregarPdfReal(art).then(() => {
+        if (this.artigoAberto === art) this.renderizar();
+      });
+      return;
+    }
+    if (pdfInfo) paginasPdf = art.conteudoPaginasPdf;
     const totalPags = paginasPdf.length;
+    const folhasReais = [];
 
     paginasPdf.forEach((pagDados, idx) => {
       const numPag = idx + 1;
       const pinsDaPagina = art.fichamento.notasPagina?.[numPag] || [];
       const tracosDaPagina = art.fichamento.tracosPorPagina?.[numPag] || [];
       const isPagAtiva = numPag === this.paginaAtual;
+      const dimPag = pdfInfo?.dims?.[idx];
+      const alturaReal = dimPag ? Math.round(794 * dimPag.h / dimPag.w) : 1123;
 
       const folhaWrap = document.createElement('div');
       folhaWrap.className = 'ath-pdf-pagina-bloco-wrap';
@@ -1159,8 +1186,11 @@ export class EstudoArtigosView {
           <span class="ath-pdf-etiqueta-stats" data-stats-pag="${numPag}">${tracosDaPagina.length} risco(s) · ${pinsDaPagina.length} nota(s)</span>
         </div>
 
-        <div class="ath-folha-a4 ath-pdf-folha-container ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" style="transform: scale(${this.zoomPct / 100}); transform-origin: top center;">
-          ${art.pdfBlobUrl && numPag === 1 ? `
+        <div class="ath-folha-a4 ath-pdf-folha-container ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" style="${pdfInfo ? `width:794px; height:${alturaReal}px; min-height:0; padding:0; ` : ''}transform: scale(${this.zoomPct / 100}); transform-origin: top center;">
+          ${pdfInfo ? `
+            <canvas class="ath-pdf-render-canvas" style="width:794px; height:${alturaReal}px;"></canvas>
+            <div class="ath-pdf-folha-texto ath-pdf-text-layer" data-texto-pag="${numPag}"></div>
+          ` : art.pdfBlobUrl && numPag === 1 ? `
             <embed src="${art.pdfBlobUrl}" type="application/pdf" class="ath-pdf-embed-nativo">
           ` : `
             <div class="ath-pdf-folha-texto" data-texto-pag="${numPag}">
@@ -1180,7 +1210,7 @@ export class EstudoArtigosView {
           `}
 
           <!-- Camada Transparente de Risco Livre, Linha Reta e Marca-Texto (Samsung Notes Canvas) -->
-          <canvas class="ath-pdf-ink-canvas" data-canvas-pag="${numPag}" width="794" height="1123" style="pointer-events: ${this.ferramentaAtiva === 'cursor' ? 'none' : 'auto'}; cursor: ${this.ferramentaAtiva === 'cursor' ? 'text' : 'crosshair'};"></canvas>
+          <canvas class="ath-pdf-ink-canvas" data-canvas-pag="${numPag}" width="794" height="${pdfInfo ? alturaReal : 1123}" style="pointer-events: ${this.ferramentaAtiva === 'cursor' ? 'none' : 'auto'}; cursor: ${this.ferramentaAtiva === 'cursor' ? 'text' : 'crosshair'};"></canvas>
 
           <!-- Camada de Notas Adesivas Editáveis na Página -->
           <div class="ath-pdf-pins-layer" data-pins-pag="${numPag}"></div>
@@ -1188,6 +1218,7 @@ export class EstudoArtigosView {
       `;
 
       stack.appendChild(folhaWrap);
+      if (pdfInfo) folhasReais.push(folhaWrap.querySelector('.ath-pdf-folha-container'));
 
       // Renderiza as notas adesivas (pins) desta página
       this.renderizarPinsDaPagina(folhaWrap.querySelector(`[data-pins-pag="${numPag}"]`), art, numPag, root);
@@ -1202,6 +1233,22 @@ export class EstudoArtigosView {
         this.definirPaginaAtivaSilencioso(numPag, root);
       });
     });
+
+    // Desenha as páginas do PDF real sob demanda (só as que estão perto da tela)
+    if (pdfInfo && folhasReais.length) {
+      const palcoRender = root.querySelector('#athEstudioPalco');
+      const desenhar = (folha) => this.renderizarPaginaPdfReal(pdfInfo, folha, parseInt(folha.dataset.numPagina, 10));
+      if (typeof IntersectionObserver !== 'undefined' && palcoRender) {
+        const obs = new IntersectionObserver(entradas => {
+          entradas.forEach(en => {
+            if (en.isIntersecting) { obs.unobserve(en.target); desenhar(en.target); }
+          });
+        }, { root: palcoRender, rootMargin: '900px 0px' });
+        folhasReais.forEach(f => obs.observe(f));
+      } else {
+        folhasReais.forEach(desenhar);
+      }
+    }
 
     // Atualiza página ativa conforme rolagem do palco (com throttle via requestAnimationFrame)
     const palco = root.querySelector('#athEstudioPalco');
@@ -1230,6 +1277,76 @@ export class EstudoArtigosView {
           }
         });
       }, { passive: true });
+    }
+  }
+
+  /** Abre o PDF com pdf.js, mede cada página e prepara uma folha por página. */
+  async carregarPdfReal(art) {
+    const url = art.pdfBlobUrl;
+    if (!this._pdfDocs) this._pdfDocs = new Map();
+    if (!this._pdfFalhou) this._pdfFalhou = new Set();
+    if (this._pdfDocs.has(url)) return true;
+    try {
+      const lib = await carregarPdfJs();
+      const doc = await lib.getDocument({ url }).promise;
+      const n = doc.numPages;
+      const dims = await Promise.all(Array.from({ length: n }, async (_, i) => {
+        const v = (await doc.getPage(i + 1)).getViewport({ scale: 1 });
+        return { w: v.width, h: v.height };
+      }));
+      const atuais = art.conteudoPaginasPdf || [];
+      if (atuais.length !== n || !atuais[0]?.real) {
+        art.conteudoPaginasPdf = dims.map((_, i) => ({
+          numero: i + 1,
+          real: true,
+          cabecalho: '',
+          titulo: 'Folha do PDF',
+          autores: '',
+          paragrafos: []
+        }));
+      }
+      art.totalPaginas = n;
+      this._pdfDocs.set(url, { doc, dims, n });
+      return true;
+    } catch (err) {
+      console.warn('Athenes — falha ao abrir PDF com pdf.js:', err);
+      this._pdfFalhou.add(url);
+      return false;
+    }
+  }
+
+  async renderizarPaginaPdfReal(info, folha, numPag) {
+    if (!folha || folha.dataset.renderizada) return;
+    folha.dataset.renderizada = '1';
+    try {
+      const page = await info.doc.getPage(numPag);
+      const d = info.dims[numPag - 1];
+      const escala = 794 / d.w;
+      const viewport = page.getViewport({ scale: escala });
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const cv = folha.querySelector('.ath-pdf-render-canvas');
+      if (!cv) return;
+      cv.width = Math.floor(viewport.width * dpr);
+      cv.height = Math.floor(viewport.height * dpr);
+      await page.render({
+        canvasContext: cv.getContext('2d'),
+        viewport,
+        transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null
+      }).promise;
+
+      const camada = folha.querySelector('.ath-pdf-text-layer');
+      if (camada) {
+        camada.style.setProperty('--scale-factor', String(escala));
+        camada.style.setProperty('--total-scale-factor', String(escala));
+        const lib = await carregarPdfJs();
+        await new lib.TextLayer({
+          textContentSource: page.streamTextContent(),
+          container: camada,
+          viewport
+        }).render();
+      }
+    } catch (err) {
+      console.warn('Athenes — falha ao desenhar página do PDF:', err);
     }
   }
 

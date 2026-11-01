@@ -1421,3 +1421,10 @@ mark.ath-pdf-grifo-texto {
   padding: 1px 2px;
   border-radius: 3px;
 }
+
+/* PDF real renderizado com pdf.js: uma folha por página, no formato original */
+.ath-pdf-render-canvas { display: block; position: absolute; inset: 0; background: #FFFFFF; border-radius: 2px; }
+.ath-pdf-text-layer { position: absolute; inset: 0; padding: 0; overflow: hidden; line-height: 1; z-index: 3; font-family: sans-serif; text-size-adjust: none; }
+.ath-pdf-text-layer span, .ath-pdf-text-layer br { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+.ath-pdf-text-layer ::selection { background: rgba(49, 79, 121, 0.35); }
+.ath-pdf-carregando { padding: 40px; text-align: center; font-weight: 700; color: #314F79; }
