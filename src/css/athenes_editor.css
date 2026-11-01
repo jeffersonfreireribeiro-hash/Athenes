@@ -1291,3 +1291,196 @@ ul.ath-lista-ponto-traco > li::before {
   background: var(--ath-primary-soft, #EEF4FA) !important;
   border-color: var(--ath-primary, #314F79) !important;
 }
+
+/* Quadro do formato ocupando 100% da largura útil disponível, alinhado aos outros quadros */
+.rm-icg.rm-icg-formato {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+  align-items: center !important;
+  justify-items: center !important;
+  background: var(--ath-input, #F4F5F8) !important;
+  border: 1px solid var(--ath-primary-line, #C8D7E6) !important;
+  border-radius: 999px !important;
+  padding: 3px 4px !important;
+  gap: 0 !important;
+  margin: 0 !important;
+}
+
+.rm-icg.rm-icg-formato .rm-ic-bt {
+  width: 34px !important;
+  height: 34px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  margin: 0 auto !important;
+  border-radius: 50% !important;
+  border: none !important;
+}
+
+.rm-icg.rm-icg-formato .rm-ic-bt.on,
+.rm-icg.rm-icg-formato .rm-ic-bt[aria-pressed="true"] {
+  background: var(--glx-primary, #314F79) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 10px rgba(49, 79, 121, 0.20) !important;
+}
+
+/* =========================================================================
+   Botões e Painéis de Topo (Arquivo & Margens, Cabeçalho/Rodapé, Estilos)
+   e Coluna Esquerda Dividida 50/50 (Mestras em Uso e Blocos da Seção)
+   ========================================================================= */
+
+.rm-prev-topo {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  position: relative !important;
+  padding: 2px 0 6px 0 !important;
+  flex-wrap: nowrap !important;
+}
+
+.rm-prev-topo-esq {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rm-prev-menus-topo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  position: relative;
+}
+
+.rm-menu-topo-item {
+  position: relative;
+}
+
+.rm-btn-menu-topo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ath-primary-line, #C8D7E6);
+  background: #FFFFFF;
+  color: var(--ath-primary, #314F79);
+  font: 700 12px var(--glx-font, 'Nunito', sans-serif);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.rm-btn-menu-topo:hover,
+.rm-btn-menu-topo.ativo,
+.rm-btn-menu-topo[aria-expanded="true"] {
+  background: var(--ath-primary-soft, #EEF4FA);
+  border-color: var(--ath-primary, #314F79);
+  color: var(--ath-primary, #314F79);
+  box-shadow: 0 2px 6px rgba(49, 79, 121, 0.15);
+}
+
+.rm-topo-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  max-width: 90vw;
+  background: #FFFFFF;
+  border: 1px solid var(--ath-primary-line, #C8D7E6);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(15, 23, 42, 0.08);
+  padding: 14px 16px;
+  z-index: 1050;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: athPopoverEntrada 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rm-topo-popover[hidden] {
+  display: none !important;
+}
+
+.rm-topo-popover-estilos {
+  width: 340px;
+}
+
+.rm-popover-topo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ath-primary-line, #C8D7E6);
+}
+
+.rm-popover-topo-head strong {
+  font: 800 12px var(--glx-font, 'Nunito', sans-serif);
+  color: var(--ath-primary, #314F79);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+@keyframes athPopoverEntrada {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Coluna lateral esquerda dividida 50/50 de forma fixa e elegante */
+.rm-col-esq {
+  overflow-y: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  height: 100% !important;
+  padding-right: 0 !important;
+  min-height: 0 !important;
+}
+
+.rm-card-meio-a-meio {
+  flex: 1 1 50% !important;
+  min-height: 0 !important;
+  max-height: calc(50% - 6px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  background: #FFFFFF !important;
+  border-radius: 18px !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+  padding: 12px 14px !important;
+  box-sizing: border-box !important;
+}
+
+.rm-card-meio-a-meio-topo {
+  flex: none !important;
+}
+
+.rm-card-meio-a-meio-corpo {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin !important;
+  padding-right: 4px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+}
+
+.rm-card-meio-a-meio-rodape {
+  flex: none !important;
+  margin-top: 8px !important;
+  padding-top: 6px !important;
+  border-top: 1px solid #F1F5F9 !important;
+}
+

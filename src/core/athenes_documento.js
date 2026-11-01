@@ -877,6 +877,32 @@ export function duplicarMestra(doc, mestraId, novoNome = null) {
 }
 
 /**
+ * Remove uma página mestra do catálogo do documento
+ * @param {Object} doc - Documento Athenes
+ * @param {string} mestraId - ID da página mestra a remover
+ * @returns {boolean} True se removida com sucesso, false caso contrário
+ */
+export function removerMestra(doc, mestraId) {
+  if (!doc || !Array.isArray(doc.mestras) || doc.mestras.length <= 1) return false;
+  const idx = doc.mestras.findIndex(m => m.id === mestraId);
+  if (idx < 0) return false;
+
+  doc.mestras.splice(idx, 1);
+  doc.modelosPagina = doc.mestras;
+
+  // Se alguma seção usava esta mestra, migra para a primeira mestra restante
+  const mestraSubstituta = doc.mestras[0].id;
+  (doc.secoes || []).forEach(sec => {
+    if (sec.mestraId === mestraId) {
+      sec.mestraId = mestraSubstituta;
+    }
+  });
+
+  repaginarDocumento(doc);
+  return true;
+}
+
+/**
  * Adiciona um bloco na seção ativa
  */
 export function adicionarBlocoNaSecao(doc, secaoId, bloco, posicao = null) {

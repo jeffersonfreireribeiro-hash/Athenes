@@ -9,7 +9,7 @@
  * - Inserção de referências cruzadas e citações Zotero
  */
 
-import { FONTES_SISTEMA, PESOS_FONTE } from '../core/athenes_estilos.js';
+import { FONTES_SISTEMA, PESOS_FONTE, estiloParaCss, alinhamentoCss, ALINHAMENTOS } from '../core/athenes_estilos.js';
 import {
   modeloDaPagina, recalcularNumeracaoAutomatica, resolverReferenciasCruzadas,
   ROTULOS_FIGURA, rotuloDaFigura, aplicarNumeracaoNoTitulo, removerPrefixoNumeracaoTitulo,
@@ -38,6 +38,7 @@ export class PainelPropriedades {
     this.doc = documento;
     this.blocoSelecionado = null;
     this.paginaSelecionada = null;
+    this.estiloSelecionado = null;
     this.onAlterado = opcoes.onAlterado || (() => {});
     this.onAbrirZotero = opcoes.onAbrirZotero || (() => {});
     this.onDividirBloco = opcoes.onDividirBloco || (() => {});
@@ -50,9 +51,17 @@ export class PainelPropriedades {
     this.renderizar();
   }
 
+  setEstilo(estilo) {
+    this.estiloSelecionado = estilo;
+    this.blocoSelecionado = null;
+    this.paginaSelecionada = null;
+    this.renderizar();
+  }
+
   setSelecao(bloco, pagina) {
     this.blocoSelecionado = bloco;
     this.paginaSelecionada = pagina;
+    this.estiloSelecionado = null;
     this.renderizar();
   }
 
@@ -62,6 +71,12 @@ export class PainelPropriedades {
 
     const wrapper = document.createElement('div');
     wrapper.className = 'rm-props';
+
+    if (this.estiloSelecionado) {
+      this.renderizarEditorEstilo(wrapper, this.estiloSelecionado);
+      this.container.appendChild(wrapper);
+      return;
+    }
 
     if (!this.blocoSelecionado) {
       wrapper.innerHTML = `
@@ -300,8 +315,8 @@ export class PainelPropriedades {
       const fonteAtiva = b.fonte || '';
 
       box.innerHTML = `
-        <label style="font:700 12px var(--glx-font);">Texto do Título
-          <input type="text" id="rmCampoTexto" class="glx-input" style="width:100%; margin-top:4px;" value="${b.texto || ''}">
+        <label style="font:700 12px var(--glx-font); width:100%; display:block;">Texto
+          <textarea id="rmCampoTexto" class="glx-input" rows="2" style="width:100%; min-height:48px; margin-top:4px; resize:vertical; font-family:var(--glx-font); font-size:12.5px; line-height:1.45; padding:8px 12px; border-radius:12px; box-sizing:border-box;">${b.texto || ''}</textarea>
         </label>
         <div class="rm-linha2">
           <label style="font:700 12px var(--glx-font);">Nível
@@ -311,11 +326,17 @@ export class PainelPropriedades {
               <option value="3" ${b.nivel === 3 ? 'selected' : ''}>3 (Sub-subseção)</option>
             </select>
           </label>
-          <label style="font:700 12px var(--glx-font);">Estilo Tipográfico
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label style="font:700 12px var(--glx-font); margin:0;">Estilo</label>
+              <button type="button" class="rm-ic" id="athBtnEditarEstiloDoBloco" title="Editar estilo com lápis" style="width:22px; height:22px;">
+                ${svgIcone('lapis', 12)}
+              </button>
+            </div>
             <select id="rmCampoEstilo" class="glx-select" style="width:100%; margin-top:4px;">
               ${this.doc.estilos.map(e => `<option value="${e.id}" ${e.id === b.estiloId ? 'selected' : ''}>${e.nome}</option>`).join('')}
             </select>
-          </label>
+          </div>
         </div>
 
         <!-- FORMATO: 7 Modos de Alinhamento com Opção Do Estilo -->
@@ -328,7 +349,7 @@ export class PainelPropriedades {
               Do estilo (${rotuloAlinhamento(estiloAtivo.alinhamento)})
             </button>
           </div>
-          <div class="rm-icg" style="display:flex; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:3px; gap:2px; justify-content:space-between;">
+          <div class="rm-icg rm-icg-formato" style="width:100%; box-sizing:border-box;">
             <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Alinhar à esquerda: primeira e última linhas à esquerda">
               ${svgIcone('alinhamento_esq', 16)}
             </button>
@@ -378,6 +399,46 @@ export class PainelPropriedades {
           </div>
         </div>
 
+        <!-- Fundo atrás do texto (Soft UI Badge com amostra e hex visíveis) -->
+        <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+          <label class="rm-chk" style="font-size:12.5px; margin:0; display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="rmCampoFundoAtivo" ${b.fundo_ativo ? 'checked' : ''}>
+            <span>Fundo atrás do texto</span>
+          </label>
+          <label class="rm-cor-linha-badge" id="rmFundoBadge" style="display:${b.fundo_ativo ? 'inline-flex' : 'none'}; align-items:center; gap:6px; cursor:pointer; padding:3px 10px; border-radius:999px; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); margin:0; position:relative;" title="Clique para escolher a cor de fundo">
+            <span id="rmFundoSwatch" style="width:16px; height:16px; border-radius:50%; background:${b.fundo_cor || '#FFF2A8'}; border:1px solid rgba(0,0,0,0.25); display:inline-block; flex:none;"></span>
+            <span style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);" id="rmFundoHex">${b.fundo_cor || '#FFF2A8'}</span>
+            <input type="color" id="rmCampoFundoCor" value="${b.fundo_cor || '#FFF2A8'}" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
+          </label>
+        </div>
+
+        <!-- Bordas / Linhas de destaque -->
+        <div>
+          <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
+            Bordas / Linhas de destaque
+          </span>
+          <div class="rm-icg" style="display:inline-flex; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:3px; gap:2px;">
+            <button type="button" class="rm-ic-bt ${(!b.borda_tipo || b.borda_tipo === 'sem') ? 'on' : ''}" data-borda="sem" title="Sem borda / padrão">
+              ${svgIcone('borda_sem', 16)}
+            </button>
+            <button type="button" class="rm-ic-bt ${b.borda_tipo === 'tachado' ? 'on' : ''}" data-borda="tachado" title="Linha média / tachado">
+              ${svgIcone('borda_tachado', 16)}
+            </button>
+            <button type="button" class="rm-ic-bt ${b.borda_tipo === 'inferior' ? 'on' : ''}" data-borda="inferior" title="Linha inferior / sublinhado de destaque">
+              ${svgIcone('borda_inferior', 16)}
+            </button>
+          </div>
+        </div>
+
+        <!-- Distância entre Blocos (pt) -->
+        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:4px; background:#fff;">
+          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;">
+            <span>Distância entre Blocos</span>
+            <span style="font-size:10px; color:var(--glx-muted); text-transform:none; font-weight:600;">pt</span>
+          </div>
+          <input type="number" id="rmCampoEspacoDepois" class="glx-input" min="0" max="100" step="1" value="${b.espaco_depois_pt ?? estiloAtivo.espaco_depois_pt ?? 8}" style="width:100%; height:32px; padding:0 10px; box-sizing:border-box;">
+        </div>
+
         <label class="rm-chk" style="font-size:12px; margin-top:4px;">
           <input type="checkbox" id="rmCampoManter" ${b.manterComProximo ? 'checked' : ''}>
           Manter título com o parágrafo seguinte (evitar órfão)
@@ -389,6 +450,53 @@ export class PainelPropriedades {
       box.querySelector('#rmCampoEstilo').addEventListener('change', e => { b.estiloId = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmCampoFonte').addEventListener('change', e => { b.fonte = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmCampoManter').addEventListener('change', e => { b.manterComProximo = e.target.checked; this.notificarMudanca(); });
+
+      // Fundo em Título
+      const chkFundoT = box.querySelector('#rmCampoFundoAtivo');
+      const badgeFundoT = box.querySelector('#rmFundoBadge');
+      const inpFundoCorT = box.querySelector('#rmCampoFundoCor');
+      const swatchFundoT = box.querySelector('#rmFundoSwatch');
+      const hexFundoT = box.querySelector('#rmFundoHex');
+
+      if (chkFundoT && inpFundoCorT) {
+        chkFundoT.addEventListener('change', () => {
+          b.fundo_ativo = chkFundoT.checked;
+          if (b.fundo_ativo && !b.fundo_cor) b.fundo_cor = '#FFF2A8';
+          if (badgeFundoT) badgeFundoT.style.display = b.fundo_ativo ? 'inline-flex' : 'none';
+          this.notificarMudanca();
+          this.renderizar();
+        });
+        badgeFundoT?.addEventListener('click', () => {
+          inpFundoCorT.click();
+        });
+        inpFundoCorT.addEventListener('input', e => {
+          b.fundo_cor = e.target.value;
+          if (swatchFundoT) swatchFundoT.style.background = b.fundo_cor;
+          if (hexFundoT) hexFundoT.textContent = b.fundo_cor;
+          this.notificarMudanca();
+          this.renderizar();
+        });
+      }
+
+      box.querySelector('#athBtnEditarEstiloDoBloco')?.addEventListener('click', () => {
+        const est = (this.doc.estilos || []).find(e => e.id === b.estiloId) || this.doc.estilos?.[0];
+        if (est) this.setEstilo(est);
+      });
+
+      // Bordas em Título
+      box.querySelectorAll('[data-borda]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          b.borda_tipo = btn.dataset.borda;
+          this.notificarMudanca();
+          this.renderizar();
+        });
+      });
+
+      // Distância entre blocos em Título
+      box.querySelector('#rmCampoEspacoDepois')?.addEventListener('input', e => {
+        b.espaco_depois_pt = parseFloat(e.target.value) || 0;
+        this.notificarMudanca();
+      });
 
       box.querySelector('#rmBtnAlinEstilo')?.addEventListener('click', () => {
         delete b.alinhamento;
@@ -441,12 +549,22 @@ export class PainelPropriedades {
       );
 
       box.innerHTML = `
+        <label style="font:700 12px var(--glx-font); width:100%; display:block;">Texto
+          <textarea id="rmCampoTexto" class="glx-input" rows="3" style="width:100%; min-height:56px; margin-top:4px; resize:vertical; font-family:var(--glx-font); font-size:12.5px; line-height:1.45; padding:8px 12px; border-radius:12px; box-sizing:border-box;">${b.texto || ''}</textarea>
+        </label>
+
         <!-- Estilo de texto -->
-        <label style="font:700 12px var(--glx-font);">Estilo de texto
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label style="font:700 12px var(--glx-font); margin:0;">Estilo de texto</label>
+            <button type="button" class="rm-ic" id="athBtnEditarEstiloDoBloco" title="Configurar este estilo no painel" style="width:22px; height:22px;">
+              ${svgIcone('lapis', 12)}
+            </button>
+          </div>
           <select id="rmCampoEstilo" class="glx-select" style="width:100%; margin-top:4px;">
             ${this.doc.estilos.map(e => `<option value="${e.id}" ${e.id === b.estiloId ? 'selected' : ''}>${e.nome}</option>`).join('')}
           </select>
-        </label>
+        </div>
         <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:-6px; margin-bottom:2px;">
           <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnAplicarEstiloBloco" style="flex:1;" title="Aplicar este estilo a todo o texto do bloco">
             Aplicar ao bloco todo
@@ -466,7 +584,7 @@ export class PainelPropriedades {
               Do estilo (${rotuloAlinhamento(estiloAtivo.alinhamento)})
             </button>
           </div>
-          <div class="rm-icg" style="display:flex; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:3px; gap:2px; justify-content:space-between;">
+          <div class="rm-icg rm-icg-formato" style="width:100%; box-sizing:border-box;">
             <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Alinhar à esquerda: primeira e última linhas à esquerda">
               ${svgIcone('alinhamento_esq', 16)}
             </button>
@@ -516,13 +634,17 @@ export class PainelPropriedades {
           </div>
         </div>
 
-        <!-- Fundo atrás do texto -->
-        <div style="display:flex; align-items:center; justify-content:space-between;">
-          <label class="rm-chk" style="font-size:12.5px;">
+        <!-- Fundo atrás do texto (Soft UI Badge com amostra e hex visíveis) -->
+        <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+          <label class="rm-chk" style="font-size:12.5px; margin:0; display:flex; align-items:center; gap:8px; cursor:pointer;">
             <input type="checkbox" id="rmCampoFundoAtivo" ${b.fundo_ativo ? 'checked' : ''}>
-            Fundo atrás do texto
+            <span>Fundo atrás do texto</span>
           </label>
-          <input type="color" id="rmCampoFundoCor" value="${b.fundo_cor || '#FFF2A8'}" style="width:28px; height:24px; border:none; background:none; cursor:pointer; display:${b.fundo_ativo ? 'block' : 'none'};">
+          <label class="rm-cor-linha-badge" id="rmFundoBadge" style="display:${b.fundo_ativo ? 'inline-flex' : 'none'}; align-items:center; gap:6px; cursor:pointer; padding:3px 10px; border-radius:999px; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); margin:0; position:relative;" title="Clique para escolher a cor de fundo">
+            <span id="rmFundoSwatch" style="width:16px; height:16px; border-radius:50%; background:${b.fundo_cor || '#FFF2A8'}; border:1px solid rgba(0,0,0,0.25); display:inline-block; flex:none;"></span>
+            <span style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);" id="rmFundoHex">${b.fundo_cor || '#FFF2A8'}</span>
+            <input type="color" id="rmCampoFundoCor" value="${b.fundo_cor || '#FFF2A8'}" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
+          </label>
         </div>
 
         <!-- Bordas / Linhas de destaque -->
@@ -673,18 +795,34 @@ export class PainelPropriedades {
         this.renderizar();
       });
 
-      // Fundo
+      // Fundo Soft UI
       const chkFundo = box.querySelector('#rmCampoFundoAtivo');
+      const badgeFundo = box.querySelector('#rmFundoBadge');
       const inpFundoCor = box.querySelector('#rmCampoFundoCor');
+      const swatchFundo = box.querySelector('#rmFundoSwatch');
+      const hexFundo = box.querySelector('#rmFundoHex');
+
       chkFundo.addEventListener('change', () => {
         b.fundo_ativo = chkFundo.checked;
         if (b.fundo_ativo && !b.fundo_cor) b.fundo_cor = '#FFF2A8';
-        inpFundoCor.style.display = b.fundo_ativo ? 'block' : 'none';
+        if (badgeFundo) badgeFundo.style.display = b.fundo_ativo ? 'inline-flex' : 'none';
         this.notificarMudanca();
+        this.renderizar();
+      });
+      badgeFundo?.addEventListener('click', () => {
+        inpFundoCor.click();
       });
       inpFundoCor.addEventListener('input', e => {
         b.fundo_cor = e.target.value;
+        if (swatchFundo) swatchFundo.style.background = b.fundo_cor;
+        if (hexFundo) hexFundo.textContent = b.fundo_cor;
         this.notificarMudanca();
+        this.renderizar();
+      });
+
+      box.querySelector('#athBtnEditarEstiloDoBloco')?.addEventListener('click', () => {
+        const est = (this.doc.estilos || []).find(e => e.id === b.estiloId) || this.doc.estilos?.[0];
+        if (est) this.setEstilo(est);
       });
 
       // Bordas
@@ -1364,6 +1502,234 @@ export class PainelPropriedades {
     });
 
     wrapper.appendChild(ajudanteBox);
+  }
+
+  renderizarEditorEstilo(wrapper, est) {
+    const rasc = JSON.parse(JSON.stringify(est));
+    const alinAtivo = rasc.alinhamento || 'esquerda';
+    const corAtiva = rasc.cor || '#1F2733';
+
+    const box = document.createElement('div');
+    box.className = 'ath-editor-estilo-painel';
+    box.style.display = 'flex';
+    box.style.flexDirection = 'column';
+    box.style.gap = '10px';
+
+    box.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; padding-bottom:8px; border-bottom:1px solid var(--ath-primary-line, #C8D7E6);">
+        <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnVoltarPropsBloco" style="display:inline-flex; align-items:center; gap:4px; font-weight:700; height:24px; padding:0 8px;">
+          ${svgIcone('voltar', 12)} Voltar
+        </button>
+        <strong style="font:800 12px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.05em;">Estilo Tipográfico</strong>
+      </div>
+
+      <!-- Preview do Estilo -->
+      <div id="athEstiloPreviaPainel" style="background:#fff; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:12px 14px; box-shadow:0 2px 8px rgba(0,0,0,0.04); min-height:48px; max-height:84px; overflow:hidden;">
+        Aa — Texto de exemplo do estilo
+      </div>
+
+      <label style="font:700 12px var(--glx-font); width:100%; display:block;">Nome do estilo
+        <input type="text" id="athEstiloNome" class="glx-input" style="width:100%; height:34px; margin-top:4px; box-sizing:border-box;" value="${rasc.nome || ''}">
+      </label>
+
+      <label style="font:700 12px var(--glx-font); width:100%; display:block;">Fonte
+        <select id="athEstiloFonte" class="glx-select" style="width:100%; height:34px; margin-top:4px;">
+          ${Object.values(FONTES_SISTEMA).map(f => `<option value="${f.id}" ${f.id === (rasc.fonte || 'nunito') ? 'selected' : ''}>${f.rotulo}</option>`).join('')}
+        </select>
+      </label>
+
+      <div class="rm-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <label style="font:700 12px var(--glx-font);">Tamanho (pt)
+          <input type="number" id="athEstiloTamanho" class="glx-input" min="6" max="72" step="0.5" value="${rasc.tamanho_pt || 12}" style="width:100%; height:34px; margin-top:4px; box-sizing:border-box;">
+        </label>
+        <label style="font:700 12px var(--glx-font);">Peso
+          <select id="athEstiloPeso" class="glx-select" style="width:100%; height:34px; margin-top:4px;">
+            ${PESOS_FONTE.map(p => `<option value="${p.valor}" ${p.valor === (rasc.peso || 400) ? 'selected' : ''}>${p.rotulo}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+
+      <!-- FORMATO: 7 botões ocupando 100% da largura útil -->
+      <div>
+        <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
+          Formato
+        </span>
+        <div class="rm-icg rm-icg-formato" style="width:100%; box-sizing:border-box;">
+          <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Alinhar à esquerda: primeira e última linhas à esquerda">
+            ${svgIcone('alinhamento_esq', 16)}
+          </button>
+          <button type="button" class="rm-ic-bt ${alinAtivo === 'centro' ? 'on' : ''}" data-alin="centro" title="Centralizado: todo o texto centralizado">
+            ${svgIcone('alinhamento_cen', 16)}
+          </button>
+          <button type="button" class="rm-ic-bt ${alinAtivo === 'direita' ? 'on' : ''}" data-alin="direita" title="Alinhar à direita: todo o texto alinhado à direita">
+            ${svgIcone('alinhamento_dir', 16)}
+          </button>
+          <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado' ? 'on' : ''}" data-alin="justificado" title="Justificado total: todas as linhas preenchem toda a largura">
+            ${svgIcone('alinhamento_jus', 16)}
+          </button>
+          <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_esquerda' ? 'on' : ''}" data-alin="justificado_esquerda" title="Justificado com a última linha à esquerda (padrão editorial)">
+            ${svgIcone('alinhamento_jus_esq', 16)}
+          </button>
+          <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_centro' ? 'on' : ''}" data-alin="justificado_centro" title="Justificado com a última linha centralizada">
+            ${svgIcone('alinhamento_jus_cen', 16)}
+          </button>
+          <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_direita' ? 'on' : ''}" data-alin="justificado_direita" title="Justificado com a última linha à direita">
+            ${svgIcone('alinhamento_jus_dir', 16)}
+          </button>
+        </div>
+      </div>
+
+      <div class="rm-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <label style="font:700 12px var(--glx-font);">Entrelinha
+          <input type="number" id="athEstiloEntrelinha" class="glx-input" step="0.05" min="1" max="3" value="${rasc.entrelinha || 1.5}" style="width:100%; height:34px; margin-top:4px; box-sizing:border-box;">
+        </label>
+        <label style="font:700 12px var(--glx-font);">Cor do texto
+          <label class="rm-cor-linha-badge" id="athEstiloCorBadge" style="display:flex; align-items:center; gap:6px; cursor:pointer; padding:3px 10px; border-radius:999px; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); margin-top:4px; height:34px; box-sizing:border-box; position:relative;" title="Clique para escolher a cor">
+            <span id="athEstiloCorSwatch" style="width:16px; height:16px; border-radius:50%; background:${corAtiva}; border:1px solid rgba(0,0,0,0.2); display:inline-block; flex:none;"></span>
+            <span style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);" id="athEstiloCorHex">${corAtiva}</span>
+            <input type="color" id="athEstiloCorInput" value="${corAtiva.startsWith('#') ? corAtiva : '#1F2733'}" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
+          </label>
+        </label>
+      </div>
+
+      <div>
+        <label style="font:700 12px var(--glx-font); width:100%; display:block;">Distância Parágrafos Enter (pt)
+          <input type="number" id="athEstiloEspacoParagrafos" class="glx-input" min="0" max="48" step="1" value="${rasc.espaco_paragrafos_pt ?? 6}" style="width:100%; height:34px; margin-top:4px; box-sizing:border-box;">
+        </label>
+      </div>
+
+      <div style="display:flex; gap:16px; align-items:center;">
+        <label class="rm-chk" style="font-size:12px;">
+          <input type="checkbox" id="athEstiloItalico" ${rasc.italico ? 'checked' : ''}> Itálico
+        </label>
+        <label class="rm-chk" style="font-size:12px;">
+          <input type="checkbox" id="athEstiloCaixaAlta" ${rasc.caixa_alta ? 'checked' : ''}> Caixa Alta
+        </label>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px; padding-top:10px; border-top:1px solid var(--ath-primary-line, #C8D7E6);">
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="athBtnSalvarEstilo" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px;">
+            ${svgIcone('salvar', 14)} Salvar Estilo
+          </button>
+          <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="athBtnDuplicarEstilo" style="flex:1;">
+            Salvar como Novo
+          </button>
+        </div>
+        ${est.personalizado ? `
+          <button type="button" class="glx-btn glx-btn-perigo glx-btn-sm" id="athBtnExcluirEstilo" style="width:100%; color:#DC2626; border-color:#FECACA; background:#FEF2F2;">
+            Excluir Estilo
+          </button>
+        ` : ''}
+      </div>
+    `;
+
+    const previaEl = box.querySelector('#athEstiloPreviaPainel');
+    const swatchEl = box.querySelector('#athEstiloCorSwatch');
+    const hexEl = box.querySelector('#athEstiloCorHex');
+    const inputCor = box.querySelector('#athEstiloCorInput');
+
+    const atualizarPrevia = () => {
+      previaEl.style.cssText = `${estiloParaCss(rasc)} min-height:48px; max-height:84px; overflow:hidden; text-align:${alinhamentoCss(rasc.alinhamento, 'left')}; text-align-last:auto;`;
+      swatchEl.style.background = rasc.cor || '#1F2733';
+      hexEl.textContent = rasc.cor || '#1F2733';
+    };
+    atualizarPrevia();
+
+    box.querySelector('#athBtnVoltarPropsBloco').addEventListener('click', () => {
+      this.estiloSelecionado = null;
+      this.renderizar();
+    });
+
+    box.querySelector('#athEstiloNome').addEventListener('input', e => {
+      rasc.nome = e.target.value;
+      atualizarPrevia();
+    });
+
+    box.querySelector('#athEstiloFonte').addEventListener('change', e => {
+      rasc.fonte = e.target.value;
+      atualizarPrevia();
+    });
+
+    box.querySelector('#athEstiloTamanho').addEventListener('input', e => {
+      rasc.tamanho_pt = parseFloat(e.target.value) || 12;
+      atualizarPrevia();
+    });
+
+    box.querySelector('#athEstiloPeso').addEventListener('change', e => {
+      rasc.peso = parseInt(e.target.value, 10);
+      atualizarPrevia();
+    });
+
+    box.querySelectorAll('[data-alin]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        rasc.alinhamento = btn.dataset.alin;
+        box.querySelectorAll('[data-alin]').forEach(b => b.classList.toggle('on', b.dataset.alin === rasc.alinhamento));
+        atualizarPrevia();
+      });
+    });
+
+    box.querySelector('#athEstiloEntrelinha').addEventListener('input', e => {
+      rasc.entrelinha = parseFloat(e.target.value) || 1.5;
+      atualizarPrevia();
+    });
+
+    box.querySelector('#athEstiloCorBadge').addEventListener('click', () => {
+      inputCor.click();
+    });
+
+    inputCor.addEventListener('input', e => {
+      rasc.cor = e.target.value;
+      atualizarPrevia();
+    });
+
+    box.querySelector('#athEstiloEspacoParagrafos').addEventListener('input', e => {
+      rasc.espaco_paragrafos_pt = parseFloat(e.target.value) || 0;
+      atualizarPrevia();
+    });
+
+    box.querySelector('#athEstiloItalico').addEventListener('change', e => {
+      rasc.italico = e.target.checked;
+      atualizarPrevia();
+    });
+
+    box.querySelector('#athEstiloCaixaAlta').addEventListener('change', e => {
+      rasc.caixa_alta = e.target.checked;
+      atualizarPrevia();
+    });
+
+    box.querySelector('#athBtnSalvarEstilo').addEventListener('click', () => {
+      Object.assign(est, rasc);
+      this.notificarMudanca(true);
+      this.renderizar();
+    });
+
+    box.querySelector('#athBtnDuplicarEstilo').addEventListener('click', () => {
+      const novoId = 'est_' + Date.now().toString(36);
+      const novoEst = {
+        ...rasc,
+        id: novoId,
+        nome: `${rasc.nome} (Cópia)`,
+        personalizado: true
+      };
+      this.doc.estilos.push(novoEst);
+      this.estiloSelecionado = novoEst;
+      this.notificarMudanca(true);
+      this.renderizar();
+    });
+
+    box.querySelector('#athBtnExcluirEstilo')?.addEventListener('click', () => {
+      if (!window.confirm(`Tem certeza que deseja excluir o estilo "${est.nome}"?`)) return;
+      const idx = this.doc.estilos.findIndex(e => e.id === est.id);
+      if (idx >= 0) {
+        this.doc.estilos.splice(idx, 1);
+        this.estiloSelecionado = null;
+        this.notificarMudanca(true);
+        this.renderizar();
+      }
+    });
+
+    wrapper.appendChild(box);
   }
 
   notificarMudanca(estrutural = false) {

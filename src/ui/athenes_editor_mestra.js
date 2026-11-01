@@ -8,7 +8,7 @@
  */
 
 import { svgIcone } from './athenes_icones.js';
-import { repaginarDocumento, formatarNumeroPagina, criarElementoMestra } from '../core/athenes_documento.js';
+import { repaginarDocumento, formatarNumeroPagina, criarElementoMestra, removerMestra } from '../core/athenes_documento.js';
 
 export class ModalEditorMestra {
   constructor(documento, mestraId, opcoes = {}) {
@@ -312,7 +312,12 @@ export class ModalEditorMestra {
       </div>
 
       <div class="ath-modal-foot" style="padding:12px 20px; border-top:1px solid var(--ath-primary-line, #C8D7E6); background:var(--ath-surface-elevated, #F8FAFC); display:flex; justify-content:space-between; align-items:center; flex:none;">
-        <span style="font-size:12px; color:var(--glx-muted, #6B7585);">Alterações serão aplicadas mantendo todos os blocos e textos.</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button type="button" class="glx-btn glx-btn-perigo glx-btn-sm" id="athBtnExcluirMestra" style="display:flex; align-items:center; gap:6px; color:#DC2626; border-color:#FECACA; background:#FEF2F2;" title="Excluir esta página mestra do catálogo">
+            ${svgIcone('lixeira', 13)} Excluir Mestra
+          </button>
+          <span style="font-size:11.5px; color:var(--glx-muted, #6B7585);">Alterações serão aplicadas mantendo todos os blocos e textos.</span>
+        </div>
         <div style="display:flex; gap:10px;">
           <button type="button" class="glx-btn glx-btn-soft" id="athBtnCancelarMestra">Cancelar</button>
           <button type="button" class="glx-btn glx-btn-primary" id="athBtnSalvarMestra">Salvar Página Mestra</button>
@@ -564,6 +569,29 @@ export class ModalEditorMestra {
 
     modal.querySelector('#athBtnFecharMestraModal').addEventListener('click', fechar);
     modal.querySelector('#athBtnCancelarMestra').addEventListener('click', fechar);
+
+    const btnExcluir = modal.querySelector('#athBtnExcluirMestra');
+    if (btnExcluir) {
+      if ((this.doc.mestras || []).length <= 1) {
+        btnExcluir.disabled = true;
+        btnExcluir.title = 'Não é possível excluir a única página mestra do documento';
+        btnExcluir.style.opacity = '0.5';
+        btnExcluir.style.cursor = 'not-allowed';
+      } else {
+        btnExcluir.addEventListener('click', () => {
+          const secoesQueUsam = (this.doc.secoes || []).filter(s => s.mestraId === this.rascunho.id);
+          let msg = `Tem certeza que deseja excluir a página mestra "${this.mestraOriginal?.nome || this.rascunho.nome}"?`;
+          if (secoesQueUsam.length > 0) {
+            msg = `Esta página mestra está em uso por ${secoesQueUsam.length} seção(ões) do documento.\nAo excluí-la, essas seções serão vinculadas à primeira mestra restante.\n\nDeseja continuar?`;
+          }
+          if (window.confirm && !window.confirm(msg)) return;
+          removerMestra(this.doc, this.rascunho.id);
+          fechar();
+          this.onSalvar();
+        });
+      }
+    }
+
     this.backdrop.addEventListener('click', e => {
       if (e.target === this.backdrop) fechar();
     });

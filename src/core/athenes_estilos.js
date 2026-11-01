@@ -516,20 +516,20 @@ export function estiloParaCss(estilo, fontesDisponiveis = FONTES_SISTEMA) {
 
   // Kerning / Tracking
   if (estilo.espacamento_letras_em) {
+    props.push(`letter-spacing: ${estilo.espacamento_letras_em}em;`);
+  }
   if (estilo.espacamento_palavras_em) {
     props.push(`word-spacing: ${estilo.espacamento_palavras_em}em;`);
   }
   if (estilo.fundo_cor) {
-    props.push(`background-color: ${estilo.fundo_cor};`);
+    props.push(`background-color: ${estilo.fundo_cor}; padding: 3px 6px; border-radius: 4px; display: inline-block; box-decoration-break: clone; -webkit-box-decoration-break: clone;`);
   }
   if (estilo.borda_tipo === 'tachado') {
     props.push('text-decoration: line-through;');
   } else if (estilo.borda_tipo === 'inferior') {
-    props.push('border-bottom: 2px solid currentColor; padding-bottom: 2px;');
+    props.push('border-bottom: 2px solid currentColor; padding-bottom: 3px; display: inline-block;');
   } else if (estilo.borda_tipo === 'caixa') {
-    props.push('border: 1px solid var(--ath-primary-line, #C8D7E6); padding: 4px 8px; border-radius: 4px;');
-  }
-    props.push(`letter-spacing: ${estilo.espacamento_letras_em}em;`);
+    props.push('border: 1px solid var(--ath-primary-line, #C8D7E6); padding: 4px 8px; border-radius: 6px; display: inline-block;');
   }
 
   // Hifenização
@@ -543,4 +543,18 @@ export function estiloParaCss(estilo, fontesDisponiveis = FONTES_SISTEMA) {
   }
 
   return props.join(' ');
+}
+
+
+export function alinhamentoCss(valor, padrao = 'left') {
+  const map = {
+    esquerda: 'left',
+    centro: 'center',
+    direita: 'right',
+    justificado: 'justify',
+    justificado_esquerda: 'justify',
+    justificado_centro: 'justify',
+    justificado_direita: 'justify'
+  };
+  return map[valor] || padrao;
 }

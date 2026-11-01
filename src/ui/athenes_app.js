@@ -76,6 +76,9 @@ export class AthenesApp {
       onSelecionarBloco: (bloco, pagina) => {
         if (this.painelProps) this.painelProps.setSelecao(bloco, pagina);
       },
+      onEditarEstilo: (estilo) => {
+        if (this.painelProps) this.painelProps.setEstilo(estilo);
+      },
       onRenderizado: (inspetorEl) => this.montarPainelProps(inspetorEl),
       onVoltarDashboard: () => {
         this.autoSalvar();

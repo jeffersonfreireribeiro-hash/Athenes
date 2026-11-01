@@ -29,6 +29,7 @@ import {
   dividirBlocoTexto,
   adicionarSecao,
   removerSecao,
+  removerMestra,
   moverSecao,
   trocarMestraDaSecao,
   recalcularNumeracaoAutomatica,
@@ -68,8 +69,15 @@ const MENUS_BLOCO = {
   ]
 };
 
-function rotuloDoBloco(b) {
+function rotuloDoBloco(b, doc = null) {
   if (b.tipo === 'figura') return ROTULOS_FIGURA[b.subtipo] || 'Figura';
+  if (b.tipo === 'titulo' || b.tipo === 'subtitulo' || b.tipo === 'paragrafo' || b.tipo === 'texto') {
+    if (doc && b.estiloId) {
+      const est = (doc.estilos || []).find(e => e.id === b.estiloId);
+      if (est) return est.nome;
+    }
+    return 'Texto';
+  }
   return TIPO_ROTULO[b.tipo] || b.tipo;
 }
 
@@ -94,6 +102,7 @@ export class EditorView {
     this.estilosAberto = false;
     this._tSnap = null;
 
+    this.opcoes = opcoes;
     this.onAlterado = opcoes.onAlterado || (() => {});
     this.onSelecionarBloco = opcoes.onSelecionarBloco || (() => {});
     this.onVoltarDashboard = opcoes.onVoltarDashboard || (() => {});
@@ -101,6 +110,8 @@ export class EditorView {
     this.onAbrirZotero = opcoes.onAbrirZotero || (() => {});
     this.onAbrirConexoes = opcoes.onAbrirConexoes || (() => {});
     this.onRenderizado = opcoes.onRenderizado || (() => {});
+    this.onEditarEstilo = opcoes.onEditarEstilo || (() => {});
+    this.menuTopoAberto = null;
 
     repaginarDocumento(this.doc);
     this.normalizarBlocosLegados();
@@ -217,8 +228,44 @@ export class EditorView {
         <!-- COLUNA CENTRAL: Prévia da Folha A4 com Barra de Blocos Flutuante e Edição Direta -->
         <section class="rm-col rm-col-prev" id="rmColPrev">
           <div class="rm-prev-topo">
-            <strong>Prévia</strong>
-            <span id="rmPrevInfo" class="rm-prev-info"></span>
+            <div class="rm-prev-topo-esq">
+              <strong>Prévia</strong>
+              <span id="rmPrevInfo" class="rm-prev-info"></span>
+            </div>
+            <div class="rm-prev-menus-topo" id="rmPrevMenusTopo">
+              <div class="rm-menu-topo-item" data-menu="arquivo">
+                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuArquivo" aria-haspopup="dialog" aria-expanded="false" title="Configurar propriedades do arquivo, formato e margens">
+                  ${svgIcone('documento', 14)}
+                  <span>Arquivo & Margens</span>
+                  <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
+                    <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <div class="rm-topo-popover" id="athPopoverArquivo" role="dialog" aria-label="Arquivo e Margens" hidden></div>
+              </div>
+
+              <div class="rm-menu-topo-item" data-menu="cabrod">
+                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuCabRod" aria-haspopup="dialog" aria-expanded="false" title="Configurar cabeçalho, rodapé e numeração da página">
+                  ${svgIcone('subtitulo', 14)}
+                  <span>Cabeçalho & Rodapé</span>
+                  <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
+                    <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <div class="rm-topo-popover" id="athPopoverCabRod" role="dialog" aria-label="Cabeçalho e Rodapé" hidden></div>
+              </div>
+
+              <div class="rm-menu-topo-item" data-menu="estilos">
+                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuEstilos" aria-haspopup="dialog" aria-expanded="false" title="Estilos tipográficos do documento">
+                  ${svgIcone('paragrafo', 14)}
+                  <span>Estilos de Texto</span>
+                  <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
+                    <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <div class="rm-topo-popover rm-topo-popover-estilos" id="athPopoverEstilos" role="dialog" aria-label="Estilos de Texto" hidden></div>
+              </div>
+            </div>
           </div>
 
           <div class="rm-barra-blocos" id="rmBarraBlocos">
@@ -285,6 +332,9 @@ export class EditorView {
 
     // Liga eventos dos botões de topo e barra
     this.ligarEventosGerais(root);
+
+    // Monta menus suspensos de topo (Arquivo, Cabeçalho/Rodapé, Estilos)
+    this.montarMenusTopo(root);
 
     // Renderiza Coluna Esquerda
     this.renderizarColunaEsquerda(root.querySelector('#rmColEsq'));
@@ -357,18 +407,71 @@ export class EditorView {
     });
   }
 
-  renderizarColunaEsquerda(colEsq) {
-    if (!colEsq) return;
-    colEsq.innerHTML = '';
-
+  montarMenusTopo(root) {
     const mestra = this.obterMestraAtiva();
-    const secAtiva = this.obterSecaoAtiva();
     const margens = mestra.margens_mm || { t: 25, r: 20, b: 20, l: 25 };
+    const estilos = this.doc.estilos || [];
 
-    // 1. Bloco de Configuração do Documento e Margens
-    const cardCfg = document.createElement('div');
-    cardCfg.className = 'rm-bloco-cfg';
-    cardCfg.innerHTML = `
+    const popArquivo = root.querySelector('#athPopoverArquivo');
+    const popCabRod = root.querySelector('#athPopoverCabRod');
+    const popEstilos = root.querySelector('#athPopoverEstilos');
+
+    const btnArquivo = root.querySelector('#athBtnMenuArquivo');
+    const btnCabRod = root.querySelector('#athBtnMenuCabRod');
+    const btnEstilos = root.querySelector('#athBtnMenuEstilos');
+
+    const popovers = { arquivo: popArquivo, cabrod: popCabRod, estilos: popEstilos };
+    const botoes = { arquivo: btnArquivo, cabrod: btnCabRod, estilos: btnEstilos };
+
+    const fecharTodos = () => {
+      Object.values(popovers).forEach(p => { if (p) p.hidden = true; });
+      Object.values(botoes).forEach(b => {
+        if (b) {
+          b.setAttribute('aria-expanded', 'false');
+          b.classList.remove('ativo');
+        }
+      });
+      this.menuTopoAberto = null;
+    };
+
+    const togglePopover = (chave) => {
+      const p = popovers[chave];
+      const b = botoes[chave];
+      if (!p || !b) return;
+      const estavaAberto = !p.hidden;
+      fecharTodos();
+      if (!estavaAberto) {
+        p.hidden = false;
+        b.setAttribute('aria-expanded', 'true');
+        b.classList.add('ativo');
+        this.menuTopoAberto = chave;
+        if (chave === 'arquivo') {
+          this.pintarDiagramaMargens();
+        }
+      }
+    };
+
+    btnArquivo.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePopover('arquivo');
+    });
+
+    btnCabRod.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePopover('cabrod');
+    });
+
+    btnEstilos.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePopover('estilos');
+    });
+
+    // 1. Popover Arquivo & Margens
+    popArquivo.innerHTML = `
+      <div class="rm-popover-topo-head">
+        <strong>Arquivo & Margens</strong>
+        <button type="button" class="rm-ic" data-fechar-popover title="Fechar">${svgIcone('fechar', 13)}</button>
+      </div>
       <label>Nome
         <input type="text" id="rmNome" value="${this.doc.titulo || ''}">
       </label>
@@ -392,12 +495,7 @@ export class EditorView {
         </label>
       </div>
 
-      <div class="rm-filtro-doc-topo" style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:4px; width:100%; box-sizing:border-box;">
-        <span class="rm-rot" style="margin:0; font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;" title="Filtro dos documentos (opcional)">Filtro dos documentos</span>
-        <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" style="white-space:nowrap !important; flex:none !important; flex-shrink:0 !important; height:24px; padding:0 10px; font-size:11px;">+ Filtro</button>
-      </div>
-
-      <span class="rm-rot" style="margin-top:6px;">Margens da folha</span>
+      <span class="rm-rot" style="margin-top:4px;">Margens da folha</span>
       <div class="rm-margens">
         <div class="rm-folha-mini" aria-hidden="true"><i id="rmMDiag"></i></div>
         <div class="rm-margens-campos">
@@ -413,33 +511,32 @@ export class EditorView {
       <span class="rm-dica">Dentro das margens a folha tem 12 colunas: cada bloco escolhe onde começa e quantas ocupa.</span>
     `;
 
-    cardCfg.querySelector('#rmNome').addEventListener('input', e => {
+    popArquivo.querySelector('#rmNome').addEventListener('input', e => {
       this.doc.titulo = e.target.value;
       const tInput = this.container.querySelector('#athInputTituloDoc');
       if (tInput) tInput.value = e.target.value;
       this.notificarMudanca();
     });
 
-    cardCfg.querySelector('#rmDescricao').addEventListener('input', e => {
+    popArquivo.querySelector('#rmDescricao').addEventListener('input', e => {
       this.doc.subtitulo = e.target.value;
       this.notificarMudanca();
     });
 
-    cardCfg.querySelector('#rmEscopo').addEventListener('change', e => {
+    popArquivo.querySelector('#rmEscopo').addEventListener('change', e => {
       this.doc.tipoDoc = e.target.value;
       this.notificarMudanca();
     });
 
-    cardCfg.querySelector('#rmOrientacao').addEventListener('change', e => {
+    popArquivo.querySelector('#rmOrientacao').addEventListener('change', e => {
       mestra.orientacao = e.target.value;
       this.pintarDiagramaMargens();
       this.renderizarFolhasPaginas();
       this.notificarMudanca();
     });
 
-    // Lógica das Margens da Folha
     const ligarMargem = (id, chave) => {
-      cardCfg.querySelector(id).addEventListener('input', e => {
+      popArquivo.querySelector(id).addEventListener('input', e => {
         const val = parseInt(e.target.value, 10) || 10;
         if (this.margemElo) {
           mestra.margens_mm.t = val;
@@ -447,7 +544,7 @@ export class EditorView {
           mestra.margens_mm.b = val;
           mestra.margens_mm.l = val;
           for (const campoId of ['#rmMT', '#rmMB', '#rmML', '#rmMR']) {
-            const el = cardCfg.querySelector(campoId);
+            const el = popArquivo.querySelector(campoId);
             if (el) el.value = val;
           }
         } else {
@@ -464,9 +561,9 @@ export class EditorView {
     ligarMargem('#rmML', 'l');
     ligarMargem('#rmMR', 'r');
 
-    cardCfg.querySelector('#rmMElo').addEventListener('click', () => {
+    popArquivo.querySelector('#rmMElo').addEventListener('click', () => {
       this.margemElo = !this.margemElo;
-      const eloBtn = cardCfg.querySelector('#rmMElo');
+      const eloBtn = popArquivo.querySelector('#rmMElo');
       eloBtn.setAttribute('aria-pressed', String(this.margemElo));
       eloBtn.classList.toggle('on', this.margemElo);
       if (this.margemElo) {
@@ -474,37 +571,287 @@ export class EditorView {
         mestra.margens_mm.r = tVal;
         mestra.margens_mm.b = tVal;
         mestra.margens_mm.l = tVal;
-        cardCfg.querySelector('#rmMR').value = tVal;
-        cardCfg.querySelector('#rmMB').value = tVal;
-        cardCfg.querySelector('#rmML').value = tVal;
+        popArquivo.querySelector('#rmMR').value = tVal;
+        popArquivo.querySelector('#rmMB').value = tVal;
+        popArquivo.querySelector('#rmML').value = tVal;
         this.pintarDiagramaMargens();
         this.renderizarFolhasPaginas();
         this.notificarMudanca();
       }
     });
 
-    colEsq.appendChild(cardCfg);
+    // 2. Popover Cabeçalho e Rodapé
+    popCabRod.innerHTML = `
+      <div class="rm-popover-topo-head">
+        <strong>Cabeçalho e Rodapé</strong>
+        <button type="button" class="rm-ic" data-fechar-popover title="Fechar">${svgIcone('fechar', 13)}</button>
+      </div>
+      <label class="rm-chk"><input type="checkbox" id="rmCabAtivo" ${mestra.cabecalho?.ativo ? 'checked' : ''}> Mostrar cabeçalho</label>
+      <span class="rm-rot">Logo da empresa</span>
+      <label class="rm-arquivo glx-btn glx-btn-soft glx-btn-sm" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+        ${svgIcone('imagem', 14)}
+        <span>Escolher imagem</span>
+        <input type="file" id="rmLogoArq" accept="image/png,image/jpeg,image/webp" hidden>
+      </label>
+      <span class="rm-dica">PNG, JPEG ou WebP, até 400 KB.</span>
+      <label>Linhas do cabeçalho (uma por linha; aceita variáveis)
+        <textarea id="rmCabLinhas" rows="3">${mestra.cabecalho?.texto || '{{documento.titulo}}\n{{documento.instituicao}}'}</textarea>
+      </label>
+      <label>Alinhamento do cabeçalho
+        <select id="rmCabAlinha" class="glx-select">
+          <option value="esquerda" ${mestra.cabecalho?.alinhamento === 'esquerda' ? 'selected' : ''}>Logo à esquerda</option>
+          <option value="direita" ${mestra.cabecalho?.alinhamento === 'direita' ? 'selected' : ''}>Logo à direita</option>
+          <option value="centro" ${mestra.cabecalho?.alinhamento === 'centro' ? 'selected' : ''}>Centralizado</option>
+        </select>
+      </label>
+      <label class="rm-chk" style="margin-top:6px;"><input type="checkbox" id="rmRodAtivo" ${mestra.rodape?.ativo ? 'checked' : ''}> Mostrar rodapé</label>
+      <label>Texto do rodapé
+        <textarea id="rmRodTexto" rows="2">${mestra.rodape?.texto || 'Athenes · Editor Científico e Acadêmico'}</textarea>
+      </label>
+      <label class="rm-chk"><input type="checkbox" id="rmRodNum" ${mestra.rodape?.numeracao ? 'checked' : ''}> Numerar páginas ("Página 1 de 3")</label>
+    `;
 
-    // 2. Accordion PÁGINAS MESTRAS (Lista Unificada com Edição e Aplicação)
-    const secMestras = document.createElement('details');
-    secMestras.className = 'rm-sec';
-    secMestras.open = true;
-    secMestras.innerHTML = `
-      <summary>PÁGINAS MESTRAS <span class="rm-contagem">(${this.doc.mestras?.length || 0})</span></summary>
-      
-      <!-- Lista Única de Todas as Páginas Mestras -->
-      <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;" id="rmListaMestrasUnificada"></div>
-      
-      <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="rmBtnNovaMestra" style="margin-top:10px; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;">
-        ${svgIcone('mais', 14)} Nova Página Mestra
+    popCabRod.querySelector('#rmCabAtivo').addEventListener('change', e => {
+      mestra.cabecalho = mestra.cabecalho || {};
+      mestra.cabecalho.ativo = e.target.checked;
+      this.renderizarFolhasPaginas();
+      this.notificarMudanca();
+    });
+
+    popCabRod.querySelector('#rmCabLinhas').addEventListener('input', e => {
+      mestra.cabecalho = mestra.cabecalho || {};
+      mestra.cabecalho.texto = e.target.value;
+      this.renderizarFolhasPaginas();
+      this.notificarMudanca();
+    });
+
+    popCabRod.querySelector('#rmCabAlinha').addEventListener('change', e => {
+      mestra.cabecalho = mestra.cabecalho || {};
+      mestra.cabecalho.alinhamento = e.target.value;
+      this.renderizarFolhasPaginas();
+      this.notificarMudanca();
+    });
+
+    popCabRod.querySelector('#rmLogoArq')?.addEventListener('change', e => {
+      const arq = e.target.files?.[0];
+      if (!arq) return;
+      const leitor = new FileReader();
+      leitor.onload = ev => {
+        mestra.cabecalho = mestra.cabecalho || {};
+        mestra.cabecalho.logo_base64 = ev.target.result;
+        this.renderizarFolhasPaginas();
+        this.notificarMudanca();
+      };
+      leitor.readAsDataURL(arq);
+    });
+
+    popCabRod.querySelector('#rmRodAtivo').addEventListener('change', e => {
+      mestra.rodape = mestra.rodape || {};
+      mestra.rodape.ativo = e.target.checked;
+      this.renderizarFolhasPaginas();
+      this.notificarMudanca();
+    });
+
+    popCabRod.querySelector('#rmRodTexto').addEventListener('input', e => {
+      mestra.rodape = mestra.rodape || {};
+      mestra.rodape.texto = e.target.value;
+      this.renderizarFolhasPaginas();
+      this.notificarMudanca();
+    });
+
+    popCabRod.querySelector('#rmRodNum').addEventListener('change', e => {
+      mestra.rodape = mestra.rodape || {};
+      mestra.rodape.numeracao = e.target.checked;
+      this.renderizarFolhasPaginas();
+      this.notificarMudanca();
+    });
+
+    // 3. Popover Estilos de Texto
+    const estiloAtivo = estilos.find(e => e.id === this.estiloSelecionadoId) || estilos[0];
+    const fonteRotulo = id => (FONTES_SISTEMA[id]?.rotulo || id || '').replace(/ \(.*\)$/, '');
+
+    popEstilos.innerHTML = `
+      <div class="rm-popover-topo-head">
+        <strong>Estilos de Texto <span class="rm-contagem">(${estilos.length})</span></strong>
+        <button type="button" class="rm-ic" data-fechar-popover title="Fechar">${svgIcone('fechar', 13)}</button>
+      </div>
+      <ul class="rm-lista-estilos" id="rmListaEstilosTopo" style="max-height:220px; overflow-y:auto; margin-top:4px; margin-bottom:4px; padding:2px;"></ul>
+      <div class="rm-estilo-previa" id="rmEstiloPreviaTopo" style="margin-top:6px; margin-bottom:6px;">Aa — Texto de exemplo do estilo</div>
+      <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="rmBtnNovoEstiloTopo" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; margin-top:4px;">
+        ${svgIcone('mais', 12)} Novo Estilo
       </button>
     `;
 
-    const listaMestrasBox = secMestras.querySelector('#rmListaMestrasUnificada');
-    (this.doc.mestras || []).forEach(mestra => {
-      const secoesQueUsam = (this.doc.secoes || []).filter(s => s.mestraId === mestra.id);
-      const emUso = secoesQueUsam.length > 0;
-      const ehSecaoAtiva = secoesQueUsam.some(s => s.id === this.secaoAtivaId);
+    const previaTopo = popEstilos.querySelector('#rmEstiloPreviaTopo');
+    const atualizarPreviaTopo = (est) => {
+      if (!est || !previaTopo) return;
+      previaTopo.style.cssText = `${estiloParaCss(est)} margin-top:6px; margin-bottom:6px; max-height:70px; overflow:hidden; text-align:${alinhamentoCss(est.alinhamento, 'left')}; text-align-last:auto;`;
+    };
+    if (estiloAtivo) atualizarPreviaTopo(estiloAtivo);
+
+    const listaEstilosTopo = popEstilos.querySelector('#rmListaEstilosTopo');
+    estilos.forEach(est => {
+      const li = document.createElement('li');
+      li.style.listStyle = 'none';
+      li.style.margin = '0 0 4px 0';
+      const ehSel = (est.id === this.estiloSelecionadoId);
+      li.innerHTML = `
+        <div class="rm-estilo-item ${ehSel ? 'on' : ''}" style="display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; cursor:pointer; padding:6px 10px; border-radius:10px; box-sizing:border-box;">
+          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+            <span class="rm-estilo-amostra" style="color:${est.cor || '#1F2733'}; font-weight:${est.peso || 400}; flex:none;">Aa</span>
+            <span class="rm-estilo-nome" style="flex:1; min-width:0;">
+              <strong style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block;">${est.nome}</strong>
+              <small style="color:var(--glx-muted, #6B7585);">${fonteRotulo(est.fonte)} · ${est.tamanho_pt || 12} pt · ${est.peso || 400}</small>
+            </span>
+            ${est.personalizado ? '<em class="rm-estilo-tag" style="flex:none;">seu</em>' : ''}
+          </div>
+          <button type="button" class="rm-ic" data-acao="editar-estilo" title="Editar estilo (${est.nome})" style="width:26px; height:26px; flex:none; border-radius:6px; border:1px solid #CBD5E1; background:#fff;">
+            ${svgIcone('lapis', 13)}
+          </button>
+        </div>
+      `;
+
+      const itemCard = li.querySelector('.rm-estilo-item');
+      const btnEditar = li.querySelector('[data-acao="editar-estilo"]');
+
+      const selecionarEEmitir = () => {
+        this.estiloSelecionadoId = est.id;
+        popEstilos.querySelectorAll('.rm-estilo-item').forEach(b => b.classList.remove('on'));
+        itemCard.classList.add('on');
+        atualizarPreviaTopo(est);
+        fecharTodos();
+        this.onEditarEstilo(est);
+      };
+
+      itemCard.addEventListener('click', (e) => {
+        if (e.target.closest('[data-acao="editar-estilo"]')) return;
+        selecionarEEmitir();
+      });
+
+      btnEditar.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selecionarEEmitir();
+      });
+
+      listaEstilosTopo.appendChild(li);
+    });
+
+    popEstilos.querySelector('#rmBtnNovoEstiloTopo').addEventListener('click', () => {
+      const novo = {
+        id: 'est_' + Date.now().toString(36),
+        nome: 'Novo Estilo',
+        fonte: 'nunito',
+        tamanho_pt: 12,
+        peso: 400,
+        alinhamento: 'esquerda',
+        entrelinha: 1.5,
+        espaco_depois_pt: 8,
+        espaco_paragrafos_pt: 6,
+        cor: '#1F2733',
+        personalizado: true
+      };
+      this.doc.estilos.push(novo);
+      this.estiloSelecionadoId = novo.id;
+      this.notificarMudanca();
+      fecharTodos();
+      this.renderizar();
+      this.onEditarEstilo(novo);
+    });
+
+    // Fechar ao clicar nos botões 'X'
+    root.querySelectorAll('[data-fechar-popover]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fecharTodos();
+      });
+    });
+
+    // Fechar ao clicar fora dos itens de menu topo
+    if (!this._menusTopoRegistrados) {
+      this._menusTopoRegistrados = true;
+      document.addEventListener('click', (ev) => {
+        if (!ev.target.closest('.rm-menu-topo-item')) {
+          fecharTodos();
+        }
+      });
+      document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape') fecharTodos();
+      });
+    }
+
+    if (this.menuTopoAberto && popovers[this.menuTopoAberto]) {
+      popovers[this.menuTopoAberto].hidden = false;
+      botoes[this.menuTopoAberto]?.setAttribute('aria-expanded', 'true');
+      botoes[this.menuTopoAberto]?.classList.add('ativo');
+    }
+  }
+
+  renderizarColunaEsquerda(colEsq) {
+    if (!colEsq) return;
+    colEsq.innerHTML = '';
+
+    const secAtiva = this.obterSecaoAtiva();
+
+    // Metade superior (50%): Páginas Mestras em Uso
+    colEsq.appendChild(this.montarCardMestrasEmUso());
+
+    // Metade inferior (50%): Blocos da Seção Ativa
+    colEsq.appendChild(this.montarCardBlocos(secAtiva));
+  }
+
+  montarCardMestrasEmUso() {
+    const cardMestras = document.createElement('div');
+    cardMestras.className = 'rm-card-meio-a-meio';
+    cardMestras.id = 'athCardMestrasEmUso';
+
+    cardMestras.innerHTML = `
+      <div class="rm-card-meio-a-meio-topo">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <strong style="font:800 12px var(--glx-font); color:var(--glx-muted, #6B7585); text-transform:uppercase; letter-spacing:.08em;">
+            Páginas Mestras em Uso <span class="rm-contagem">(${this.doc.secoes?.length || 0})</span>
+          </strong>
+        </div>
+
+        <!-- Caixa de seleção no topo com maiszinho para adicionar à sequência -->
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px; padding:10px; background:var(--ath-surface-elevated, #F8FAFC); border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px;">
+          <span style="font:800 11px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em;">Adicionar Mestra à Sequência</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <select id="athSelectAdicionarMestra" class="glx-select" style="flex:1; height:32px; font-size:11.5px; padding:0 8px; border-radius:8px;">
+              ${(this.doc.mestras || []).map(m => `
+                <option value="${m.id}">${m.nome} (${m.orientacao === 'paisagem' ? 'Paisagem' : 'Retrato'})</option>
+              `).join('')}
+            </select>
+            <button type="button" class="glx-btn glx-btn-primary" id="athBtnAdicionarMestra" title="Adicionar mestra selecionada à sequência do documento" style="width:32px; height:32px; padding:0; flex:none; display:flex; align-items:center; justify-content:center; border-radius:8px;">
+              ${svgIcone('mais', 14)}
+            </button>
+          </div>
+          <!-- Gerenciamento do Catálogo de Mestras -->
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:2px;">
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnNovaMestraCatalogo" style="font-size:10.5px; padding:2px 8px; height:22px; display:inline-flex; align-items:center; gap:4px;" title="Criar nova página mestra do zero no catálogo">
+              ${svgIcone('mais', 11)} Nova Mestra
+            </button>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <button type="button" class="rm-ic" id="athBtnEditarMestraCatalogo" title="Editar propriedades da mestra selecionada no catálogo" style="width:22px; height:22px;">
+                ${svgIcone('lapis', 12)}
+              </button>
+              <button type="button" class="rm-ic rm-ic-perigo" id="athBtnExcluirMestraCatalogo" title="Excluir esta mestra do catálogo" style="width:22px; height:22px; color:#DC2626;">
+                ${svgIcone('lixeira', 12)}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista das Seções / Mestras em uso na sequência do documento -->
+      <div class="rm-card-meio-a-meio-corpo" id="rmListaMestrasEmUso"></div>
+    `;
+
+    const listaEmUsoBox = cardMestras.querySelector('#rmListaMestrasEmUso');
+    (this.doc.secoes || []).forEach((sec, idx) => {
+      const mestra = (this.doc.mestras || []).find(m => m.id === sec.mestraId) || this.doc.mestras?.[0];
+      const ehSecaoAtiva = (sec.id === this.secaoAtivaId);
+      const ehPrimeira = (idx === 0);
+      const ehUltima = (idx === this.doc.secoes.length - 1);
 
       const item = document.createElement('div');
       item.className = `rm-mestra-card ${ehSecaoAtiva ? 'sel' : ''}`;
@@ -517,42 +864,72 @@ export class EditorView {
       item.style.background = ehSecaoAtiva ? 'var(--ath-primary-soft, #EEF4FA)' : '#fff';
       item.style.boxSizing = 'border-box';
       item.style.width = '100%';
-
-      const rotuloUso = emUso 
-        ? `<span class="rm-selo" style="font-size:9.5px; padding:2px 7px; background:#E8F5E9; color:#2E7D32; font-weight:700; white-space:nowrap !important; flex:none;">● Em uso (${secoesQueUsam.map(s => s.nome).join(', ')})</span>`
-        : `<span class="rm-selo" style="font-size:9.5px; padding:2px 7px; background:#F1F5F9; color:#64748B; white-space:nowrap !important; flex:none;">Disponível</span>`;
+      item.style.cursor = 'pointer';
+      item.style.flexShrink = '0';
 
       item.innerHTML = `
         <div class="rm-mestra-card-topo" style="display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%;">
-          <strong class="rm-mestra-titulo" style="font-size:12.5px; font-weight:800; color:var(--ath-text, #1F2733); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; cursor:pointer;" title="${mestra.nome}">${mestra.nome}</strong>
-          <button type="button" class="rm-ic" data-acao="editar-mestra" title="Editar Página Mestra (${mestra.nome})" style="flex:none; width:26px; height:26px; border-radius:6px; border:1px solid #CBD5E1; background:#fff;">${svgIcone('lapis', 13)}</button>
+          <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:${ehSecaoAtiva ? 'var(--ath-primary, #314F79)' : '#E2E8F0'}; color:${ehSecaoAtiva ? '#fff' : '#475569'}; font:800 11px var(--glx-font); flex:none;">
+              ${idx + 1}
+            </span>
+            <strong class="rm-mestra-titulo" style="font-size:12.5px; font-weight:800; color:var(--ath-text, #1F2733); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="${mestra ? mestra.nome : sec.nome}">
+              ${mestra ? mestra.nome : sec.nome}
+            </strong>
+          </div>
+          <div style="display:flex; align-items:center; gap:2px; flex:none;">
+            <button type="button" class="rm-ic" data-acao="subir-secao" title="Subir na sequência" style="width:22px; height:22px;" ${ehPrimeira ? 'disabled style="opacity:0.25; cursor:not-allowed;"' : ''}>
+              ${svgIcone('cima', 12)}
+            </button>
+            <button type="button" class="rm-ic" data-acao="descer-secao" title="Descer na sequência" style="width:22px; height:22px;" ${ehUltima ? 'disabled style="opacity:0.25; cursor:not-allowed;"' : ''}>
+              ${svgIcone('baixo', 12)}
+            </button>
+            <button type="button" class="rm-ic" data-acao="editar-mestra" title="Configurar Mestra (${mestra ? mestra.nome : ''})" style="width:22px; height:22px;">
+              ${svgIcone('lapis', 12)}
+            </button>
+            <button type="button" class="rm-ic rm-ic-perigo" data-acao="remover-secao" title="Tirar da sequência do documento" style="width:22px; height:22px; color:#DC2626;">
+              ${svgIcone('fechar', 12)}
+            </button>
+          </div>
         </div>
         <div class="rm-mestra-card-meta" style="display:flex; align-items:center; gap:5px; flex-wrap:wrap; width:100%; margin-top:2px;">
-          <span class="rm-selo" style="font-size:9.5px; padding:2px 7px; white-space:nowrap !important; flex:none;">${mestra.modo_aplicacao === 'fixa' ? 'Fixa · Grade 2D' : 'Progressiva · Fluxo'}</span>
-          <span style="font-size:10.5px; color:var(--glx-muted, #6B7585); white-space:nowrap; flex:none;">${mestra.orientacao === 'paisagem' ? 'Paisagem' : 'Retrato'}</span>
-          ${rotuloUso}
-        </div>
-        <div class="rm-mestra-card-acoes" style="display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; margin-top:5px; padding-top:5px; border-top:1px dashed rgba(49, 79, 121, 0.16);">
-          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" data-acao="usar-mestra" title="Adicionar seção usando esta mestra ao documento" style="white-space:nowrap !important; flex:none; height:24px; font-size:11px; padding:0 10px;">+ Usar</button>
-          ${emUso ? `
-            <div style="display:flex; align-items:center; gap:3px; flex:none;">
-              <button type="button" class="rm-ic" data-acao="subir-secao" title="Mover para cima" style="width:24px; height:24px;">${svgIcone('cima', 12)}</button>
-              <button type="button" class="rm-ic" data-acao="descer-secao" title="Mover para baixo" style="width:24px; height:24px;">${svgIcone('baixo', 12)}</button>
-              <button type="button" class="rm-ic rm-ic-perigo" data-acao="remover-secao" title="Remover seção do documento" style="width:24px; height:24px;">${svgIcone('fechar', 12)}</button>
-            </div>
-          ` : ''}
+          <span class="rm-selo" style="font-size:9.5px; padding:2px 7px; white-space:nowrap !important; flex:none;">
+            ${mestra?.modo_aplicacao === 'fixa' ? 'Fixa · Grade 2D' : 'Progressiva · Fluxo'}
+          </span>
+          <span style="font-size:10.5px; color:var(--glx-muted, #6B7585); white-space:nowrap; flex:none;">
+            ${mestra?.orientacao === 'paisagem' ? 'Paisagem' : 'Retrato'}
+          </span>
+          <span style="font-size:10px; color:var(--ath-primary, #314F79); font-weight:700; background:#EAF2FA; padding:1px 6px; border-radius:999px;">
+            ${sec.blocos?.length || 0} ${sec.blocos?.length === 1 ? 'bloco' : 'blocos'}
+          </span>
         </div>
       `;
 
-      item.querySelector('.rm-mestra-titulo').addEventListener('click', () => {
-        if (emUso) {
-          this.secaoAtivaId = secoesQueUsam[0].id;
-          this.renderizar();
-        }
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        this.secaoAtivaId = sec.id;
+        this.renderizar();
       });
 
-      item.querySelector('[data-acao="editar-mestra"]').addEventListener('click', e => {
+      item.querySelector('[data-acao="subir-secao"]')?.addEventListener('click', e => {
         e.stopPropagation();
+        if (ehPrimeira) return;
+        moverSecao(this.doc, sec.id, -1);
+        this.notificarMudanca();
+        this.renderizar();
+      });
+
+      item.querySelector('[data-acao="descer-secao"]')?.addEventListener('click', e => {
+        e.stopPropagation();
+        if (ehUltima) return;
+        moverSecao(this.doc, sec.id, 1);
+        this.notificarMudanca();
+        this.renderizar();
+      });
+
+      item.querySelector('[data-acao="editar-mestra"]')?.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!mestra) return;
         new ModalEditorMestra(this.doc, mestra.id, {
           onSalvar: () => {
             this.notificarMudanca();
@@ -561,43 +938,73 @@ export class EditorView {
         });
       });
 
-      item.querySelector('[data-acao="usar-mestra"]').addEventListener('click', e => {
+      item.querySelector('[data-acao="remover-secao"]')?.addEventListener('click', e => {
         e.stopPropagation();
-        const nova = adicionarSecao(this.doc, mestra.nome, mestra.id);
-        this.secaoAtivaId = nova.id;
+        if (this.doc.secoes.length <= 1) {
+          alert('O documento precisa conter pelo menos uma seção de página mestra.');
+          return;
+        }
+        if (sec.blocos?.length > 0) {
+          const temTexto = sec.blocos.some(b => (b.texto && b.texto.trim().length > 0));
+          if (temTexto && window.confirm && !window.confirm(`Esta seção contém ${sec.blocos.length} bloco(s). Deseja realmente removê-la da sequência do documento?`)) {
+            return;
+          }
+        }
+        removerSecao(this.doc, sec.id);
+        this.secaoAtivaId = this.doc.secoes[0]?.id;
         this.notificarMudanca();
         this.renderizar();
       });
 
-      if (emUso) {
-        const primSec = secoesQueUsam[0];
-        item.querySelector('[data-acao="subir-secao"]')?.addEventListener('click', e => {
-          e.stopPropagation();
-          moverSecao(this.doc, primSec.id, -1);
-          this.notificarMudanca();
-          this.renderizar();
-        });
-        item.querySelector('[data-acao="descer-secao"]')?.addEventListener('click', e => {
-          e.stopPropagation();
-          moverSecao(this.doc, primSec.id, 1);
-          this.notificarMudanca();
-          this.renderizar();
-        });
-        item.querySelector('[data-acao="remover-secao"]')?.addEventListener('click', e => {
-          e.stopPropagation();
-          if (this.doc.secoes.length > 1) {
-            removerSecao(this.doc, primSec.id);
-            this.secaoAtivaId = this.doc.secoes[0]?.id;
-            this.notificarMudanca();
-            this.renderizar();
-          }
-        });
-      }
-
-      listaMestrasBox.appendChild(item);
+      listaEmUsoBox.appendChild(item);
     });
 
-    secMestras.querySelector('#rmBtnNovaMestra').addEventListener('click', () => {
+    const selMestra = cardMestras.querySelector('#athSelectAdicionarMestra');
+
+    cardMestras.querySelector('#athBtnAdicionarMestra').addEventListener('click', () => {
+      const mestraId = selMestra.value;
+      const mestra = (this.doc.mestras || []).find(m => m.id === mestraId) || this.doc.mestras?.[0];
+      if (!mestra) return;
+      const nova = adicionarSecao(this.doc, mestra.nome, mestra.id);
+      this.secaoAtivaId = nova.id;
+      this.notificarMudanca();
+      this.renderizar();
+    });
+
+    cardMestras.querySelector('#athBtnEditarMestraCatalogo').addEventListener('click', () => {
+      const mestraId = selMestra.value;
+      if (!mestraId) return;
+      new ModalEditorMestra(this.doc, mestraId, {
+        onSalvar: () => {
+          this.notificarMudanca();
+          this.renderizar();
+        }
+      });
+    });
+
+    cardMestras.querySelector('#athBtnExcluirMestraCatalogo').addEventListener('click', () => {
+      const mestraId = selMestra.value;
+      const mestra = (this.doc.mestras || []).find(m => m.id === mestraId);
+      if (!mestra) return;
+
+      if ((this.doc.mestras || []).length <= 1) {
+        alert('Não é possível excluir a única página mestra do catálogo.');
+        return;
+      }
+
+      const secoesUso = (this.doc.secoes || []).filter(s => s.mestraId === mestraId);
+      let msg = `Deseja excluir a página mestra "${mestra.nome}" do catálogo?`;
+      if (secoesUso.length > 0) {
+        msg = `A página mestra "${mestra.nome}" está em uso por ${secoesUso.length} seção(ões) do documento.\nAo excluí-la, essas seções serão migradas para a mestra principal.\n\nDeseja continuar?`;
+      }
+      if (window.confirm && !window.confirm(msg)) return;
+
+      removerMestra(this.doc, mestraId);
+      this.notificarMudanca();
+      this.renderizar();
+    });
+
+    cardMestras.querySelector('#athBtnNovaMestraCatalogo').addEventListener('click', () => {
       const novoId = 'mestra_' + Date.now().toString(36);
       const novaMestra = {
         id: novoId,
@@ -622,85 +1029,7 @@ export class EditorView {
       });
     });
 
-    colEsq.appendChild(secMestras);
-
-    // 3. Accordion CABEÇALHO E RODAPÉ
-    const secCabRod = document.createElement('details');
-    secCabRod.className = 'rm-sec';
-    secCabRod.innerHTML = `
-      <summary>Cabeçalho e rodapé</summary>
-      <label class="rm-chk"><input type="checkbox" id="rmCabAtivo" ${mestra.cabecalho?.ativo ? 'checked' : ''}> Mostrar cabeçalho</label>
-      <span class="rm-rot">Logo da empresa</span>
-      <label class="rm-arquivo glx-btn glx-btn-soft glx-btn-sm">
-        ${svgIcone('imagem', 14)}
-        <span>Escolher imagem</span>
-        <input type="file" id="rmLogoArq" accept="image/png,image/jpeg,image/webp" hidden>
-      </label>
-      <span class="rm-dica">PNG, JPEG ou WebP, até 400 KB.</span>
-      <label>Linhas do cabeçalho (uma por linha; aceita variáveis)
-        <textarea id="rmCabLinhas" rows="3">${mestra.cabecalho?.texto || '{{documento.titulo}}\n{{documento.instituicao}}'}</textarea>
-      </label>
-      <label>Alinhamento do cabeçalho
-        <select id="rmCabAlinha" class="glx-select">
-          <option value="esquerda" ${mestra.cabecalho?.alinhamento === 'esquerda' ? 'selected' : ''}>Logo à esquerda</option>
-          <option value="direita" ${mestra.cabecalho?.alinhamento === 'direita' ? 'selected' : ''}>Logo à direita</option>
-          <option value="centro" ${mestra.cabecalho?.alinhamento === 'centro' ? 'selected' : ''}>Centralizado</option>
-        </select>
-      </label>
-      <label class="rm-chk"><input type="checkbox" id="rmRodAtivo" ${mestra.rodape?.ativo ? 'checked' : ''}> Mostrar rodapé</label>
-      <label>Texto do rodapé
-        <textarea id="rmRodTexto" rows="2">${mestra.rodape?.texto || 'Athenes · Editor Científico e Acadêmico'}</textarea>
-      </label>
-      <label class="rm-chk"><input type="checkbox" id="rmRodNum" ${mestra.rodape?.numeracao ? 'checked' : ''}> Numerar páginas ("Página 1 de 3")</label>
-    `;
-
-    secCabRod.querySelector('#rmCabAtivo').addEventListener('change', e => {
-      mestra.cabecalho = mestra.cabecalho || {};
-      mestra.cabecalho.ativo = e.target.checked;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
-    });
-
-    secCabRod.querySelector('#rmCabLinhas').addEventListener('input', e => {
-      mestra.cabecalho = mestra.cabecalho || {};
-      mestra.cabecalho.texto = e.target.value;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
-    });
-
-    secCabRod.querySelector('#rmCabAlinha').addEventListener('change', e => {
-      mestra.cabecalho = mestra.cabecalho || {};
-      mestra.cabecalho.alinhamento = e.target.value;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
-    });
-
-    secCabRod.querySelector('#rmRodAtivo').addEventListener('change', e => {
-      mestra.rodape = mestra.rodape || {};
-      mestra.rodape.ativo = e.target.checked;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
-    });
-
-    secCabRod.querySelector('#rmRodTexto').addEventListener('input', e => {
-      mestra.rodape = mestra.rodape || {};
-      mestra.rodape.texto = e.target.value;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
-    });
-
-    secCabRod.querySelector('#rmRodNum').addEventListener('change', e => {
-      mestra.rodape = mestra.rodape || {};
-      mestra.rodape.numeracao = e.target.checked;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
-    });
-
-    colEsq.appendChild(secCabRod);
-
-    // 4. Estilos de texto (lista + salvar) e 5. Blocos (linhas, grupos e arrastar)
-    colEsq.appendChild(this.montarSecaoEstilos());
-    colEsq.appendChild(this.montarSecaoBlocos(secAtiva));
+    return cardMestras;
   }
 
   /* Menus da barra de blocos (Figura: gráfico, fotografia…; Quadro: campos…) */
@@ -762,204 +1091,132 @@ export class EditorView {
       return sec;
     }
     this.estiloSelecionadoId = estilo.id;
-    if (!this.rascunhoEstilo || this.rascunhoEstilo.id !== estilo.id) {
-      this.rascunhoEstilo = JSON.parse(JSON.stringify(estilo));
-    }
-    const rasc = this.rascunhoEstilo;
-    const modificado = () => JSON.stringify(rasc) !== JSON.stringify(estilo);
     const fonteRotulo = id => (FONTES_SISTEMA[id]?.rotulo || id || '').replace(/ \(.*\)$/, '');
 
     sec.innerHTML = `
-      <summary>Estilos de texto <span class="rm-contagem">(${estilos.length})</span></summary>
-      <ul class="rm-lista-estilos" id="rmListaEstilos"></ul>
-      <div class="rm-estilo-previa" id="rmEstiloPrevia">Aa — Texto de exemplo do estilo</div>
-      <label>Nome do estilo
-        <input type="text" id="rmEstNome" value="">
-      </label>
-      <label>Fonte
-        <select id="rmEstFonte" class="glx-select">
-          ${Object.values(FONTES_SISTEMA).map(f => `<option value="${f.id}">${f.rotulo}</option>`).join('')}
-        </select>
-      </label>
-      <div class="rm-linha2">
-        <label>Tamanho (pt)
-          <input type="number" id="rmEstTamanho" min="6" max="72" step="0.5">
-        </label>
-        <label>Peso
-          <select id="rmEstPeso" class="glx-select">
-            ${PESOS_FONTE.map(p => `<option value="${p.valor}">${p.rotulo}</option>`).join('')}
-          </select>
-        </label>
-      </div>
-      <div class="rm-linha2">
-        <label>Entrelinha
-          <input type="number" id="rmEstEntrelinha" step="0.1" min="1" max="3">
-        </label>
-        <label>Cor
-          <div class="rm-cor-linha">
-            <input type="color" id="rmEstCor" class="rm-cor">
-            <span class="rm-hex" id="rmEstCorHex"></span>
-          </div>
-        </label>
-      </div>
-      <div class="rm-linha2">
-        <label>Distância entre Blocos (pt)
-          <input type="number" id="rmEstEspacoDepois" min="0" max="72" step="1" title="Margem de afastamento para o próximo bloco">
-        </label>
-        <label>Distância Parágrafos Enter (pt)
-          <input type="number" id="rmEstEspacoParagrafos" min="0" max="48" step="1" title="Espaço entre parágrafos gerados com Enter">
-        </label>
-      </div>
-      <div class="rm-icg" id="rmEstAlin"></div>
-      <label class="rm-chk"><input type="checkbox" id="rmEstItalico"> Itálico</label>
-      <label class="rm-chk"><input type="checkbox" id="rmEstCaixaAlta"> Tudo em caixa-alta</label>
-      <div class="rm-estilo-acoes">
-        <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="rmEstSalvar">${svgIcone('salvar', 14)} Salvar estilo</button>
-        <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="rmEstNovo">Salvar como novo</button>
-        <button type="button" class="glx-btn glx-btn-soft glx-btn-sm rm-perigo" id="rmEstExcluir">Excluir</button>
-      </div>
+      <summary>ESTILOS DE TEXTO <span class="rm-contagem">(${estilos.length})</span></summary>
+      <ul class="rm-lista-estilos" id="rmListaEstilos" style="max-height:260px; overflow-y:auto; margin-top:6px;"></ul>
+      <div class="rm-estilo-previa" id="rmEstiloPrevia" style="margin-top:10px; margin-bottom:8px;">Aa — Texto de exemplo do estilo</div>
+      <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="rmBtnNovoEstiloEsq" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; margin-top:6px;">
+        ${svgIcone('mais', 12)} Novo Estilo
+      </button>
     `;
+
+    const previa = sec.querySelector('#rmEstiloPrevia');
+    const atualizarPrevia = (est) => {
+      previa.style.cssText = `${estiloParaCss(est)} margin-top:10px; margin-bottom:8px; max-height:84px; overflow:hidden; text-align:${alinhamentoCss(est.alinhamento, 'left')}; text-align-last:auto;`;
+    };
+    atualizarPrevia(estilo);
 
     // Lista de estilos
     const lista = sec.querySelector('#rmListaEstilos');
     estilos.forEach(est => {
       const li = document.createElement('li');
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `rm-estilo-item ${est.id === estilo.id ? 'on' : ''}`;
-      btn.innerHTML = `
-        <span class="rm-estilo-amostra" style="color:${est.cor || '#1F2733'}; font-weight:${est.peso || 400}">Aa</span>
-        <span class="rm-estilo-nome"><strong>${est.nome}</strong><small>${fonteRotulo(est.fonte)} · ${est.tamanho_pt || 12} pt · ${est.peso || 400}</small></span>
-        ${est.personalizado ? '<em class="rm-estilo-tag">seu</em>' : ''}
+      li.style.listStyle = 'none';
+      li.style.margin = '0 0 4px 0';
+      const ehSel = (est.id === this.estiloSelecionadoId);
+      li.innerHTML = `
+        <div class="rm-estilo-item ${ehSel ? 'on' : ''}" style="display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; cursor:pointer; padding:6px 10px; border-radius:10px; box-sizing:border-box;">
+          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+            <span class="rm-estilo-amostra" style="color:${est.cor || '#1F2733'}; font-weight:${est.peso || 400}; flex:none;">Aa</span>
+            <span class="rm-estilo-nome" style="flex:1; min-width:0;">
+              <strong style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block;">${est.nome}</strong>
+              <small style="color:var(--glx-muted, #6B7585);">${fonteRotulo(est.fonte)} · ${est.tamanho_pt || 12} pt · ${est.peso || 400}</small>
+            </span>
+            ${est.personalizado ? '<em class="rm-estilo-tag" style="flex:none;">seu</em>' : ''}
+          </div>
+          <button type="button" class="rm-ic" data-acao="editar-estilo" title="Editar estilo (${est.nome})" style="width:26px; height:26px; flex:none; border-radius:6px; border:1px solid #CBD5E1; background:#fff;">
+            ${svgIcone('lapis', 13)}
+          </button>
+        </div>
       `;
-      btn.addEventListener('click', () => {
-        if (est.id === estilo.id) return;
-        if (modificado() && !window.confirm('Descartar as alterações não salvas deste estilo?')) return;
+
+      const itemCard = li.querySelector('.rm-estilo-item');
+      const btnEditar = li.querySelector('[data-acao="editar-estilo"]');
+
+      const selecionarEEmitir = () => {
         this.estiloSelecionadoId = est.id;
-        this.rascunhoEstilo = null;
-        this.estilosAberto = true;
-        this.redesenharColunaEsquerda();
+        sec.querySelectorAll('.rm-estilo-item').forEach(b => b.classList.remove('on'));
+        itemCard.classList.add('on');
+        atualizarPrevia(est);
+        this.opcoes.onEditarEstilo?.(est);
+      };
+
+      itemCard.addEventListener('click', (e) => {
+        if (e.target.closest('[data-acao="editar-estilo"]')) return;
+        selecionarEEmitir();
       });
-      li.appendChild(btn);
+
+      btnEditar.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selecionarEEmitir();
+      });
+
       lista.appendChild(li);
     });
 
-    // Campos ligados ao rascunho
-    const previa = sec.querySelector('#rmEstiloPrevia');
-    const btnSalvar = sec.querySelector('#rmEstSalvar');
-    const btnExcluir = sec.querySelector('#rmEstExcluir');
-    const alin = sec.querySelector('#rmEstAlin');
-
-    const atualizar = () => {
-      previa.style.cssText = `${estiloParaCss(rasc)} margin-top:16px; margin-bottom:16px; max-height:84px; overflow:hidden; text-align:${alinhamentoCss(rasc.alinhamento, 'left')}; text-align-last:auto;`;
-      sec.querySelector('#rmEstCorHex').textContent = rasc.cor || '#1F2733';
-      btnSalvar.disabled = !modificado();
-      alin.querySelectorAll('button').forEach(b => {
-        const ativo = b.dataset.alin === (rasc.alinhamento || 'esquerda');
-        b.classList.toggle('on', ativo);
-        b.setAttribute('aria-pressed', String(ativo));
-      });
-    };
-
-    sec.querySelector('#rmEstNome').value = rasc.nome || '';
-    sec.querySelector('#rmEstFonte').value = rasc.fonte || 'nunito';
-    sec.querySelector('#rmEstTamanho').value = rasc.tamanho_pt || 12;
-    sec.querySelector('#rmEstPeso').value = String(rasc.peso || 400);
-    sec.querySelector('#rmEstEntrelinha').value = rasc.entrelinha || 1.5;
-    sec.querySelector('#rmEstEspacoDepois').value = rasc.espaco_depois_pt ?? 8;
-    sec.querySelector('#rmEstEspacoParagrafos').value = rasc.espaco_paragrafos_pt ?? 6;
-    sec.querySelector('#rmEstCor').value = /^#[0-9a-f]{6}$/i.test(rasc.cor || '') ? rasc.cor : '#1F2733';
-    sec.querySelector('#rmEstItalico').checked = !!rasc.italico;
-    sec.querySelector('#rmEstCaixaAlta').checked = !!rasc.caixa_alta;
-
-    [['esquerda', 'alinhamento_esq', 'À esquerda'], ['centro', 'alinhamento_cen', 'Centralizado'], ['direita', 'alinhamento_dir', 'À direita'], ['justificado', 'alinhamento_jus', 'Justificado']].forEach(([id, icone, titulo]) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'rm-ic-bt';
-      b.dataset.alin = id;
-      b.title = titulo;
-      b.innerHTML = svgIcone(icone, 16);
-      b.addEventListener('click', () => { rasc.alinhamento = id; atualizar(); });
-      alin.appendChild(b);
-    });
-
-    sec.querySelector('#rmEstNome').addEventListener('input', e => { rasc.nome = e.target.value; atualizar(); });
-    sec.querySelector('#rmEstFonte').addEventListener('change', e => { rasc.fonte = e.target.value; atualizar(); });
-    sec.querySelector('#rmEstTamanho').addEventListener('input', e => { rasc.tamanho_pt = parseFloat(e.target.value) || 12; atualizar(); });
-    sec.querySelector('#rmEstPeso').addEventListener('change', e => { rasc.peso = parseInt(e.target.value, 10); atualizar(); });
-    sec.querySelector('#rmEstEntrelinha').addEventListener('input', e => { rasc.entrelinha = parseFloat(e.target.value) || 1.5; atualizar(); });
-    sec.querySelector('#rmEstEspacoDepois').addEventListener('input', e => { rasc.espaco_depois_pt = parseFloat(e.target.value) || 0; atualizar(); });
-    sec.querySelector('#rmEstEspacoParagrafos').addEventListener('input', e => { rasc.espaco_paragrafos_pt = parseFloat(e.target.value) || 0; atualizar(); });
-    sec.querySelector('#rmEstCor').addEventListener('input', e => { rasc.cor = e.target.value; atualizar(); });
-    sec.querySelector('#rmEstItalico').addEventListener('change', e => { rasc.italico = e.target.checked; atualizar(); });
-    sec.querySelector('#rmEstCaixaAlta').addEventListener('change', e => { rasc.caixa_alta = e.target.checked; atualizar(); });
-
-    btnSalvar.addEventListener('click', () => {
-      if (!modificado()) return;
-      Object.assign(estilo, JSON.parse(JSON.stringify(rasc)));
-      this.rascunhoEstilo = null;
-      this.estilosAberto = true;
-      this.notificarMudanca();
-      this.renderizarFolhasPaginas();
-      this.redesenharColunaEsquerda();
-    });
-
-    sec.querySelector('#rmEstNovo').addEventListener('click', () => {
-      const novo = JSON.parse(JSON.stringify(rasc));
-      novo.id = gerarId('estilo');
-      novo.personalizado = true;
-      if (novo.nome === estilo.nome) novo.nome = `${estilo.nome} (novo)`;
+    sec.querySelector('#rmBtnNovoEstiloEsq').addEventListener('click', () => {
+      const novo = {
+        id: 'est_' + Date.now().toString(36),
+        nome: 'Novo Estilo',
+        fonte: 'nunito',
+        tamanho_pt: 12,
+        peso: 400,
+        alinhamento: 'esquerda',
+        entrelinha: 1.5,
+        espaco_depois_pt: 8,
+        espaco_paragrafos_pt: 6,
+        cor: '#1F2733',
+        personalizado: true
+      };
       this.doc.estilos.push(novo);
       this.estiloSelecionadoId = novo.id;
-      this.rascunhoEstilo = null;
-      this.estilosAberto = true;
       this.notificarMudanca();
-      this.redesenharColunaEsquerda();
+      this.renderizar();
+      this.opcoes.onEditarEstilo?.(novo);
     });
 
-    btnExcluir.disabled = !estilo.personalizado;
-    btnExcluir.title = estilo.personalizado ? 'Excluir este estilo' : 'Estilos padrão do perfil não podem ser excluídos';
-    btnExcluir.addEventListener('click', () => {
-      if (!estilo.personalizado) return;
-      if (!window.confirm(`Excluir o estilo "${estilo.nome}"? Os blocos que o usam voltam para "Corpo de Texto".`)) return;
-      for (const s of this.doc.secoes || []) {
-        for (const b of s.blocos || []) if (b.estiloId === estilo.id) b.estiloId = 'corpo';
-      }
-      this.doc.estilos = this.doc.estilos.filter(e => e.id !== estilo.id);
-      this.estiloSelecionadoId = this.doc.estilos[0]?.id;
-      this.rascunhoEstilo = null;
-      this.estilosAberto = true;
-      this.notificarMudanca();
-      this.renderizarFolhasPaginas();
-      this.redesenharColunaEsquerda();
-    });
-
-    atualizar();
     return sec;
   }
 
   redesenharColunaEsquerda() {
     const col = this.container.querySelector('#rmColEsq');
     if (!col) return;
-    const rolagem = col.scrollTop;
+    const scrollMestras = col.querySelector('#rmListaMestrasEmUso')?.scrollTop || 0;
+    const scrollBlocos = col.querySelector('#athCardBlocosSecao .rm-card-meio-a-meio-corpo')?.scrollTop || 0;
     this.renderizarColunaEsquerda(col);
-    col.scrollTop = rolagem;
+    const mEl = col.querySelector('#rmListaMestrasEmUso');
+    if (mEl) mEl.scrollTop = scrollMestras;
+    const bEl = col.querySelector('#athCardBlocosSecao .rm-card-meio-a-meio-corpo');
+    if (bEl) bEl.scrollTop = scrollBlocos;
   }
 
   /* ======================================================================
      Lista de blocos: linhas, grupos e arrastar/soltar (mecânica do Clux.js)
      ====================================================================== */
-  montarSecaoBlocos(secAtiva) {
+  montarCardBlocos(secAtiva) {
     const blocosSecao = secAtiva?.blocos || [];
-    const sec = document.createElement('details');
-    sec.className = 'rm-sec';
-    sec.open = true;
-    sec.innerHTML = `
-      <summary>BLOCOS <span class="rm-contagem">(${blocosSecao.length})</span></summary>
-      <ol class="rm-blocos" id="rmListaBlocosSec"></ol>
-      <span class="rm-dica">Arraste um bloco: solte na borda de outro para reordenar ou no centro para colocá-los lado a lado na mesma linha.</span>
+    const card = document.createElement('div');
+    card.className = 'rm-card-meio-a-meio';
+    card.id = 'athCardBlocosSecao';
+    card.innerHTML = `
+      <div class="rm-card-meio-a-meio-topo">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <strong style="font:800 12px var(--glx-font); color:var(--glx-muted, #6B7585); text-transform:uppercase; letter-spacing:.08em;">
+            Blocos da Seção <span class="rm-contagem">(${blocosSecao.length})</span>
+          </strong>
+        </div>
+      </div>
+      <div class="rm-card-meio-a-meio-corpo">
+        <ol class="rm-blocos" id="rmListaBlocosSec"></ol>
+      </div>
+      <div class="rm-card-meio-a-meio-rodape">
+        <span class="rm-dica" style="margin:0; font-size:11px; line-height:1.3; color:var(--glx-muted, #6B7585); display:block;">
+          Arraste um bloco: solte na borda de outro para reordenar ou no centro para colocá-los lado a lado na mesma linha.
+        </span>
+      </div>
     `;
-    const ol = sec.querySelector('#rmListaBlocosSec');
+    const ol = card.querySelector('#rmListaBlocosSec');
     calcularLinhas(blocosSecao).forEach((linha, i) => {
       const cab = document.createElement('li');
       cab.className = 'rm-linha-cab';
@@ -977,7 +1234,11 @@ export class EditorView {
         ol.appendChild(this.criarItemBloco(linha[0], secAtiva));
       }
     });
-    return sec;
+    return card;
+  }
+
+  montarSecaoBlocos(secAtiva) {
+    return this.montarCardBlocos(secAtiva);
   }
 
   criarItemBloco(b, secAtiva) {
@@ -987,7 +1248,7 @@ export class EditorView {
     li.draggable = true;
     li.innerHTML = `
       <button type="button" class="rm-bl-nome">
-        <strong>${rotuloDoBloco(b)}</strong>
+        <strong>${rotuloDoBloco(b, this.doc)}</strong>
         <span>${resumoBloco(b)}</span>
       </button>
       <div class="rm-bl-acoes" draggable="false">
@@ -1438,7 +1699,12 @@ export class EditorView {
     // Crachá do Bloco
     const cracha = document.createElement('span');
     cracha.className = 'ath-bloco-cracha';
-    cracha.textContent = b.tipo;
+    if (b.tipo === 'titulo' || b.tipo === 'subtitulo' || b.tipo === 'paragrafo' || b.tipo === 'texto') {
+      const est = (this.doc.estilos || []).find(e => e.id === b.estiloId);
+      cracha.textContent = est ? est.nome.toUpperCase() : 'TEXTO';
+    } else {
+      cracha.textContent = (TIPO_ROTULO[b.tipo] || b.tipo).toUpperCase();
+    }
     el.appendChild(cracha);
 
     // Seleção dinâmica bidirecional ao clicar no bloco na página
@@ -1469,7 +1735,7 @@ export class EditorView {
       ...(b.fonte ? { fonte: b.fonte } : {}),
       ...(b.alinhamento ? { alinhamento: b.alinhamento } : {}),
       ...(b.cor ? { cor: b.cor } : {}),
-      ...(b.fundo_ativo && b.fundo_cor ? { fundo_cor: b.fundo_cor } : {}),
+      ...(b.fundo_ativo ? { fundo_cor: b.fundo_cor || '#FFF2A8' } : {}),
       ...(b.borda_tipo ? { borda_tipo: b.borda_tipo } : {}),
       ...(b.entrelinha ? { entrelinha: b.entrelinha } : {}),
       ...(b.espaco_antes_pt !== undefined ? { espaco_antes_pt: b.espaco_antes_pt } : {}),

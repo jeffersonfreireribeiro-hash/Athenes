@@ -10,6 +10,7 @@ import {
   moverSecao,
   trocarMestraDaSecao,
   duplicarMestra,
+  removerMestra,
   repaginarDocumento,
   MODOS_APLICACAO_MESTRA
 } from '../src/core/athenes_documento.js';
@@ -174,5 +175,34 @@ describe('Athenes — Sistema de Páginas Mestras e Fluxo Contínuo', () => {
     const pag2 = pagsCorpo[1];
     const temTituloNaPag2 = pag2.blocos.some(b => b.texto === '3. NOVO TÓPICO COM PRÓXIMO');
     assert.ok(temTituloNaPag2, 'O título com manterComProximo deve ser transferido para a página 2');
+  });
+
+  it('permite excluir páginas mestras do catálogo e migra seções vinculadas', () => {
+    const doc = criarDocumento();
+    const totalMestrasAntes = doc.mestras.length;
+
+    // Cria uma mestra personalizada
+    const nova = duplicarMestra(doc, 'corpo', 'Mestra Temporária');
+    assert.equal(doc.mestras.length, totalMestrasAntes + 1);
+
+    // Cria uma seção usando a nova mestra
+    const sec = adicionarSecao(doc, 'Seção Teste', nova.id);
+    assert.equal(sec.mestraId, nova.id);
+
+    // Remove a mestra
+    const sucesso = removerMestra(doc, nova.id);
+    assert.equal(sucesso, true);
+    assert.equal(doc.mestras.length, totalMestrasAntes);
+    assert.ok(!doc.mestras.some(m => m.id === nova.id));
+
+    // A seção que a usava deve ter sido migrada para a primeira mestra disponível
+    assert.equal(sec.mestraId, doc.mestras[0].id);
+
+    // Não deve permitir excluir quando resta apenas 1 mestra
+    while (doc.mestras.length > 1) {
+      doc.mestras.pop();
+    }
+    assert.equal(removerMestra(doc, doc.mestras[0].id), false);
+    assert.equal(doc.mestras.length, 1);
   });
 });
