@@ -1210,10 +1210,10 @@ export class EstudoArtigosView {
       if (estaEditando) {
         card.innerHTML = `
           <div class="ath-pdf-pin-cab ath-pin-arrastavel" style="background:${escapeHtml(pin.cor || '#F59E0B')};">
-            <span class="ath-pin-cab-titulo">📌 Nota #${idx + 1} (Pág. ${numPag})</span>
+            <span class="ath-pin-cab-titulo">${svgIcone('nota', 12)} Nota #${idx + 1} (Pág. ${numPag})</span>
             <div class="ath-pin-cab-acoes">
-              <button type="button" class="ath-pin-edit-btn" data-min-edicao-pin="${escapeHtml(pin.id)}" title="Minimizar nota na folha">—</button>
-              <button type="button" class="ath-pin-del" data-fechar-edicao-pin="${escapeHtml(pin.id)}" title="Concluir edição">✕</button>
+              <button type="button" class="ath-pin-edit-btn" data-min-edicao-pin="${escapeHtml(pin.id)}" title="Minimizar nota na folha">${svgIcone('minimizar', 11)}</button>
+              <button type="button" class="ath-pin-del" data-fechar-edicao-pin="${escapeHtml(pin.id)}" title="Concluir edição">${svgIcone('fechar', 11)}</button>
             </div>
           </div>
           <div class="ath-pdf-pin-form">
@@ -1226,9 +1226,15 @@ export class EstudoArtigosView {
                 `).join('')}
               </div>
               <div class="ath-pin-botoes">
-                <button type="button" class="ath-pin-btn-fechar" data-tam-pin="${escapeHtml(pin.id)}" title="Alternar tamanho Pequena / Normal">${pin.tamanho === 'pequena' ? 'Tam: P' : 'Tam: M'}</button>
-                <button type="button" class="ath-pin-btn-excluir" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">Excluir</button>
-                <button type="button" class="ath-pin-btn-salvar" data-salvar-pin="${escapeHtml(pin.id)}">Salvar</button>
+                <button type="button" class="ath-pin-ic-acao ath-pin-ic-neutro" data-tam-pin="${escapeHtml(pin.id)}" title="Alternar largura (${pin.tamanho === 'pequena' ? 'Compacta -> Normal' : 'Normal -> Compacta'})">
+                  ${svgIcone('redimensionar', 12)}
+                </button>
+                <button type="button" class="ath-pin-ic-acao ath-pin-ic-perigo" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">
+                  ${svgIcone('lixeira', 12)}
+                </button>
+                <button type="button" class="ath-pin-ic-acao ath-pin-ic-primario" data-salvar-pin="${escapeHtml(pin.id)}" title="Salvar nota">
+                  ${svgIcone('check', 13)}
+                </button>
               </div>
             </div>
           </div>
@@ -1297,10 +1303,10 @@ export class EstudoArtigosView {
         // Modo Minimizado: pílula compacta que não cobre o texto do PDF
         card.innerHTML = `
           <div class="ath-pdf-pin-cab ath-pin-arrastavel" style="background:${escapeHtml(pin.cor || '#F59E0B')};" title="${escapeHtml(pin.texto || 'Clique para expandir esta nota')}">
-            <span class="ath-pin-cab-titulo" data-expandir-pin="${escapeHtml(pin.id)}">📌 #${idx + 1} ${escapeHtml(pin.titulo || 'Nota')}</span>
+            <span class="ath-pin-cab-titulo" data-expandir-pin="${escapeHtml(pin.id)}">${svgIcone('nota', 11)} #${idx + 1} ${escapeHtml(pin.titulo || 'Nota')}</span>
             <div class="ath-pin-cab-acoes">
-              <button type="button" class="ath-pin-edit-btn" data-expandir-pin="${escapeHtml(pin.id)}" title="Expandir nota">+</button>
-              <button type="button" class="ath-pin-del" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">✕</button>
+              <button type="button" class="ath-pin-edit-btn" data-expandir-pin="${escapeHtml(pin.id)}" title="Expandir nota">${svgIcone('mais', 11)}</button>
+              <button type="button" class="ath-pin-del" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">${svgIcone('fechar', 11)}</button>
             </div>
           </div>
         `;
@@ -1324,13 +1330,13 @@ export class EstudoArtigosView {
         });
       } else {
         card.innerHTML = `
-          <div class="ath-pdf-pin-cab ath-pin-arrastavel" style="background:${escapeHtml(pin.cor || '#F59E0B')};" title="Arraste para mover ou clique nos botões para diminuir/editar">
-            <span class="ath-pin-cab-titulo">📌 #${idx + 1} · ${escapeHtml(pin.titulo || 'Nota')}</span>
+          <div class="ath-pdf-pin-cab ath-pin-arrastavel" style="background:${escapeHtml(pin.cor || '#F59E0B')};" title="Arraste para mover ou clique nos ícones para redimensionar/editar">
+            <span class="ath-pin-cab-titulo">${svgIcone('nota', 11)} #${idx + 1} · ${escapeHtml(pin.titulo || 'Nota')}</span>
             <div class="ath-pin-cab-acoes">
-              <button type="button" class="ath-pin-edit-btn" data-tam-rapido-pin="${escapeHtml(pin.id)}" title="Diminuir / Aumentar largura (${pin.tamanho === 'pequena' ? 'Pequena' : 'Normal'})">${pin.tamanho === 'pequena' ? 'M' : 'P'}</button>
-              <button type="button" class="ath-pin-edit-btn" data-minimizar-pin="${escapeHtml(pin.id)}" title="Minimizar nota em pílula">—</button>
-              <button type="button" class="ath-pin-edit-btn" data-abrir-edicao-pin="${escapeHtml(pin.id)}" title="Editar esta nota">✎</button>
-              <button type="button" class="ath-pin-del" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">✕</button>
+              <button type="button" class="ath-pin-edit-btn" data-tam-rapido-pin="${escapeHtml(pin.id)}" title="Alternar largura (${pin.tamanho === 'pequena' ? 'Compacta -> Normal' : 'Normal -> Compacta'})">${svgIcone('redimensionar', 10)}</button>
+              <button type="button" class="ath-pin-edit-btn" data-minimizar-pin="${escapeHtml(pin.id)}" title="Minimizar nota em pílula">${svgIcone('minimizar', 11)}</button>
+              <button type="button" class="ath-pin-edit-btn" data-abrir-edicao-pin="${escapeHtml(pin.id)}" title="Editar esta nota">${svgIcone('lapis', 10)}</button>
+              <button type="button" class="ath-pin-del" data-del-pin="${escapeHtml(pin.id)}" title="Excluir nota">${svgIcone('fechar', 11)}</button>
             </div>
           </div>
           <div class="ath-pdf-pin-txt" data-abrir-edicao-pin="${escapeHtml(pin.id)}" title="Clique para editar o texto desta nota">
@@ -2176,15 +2182,19 @@ export class EstudoArtigosView {
             ` : todasNotasPdf.map(({ numPag, idx, pin }) => `
               <div class="ath-citacao-pdf-card" style="border-left: 4px solid ${escapeHtml(pin.cor || '#F59E0B')}; padding:8px 10px;">
                 <div class="ath-citacao-pdf-topo" style="margin-bottom:4px;">
-                  <span class="ath-citacao-pag-badge" data-ir-nota-pag="${numPag}" data-ir-nota-id="${escapeHtml(pin.id)}" title="Ir até esta nota na Página ${numPag}">
-                    📌 Pág. ${numPag} · #${idx} ${escapeHtml(pin.titulo || 'Nota')}
+                  <span class="ath-citacao-pag-badge" data-ir-nota-pag="${numPag}" data-ir-nota-id="${escapeHtml(pin.id)}" title="Ir até esta nota na Página ${numPag}" style="display:inline-flex; align-items:center; gap:4px;">
+                    ${svgIcone('nota', 11)} Pág. ${numPag} · #${idx} ${escapeHtml(pin.titulo || 'Nota')}
                   </span>
                   <div style="display:flex; gap:4px;">
-                    <button type="button" class="ath-btn ath-btn-sm" data-min-nota-lat="${escapeHtml(pin.id)}" data-min-nota-pag="${numPag}" title="${pin.minimizado ? 'Expandir nota na folha' : 'Minimizar nota na folha'}" style="height:21px; padding:0 6px; font-size:10px;">
-                      ${pin.minimizado ? '+ Expandir' : '— Diminuir'}
+                    <button type="button" class="ath-pin-ic-acao ath-pin-ic-neutro" data-min-nota-lat="${escapeHtml(pin.id)}" data-min-nota-pag="${numPag}" title="${pin.minimizado ? 'Expandir nota na folha' : 'Minimizar nota na folha'}" style="width:22px; height:22px;">
+                      ${svgIcone(pin.minimizado ? 'mais' : 'minimizar', 11)}
                     </button>
-                    <button type="button" class="ath-btn ath-btn-sm" data-edit-nota-lat="${escapeHtml(pin.id)}" data-edit-nota-pag="${numPag}" title="Editar esta nota" style="height:21px; padding:0 6px; font-size:10px;">✎</button>
-                    <button type="button" class="ath-btn ath-btn-sm" data-del-nota-lat="${escapeHtml(pin.id)}" data-del-nota-pag="${numPag}" title="Excluir nota" style="height:21px; padding:0 6px; font-size:10px; color:#B42318;">✕</button>
+                    <button type="button" class="ath-pin-ic-acao ath-pin-ic-neutro" data-edit-nota-lat="${escapeHtml(pin.id)}" data-edit-nota-pag="${numPag}" title="Editar esta nota" style="width:22px; height:22px;">
+                      ${svgIcone('lapis', 11)}
+                    </button>
+                    <button type="button" class="ath-pin-ic-acao ath-pin-ic-perigo" data-del-nota-lat="${escapeHtml(pin.id)}" data-del-nota-pag="${numPag}" title="Excluir nota" style="width:22px; height:22px;">
+                      ${svgIcone('lixeira', 11)}
+                    </button>
                   </div>
                 </div>
                 <div style="font-size:11.5px; color:#1E293B; line-height:1.38; cursor:pointer;" data-edit-nota-lat="${escapeHtml(pin.id)}" data-edit-nota-pag="${numPag}">

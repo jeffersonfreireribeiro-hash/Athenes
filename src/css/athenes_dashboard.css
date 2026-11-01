@@ -1124,7 +1124,7 @@
 }
 
 .ath-pdf-pin-balao.editando {
-  width: 276px;
+  width: 248px;
   z-index: 35;
   background: #FFFFFF !important;
   box-shadow: 0 16px 38px rgba(15, 23, 42, 0.28);
@@ -1134,11 +1134,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 10px;
+  padding: 5px 8px;
   color: #FFFFFF;
   font-size: 11px;
   cursor: grab;
   user-select: none;
+  gap: 6px;
 }
 
 .ath-pdf-pin-cab:active {
@@ -1146,6 +1147,9 @@
 }
 
 .ath-pin-cab-titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
@@ -1156,34 +1160,33 @@
 .ath-pin-cab-acoes {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  flex-shrink: 0;
 }
 
 .ath-pin-edit-btn,
 .ath-pin-del {
   border: none;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
   color: #FFFFFF;
   cursor: pointer;
-  font-weight: 900;
-  font-size: 10.5px;
-  width: 19px;
-  height: 19px;
+  width: 20px;
+  height: 20px;
   border-radius: 5px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: background 0.12s;
+  transition: background 0.12s, transform 0.1s;
 }
 
 .ath-pin-edit-btn:hover,
 .ath-pin-del:hover {
-  background: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.38);
 }
 
 .ath-pdf-pin-txt {
-  padding: 9px 11px;
+  padding: 8px 10px;
   font-size: 12px;
   color: #1F2733;
   line-height: 1.42;
@@ -1200,45 +1203,47 @@
 }
 
 .ath-pdf-pin-form {
-  padding: 10px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   background: #FFFFFF;
 }
 
 .ath-pin-input-titulo {
-  width: 100%;
-  border: 1px solid #CBD5E1;
-  border-radius: 8px;
-  padding: 5px 8px;
-  font-family: var(--glx-font, 'Nunito', sans-serif);
-  font-size: 11.5px;
-  font-weight: 800;
-  color: #0F172A;
-  background: #F8FAFC;
-  box-sizing: border-box;
+  width: 100% !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  border: 1px solid #CBD5E1 !important;
+  border-radius: 7px !important;
+  padding: 4px 8px !important;
+  font-family: var(--glx-font, 'Nunito', sans-serif) !important;
+  font-size: 11.5px !important;
+  font-weight: 800 !important;
+  color: #0F172A !important;
+  background: #F8FAFC !important;
+  box-sizing: border-box !important;
 }
 
 .ath-pin-textarea {
-  width: 100%;
-  border: 1px solid #CBD5E1;
-  border-radius: 8px;
-  padding: 6px 8px;
-  font-family: var(--glx-font, 'Nunito', sans-serif);
-  font-size: 12px;
-  color: #1E293B;
-  line-height: 1.4;
-  resize: vertical;
-  min-height: 62px;
-  box-sizing: border-box;
+  width: 100% !important;
+  border: 1px solid #CBD5E1 !important;
+  border-radius: 7px !important;
+  padding: 6px 8px !important;
+  font-family: var(--glx-font, 'Nunito', sans-serif) !important;
+  font-size: 11.5px !important;
+  color: #1E293B !important;
+  line-height: 1.38 !important;
+  resize: vertical !important;
+  min-height: 58px !important;
+  box-sizing: border-box !important;
 }
 
 .ath-pin-input-titulo:focus,
 .ath-pin-textarea:focus {
-  outline: none;
-  border-color: #314F79;
-  background: #FFFFFF;
+  outline: none !important;
+  border-color: #314F79 !important;
+  background: #FFFFFF !important;
 }
 
 .ath-pin-form-rodape {
@@ -1262,6 +1267,7 @@
   border: 2px solid transparent;
   cursor: pointer;
   padding: 0;
+  flex-shrink: 0;
 }
 
 .ath-pin-cor-dot.on {
@@ -1273,42 +1279,56 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 }
 
-.ath-pin-btn-excluir {
-  border: 1px solid #FECACA;
-  background: #FEF2F2;
-  color: #DC2626;
+.ath-pin-ic-acao {
+  width: 26px;
+  height: 26px;
   border-radius: 7px;
-  padding: 4px 7px;
-  font-family: var(--glx-font, 'Nunito', sans-serif);
-  font-size: 11px;
-  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, transform 0.1s;
 }
 
-.ath-pin-btn-fechar {
+.ath-pin-ic-acao:hover {
+  transform: translateY(-1px);
+}
+
+.ath-pin-ic-neutro {
   border: 1px solid #CBD5E1;
   background: #F8FAFC;
   color: #475569;
-  border-radius: 7px;
-  padding: 4px 8px;
-  font-family: var(--glx-font, 'Nunito', sans-serif);
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
 }
 
-.ath-pin-btn-salvar {
+.ath-pin-ic-neutro:hover {
+  background: #EFF6FF;
+  border-color: #314F79;
+  color: #314F79;
+}
+
+.ath-pin-ic-perigo {
+  border: 1px solid #FECACA;
+  background: #FEF2F2;
+  color: #DC2626;
+}
+
+.ath-pin-ic-perigo:hover {
+  background: #FEE2E2;
+  border-color: #F87171;
+}
+
+.ath-pin-ic-primario {
   border: none;
   background: #314F79;
   color: #FFFFFF;
-  border-radius: 7px;
-  padding: 4px 10px;
-  font-family: var(--glx-font, 'Nunito', sans-serif);
-  font-size: 11px;
-  font-weight: 800;
-  cursor: pointer;
+}
+
+.ath-pin-ic-primario:hover {
+  background: #233B5C;
 }
 
 /* Popover Flutuante de Seleção de Texto no PDF */
