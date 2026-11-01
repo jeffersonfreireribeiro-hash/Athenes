@@ -911,3 +911,100 @@
   font-size: 11px;
   color: #334155;
 }
+
+
+/* ==========================================================================
+   MODO TELA CHEIA (FULL-SCREEN 100VW × 100VH) DO ESTÚDIO DE LEITURA & ZOTERO
+   Idêntico ao layout de 3 colunas da Escrita (.rm-conteudo / .rm-ed-grade)
+   ========================================================================== */
+
+.ath-dashboard.ath-dashboard-estudio-full {
+  max-width: none !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.ath-dashboard.ath-dashboard-estudio-full > .ath-dash-topbar,
+.ath-dashboard.ath-dashboard-estudio-full .ath-dash-head-zotero {
+  display: none !important;
+}
+
+.ath-dashboard.ath-dashboard-estudio-full #athSecaoDashArtigosZotero,
+.ath-dashboard.ath-dashboard-estudio-full #athContainerEstudoArtigos {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ath-estudio-full-shell .rm-editor.rm-main {
+  padding: 12px 14px;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.ath-estudio-full-shell #athEstudioColEsq {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ath-estudio-full-shell #athEstudioColDir {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ath-estudio-inspetor-card {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ath-estudio-inspetor-card .ath-estudio-abas {
+  flex-shrink: 0;
+}
+
+.ath-estudio-inspetor-card .ath-estudio-painel-corpo {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.rm-ic-bt.ath-tool-pilula.ativo {
+  background: var(--glx-primary, #314F79) !important;
+  border-color: var(--glx-primary, #314F79) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 3px 10px rgba(49, 79, 121, 0.24);
+}
+
+.ath-dot-conexao {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94A3B8;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.ath-dot-conexao.on {
+  background: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.ath-btn-zotero-ok {
+  border-color: #A7F3D0 !important;
+  background: #ECFDF5 !important;
+  color: #065F46 !important;
+}

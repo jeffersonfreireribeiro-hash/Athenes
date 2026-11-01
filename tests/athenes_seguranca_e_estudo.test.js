@@ -86,3 +86,16 @@ test('ZoteroClient.sincronizarNotaFilhaNoZotero retorna fallback local quando se
   assert.equal(res.ok, false);
   assert.equal(res.modo, 'local');
 });
+
+
+test('Estúdio de Artigos Zotero & PDF usa estrutura Full-Screen de 3 colunas idêntica ao Editor (.rm-conteudo / .rm-ed-grade)', () => {
+  const codigoEstudo = fs.readFileSync(path.resolve('src/ui/athenes_estudo_artigos.js'), 'utf8');
+  const cssDash = fs.readFileSync(path.resolve('src/css/athenes_dashboard.css'), 'utf8');
+
+  assert.equal(codigoEstudo.includes('rm-conteudo ath-estudio-full-shell'), true);
+  assert.equal(codigoEstudo.includes('athEstudioColEsq'), true);
+  assert.equal(codigoEstudo.includes('athEstudioColPrev'), true);
+  assert.equal(codigoEstudo.includes('athEstudioColDir'), true);
+  assert.equal(codigoEstudo.includes('rm-barra-blocos'), true);
+  assert.equal(cssDash.includes('.ath-dashboard.ath-dashboard-estudio-full'), true);
+});

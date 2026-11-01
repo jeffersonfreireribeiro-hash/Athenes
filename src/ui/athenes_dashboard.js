@@ -13,8 +13,7 @@ import {
   salvarPerfilColaborador,
   CORES_COLABORADORES,
   obterConfigGoogleDrive,
-  salvarConfigGoogleDrive,
-  autenticarGoogleDrive
+  salvarConfigGoogleDrive
 } from '../core/athenes_colaboracao.js';
 import { EstudoArtigosView } from './athenes_estudo_artigos.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
@@ -45,7 +44,6 @@ export class DashboardView {
       this.documentos = [];
     }
 
-    // Se estiver vazio, gera 2 documentos de exemplo (Artigo ABNT e Relatório Técnico)
     if (!this.documentos || this.documentos.length === 0) {
       const docExemplo1 = criarDocumento({
         titulo: 'Análise Espacial e Diretrizes de Reurbanização Sustentável',
@@ -175,17 +173,16 @@ export class DashboardView {
 
       <!-- Conteúdo da Aba 2: Leitura de Artigos, Anotador de PDF (estilo Samsung Notes) & Zotero + Drive -->
       <section id="athSecaoDashArtigosZotero" ${this.abaAtiva === 'artigos_zotero' ? '' : 'hidden'}>
-        <header class="ath-dash-head" style="margin-bottom:18px;">
+        <header class="ath-dash-head ath-dash-head-zotero" style="margin-bottom:18px;">
           <div class="ath-dash-titulo">
             <h1>Estúdio de Artigos, Leitura de PDF & Fichamento Zotero</h1>
-            <p>Leia os PDFs direto do seu Google Drive, risque à mão livre estilo Samsung Notes, marque citações e sincronize notas com o Zotero.</p>
+            <p>Leia os PDFs direto do seu Google Drive em Tela Cheia, risque à mão livre estilo Samsung Notes, marque citações e sincronize notas com o Zotero.</p>
           </div>
         </header>
         <div id="athContainerEstudoArtigos"></div>
       </section>
     `;
 
-    // Alternância entre as duas páginas principais do Dashboard
     root.querySelectorAll('[data-aba-dash]').forEach(btn => {
       btn.addEventListener('click', () => {
         this.abaAtiva = btn.dataset.abaDash;
@@ -193,12 +190,10 @@ export class DashboardView {
       });
     });
 
-    // Modal de Identificação / Login do Usuário
     root.querySelector('#athBtnPerfilLoginDash').addEventListener('click', () => {
       this.abrirModalIdentificacaoLogin();
     });
 
-    // Eventos da Aba 1 (Escrita)
     root.querySelector('#athBtnNovoDocModal').addEventListener('click', () => this.abrirModalNovoDoc());
 
     const inputBusca = root.querySelector('#athDashBusca');
@@ -230,15 +225,17 @@ export class DashboardView {
     const p = obterPerfilColaborador();
     const driveCfg = obterConfigGoogleDrive();
     let zoteroUserId = '';
+    let zoteroApiKey = '';
     try {
       const z = JSON.parse(localStorage.getItem('athenes_zotero_cfg') || '{}');
       zoteroUserId = z.userId || '';
+      zoteroApiKey = z.apiKey || '';
     } catch (_) {}
 
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
     modal.innerHTML = `
-      <div class="ath-modal" style="max-width:520px;">
+      <div class="ath-modal" style="max-width:540px;">
         <div class="ath-modal-head">
           <h2>Identificação do Usuário & Contas Conectadas</h2>
           <button type="button" class="ath-btn ath-btn-icon" id="athModalLoginFechar">${svgIcone('fechar', 16)}</button>
@@ -285,23 +282,27 @@ export class DashboardView {
 
           <div style="padding:10px 12px; border-radius:10px; background:#F8FAFC; border:1px solid #CBD5E1; margin-top:6px;">
             <strong style="display:block; font-size:11.5px; color:#314F79; text-transform:uppercase; margin-bottom:6px;">
-              Vínculos Rápidos (Google Drive & Zotero)
+              Vínculos Rápidos (Zotero API & Google Drive)
             </strong>
-            <div class="ath-linha2">
+            <div class="ath-linha2" style="margin-bottom:8px;">
               <div class="ath-prop-grupo" style="margin-bottom:0;">
-                <label style="font-size:11px;">Client ID Google Drive (OAuth)</label>
-                <input type="text" class="ath-input" id="athLoginDriveClientId" value="${driveCfg.clientId || ''}" placeholder="Opcional (ou pasta local Drive)" style="height:30px; font-size:11.5px;">
+                <label style="font-size:11px;">Zotero API Key (Chave Privada)</label>
+                <input type="text" class="ath-input" id="athLoginZoteroKey" value="${zoteroApiKey}" placeholder="Ex.: KNEYoy8RTMlkaTuHx5WPc3bH" style="height:30px; font-size:11.5px;">
               </div>
               <div class="ath-prop-grupo" style="margin-bottom:0;">
                 <label style="font-size:11px;">Zotero User ID</label>
-                <input type="text" class="ath-input" id="athLoginZoteroId" value="${zoteroUserId}" placeholder="Ex.: 1234567" style="height:30px; font-size:11.5px;">
+                <input type="text" class="ath-input" id="athLoginZoteroId" value="${zoteroUserId}" placeholder="Ex.: 18806479" style="height:30px; font-size:11.5px;">
               </div>
+            </div>
+            <div class="ath-prop-grupo" style="margin-bottom:0;">
+              <label style="font-size:11px;">Client ID Google Drive (OAuth)</label>
+              <input type="text" class="ath-input" id="athLoginDriveClientId" value="${driveCfg.clientId || ''}" placeholder="Ex.: xxxx.apps.googleusercontent.com" style="height:30px; font-size:11.5px;">
             </div>
           </div>
         </div>
         <div class="ath-modal-foot">
           <button type="button" class="ath-btn" id="athBtnCancelarLogin">Cancelar</button>
-          <button type="button" class="ath-btn ath-btn-primary" id="athBtnSalvarLogin">Salvar Identificação</button>
+          <button type="button" class="ath-btn ath-btn-primary" id="athBtnSalvarLogin">Salvar Identificação & Chaves</button>
         </div>
       </div>
     `;
@@ -338,12 +339,15 @@ export class DashboardView {
       }
 
       const zId = modal.querySelector('#athLoginZoteroId').value.trim();
-      if (zId) {
-        try {
-          const zAtual = JSON.parse(localStorage.getItem('athenes_zotero_cfg') || '{}');
-          localStorage.setItem('athenes_zotero_cfg', JSON.stringify({ ...zAtual, userId: zId }));
-        } catch (_) {}
-      }
+      const zKey = modal.querySelector('#athLoginZoteroKey').value.trim();
+      try {
+        const zAtual = JSON.parse(localStorage.getItem('athenes_zotero_cfg') || '{}');
+        localStorage.setItem('athenes_zotero_cfg', JSON.stringify({
+          ...zAtual,
+          userId: zId || zAtual.userId || '',
+          apiKey: zKey !== undefined ? zKey : (zAtual.apiKey || '')
+        }));
+      } catch (_) {}
 
       fechar();
       this.renderizar();

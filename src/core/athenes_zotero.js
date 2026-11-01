@@ -10,8 +10,9 @@ const ZOTERO_API_BASE = 'https://api.zotero.org';
 
 export class ZoteroClient {
   constructor(config = {}) {
-    this.userId = config.userId || '';
-    this.apiKey = config.apiKey || '';
+    this.userId = config.userId ? String(config.userId).trim() : '';
+    this.apiKey = config.apiKey ? String(config.apiKey).trim() : '';
+    this.username = config.username || '';
     this.isGroup = Boolean(config.isGroup);
     this.colecoesSincronizadas = config.colecoesSincronizadas || [];
     this.cacheItens = new Map();
@@ -42,11 +43,26 @@ export class ZoteroClient {
   }
 
   /**
-   * Testa a validade das credenciais e retorna os privilégios da chave
+   * Se o usuário informou apenas a API Key, descobre automaticamente o userID via endpoint /keys/{key}
+   */
+  async garantirUserId() {
+    if (this.userId) return this.userId;
+    if (!this.apiKey) return '';
+    const info = await this.testarConexao();
+    if (info.ok && info.usuarioId) {
+      this.userId = String(info.usuarioId);
+      this.username = info.nomeUsuario || '';
+      return this.userId;
+    }
+    return '';
+  }
+
+  /**
+   * Testa a validade das credenciais e retorna os privilégios da chave (descobrindo o userID automaticamente)
    */
   async testarConexao() {
-    if (!this.userId || !this.apiKey) {
-      return { ok: false, mensagem: 'Informe o ID de usuário e a Chave de API do Zotero.' };
+    if (!this.apiKey) {
+      return { ok: false, mensagem: 'Informe a Chave de API (API Key) do Zotero.' };
     }
 
     try {
@@ -56,10 +72,16 @@ export class ZoteroClient {
         return { ok: false, status: res.status, mensagem: `Falha na autenticação (${res.status}). Verifique a chave.` };
       }
       const dados = await res.json();
+      if (dados.userID) {
+        this.userId = String(dados.userID);
+      }
+      if (dados.username) {
+        this.username = dados.username;
+      }
       return {
         ok: true,
-        usuarioId: dados.userID,
-        nomeUsuario: dados.username || `Usuário #${dados.userID}`,
+        usuarioId: dados.userID ? String(dados.userID) : this.userId,
+        nomeUsuario: dados.displayName || dados.username || `Usuário #${dados.userID || this.userId}`,
         acesso: dados.access || {}
       };
     } catch (err) {
@@ -71,6 +93,7 @@ export class ZoteroClient {
    * Lista as coleções (pastas) disponíveis na biblioteca
    */
   async listarColecoes() {
+    await this.garantirUserId();
     if (!this.userId) return [];
 
     try {
@@ -95,27 +118,40 @@ export class ZoteroClient {
    * Busca itens na biblioteca (com filtro por texto e/ou coleção)
    */
   async buscarItens({ termo = '', colecaoKey = '', limite = 50 } = {}) {
+    await this.garantirUserId();
     if (!this.userId) return [];
 
     try {
       let endpoint = colecaoKey
-        ? `${this.getBaseUrl()}/collections/${encodeURIComponent(colecaoKey)}/items`
-        : `${this.getBaseUrl()}/items`;
+        ? `${this.getBaseUrl()}/collections/${encodeURIComponent(colecaoKey)}/items/top`
+        : `${this.getBaseUrl()}/items/top`;
 
       const params = new URLSearchParams({
         limit: String(limite),
         sort: 'dateModified',
-        direction: 'desc',
-        itemType: '-attachment || -note'
+        direction: 'desc'
       });
 
       if (termo) params.set('q', termo);
 
-      const res = await fetch(`${endpoint}?${params.toString()}`, { headers: this.getHeaders() });
+      let res = await fetch(`${endpoint}?${params.toString()}`, { headers: this.getHeaders() });
+      if (!res.ok) {
+        // Fallback para /items caso /items/top não esteja disponível em mock/ambiente de teste
+        const fallbackEndpoint = colecaoKey
+          ? `${this.getBaseUrl()}/collections/${encodeURIComponent(colecaoKey)}/items`
+          : `${this.getBaseUrl()}/items`;
+        res = await fetch(`${fallbackEndpoint}?${params.toString()}`, { headers: this.getHeaders() });
+      }
       if (!res.ok) throw new Error(`Erro ao buscar itens (${res.status})`);
 
       const dados = await res.json();
-      const itensNormalizados = dados.map(d => this.normalizarItemZotero(d)).filter(Boolean);
+      const itensNormalizados = dados
+        .filter(d => {
+          const t = d?.data?.itemType;
+          return t !== 'attachment' && t !== 'note' && t !== 'annotation';
+        })
+        .map(d => this.normalizarItemZotero(d))
+        .filter(Boolean);
 
       for (const item of itensNormalizados) {
         this.cacheItens.set(item.id, item);
@@ -134,7 +170,8 @@ export class ZoteroClient {
    * contendo o resumo, as citações marcadas no PDF e o link do PDF no Google Drive
    * (sem enviar o arquivo binário do PDF para o armazenamento do Zotero).
    */
-  async sincronizarNotaFilhaNoZotero({ parentItemKey, noteKey = null, htmlNota, tags = ['Athenes', 'Fichamento PDF'] } = {}) {
+  async sincronizarNotaFilhaNoZotero({ parentItemKey, noteKey = null, htmlNota, tags = ['Athenes', 'Fichamento PDF'], artigoMetadados = null } = {}) {
+    await this.garantirUserId();
     if (!this.userId || !this.apiKey) {
       return {
         ok: false,
@@ -144,9 +181,42 @@ export class ZoteroClient {
     }
 
     try {
+      let chavePaiValida = parentItemKey && !String(parentItemKey).startsWith('ZOT') ? parentItemKey : undefined;
+
+      // Se o artigo ainda for apenas local (ex.: chave ZOT8K2M9) e tivermos metadados, cria o item bibliográfico no Zotero primeiro
+      if (!chavePaiValida && artigoMetadados && artigoMetadados.titulo) {
+        const novoItemPai = {
+          itemType: 'journalArticle',
+          title: artigoMetadados.titulo,
+          abstractNote: artigoMetadados.resumoOriginal || '',
+          publicationTitle: artigoMetadados.publicacao || '',
+          volume: artigoMetadados.volume || '',
+          issue: artigoMetadados.numero || '',
+          pages: artigoMetadados.paginas || '',
+          date: artigoMetadados.ano || '',
+          DOI: artigoMetadados.doi || '',
+          creators: (artigoMetadados.autores || []).map(a => ({
+            creatorType: 'author',
+            firstName: a.prenome || '',
+            lastName: a.sobrenome || 'Autor'
+          })),
+          tags: (artigoMetadados.palavrasChave || []).map(t => ({ tag: String(t) }))
+        };
+        const resPai = await fetch(`${this.getBaseUrl()}/items`, {
+          method: 'POST',
+          headers: this.getHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify([novoItemPai])
+        });
+        if (resPai.ok) {
+          const jsonPai = await resPai.json().catch(() => ({}));
+          const k = jsonPai?.successful?.['0']?.key;
+          if (k) chavePaiValida = k;
+        }
+      }
+
       const payloadItem = {
         itemType: 'note',
-        parentItem: parentItemKey || undefined,
+        parentItem: chavePaiValida || undefined,
         note: String(htmlNota || '<p>Fichamento Athenes</p>'),
         tags: (tags || []).map(t => ({ tag: String(t) }))
       };
@@ -154,11 +224,21 @@ export class ZoteroClient {
         payloadItem.key = noteKey;
       }
 
-      const res = await fetch(`${this.getBaseUrl()}/items`, {
+      let res = await fetch(`${this.getBaseUrl()}/items`, {
         method: 'POST',
         headers: this.getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify([payloadItem])
       });
+
+      // Se parentItem não existir na biblioteca remota, salva como nota independente para nunca perder o fichamento
+      if (!res.ok && payloadItem.parentItem) {
+        delete payloadItem.parentItem;
+        res = await fetch(`${this.getBaseUrl()}/items`, {
+          method: 'POST',
+          headers: this.getHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify([payloadItem])
+        });
+      }
 
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
@@ -170,8 +250,9 @@ export class ZoteroClient {
       return {
         ok: true,
         modo: 'zotero_api',
+        parentKey: chavePaiValida || parentItemKey || null,
         noteKey: criadoKey,
-        mensagem: 'Fichamento e citações sincronizados diretamente no item do Zotero!'
+        mensagem: 'Fichamento e citações sincronizados diretamente no Zotero!'
       };
     } catch (err) {
       return {
