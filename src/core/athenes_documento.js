@@ -16,6 +16,19 @@ export const TIPOS_DOCUMENTO = Object.freeze([
   { id: 'ensaio', rotulo: 'Ensaio / Paper Curto', icone: 'documento' }
 ]);
 
+/** Família "Figura": cada subtipo tem rótulo, numeração e lista próprios (ex.: Gráfico 1, Figura 1). */
+export const ROTULOS_FIGURA = Object.freeze({
+  figura: 'Figura',
+  grafico: 'Gráfico',
+  fotografia: 'Fotografia',
+  diagrama: 'Diagrama',
+  fluxograma: 'Fluxograma'
+});
+
+export function rotuloDaFigura(bloco) {
+  return ROTULOS_FIGURA[bloco?.subtipo] || ROTULOS_FIGURA.figura;
+}
+
 export const MODOS_APLICACAO_MESTRA = Object.freeze({
   FIXA: 'fixa',
   PROGRESSIVA: 'progressiva'
@@ -266,7 +279,8 @@ export function criarNovoBloco(tipo, dados = {}) {
 
     case 'figura':
       b.tipo = 'figura';
-      b.titulo = dados.titulo || 'Figura 1 — Descrição detalhada da ilustração';
+      b.subtipo = ROTULOS_FIGURA[dados.subtipo] ? dados.subtipo : 'figura';
+      b.titulo = dados.titulo || `${ROTULOS_FIGURA[b.subtipo]} 1 — Descrição detalhada da ilustração`;
       b.layout = dados.layout || '1'; // '1', '2_lado', '2_empilhado', '3_linha', '3_misto', '4_grade', '6_grade'
       b.itens = Array.isArray(dados.itens) ? dados.itens : [
         { id: gerarId('fig_item'), url: dados.src || dados.url || '', legenda_sub: 'Visão geral' }
@@ -998,57 +1012,49 @@ export const calcularEstatisticasDocumento = calcularEstatisticas;
  * Recalcula numeração automática e sequencial separada para Figuras, Mapas, Tabelas, Quadros e Equações.
  */
 export function recalcularNumeracaoAutomatica(doc) {
-  if (!doc || !Array.isArray(doc.secoes)) return { figuras: 0, mapas: 0, tabelas: 0, quadros: 0, formulas: 0 };
+  const vazio = { figuras: 0, mapas: 0, tabelas: 0, quadros: 0, formulas: 0, porSubtipo: {} };
+  if (!doc || !Array.isArray(doc.secoes)) return vazio;
 
-  let contFiguras = 0;
-  let contMapas = 0;
-  let contTabelas = 0;
-  let contQuadros = 0;
-  let contFormulas = 0;
+  const cont = { mapa: 0, tabela: 0, quadro: 0, formula: 0 };
+  const porSubtipo = {};
+  const nomes = Object.values(ROTULOS_FIGURA).join('|');
+  const prefixoFigura = new RegExp('^(' + nomes + ')\\s+\\d+\\s*[-—]', 'i');
+  const renumerar = (texto, rotulo, n, regex) =>
+    texto && regex.test(texto) ? texto.replace(regex, rotulo + ' ' + n + ' —') : texto;
 
   for (const sec of doc.secoes) {
     for (const b of sec.blocos || []) {
       if (b.tipo === 'figura' || b.tipo === 'imagem') {
-        contFiguras++;
-        b.numero_sequencial = contFiguras;
-        if (b.titulo && /^Figura\s+\d+\s*[-—]/i.test(b.titulo)) {
-          b.titulo = b.titulo.replace(/^Figura\s+\d+\s*[-—]/i, `Figura ${contFiguras} —`);
-        } else if (b.legenda && /^Figura\s+\d+\s*[-—]/i.test(b.legenda)) {
-          b.legenda = b.legenda.replace(/^Figura\s+\d+\s*[-—]/i, `Figura ${contFiguras} —`);
-        }
+        const sub = b.tipo === 'imagem' ? 'figura' : (ROTULOS_FIGURA[b.subtipo] ? b.subtipo : 'figura');
+        porSubtipo[sub] = (porSubtipo[sub] || 0) + 1;
+        b.numero_sequencial = porSubtipo[sub];
+        const rotulo = ROTULOS_FIGURA[sub];
+        b.titulo = renumerar(b.titulo, rotulo, b.numero_sequencial, prefixoFigura);
+        b.legenda = renumerar(b.legenda, rotulo, b.numero_sequencial, prefixoFigura);
       } else if (b.tipo === 'mapa') {
-        contMapas++;
-        b.numero_sequencial = contMapas;
-        if (b.titulo && /^Mapa\s+\d+\s*[-—]/i.test(b.titulo)) {
-          b.titulo = b.titulo.replace(/^Mapa\s+\d+\s*[-—]/i, `Mapa ${contMapas} —`);
-        }
+        b.numero_sequencial = ++cont.mapa;
+        b.titulo = renumerar(b.titulo, 'Mapa', cont.mapa, /^Mapa\s+\d+\s*[-—]/i);
       } else if (b.tipo === 'tabela') {
-        contTabelas++;
-        b.numero_sequencial = contTabelas;
-        if (b.titulo && /^Tabela\s+\d+\s*[-—]/i.test(b.titulo)) {
-          b.titulo = b.titulo.replace(/^Tabela\s+\d+\s*[-—]/i, `Tabela ${contTabelas} —`);
-        }
+        b.numero_sequencial = ++cont.tabela;
+        b.titulo = renumerar(b.titulo, 'Tabela', cont.tabela, /^Tabela\s+\d+\s*[-—]/i);
       } else if (b.tipo === 'quadro') {
-        contQuadros++;
-        b.numero_sequencial = contQuadros;
-        if (b.titulo && /^Quadro\s+\d+\s*[-—]/i.test(b.titulo)) {
-          b.titulo = b.titulo.replace(/^Quadro\s+\d+\s*[-—]/i, `Quadro ${contQuadros} —`);
-        }
+        b.numero_sequencial = ++cont.quadro;
+        b.titulo = renumerar(b.titulo, 'Quadro', cont.quadro, /^Quadro\s+\d+\s*[-—]/i);
       } else if (b.tipo === 'formula') {
-        contFormulas++;
-        b.numero_sequencial = contFormulas;
-        b.numero_equacao = `(${contFormulas})`;
+        b.numero_sequencial = ++cont.formula;
+        b.numero_equacao = '(' + cont.formula + ')';
         b.numero = b.numero_equacao;
       }
     }
   }
 
   return {
-    figuras: contFiguras,
-    mapas: contMapas,
-    tabelas: contTabelas,
-    quadros: contQuadros,
-    formulas: contFormulas
+    figuras: porSubtipo.figura || 0,
+    mapas: cont.mapa,
+    tabelas: cont.tabela,
+    quadros: cont.quadro,
+    formulas: cont.formula,
+    porSubtipo
   };
 }
 
@@ -1064,25 +1070,31 @@ function encontrarPaginaDoBloco(doc, blocoId) {
   return 1;
 }
 
-export function gerarListaFiguras(doc) {
+/** Lista de ilustrações de um subtipo da família Figura (figura, grafico, fotografia, diagrama, fluxograma). */
+export function gerarListaIlustracoes(doc, subtipo = 'figura') {
   recalcularNumeracaoAutomatica(doc);
+  const rotulo = ROTULOS_FIGURA[subtipo] || ROTULOS_FIGURA.figura;
+  const prefixo = new RegExp('^' + rotulo + '\\s+\\d+\\s*[-—]\\s*', 'i');
   const lista = [];
   for (const sec of doc.secoes || []) {
     for (const b of sec.blocos || []) {
-      if (b.tipo === 'figura' || b.tipo === 'imagem') {
-        lista.push({
-          id: b.id,
-          tipo: 'figura',
-          numero: b.numero_sequencial || 1,
-          rotulo: `Figura ${b.numero_sequencial || 1}`,
-          titulo: (b.titulo || b.legenda || 'Ilustração').replace(/^Figura\s+\d+\s*[-—]\s*/i, ''),
-          pagina: encontrarPaginaDoBloco(doc, b.id)
-        });
-      }
+      const sub = b.tipo === 'imagem' ? 'figura' : (b.tipo === 'figura' ? (ROTULOS_FIGURA[b.subtipo] ? b.subtipo : 'figura') : null);
+      if (sub !== subtipo) continue;
+      lista.push({
+        id: b.id,
+        tipo: subtipo,
+        numero: b.numero_sequencial || 1,
+        rotulo: rotulo + ' ' + (b.numero_sequencial || 1),
+        titulo: (b.titulo || b.legenda || rotulo).replace(prefixo, ''),
+        pagina: encontrarPaginaDoBloco(doc, b.id)
+      });
     }
   }
   return lista;
 }
+
+export function gerarListaFiguras(doc) { return gerarListaIlustracoes(doc, 'figura'); }
+export function gerarListaGraficos(doc) { return gerarListaIlustracoes(doc, 'grafico'); }
 
 export function gerarListaMapas(doc) {
   recalcularNumeracaoAutomatica(doc);
@@ -1154,27 +1166,26 @@ export function resolverReferenciasCruzadas(texto, doc) {
 
   const mapaBlocos = new Map();
   for (const sec of doc.secoes || []) {
-    for (const b of sec.blocos || []) {
-      mapaBlocos.set(b.id, b);
-    }
+    for (const b of sec.blocos || []) mapaBlocos.set(b.id, b);
   }
 
-  return texto.replace(/\[ref:(figura|mapa|tabela|quadro|formula|equacao):([a-zA-Z0-9_-]+)\]/gi, (match, tipo, id) => {
+  const tipos = 'figura|grafico|fotografia|diagrama|fluxograma|mapa|tabela|quadro|formula|equacao';
+  const regex = new RegExp('\\[ref:(' + tipos + '):([a-zA-Z0-9_-]+)\\]', 'gi');
+  return texto.replace(regex, (match, tipo, id) => {
     const b = mapaBlocos.get(id);
     if (!b) return match;
     const num = b.numero_sequencial || 1;
-    switch (tipo.toLowerCase()) {
-      case 'figura': return `Figura ${num}`;
-      case 'mapa': return `Mapa ${num}`;
-      case 'tabela': return `Tabela ${num}`;
-      case 'quadro': return `Quadro ${num}`;
-      case 'formula':
-      case 'equacao': return `Equação (${num})`;
+    switch (b.tipo) {
+      case 'figura': return rotuloDaFigura(b) + ' ' + num;
+      case 'imagem': return 'Figura ' + num;
+      case 'mapa': return 'Mapa ' + num;
+      case 'tabela': return 'Tabela ' + num;
+      case 'quadro': return 'Quadro ' + num;
+      case 'formula': return 'Equação (' + num + ')';
       default: return match;
     }
   });
 }
-
 
 /* =========================================================================
    Linhas e grupos de blocos (mesma mecânica do Clux.js / Glaux GIS)

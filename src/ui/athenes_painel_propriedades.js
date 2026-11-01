@@ -12,7 +12,7 @@
 import { FONTES_SISTEMA, PESOS_FONTE } from '../core/athenes_estilos.js';
 import {
   modeloDaPagina, recalcularNumeracaoAutomatica, resolverReferenciasCruzadas,
-  calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
+  ROTULOS_FIGURA, calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
 
@@ -65,7 +65,7 @@ export class PainelPropriedades {
       citacao: 'Citação Direta Longa',
       tabela: 'Tabela (ABNT/IBGE)',
       quadro: 'Quadro Estruturado',
-      figura: 'Figura / Ilustração',
+      figura: `${ROTULOS_FIGURA[b.subtipo] || 'Figura'} (ilustração)`,
       mapa: 'Mapa Territorial',
       formula: 'Fórmula Matemática',
       campos: 'Campos (rótulo e valor)',

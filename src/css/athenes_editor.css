@@ -942,3 +942,17 @@ html, body, button, input, select, textarea, option, summary, label, table,
 .ath-bloco-folha.drop-grupo.drop-dir { box-shadow: inset -6px 0 0 0 #FF6B2C; }
 .rm-bl.drop-antes { box-shadow: 0 -3px 0 0 #FF6B2C; }
 .rm-bl.drop-depois { box-shadow: 0 3px 0 0 #FF6B2C; }
+
+
+/* Botões da barra com menu (Figura ▾, Quadro ▾) */
+.rm-grupo-bt { position: relative; flex: none; }
+.rm-ic-bt.tem-menu::before { content: ''; position: absolute; right: 6px; bottom: 7px; border: 3px solid transparent; border-top: 4px solid currentColor; border-bottom: 0; opacity: .7; }
+.rm-menu-bloco { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-30%); min-width: 270px; padding: 8px; display: flex; flex-direction: column; gap: 2px; background: #fff; border: 1px solid #E6E9EF; border-radius: 18px; box-shadow: 0 16px 36px -10px rgba(31, 39, 51, .28); z-index: 80; }
+.rm-menu-bloco[hidden] { display: none; }
+.rm-menu-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 10px; border: 0; border-radius: 12px; background: transparent; text-align: left; cursor: pointer; font-family: var(--glx-font); transition: background .12s; }
+.rm-menu-item:hover, .rm-menu-item:focus-visible { background: #FFF1EB; outline: none; }
+.rm-menu-icone { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: #F4F5F8; color: #64748B; }
+.rm-menu-item:hover .rm-menu-icone { background: #FF6B2C; color: #fff; }
+.rm-menu-texto { display: flex; flex-direction: column; min-width: 0; }
+.rm-menu-texto strong { font-size: 13px; font-weight: 800; color: #1F2733; }
+.rm-menu-texto small { font-size: 11px; color: #6B7585; }

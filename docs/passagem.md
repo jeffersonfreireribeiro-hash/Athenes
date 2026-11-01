@@ -131,3 +131,9 @@
 - **Arrastar:** na lista de blocos (soltar na borda reordena, no centro agrupa) e na folha, com **alça lateral** (seis pontos) em cada bloco. Inspetor com pills de linha reais e Igualar larguras.
 - **Inspetor remontado** a cada redesenho do editor (antes ficava solto ao inserir blocos); histórico passou a registrar edições de texto e do inspetor.
 - Testes: `tests/grupos_blocos.test.js` (41 testes no total).
+
+## Famílias de blocos na barra: Figura ▾ e Quadro ▾ (01/11/2026)
+
+- **Figura ▾:** menu com Figura, Gráfico, Fotografia, Diagrama e Fluxograma. Todos são o bloco `figura` com `subtipo`; cada subtipo tem rótulo, numeração, lista (`gerarListaIlustracoes`) e referência cruzada próprios (Gráfico 1, Figura 1).
+- **Quadro ▾:** menu com Quadro e Campos (rótulo e valor); o botão Campos avulso saiu da barra.
+- Código: `MENUS_BLOCO` e `ligarMenusDeBlocos` em `src/ui/athenes_editor.js`; `ROTULOS_FIGURA` em `src/core/athenes_documento.js`; testes em `tests/ilustracoes.test.js` (43 no total).

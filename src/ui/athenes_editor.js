@@ -20,6 +20,8 @@ import {
   duplicarBloco,
   moverBloco,
   gerarId,
+  ROTULOS_FIGURA,
+  rotuloDaFigura,
   calcularLinhas,
   colocarBloco,
   moverBlocoPorLinha,
@@ -43,6 +45,25 @@ const TIPO_ROTULO = {
 function resumoBloco(b) {
   const txt = String(b.titulo || b.texto || b.rotulo || b.latex || '').replace(/<[^>]+>/g, '').trim();
   return txt.slice(0, 42) || '—';
+}
+
+const MENUS_BLOCO = {
+  figura: [
+    { tipo: 'figura', subtipo: 'figura', icone: 'imagem', rotulo: 'Figura', desc: 'Imagem, esquema ou ilustração numerada' },
+    { tipo: 'figura', subtipo: 'grafico', icone: 'grafico', rotulo: 'Gráfico', desc: 'Barras, linhas, dispersão — numeração própria' },
+    { tipo: 'figura', subtipo: 'fotografia', icone: 'fotografia', rotulo: 'Fotografia', desc: 'Registro fotográfico, com fonte e crédito' },
+    { tipo: 'figura', subtipo: 'diagrama', icone: 'diagrama', rotulo: 'Diagrama', desc: 'Relações e estruturas entre elementos' },
+    { tipo: 'figura', subtipo: 'fluxograma', icone: 'fluxograma', rotulo: 'Fluxograma', desc: 'Etapas e decisões de um processo' }
+  ],
+  quadro: [
+    { tipo: 'quadro', icone: 'quadro', rotulo: 'Quadro', desc: 'Texto organizado em caixa fechada, numerado' },
+    { tipo: 'campos', icone: 'campos', rotulo: 'Campos (rótulo e valor)', desc: 'Pares de rótulo e valor em colunas' }
+  ]
+};
+
+function rotuloDoBloco(b) {
+  if (b.tipo === 'figura') return ROTULOS_FIGURA[b.subtipo] || 'Figura';
+  return TIPO_ROTULO[b.tipo] || b.tipo;
 }
 
 const ALINHAMENTO_CSS = { esquerda: 'left', centro: 'center', direita: 'right', justificado: 'justify' };
@@ -211,10 +232,15 @@ export class EditorView {
             <!-- Botões de Inserção de Blocos com Ícones Glaux -->
             <button type="button" class="rm-ic-bt" id="rmAddTitulo" data-tip="Título" title="Inserir Título">${svgIcone('titulo', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddTexto" data-tip="Texto" title="Inserir Parágrafo">${svgIcone('paragrafo', 16)}</button>
-            <button type="button" class="rm-ic-bt" id="rmAddCampos" data-tip="Campos" title="Inserir Campos / Rótulo e Valor">${svgIcone('campos', 16)}</button>
-            <button type="button" class="rm-ic-bt" id="rmAddFigura" data-tip="Figura" title="Inserir Figura / Imagem">${svgIcone('imagem', 16)}</button>
+            <div class="rm-grupo-bt" data-grupo="figura">
+              <button type="button" class="rm-ic-bt tem-menu" id="rmAddFigura" data-tip="Figura" title="Figura, gráfico, fotografia, diagrama…" aria-haspopup="menu" aria-expanded="false">${svgIcone('imagem', 16)}</button>
+              <div class="rm-menu-bloco" role="menu" hidden></div>
+            </div>
             <button type="button" class="rm-ic-bt" id="rmAddTabela" data-tip="Tabela" title="Inserir Tabela (ABNT/IBGE)">${svgIcone('tabela', 16)}</button>
-            <button type="button" class="rm-ic-bt" id="rmAddQuadro" data-tip="Quadro" title="Inserir Quadro Fechado">${svgIcone('quadro', 16)}</button>
+            <div class="rm-grupo-bt" data-grupo="quadro">
+              <button type="button" class="rm-ic-bt tem-menu" id="rmAddQuadro" data-tip="Quadro" title="Quadro ou campos (rótulo e valor)" aria-haspopup="menu" aria-expanded="false">${svgIcone('quadro', 16)}</button>
+              <div class="rm-menu-bloco" role="menu" hidden></div>
+            </div>
             <button type="button" class="rm-ic-bt" id="rmAddMapa" data-tip="Mapa" title="Inserir Mapa Territorial">${svgIcone('mapa', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddFormula" data-tip="Fórmula" title="Inserir Fórmula Matemática">${svgIcone('formula', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddDivisor" data-tip="Divisor" title="Inserir Divisor">${svgIcone('divisor', 16)}</button>
@@ -295,10 +321,8 @@ export class EditorView {
 
     root.querySelector('#rmAddTitulo').addEventListener('click', () => adicionar('titulo', { texto: 'Novo Título' }));
     root.querySelector('#rmAddTexto').addEventListener('click', () => adicionar('paragrafo', { texto: 'Escreva seu parágrafo diretamente aqui...' }));
-    root.querySelector('#rmAddCampos').addEventListener('click', () => adicionar('campos', {}));
-    root.querySelector('#rmAddFigura').addEventListener('click', () => adicionar('figura', { titulo: 'Figura — Descrição da imagem' }));
+    this.ligarMenusDeBlocos(root, adicionar);
     root.querySelector('#rmAddTabela').addEventListener('click', () => adicionar('tabela', { titulo: 'Tabela — Dados quantitativos' }));
-    root.querySelector('#rmAddQuadro').addEventListener('click', () => adicionar('quadro', { titulo: 'Quadro — Dados conceituais' }));
     root.querySelector('#rmAddMapa').addEventListener('click', () => adicionar('mapa', { titulo: 'Mapa — Delimitação territorial' }));
     root.querySelector('#rmAddFormula').addEventListener('click', () => adicionar('formula', { latex: 'E = m \\cdot c^2' }));
     root.querySelector('#rmAddDivisor').addEventListener('click', () => adicionar('divisor', {}));
@@ -594,6 +618,49 @@ export class EditorView {
     colEsq.appendChild(this.montarSecaoBlocos(secAtiva));
   }
 
+  /* Menus da barra de blocos (Figura: gráfico, fotografia…; Quadro: campos…) */
+  ligarMenusDeBlocos(root, adicionar) {
+    const fecharTodos = () => {
+      document.querySelectorAll('.rm-menu-bloco:not([hidden])').forEach(m => {
+        m.hidden = true;
+        m.parentElement.querySelector('.rm-ic-bt')?.setAttribute('aria-expanded', 'false');
+      });
+    };
+    if (!this._menusRegistrados) {
+      this._menusRegistrados = true;
+      document.addEventListener('click', fecharTodos);
+      document.addEventListener('keydown', ev => { if (ev.key === 'Escape') fecharTodos(); });
+    }
+
+    root.querySelectorAll('.rm-grupo-bt').forEach(grupo => {
+      const itens = MENUS_BLOCO[grupo.dataset.grupo] || [];
+      const botao = grupo.querySelector('.rm-ic-bt');
+      const menu = grupo.querySelector('.rm-menu-bloco');
+      menu.innerHTML = itens.map((it, i) => `
+        <button type="button" class="rm-menu-item" role="menuitem" data-i="${i}">
+          <span class="rm-menu-icone">${svgIcone(it.icone, 16)}</span>
+          <span class="rm-menu-texto"><strong>${it.rotulo}</strong><small>${it.desc}</small></span>
+        </button>`).join('');
+
+      botao.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const abrir = menu.hidden;
+        fecharTodos();
+        menu.hidden = !abrir;
+        botao.setAttribute('aria-expanded', String(abrir));
+      });
+      menu.querySelectorAll('.rm-menu-item').forEach(el => el.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const it = itens[Number(el.dataset.i)];
+        fecharTodos();
+        const dados = it.tipo === 'figura'
+          ? { subtipo: it.subtipo, titulo: `${it.rotulo} — Descrição` }
+          : (it.tipo === 'quadro' ? { titulo: 'Quadro — Dados conceituais' } : {});
+        adicionar(it.tipo, dados);
+      }));
+    });
+  }
+
   /* ======================================================================
      Estilos de texto: lista selecionável + rascunho + "Salvar estilo"
      ====================================================================== */
@@ -822,7 +889,7 @@ export class EditorView {
     li.draggable = true;
     li.innerHTML = `
       <button type="button" class="rm-bl-nome">
-        <strong>${TIPO_ROTULO[b.tipo] || b.tipo}</strong>
+        <strong>${rotuloDoBloco(b)}</strong>
         <span>${resumoBloco(b)}</span>
       </button>
       <div class="rm-bl-acoes">
@@ -1100,7 +1167,7 @@ export class EditorView {
       const tit = document.createElement('div');
       tit.contentEditable = 'true';
       tit.className = 'ath-fig-titulo';
-      tit.innerHTML = b.titulo || `Figura ${b.numero_sequencial || 1} — Descrição da Ilustração`;
+      tit.innerHTML = b.titulo || `${rotuloDaFigura(b)} ${b.numero_sequencial || 1} — Descrição da Ilustração`;
       tit.addEventListener('blur', () => { b.titulo = tit.innerHTML; this.notificarMudancaRapida(); });
       figBox.appendChild(tit);
 
@@ -1116,7 +1183,7 @@ export class EditorView {
         const imgUrl = it.url || b.src || 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80';
         itEl.innerHTML = `
           <img src="${imgUrl}" alt="Ilustração">
-          <span class="ath-fig-sublegenda">Figura ${b.numero_sequencial || 1}${String.fromCharCode(97 + idx)} — ${it.legenda_sub || ''}</span>
+          <span class="ath-fig-sublegenda">${rotuloDaFigura(b)} ${b.numero_sequencial || 1}${String.fromCharCode(97 + idx)} — ${it.legenda_sub || ''}</span>
         `;
         grid.appendChild(itEl);
       });
