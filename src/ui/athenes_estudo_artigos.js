@@ -249,6 +249,92 @@ export function criarArtigosEstudoExemplo() {
 
 let _timerDebounceSalvarArtigos = null;
 
+/* ==========================================================================
+   PDFs LOCAIS PERSISTENTES (IndexedDB) + DOWNLOAD DO GOOGLE DRIVE
+   O PDF nunca vai para o Zotero: fica no computador (IndexedDB) ou no Drive.
+   ========================================================================== */
+const IDB_NOME = 'athenes_pdfs_v1';
+const IDB_STORE = 'pdfs';
+
+function abrirIdbPdfs() {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB indisponível'));
+    const req = indexedDB.open(IDB_NOME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function salvarPdfLocal(artId, blob) {
+  try {
+    const db = await abrirIdbPdfs();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(blob, String(artId));
+      tx.oncomplete = res;
+      tx.onerror = () => rej(tx.error);
+    });
+  } catch (_) {}
+}
+
+async function obterPdfLocal(artId) {
+  try {
+    const db = await abrirIdbPdfs();
+    return await new Promise((res, rej) => {
+      const r = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(String(artId));
+      r.onsuccess = () => res(r.result || null);
+      r.onerror = () => rej(r.error);
+    });
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Registra um arquivo PDF escolhido no computador: gera URL e guarda para reabrir depois. */
+function registrarPdfLocalNoArtigo(art, file) {
+  art.driveFileName = file.name;
+  art.driveStatus = 'PDF local / Google Drive vinculado';
+  art.pdfBlobUrl = URL.createObjectURL(file);
+  art.temPdfLocal = true;
+  salvarPdfLocal(art.id, file);
+}
+
+async function baixarPdfBlobDoDrive(fileId, accessToken) {
+  const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  if (!resp.ok) throw new Error(`Drive respondeu ${resp.status}`);
+  return await resp.blob();
+}
+
+/**
+ * Garante que o artigo tenha um PDF real para exibir: usa o que já está em memória,
+ * depois o salvo no IndexedDB, depois baixa do Google Drive (se conectado).
+ * Retorna true quando conseguiu um PDF novo.
+ */
+async function garantirPdfDoArtigo(art) {
+  if (!art || art.pdfBlobUrl) return false;
+  const local = await obterPdfLocal(art.id);
+  if (local) {
+    art.pdfBlobUrl = URL.createObjectURL(local);
+    return true;
+  }
+  const idDrive = String(art.driveFileId || '').trim();
+  if (idDrive && !/^drive_pdf_/.test(idDrive)) {
+    const cfg = obterConfigGoogleDrive();
+    if (cfg.accessToken) {
+      try {
+        const blob = await baixarPdfBlobDoDrive(idDrive, cfg.accessToken);
+        salvarPdfLocal(art.id, blob);
+        art.pdfBlobUrl = URL.createObjectURL(blob);
+        return true;
+      } catch (_) {}
+    }
+  }
+  return false;
+}
+
 export function carregarArtigosEstudo() {
   try {
     if (typeof localStorage !== 'undefined') {
@@ -673,6 +759,11 @@ export class EstudoArtigosView {
     this.paginaAtual = 1;
     this.pinEditandoId = null;
     this.renderizar();
+    if (!art.pdfBlobUrl) {
+      garantirPdfDoArtigo(art).then(carregou => {
+        if (carregou && this.artigoAberto === art) this.renderizar();
+      });
+    }
   }
 
   /* ==========================================================================
@@ -999,9 +1090,7 @@ export class EstudoArtigosView {
     root.querySelector('#athInputCarregarPdfReal').addEventListener('change', e => {
       const file = e.target.files?.[0];
       if (!file) return;
-      art.driveFileName = file.name;
-      art.driveStatus = 'PDF local / Google Drive vinculado';
-      art.pdfBlobUrl = URL.createObjectURL(file);
+      registrarPdfLocalNoArtigo(art, file);
       salvarArtigosEstudo(this.artigos);
       this.renderizar();
     });
@@ -2498,8 +2587,7 @@ export class EstudoArtigosView {
     box.querySelector('#athPainelInputArquivoPdf')?.addEventListener('change', async e => {
       const fPdf = e.target.files?.[0];
       if (!fPdf) return;
-      art.driveFileName = fPdf.name;
-      art.pdfBlobUrl = URL.createObjectURL(fPdf);
+      registrarPdfLocalNoArtigo(art, fPdf);
       salvarArtigosEstudo(this.artigos);
       const statusEl = box.querySelector('#athStatusSyncArtigo');
       if (statusEl) {
@@ -2528,8 +2616,10 @@ export class EstudoArtigosView {
       this.abrirModalEscolherPdfDoGoogleDrive((arqDrive) => {
         art.driveFileName = arqDrive.name;
         art.driveFileId = arqDrive.id;
+        art.pdfBlobUrl = null;
         salvarArtigosEstudo(this.artigos);
         this.renderizar();
+        garantirPdfDoArtigo(art).then(ok => { if (ok) this.renderizar(); });
       });
     });
 
@@ -2773,27 +2863,45 @@ export class EstudoArtigosView {
    */
   async abrirModalEscolherReferenciaZotero(artAlvo = null, onSelecionado = null) {
     this.carregarConfigZotero();
+    const conectado = Boolean(this.zoteroClient.apiKey);
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
+    const estSel = 'height:30px; font-size:11.5px; padding:0 8px; min-width:0; flex:1 1 110px;';
     modal.innerHTML = `
-      <div class="ath-modal" style="max-width:600px;">
+      <div class="ath-modal" style="max-width:640px; width:calc(100vw - 32px); max-height:88vh; display:flex; flex-direction:column;">
         <div class="ath-modal-head">
-          <h2>Vincular PDF a uma Referência do Zotero</h2>
+          <h2>Vincular a uma Referência do Zotero</h2>
           <button type="button" class="ath-btn ath-btn-icon" id="athModalEscRefFechar">${svgIcone('fechar', 16)}</button>
         </div>
-        <div class="ath-modal-corpo">
-          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <input type="text" class="ath-input" id="athBuscaRefZoteroModal" placeholder="Filtrar referências por título, autor ou ano..." style="flex:1; min-width:200px;">
-            <button type="button" class="ath-btn ath-btn-sm" id="athBtnRecarregarRefZotModal">
-              ${svgIcone('zotero', 13)} Atualizar do Zotero
-            </button>
-            <label class="ath-btn ath-btn-sm" style="cursor:pointer;">
-              ${svgIcone('upload', 13)} Importar .bib
+        <div class="ath-modal-corpo" style="display:flex; flex-direction:column; gap:8px; min-height:0; flex:1;">
+          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+            <input type="text" class="ath-input" id="athBuscaRefZoteroModal" placeholder="Buscar por título, autor, ano, DOI ou tag..." style="flex:1 1 200px; height:32px; font-size:12px;">
+            <button type="button" class="ath-btn ath-btn-sm" id="athBtnRecarregarRefZotModal" title="Buscar de novo na sua conta Zotero">${svgIcone('zotero', 13)} Atualizar</button>
+            <label class="ath-btn ath-btn-sm" style="cursor:pointer;" title="Carregar referências de um arquivo .bib exportado do Zotero">
+              ${svgIcone('upload', 13)} .bib
               <input type="file" accept=".bib,.txt" id="athInputBibNoModalRef" style="display:none;">
             </label>
           </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <select class="ath-input" id="athFiltroRefAno" style="${estSel}"><option value="">Ano: todos</option></select>
+            <select class="ath-input" id="athFiltroRefAutor" style="${estSel}"><option value="">Autor: todos</option></select>
+            <select class="ath-input" id="athFiltroRefPeriodico" style="${estSel}"><option value="">Periódico: todos</option></select>
+            <select class="ath-input" id="athFiltroRefTag" style="${estSel}"><option value="">Tag: todas</option></select>
+            <select class="ath-input" id="athFiltroRefDoi" style="${estSel}">
+              <option value="">DOI: tanto faz</option>
+              <option value="com">Com DOI</option>
+              <option value="sem">Sem DOI</option>
+            </select>
+            <select class="ath-input" id="athOrdemRef" style="${estSel}">
+              <option value="recentes">Ordem: Zotero (recentes)</option>
+              <option value="ano_desc">Ano (novo → antigo)</option>
+              <option value="ano_asc">Ano (antigo → novo)</option>
+              <option value="titulo">Título (A–Z)</option>
+              <option value="autor">Autor (A–Z)</option>
+            </select>
+          </div>
           <div id="athStatusRefZoteroModal" style="font-size:11.5px; color:#314F79; font-weight:700;"></div>
-          <div id="athListaRefZoteroModal" style="max-height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+          <div id="athListaRefZoteroModal" style="flex:1; min-height:120px; max-height:min(50vh, 400px); overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding-right:2px;"></div>
         </div>
         <div class="ath-modal-foot">
           <button type="button" class="ath-btn" id="athModalEscRefCancelar">Fechar</button>
@@ -2807,164 +2915,189 @@ export class EstudoArtigosView {
     modal.querySelector('#athModalEscRefCancelar').addEventListener('click', fechar);
     modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
 
-    // Filtra estritamente os artigos reais do usuário (nunca exibe os 3 artigos fictícios de exemplo)
-    let catalogoRefs = this.artigos
-      .filter(a => !ehArtigoExemploFicticio(a))
-      .map(a => ({
-        chave: a.chaveZotero,
-        titulo: a.titulo,
-        autores: a.autores,
-        ano: a.ano,
-        publicacao: a.publicacao,
-        volume: a.volume || '',
-        numero: a.numero || '',
-        paginas: a.paginas || '',
-        doi: a.doi || '',
-        resumo: a.resumoOriginal || '',
-        palavrasChave: a.palavrasChave || []
-      }));
+    const paraRef = (it) => ({
+      chave: it.chave || it.chaveZotero || it.id,
+      titulo: it.titulo || '(sem título)',
+      autores: it.autores?.length ? it.autores : [],
+      ano: it.ano || '',
+      publicacao: it.publicacao || it.editora || '',
+      volume: it.volume || '',
+      numero: it.numero || '',
+      paginas: it.paginas || '',
+      doi: it.doi || '',
+      resumo: it.resumo || it.resumoOriginal || '',
+      palavrasChave: it.palavrasChave || []
+    });
+
+    // Com a conta Zotero conectada, o catálogo é SOMENTE o que existe no Zotero.
+    // Sem conta conectada, usa os artigos locais reais (nunca os 3 exemplos fictícios).
+    let catalogoRefs = conectado
+      ? (this._cacheRefsZotero?.itens || []).map(paraRef)
+      : this.artigos.filter(a => !ehArtigoExemploFicticio(a)).map(paraRef);
 
     const listaEl = modal.querySelector('#athListaRefZoteroModal');
     const statusEl = modal.querySelector('#athStatusRefZoteroModal');
     const inputBusca = modal.querySelector('#athBuscaRefZoteroModal');
+    const selAno = modal.querySelector('#athFiltroRefAno');
+    const selAutor = modal.querySelector('#athFiltroRefAutor');
+    const selPer = modal.querySelector('#athFiltroRefPeriodico');
+    const selTag = modal.querySelector('#athFiltroRefTag');
+    const selDoi = modal.querySelector('#athFiltroRefDoi');
+    const selOrdem = modal.querySelector('#athOrdemRef');
+
+    const sobrenomeAutor = (r) => (r.autores?.[0]?.sobrenome || '').trim();
+
+    const preencherOpcoes = (sel, rotuloTodos, valores) => {
+      const atual = sel.value;
+      const unicos = Array.from(new Set(valores.filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
+      sel.innerHTML = `<option value="">${rotuloTodos}</option>` +
+        unicos.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+      if (unicos.includes(atual)) sel.value = atual;
+    };
+
+    const atualizarOpcoesFiltros = () => {
+      preencherOpcoes(selAno, 'Ano: todos', catalogoRefs.map(r => String(r.ano || '')).sort().reverse());
+      preencherOpcoes(selAutor, 'Autor: todos', catalogoRefs.map(sobrenomeAutor));
+      preencherOpcoes(selPer, 'Periódico: todos', catalogoRefs.map(r => r.publicacao));
+      preencherOpcoes(selTag, 'Tag: todas', catalogoRefs.flatMap(r => r.palavrasChave || []));
+    };
 
     const renderizarLista = () => {
       const q = inputBusca.value.trim().toLowerCase();
-      const filtradas = catalogoRefs.filter(r => {
+      let filtradas = catalogoRefs.filter(r => {
+        if (selAno.value && String(r.ano) !== selAno.value) return false;
+        if (selAutor.value && sobrenomeAutor(r) !== selAutor.value) return false;
+        if (selPer.value && r.publicacao !== selPer.value) return false;
+        if (selTag.value && !(r.palavrasChave || []).includes(selTag.value)) return false;
+        if (selDoi.value === 'com' && !r.doi) return false;
+        if (selDoi.value === 'sem' && r.doi) return false;
         if (!q) return true;
         const autStr = (r.autores || []).map(x => `${x.sobrenome} ${x.prenome}`).join(' ');
-        return `${r.titulo} ${autStr} ${r.ano} ${r.publicacao}`.toLowerCase().includes(q);
+        return `${r.titulo} ${autStr} ${r.ano} ${r.publicacao} ${r.doi} ${(r.palavrasChave || []).join(' ')}`.toLowerCase().includes(q);
       });
+
+      const ordem = selOrdem.value;
+      if (ordem === 'ano_desc') filtradas.sort((a, b) => String(b.ano).localeCompare(String(a.ano)));
+      else if (ordem === 'ano_asc') filtradas.sort((a, b) => String(a.ano).localeCompare(String(b.ano)));
+      else if (ordem === 'titulo') filtradas.sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'));
+      else if (ordem === 'autor') filtradas.sort((a, b) => sobrenomeAutor(a).localeCompare(sobrenomeAutor(b), 'pt-BR'));
 
       if (filtradas.length === 0) {
         listaEl.innerHTML = `
-          <div style="padding:18px 16px; text-align:center; color:#475569; font-size:12.5px; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:10px; line-height:1.5;">
-            <strong style="color:#0F172A; display:block; margin-bottom:4px;">Nenhuma referência encontrada na sua nuvem do Zotero (${escapeHtml(this.zoteroClient.username || 'ID #' + (this.zoteroClient.userId || '18806479'))}).</strong>
-            Se os seus artigos estão no <b>Zotero Desktop</b> do seu computador, clique no botão redondo verde <b>Sincronizar com zotero.org</b> no canto superior direito do Zotero Desktop e depois em <b>Atualizar do Zotero</b> acima — ou clique em <b>Importar .bib</b> ao lado para carregar suas referências agora mesmo!
-          </div>
-        `;
+          <div style="padding:14px; text-align:center; color:#475569; font-size:12px; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:10px; line-height:1.5;">
+            ${catalogoRefs.length === 0
+              ? (conectado
+                ? 'Sua conta Zotero online não tem itens (ou ainda não sincronizou). No Zotero Desktop, clique no botão verde de sincronizar e depois em <b>Atualizar</b>; ou use <b>.bib</b>.'
+                : 'Conecte sua Zotero API Key ou importe um arquivo <b>.bib</b>.')
+              : 'Nenhuma referência com esses filtros.'}
+          </div>`;
         return;
       }
 
-      listaEl.innerHTML = filtradas.map((r, i) => {
-        const autTxt = (r.autores || []).map(a => `${a.sobrenome}${a.prenome ? ', ' + a.prenome : ''}`).join('; ');
+      // Renderiza em lote único (sem reflow por item) e limita a 200 cartões para manter a tela leve.
+      const limite = 200;
+      const html = filtradas.slice(0, limite).map((r, i) => {
+        const autTxt = (r.autores || []).map(a => `${a.sobrenome}${a.prenome ? ', ' + a.prenome : ''}`).join('; ') || 'Autor não informado';
         return `
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border:1px solid #CBD5E1; border-radius:10px; background:#F8FAFC;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border:1px solid #CBD5E1; border-radius:10px; background:#F8FAFC; flex:0 0 auto;">
             <div style="min-width:0; flex:1;">
-              <div style="font-size:12.5px; font-weight:800; color:#0F172A; line-height:1.3;">${escapeHtml(r.titulo)}</div>
-              <div style="font-size:11px; color:#314F79; font-weight:700; margin-top:2px;">
-                ${escapeHtml(autTxt)} (${escapeHtml(r.ano)}) · ${escapeHtml(r.publicacao || '')}
+              <div style="font-size:12px; font-weight:800; color:#0F172A; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${escapeHtml(r.titulo)}</div>
+              <div style="font-size:11px; color:#314F79; font-weight:700; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${escapeHtml(autTxt)}${r.ano ? ` (${escapeHtml(r.ano)})` : ''}${r.publicacao ? ` · ${escapeHtml(r.publicacao)}` : ''}
               </div>
-              <div style="font-size:10.5px; color:#64748B; margin-top:2px;">
-                Key: <code>${escapeHtml(r.chave || 'ZOT')}</code> ${r.doi ? `· DOI: ${escapeHtml(r.doi)}` : ''}
+              <div style="font-size:10.5px; color:#64748B; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                <code>${escapeHtml(r.chave || '')}</code>${r.doi ? ` · DOI ${escapeHtml(r.doi)}` : ''}
               </div>
             </div>
-            <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" data-vincular-ref-idx="${i}">
-              Vincular Info
-            </button>
-          </div>
-        `;
-      }).join('');
-
-      listaEl.querySelectorAll('[data-vincular-ref-idx]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const ref = filtradas[parseInt(btn.dataset.vincularRefIdx, 10)];
-          if (!ref) return;
-          if (artAlvo) {
-            artAlvo.chaveZotero = ref.chave || artAlvo.chaveZotero;
-            artAlvo.titulo = ref.titulo || artAlvo.titulo;
-            artAlvo.autores = ref.autores?.length ? ref.autores : artAlvo.autores;
-            artAlvo.ano = ref.ano || artAlvo.ano;
-            artAlvo.publicacao = ref.publicacao || artAlvo.publicacao;
-            artAlvo.volume = ref.volume || artAlvo.volume;
-            artAlvo.numero = ref.numero || artAlvo.numero;
-            artAlvo.paginas = ref.paginas || artAlvo.paginas;
-            artAlvo.doi = ref.doi || artAlvo.doi;
-            if (ref.resumo) artAlvo.resumoOriginal = ref.resumo;
-            if (ref.palavrasChave?.length) artAlvo.palavrasChave = ref.palavrasChave;
-            if (artAlvo.conteudoPaginasPdf?.[0]) {
-              artAlvo.conteudoPaginasPdf[0].titulo = artAlvo.titulo.toUpperCase();
-              artAlvo.conteudoPaginasPdf[0].autores = (artAlvo.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome}`.trim()).join(' · ');
-            }
-            salvarArtigosEstudo(this.artigos);
-            this.renderizar();
-          }
-          if (onSelecionado) onSelecionado(ref);
-          fechar();
-        });
-      });
+            <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" data-vincular-ref-idx="${i}" style="flex:0 0 auto;">Vincular</button>
+          </div>`;
+      }).join('') + (filtradas.length > limite
+        ? `<div style="font-size:11px; color:#64748B; text-align:center; padding:4px;">Mostrando ${limite} de ${filtradas.length}. Refine a busca ou os filtros.</div>`
+        : '');
+      listaEl.innerHTML = html;
+      listaEl._filtradas = filtradas;
     };
 
-    const buscarDaApi = async () => {
-      if (!this.zoteroClient.apiKey) {
+    // Um único listener delegado em vez de um por botão
+    listaEl.addEventListener('click', ev => {
+      const btn = ev.target.closest('[data-vincular-ref-idx]');
+      if (!btn) return;
+      const ref = listaEl._filtradas?.[parseInt(btn.dataset.vincularRefIdx, 10)];
+      if (!ref) return;
+      if (artAlvo) {
+        artAlvo.chaveZotero = ref.chave || artAlvo.chaveZotero;
+        artAlvo.titulo = ref.titulo || artAlvo.titulo;
+        artAlvo.autores = ref.autores?.length ? ref.autores : artAlvo.autores;
+        artAlvo.ano = ref.ano || artAlvo.ano;
+        artAlvo.publicacao = ref.publicacao || artAlvo.publicacao;
+        artAlvo.volume = ref.volume || artAlvo.volume;
+        artAlvo.numero = ref.numero || artAlvo.numero;
+        artAlvo.paginas = ref.paginas || artAlvo.paginas;
+        artAlvo.doi = ref.doi || artAlvo.doi;
+        if (ref.resumo) artAlvo.resumoOriginal = ref.resumo;
+        if (ref.palavrasChave?.length) artAlvo.palavrasChave = ref.palavrasChave;
+        if (artAlvo.conteudoPaginasPdf?.[0]) {
+          artAlvo.conteudoPaginasPdf[0].titulo = artAlvo.titulo.toUpperCase();
+          artAlvo.conteudoPaginasPdf[0].autores = (artAlvo.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome}`.trim()).join(' · ');
+        }
+        salvarArtigosEstudo(this.artigos);
+        this.renderizar();
+      }
+      if (onSelecionado) onSelecionado(ref);
+      fechar();
+    });
+
+    const TTL_CACHE_MS = 5 * 60 * 1000;
+    const buscarDaApi = async (forcar = false) => {
+      if (!conectado) {
         statusEl.textContent = 'Conecte sua Zotero API Key ou importe um arquivo .bib.';
         renderizarLista();
         return;
       }
-      statusEl.textContent = 'Buscando referências da sua biblioteca Zotero (pessoal e grupos)...';
-      const remotos = await this.zoteroClient.buscarItens({ limite: 60 });
-      if (Array.isArray(remotos) && remotos.length > 0) {
-        remotos.forEach(it => {
-          if (!catalogoRefs.some(c => c.chave === it.chave || c.titulo === it.titulo)) {
-            catalogoRefs.unshift({
-              chave: it.chave || it.id,
-              titulo: it.titulo,
-              autores: it.autores || [{ sobrenome: 'Autor', prenome: '' }],
-              ano: it.ano || '2026',
-              publicacao: it.publicacao || it.editora || '',
-              volume: it.volume || '',
-              numero: it.numero || '',
-              paginas: it.paginas || '',
-              doi: it.doi || '',
-              resumo: it.resumo || '',
-              palavrasChave: it.palavrasChave || []
-            });
-          }
-        });
-        statusEl.textContent = `${remotos.length} referência(s) carregadas da sua biblioteca Zotero ✓`;
-      } else {
-        statusEl.textContent = catalogoRefs.length > 0
-          ? `Exibindo ${catalogoRefs.length} referência(s) da sua biblioteca.`
-          : 'Sua biblioteca online em zotero.org ainda possui 0 itens sincronizados.';
+      const c = this._cacheRefsZotero;
+      if (!forcar && c && Date.now() - c.t < TTL_CACHE_MS) {
+        catalogoRefs = c.itens.map(paraRef);
+        statusEl.textContent = `${catalogoRefs.length} referência(s) da sua biblioteca Zotero ✓`;
+        atualizarOpcoesFiltros();
+        renderizarLista();
+        return;
       }
+      statusEl.textContent = 'Buscando referências na sua biblioteca Zotero...';
+      const remotos = await this.zoteroClient.buscarItens({ limite: 100 });
+      const lista = Array.isArray(remotos) ? remotos : [];
+      this._cacheRefsZotero = { t: Date.now(), itens: lista };
+      catalogoRefs = lista.map(paraRef);
+      statusEl.textContent = catalogoRefs.length
+        ? `${catalogoRefs.length} referência(s) da sua biblioteca Zotero ✓`
+        : 'Sua biblioteca online em zotero.org tem 0 itens.';
+      atualizarOpcoesFiltros();
       renderizarLista();
     };
 
     modal.querySelector('#athInputBibNoModalRef')?.addEventListener('change', async e => {
       const file = e.target.files?.[0];
       if (!file) return;
-      const texto = await file.text();
-      const importados = ZoteroClient.importarBibTeX(texto);
-      importados.forEach(it => {
-        const novo = this.converterItemZoteroParaEstudo(it);
-        if (!this.artigos.some(a => a.titulo === novo.titulo)) {
-          this.artigos.unshift(novo);
-        }
-        if (!catalogoRefs.some(c => c.titulo === it.titulo)) {
-          catalogoRefs.unshift({
-            chave: it.chave || it.id,
-            titulo: it.titulo,
-            autores: it.autores || [{ sobrenome: 'Autor', prenome: '' }],
-            ano: it.ano || '2026',
-            publicacao: it.publicacao || '',
-            volume: it.volume || '',
-            numero: it.numero || '',
-            paginas: it.paginas || '',
-            doi: it.doi || '',
-            resumo: it.resumo || '',
-            palavrasChave: []
-          });
-        }
+      const importados = ZoteroClient.importarBibTeX(await file.text());
+      importados.map(paraRef).forEach(r => {
+        if (!catalogoRefs.some(c => c.titulo === r.titulo)) catalogoRefs.unshift(r);
       });
-      salvarArtigosEstudo(this.artigos);
-      statusEl.textContent = `${importados.length} referência(s) importada(s) do arquivo .bib ✓`;
+      statusEl.textContent = `${importados.length} referência(s) lida(s) do .bib ✓ (apenas para vincular; não entram no catálogo)`;
+      atualizarOpcoesFiltros();
       renderizarLista();
     });
 
-    inputBusca.addEventListener('input', renderizarLista);
-    modal.querySelector('#athBtnRecarregarRefZotModal').addEventListener('click', buscarDaApi);
+    let debounceBusca = null;
+    inputBusca.addEventListener('input', () => {
+      clearTimeout(debounceBusca);
+      debounceBusca = setTimeout(renderizarLista, 120);
+    });
+    [selAno, selAutor, selPer, selTag, selDoi, selOrdem].forEach(s => s.addEventListener('change', renderizarLista));
+    modal.querySelector('#athBtnRecarregarRefZotModal').addEventListener('click', () => buscarDaApi(true));
+
+    atualizarOpcoesFiltros();
     renderizarLista();
-    if (this.zoteroClient.apiKey) buscarDaApi();
+    if (conectado) buscarDaApi(false);
+    else statusEl.textContent = 'Zotero não conectado: mostrando só artigos locais.';
   }
 
   /**
@@ -3178,7 +3311,7 @@ export class EstudoArtigosView {
         novoArt.driveFileId = driveFileIdSelecionado;
       }
       if (arquivoPdfSelecionado) {
-        novoArt.pdfBlobUrl = URL.createObjectURL(arquivoPdfSelecionado);
+        registrarPdfLocalNoArtigo(novoArt, arquivoPdfSelecionado);
         const cfgDrive = obterConfigGoogleDrive();
         if (cfgDrive.accessToken) {
           salvarArquivoNoGoogleDrive({
