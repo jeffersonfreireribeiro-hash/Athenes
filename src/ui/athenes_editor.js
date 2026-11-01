@@ -28,6 +28,11 @@ import {
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
 
+const ALINHAMENTO_CSS = { esquerda: 'left', centro: 'center', direita: 'right', justificado: 'justify' };
+function alinhamentoCss(valor, padrao) {
+  return ALINHAMENTO_CSS[valor] || padrao;
+}
+
 export class EditorView {
   constructor(containerEl, documento, opcoes = {}) {
     this.container = containerEl;
@@ -47,6 +52,7 @@ export class EditorView {
     this.onAbrirZotero = opcoes.onAbrirZotero || (() => {});
     this.onAbrirConexoes = opcoes.onAbrirConexoes || (() => {});
 
+    repaginarDocumento(this.doc);
     this.normalizarBlocosLegados();
     repaginarDocumento(this.doc);
     this.salvarSnapshot();
@@ -711,6 +717,7 @@ export class EditorView {
     }
 
     paginas.forEach(pag => {
+      try {
       const mestraPag = modeloDaPagina(this.doc, pag);
       const margens = mestraPag?.margens_mm || { t: 25, r: 20, b: 20, l: 25 };
 
@@ -788,6 +795,12 @@ export class EditorView {
 
       folha.appendChild(areaUtil);
       palco.appendChild(folha);
+      } catch (erro) {
+        const aviso = document.createElement('div');
+        aviso.className = 'rm-vazio-cartao';
+        aviso.textContent = 'Não foi possível desenhar a página ' + pag.numero + ': ' + erro.message;
+        palco.appendChild(aviso);
+      }
     });
   }
 
@@ -820,7 +833,7 @@ export class EditorView {
       const heading = document.createElement(tag);
       heading.contentEditable = 'true';
       heading.className = 'ath-titulo-editable';
-      heading.style.cssText = `${cssEstilo}; margin:0; outline:none; text-align:${b.alinhamento || 'left'};`;
+      heading.style.cssText = `${cssEstilo}; margin:0; outline:none; text-align:${alinhamentoCss(b.alinhamento, 'left')};`;
       heading.innerHTML = b.texto || 'Título da Seção';
 
       heading.addEventListener('input', () => {
@@ -835,7 +848,7 @@ export class EditorView {
       const p = document.createElement('p');
       p.contentEditable = 'true';
       p.className = 'ath-texto-editable';
-      p.style.cssText = `${cssEstilo}; margin:0; outline:none; text-align:${b.alinhamento || 'justify'};`;
+      p.style.cssText = `${cssEstilo}; margin:0; outline:none; text-align:${alinhamentoCss(b.alinhamento, 'justify')};`;
       p.innerHTML = resolverReferenciasCruzadas(b.texto || '', this.doc);
 
       p.addEventListener('blur', () => {
