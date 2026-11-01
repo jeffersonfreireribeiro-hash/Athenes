@@ -8,7 +8,7 @@
 import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
-import { gerarSumarioDinamico, modeloDaPagina } from './athenes_documento.js';
+import { gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento } from './athenes_documento.js';
 
 export function escaparHtml(texto) {
   if (texto === undefined || texto === null) return '';
@@ -188,11 +188,28 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       </figure>`;
     }
 
-    case 'formula':
-      return `<div class="ath-bloco ath-formula" style="margin:10px 0; padding:10px; background:#F8FAFC; border-radius:6px; display:flex; justify-content:space-between; align-items:center; break-inside:avoid;" data-id="${bloco.id}">
-        <span style="font-family:'Cambria Math', 'Times New Roman', serif; font-size:12pt; font-style:italic;">${escaparHtml(bloco.latex || '')}</span>
-        <span style="font-size:10pt; color:#64748B; font-weight:600;">${bloco.numero_equacao || ''}</span>
+    case 'formula': {
+      const moldura = gerarCssMolduraBloco(bloco);
+      const molduraCssStr = Object.entries(moldura).map(([k, v]) => `${k.replace(/([A-Z])/g, '-$1').toLowerCase()}:${v};`).join(' ');
+      const posNum = bloco.posicao_numero || 'direita';
+      const numTxt = bloco.numero_equacao || bloco.numero || '';
+      const numBadge = (posNum !== 'oculto' && numTxt) ? `<span style="font-size:10pt; color:#64748B; font-weight:700;">${escaparHtml(numTxt)}</span>` : '';
+      const formulaTxt = `<span style="font-family:'Cambria Math', 'Times New Roman', serif; font-size:12pt; font-style:italic; flex:1; text-align:center;">${escaparHtml(bloco.latex || bloco.formula || '')}</span>`;
+
+      let linhaPrincipal = '';
+      if (posNum === 'esquerda') linhaPrincipal = `<div style="display:flex; justify-content:space-between; align-items:center; width:100%;">${numBadge}${formulaTxt}</div>`;
+      else if (posNum === 'abaixo') linhaPrincipal = `<div style="display:flex; flex-direction:column; align-items:center; gap:4px; width:100%;">${formulaTxt}${numBadge}</div>`;
+      else linhaPrincipal = `<div style="display:flex; justify-content:space-between; align-items:center; width:100%;">${formulaTxt}${numBadge}</div>`;
+
+      const legendaHtml = (bloco.legenda_formula || bloco.legenda) ? `<div style="margin-top:4px; font-size:9pt; color:#64748B; font-style:italic;">${escaparHtml(bloco.legenda_formula || bloco.legenda)}</div>` : '';
+      const fonteHtml = (bloco.fonte_formula || bloco.fonte) ? `<div style="margin-top:2px; font-size:8.5pt; color:#94A3B8;">${escaparHtml(bloco.fonte_formula || bloco.fonte)}</div>` : '';
+
+      return `<div class="ath-bloco ath-formula" style="margin:10px 0; ${molduraCssStr} break-inside:avoid;" data-id="${bloco.id}">
+        ${linhaPrincipal}
+        ${legendaHtml}
+        ${fonteHtml}
       </div>`;
+    }
 
     case 'anexo':
       return `<div class="ath-bloco ath-anexo-card" style="margin:8px 0; padding:10px 14px; border:1px solid #E2E8F0; border-radius:8px; display:flex; align-items:center; gap:12px; background:#FFFFFF; break-inside:avoid;" data-id="${bloco.id}">
@@ -253,6 +270,7 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
  * Gera o documento HTML completo com CSS Paged Media para impressão e exportação em PDF
  */
 export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
+  if (!documento.paginas || documento.paginas.length === 0) repaginarDocumento(documento);
   const estilosMap = {};
   for (const est of (documento.estilos || [])) {
     estilosMap[est.id] = est;
@@ -282,17 +300,30 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
       return `<div class="ath-bloco-grid" style="${gridCol}">${renderizarBlocoHtml(b, estilosMap, documento, opcoes)}</div>`;
     }).join('\n');
 
-    // Rodapé da página
+    // Rodapé da página com formatação avançada e numeração alternada
     let rodHtml = '';
     if (modelo.rodape?.ativo) {
       const textoRod = (modelo.rodape.texto || '')
         .replace('{documento.titulo}', documento.titulo || '')
         .replace('{documento.autor_principal}', documento.metadados?.autores?.[0]?.nome || '');
-      const numeroHtml = modelo.rodape.numeracao
-        ? `<span class="ath-num-pagina">Página ${pag.numero || (index + 1)}</span>`
+      
+      const numFormatado = modelo.rodape.numeracao !== false
+        ? formatarNumeroPagina(pag.numero || (index + 1), documento.paginas?.length || 1, modelo.rodape)
         : '';
+      const numeroHtml = numFormatado ? `<span class="ath-num-pagina" style="font-weight:700;">${escaparHtml(numFormatado)}</span>` : '';
 
-      rodHtml = `<footer class="ath-folha-rodape" style="display:flex; justify-content:space-between; align-items:center; border-top:${modelo.rodape.linha_divisoria ? '1px solid #E2E8F0' : 'none'}; padding-top:3mm; margin-top:auto; font-size:8.5pt; color:#64748B;">
+      const pos = modelo.rodape.posicao_numero || 'direita';
+      const ehPar = (pag.numero || (index + 1)) % 2 === 0;
+      let rodEstilo = 'display:flex; justify-content:space-between; align-items:center;';
+      if (pos === 'alternado') {
+        if (ehPar) rodEstilo = 'display:flex; flex-direction:row-reverse; justify-content:space-between; align-items:center;';
+      } else if (pos === 'centro') {
+        rodEstilo = 'display:flex; justify-content:center; gap:20px; align-items:center;';
+      } else if (pos === 'esquerda') {
+        rodEstilo = 'display:flex; flex-direction:row-reverse; justify-content:space-between; align-items:center;';
+      }
+
+      rodHtml = `<footer class="ath-folha-rodape" style="${rodEstilo} border-top:${modelo.rodape.linha_divisoria ? '1px solid #E2E8F0' : 'none'}; padding-top:3mm; margin-top:auto; font-size:8.5pt; color:#64748B;">
         <span>${escaparHtml(textoRod)}</span>
         ${numeroHtml}
       </footer>`;
@@ -300,10 +331,31 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
 
     const { largura_mm, altura_mm } = dimensoesPapelMm(modelo.formato, modelo.orientacao);
 
-    // Elementos recorrentes da página mestra (tarjas, marcas d'água, molduras)
+    // Elementos recorrentes da página mestra (coordenadas mm, sangria total, capas e tarjas)
     let elemRecHtml = '';
     if (Array.isArray(modelo.elementos_recorrentes) && modelo.elementos_recorrentes.length > 0) {
       elemRecHtml = modelo.elementos_recorrentes.map(elem => {
+        if (elem.tipo === 'foto_capa') {
+          const sangria = !!elem.sangria;
+          const topMm = sangria ? 0 : (elem.y_mm || 0);
+          const leftMm = sangria ? 0 : (elem.x_mm || 0);
+          const wMm = sangria ? largura_mm : (elem.largura_mm || largura_mm);
+          const hMm = sangria ? altura_mm : (elem.altura_mm || 140);
+          const imgUrl = elem.url || '';
+          const zIdx = elem.camada === 'frente' ? 5 : 0;
+          if (imgUrl) {
+            return `<div style="position:absolute; top:${topMm}mm; left:${leftMm}mm; width:${wMm}mm; height:${hMm}mm; overflow:hidden; z-index:${zIdx};"><img src="${imgUrl}" style="width:100%; height:100%; object-fit:${elem.ajuste || 'cover'}; opacity:${elem.opacidade !== undefined ? elem.opacidade : 1};" alt="Foto de Capa" /></div>`;
+          }
+          return `<div style="position:absolute; top:${topMm}mm; left:${leftMm}mm; width:${wMm}mm; height:${hMm}mm; background:linear-gradient(135deg, #EEF4FA, #D5E3F0); display:flex; align-items:center; justify-content:center; color:#314F79; font-size:12pt; font-weight:700; z-index:${zIdx};">Foto de Capa (${wMm} × ${hMm} mm)</div>`;
+        }
+        if (elem.tipo === 'caixa_grade' && elem.posicionamento_modo === 'coordenadas') {
+          const sangria = !!elem.sangria;
+          const topMm = sangria ? 0 : (elem.y_mm || 20);
+          const leftMm = sangria ? 0 : (elem.x_mm || 20);
+          const wMm = sangria ? largura_mm : (elem.largura_mm || 170);
+          const hMm = sangria ? altura_mm : (elem.altura_mm || 50);
+          return `<div style="position:absolute; top:${topMm}mm; left:${leftMm}mm; width:${wMm}mm; height:${hMm}mm; border:1px solid ${elem.cor || '#314F79'}; background:${elem.fundo || 'rgba(49,79,121,0.05)'}; border-radius:4px; z-index:${elem.camada === 'frente' ? 4 : 0};"></div>`;
+        }
         if (elem.tipo === 'tarja') {
           if (elem.posicao === 'topo') return '<div style="position:absolute; top:0; left:0; right:0; height:' + (elem.altura_mm || 8) + 'mm; background:' + (elem.cor || '#314F79') + '; pointer-events:none;"></div>';
           if (elem.posicao === 'base') return '<div style="position:absolute; bottom:0; left:0; right:0; height:' + (elem.altura_mm || 8) + 'mm; background:' + (elem.cor || '#314F79') + '; pointer-events:none;"></div>';
@@ -318,8 +370,8 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
         return '';
       }).join('\n');
     }
-
-    return `<section class="ath-pagina" style="position:relative; width:${largura_mm}mm; min-height:${altura_mm}mm; padding:${m.t}mm ${m.r}mm ${m.b}mm ${m.l}mm;" data-pagina="${index + 1}">
+    
+return `<section class="ath-pagina" style="position:relative; width:${largura_mm}mm; min-height:${altura_mm}mm; padding:${m.t}mm ${m.r}mm ${m.b}mm ${m.l}mm;" data-pagina="${index + 1}">
       ${elemRecHtml}
       <div class="ath-folha-corpo" style="position:relative; z-index:1; display:flex; flex-direction:column; min-height:${altura_mm - m.t - m.b}mm;">
         ${cabHtml}

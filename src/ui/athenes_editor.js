@@ -26,15 +26,19 @@ import {
   colocarBloco,
   moverBlocoPorLinha,
   duplicarBlocoNaSecao,
+  dividirBlocoTexto,
   adicionarSecao,
   removerSecao,
   moverSecao,
   trocarMestraDaSecao,
   recalcularNumeracaoAutomatica,
-  resolverReferenciasCruzadas
+  resolverReferenciasCruzadas,
+  formatarNumeroPagina,
+  gerarCssMolduraBloco
 } from '../core/athenes_documento.js';
-import { svgIcone } from './athenes_icones.js';
+import { svgIcone, svgLogo } from './athenes_icones.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
+import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 
 const TIPO_ROTULO = {
   titulo: 'Título', subtitulo: 'Subtítulo', paragrafo: 'Texto', citacao: 'Citação', tabela: 'Tabela',
@@ -180,7 +184,7 @@ export class EditorView {
     topoShell.innerHTML = `
       <div class="ath-topo-esq">
         <a class="ath-marca-link" id="athBrandVoltar" title="Voltar para a Visão Geral">
-          ${svgIcone('artigo', 18)}
+          ${svgLogo(26)}
           <span>ATHENES</span>
         </a>
         <input type="text" class="ath-doc-titulo-topo" id="athInputTituloDoc" value="${this.doc.titulo || 'Sem título'}" title="Clique para renomear">
@@ -237,8 +241,8 @@ export class EditorView {
             <div class="rm-grupo-bt" data-grupo="figura">
               <button type="button" class="rm-ic-bt tem-menu" id="rmAddFigura" data-tip="Figura" title="Figura, gráfico, fotografia, diagrama…" aria-haspopup="menu" aria-expanded="false">
                 ${svgIcone('imagem', 15)}
-                <svg class="rm-seta-dropdown-icone" viewBox="0 0 7 5" width="7" height="5" aria-hidden="true">
-                  <path d="M1 1.2L3.5 3.7L6 1.2" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="5.5" height="3.5" aria-hidden="true">
+                  <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
               <div class="rm-menu-bloco" role="menu" hidden></div>
@@ -247,8 +251,8 @@ export class EditorView {
             <div class="rm-grupo-bt" data-grupo="quadro">
               <button type="button" class="rm-ic-bt tem-menu" id="rmAddQuadro" data-tip="Quadro" title="Quadro ou campos (rótulo e valor)" aria-haspopup="menu" aria-expanded="false">
                 ${svgIcone('quadro', 15)}
-                <svg class="rm-seta-dropdown-icone" viewBox="0 0 7 5" width="7" height="5" aria-hidden="true">
-                  <path d="M1 1.2L3.5 3.7L6 1.2" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="5.5" height="3.5" aria-hidden="true">
+                  <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
               <div class="rm-menu-bloco" role="menu" hidden></div>
@@ -975,6 +979,7 @@ export class EditorView {
         <button type="button" class="rm-ic" data-acao="subir" title="Subir uma linha">${svgIcone('cima', 14)}</button>
         <button type="button" class="rm-ic" data-acao="descer" title="Descer uma linha">${svgIcone('baixo', 14)}</button>
         <button type="button" class="rm-ic" data-acao="duplicar" title="Duplicar">${svgIcone('copiar', 14)}</button>
+        <button type="button" class="rm-ic" data-acao="dividir" title="Dividir este bloco em dois">${svgIcone('divisor', 14)}</button>
         <button type="button" class="rm-ic rm-ic-perigo" data-acao="remover" title="Excluir">${svgIcone('fechar', 14)}</button>
       </div>
     `;
@@ -988,6 +993,7 @@ export class EditorView {
     acao('subir', () => { if (moverBlocoPorLinha(this.doc, b.id, -1)) this.aposEstrutura(b); });
     acao('descer', () => { if (moverBlocoPorLinha(this.doc, b.id, 1)) this.aposEstrutura(b); });
     acao('duplicar', () => { const c = duplicarBlocoNaSecao(this.doc, b.id); if (c) this.aposEstrutura(c); });
+    acao('dividir', () => { this.dividirBlocoAtual(b.id); });
     acao('remover', () => {
       removerBlocoDaSecao(this.doc, secAtiva.id, b.id);
       this.aposEstrutura(this.blocoSelecionado?.id === b.id ? null : this.blocoSelecionado);
@@ -1003,6 +1009,16 @@ export class EditorView {
     this.blocoSelecionado = b;
     this.renderizar();
     this.onSelecionarBloco(b, null);
+  }
+
+  
+  dividirBlocoAtual(blocoId = null, corte = null) {
+    const id = blocoId || this.blocoSelecionado?.id;
+    if (!id) return;
+    const res = dividirBlocoTexto(this.doc, id, corte);
+    if (res) {
+      this.aposEstrutura(res.novoBloco);
+    }
   }
 
   aposEstrutura(selecionado) {
@@ -1119,7 +1135,7 @@ export class EditorView {
       guiaMargem.style.inset = `${padTop}px ${padRight}px ${padBottom}px ${padLeft}px`;
       folha.appendChild(guiaMargem);
 
-      // Elementos Recorrentes da Página Mestra (Affinity / InDesign level)
+      // Elementos Recorrentes da Página Mestra (Nível Editorial)
       if (Array.isArray(mestraPag?.elementos_recorrentes) && mestraPag.elementos_recorrentes.length > 0) {
         const wrapElemMestra = document.createElement('div');
         wrapElemMestra.className = 'ath-folha-elementos-mestra';
@@ -1129,7 +1145,45 @@ export class EditorView {
         wrapElemMestra.style.zIndex = '0';
 
         mestraPag.elementos_recorrentes.forEach(elem => {
-          if (elem.tipo === 'tarja') {
+          if (elem.tipo === 'foto_capa') {
+            const sangria = !!elem.sangria;
+            const folhaW = (paisagem ? 297 : 210) * pxPorMm;
+            const folhaH = (paisagem ? 210 : 297) * pxPorMm;
+            const topPx = sangria ? 0 : (elem.y_mm || 0) * pxPorMm;
+            const leftPx = sangria ? 0 : (elem.x_mm || 0) * pxPorMm;
+            const wPx = sangria ? folhaW : (elem.largura_mm || 210) * pxPorMm;
+            const hPx = sangria ? folhaH : (elem.altura_mm || 140) * pxPorMm;
+
+            const fotoEl = document.createElement('div');
+            fotoEl.style.position = 'absolute';
+            fotoEl.style.top = `${topPx}px`;
+            fotoEl.style.left = `${leftPx}px`;
+            fotoEl.style.width = `${wPx}px`;
+            fotoEl.style.height = `${hPx}px`;
+            fotoEl.style.overflow = 'hidden';
+            fotoEl.style.zIndex = elem.camada === 'frente' ? '4' : '0';
+
+            if (elem.url) {
+              const img = document.createElement('img');
+              img.src = elem.url;
+              img.style.width = '100%';
+              img.style.height = '100%';
+              img.style.objectFit = elem.ajuste || 'cover';
+              img.style.opacity = String(elem.opacidade !== undefined ? elem.opacidade : 1);
+              fotoEl.appendChild(img);
+            } else {
+              fotoEl.style.background = 'linear-gradient(135deg, #EEF4FA, #D5E3F0)';
+              fotoEl.style.display = 'flex';
+              fotoEl.style.flexDirection = 'column';
+              fotoEl.style.alignItems = 'center';
+              fotoEl.style.justifyContent = 'center';
+              fotoEl.style.color = '#314F79';
+              fotoEl.style.fontSize = '12px';
+              fotoEl.style.fontWeight = '700';
+              fotoEl.innerHTML = `<span>🖼 Foto de Capa Livre</span><span style="font-size:10px; opacity:0.8;">${sangria ? 'Sangria Total' : `${elem.largura_mm || 210} × ${elem.altura_mm || 140} mm`}</span>`;
+            }
+            wrapElemMestra.appendChild(fotoEl);
+          } else if (elem.tipo === 'tarja') {
             const altPx = (elem.altura_mm || 8) * pxPorMm;
             const tarjaEl = document.createElement('div');
             tarjaEl.style.position = 'absolute';
@@ -1179,17 +1233,33 @@ export class EditorView {
             molduraEl.style.fontSize = '11px';
             molduraEl.style.fontWeight = '700';
             molduraEl.style.color = elem.cor || '#314F79';
-            const lin = mestraPag.grade_2d?.linhas || 3;
-            const col = mestraPag.grade_2d?.colunas || 3;
-            const alturaUtil = (paisagem ? 210 : 297) * pxPorMm - padTop - padBottom;
-            const larguraUtil = (paisagem ? 297 : 210) * pxPorMm - padLeft - padRight;
-            const cellH = alturaUtil / lin;
-            const cellW = larguraUtil / col;
-            molduraEl.style.top = `${padTop + ((elem.linha || 1) - 1) * cellH}px`;
-            molduraEl.style.left = `${padLeft + ((elem.coluna || 1) - 1) * cellW}px`;
-            molduraEl.style.width = `${Math.max(cellW * (elem.spanColunas || 1) - 8, 40)}px`;
-            molduraEl.style.height = `${Math.max(cellH * (elem.spanLinhas || 1) - 8, 40)}px`;
-            molduraEl.innerHTML = `<span>${elem.titulo || 'Quadro'}</span>`;
+            molduraEl.style.zIndex = elem.camada === 'frente' ? '4' : '0';
+
+            if (elem.posicionamento_modo === 'coordenadas') {
+              const sangria = !!elem.sangria;
+              const folhaW = (paisagem ? 297 : 210) * pxPorMm;
+              const folhaH = (paisagem ? 210 : 297) * pxPorMm;
+              const topPx = sangria ? 0 : (elem.y_mm || 20) * pxPorMm;
+              const leftPx = sangria ? 0 : (elem.x_mm || 20) * pxPorMm;
+              const wPx = sangria ? folhaW : (elem.largura_mm || 170) * pxPorMm;
+              const hPx = sangria ? folhaH : (elem.altura_mm || 50) * pxPorMm;
+              molduraEl.style.top = `${topPx}px`;
+              molduraEl.style.left = `${leftPx}px`;
+              molduraEl.style.width = `${wPx}px`;
+              molduraEl.style.height = `${hPx}px`;
+            } else {
+              const lin = mestraPag.grade_2d?.linhas || 3;
+              const col = mestraPag.grade_2d?.colunas || 3;
+              const alturaUtil = (paisagem ? 210 : 297) * pxPorMm - padTop - padBottom;
+              const larguraUtil = (paisagem ? 297 : 210) * pxPorMm - padLeft - padRight;
+              const cellH = alturaUtil / lin;
+              const cellW = larguraUtil / col;
+              molduraEl.style.top = `${padTop + ((elem.linha || 1) - 1) * cellH}px`;
+              molduraEl.style.left = `${padLeft + ((elem.coluna || 1) - 1) * cellW}px`;
+              molduraEl.style.width = `${Math.max(cellW * (elem.spanColunas || 1) - 8, 40)}px`;
+              molduraEl.style.height = `${Math.max(cellH * (elem.spanLinhas || 1) - 8, 40)}px`;
+            }
+            molduraEl.innerHTML = `<span>${elem.titulo || 'Moldura'}</span>`;
             wrapElemMestra.appendChild(molduraEl);
           }
         });
@@ -1240,13 +1310,41 @@ export class EditorView {
 
       areaUtil.appendChild(gradeBlocos);
 
-      // Rodapé da Página com Numeração
+      // Rodapé da Página com Numeração Completa e Alternada
       if (mestraPag?.rodape?.ativo) {
         const rod = document.createElement('div');
         rod.className = 'ath-folha-rodape';
         const txtRod = mestraPag.rodape.texto || 'Athenes · Editor de Documentos';
-        const numTxt = mestraPag.rodape.numeracao ? `Página ${pag.numero} de ${paginas.length}` : '';
-        rod.innerHTML = `<span>${txtRod}</span><span><strong>${numTxt}</strong></span>`;
+        
+        let numTxt = '';
+        if (mestraPag.rodape.numeracao !== false) {
+          numTxt = formatarNumeroPagina(pag.numero, paginas.length, mestraPag.rodape);
+        }
+
+        const pos = mestraPag.rodape.posicao_numero || 'direita';
+        const ehPar = pag.numero % 2 === 0;
+
+        if (pos === 'alternado') {
+          // Espelhado: par = número à esquerda, ímpar = número à direita
+          if (ehPar) {
+            rod.style.flexDirection = 'row-reverse';
+            rod.innerHTML = `<span>${txtRod}</span><span><strong>${numTxt}</strong></span>`;
+          } else {
+            rod.style.flexDirection = 'row';
+            rod.innerHTML = `<span>${txtRod}</span><span><strong>${numTxt}</strong></span>`;
+          }
+        } else if (pos === 'centro') {
+          rod.style.justifyContent = 'center';
+          rod.style.gap = '20px';
+          rod.innerHTML = `<span>${txtRod}</span><span><strong>${numTxt}</strong></span>`;
+        } else if (pos === 'esquerda') {
+          rod.style.flexDirection = 'row-reverse';
+          rod.innerHTML = `<span>${txtRod}</span><span><strong>${numTxt}</strong></span>`;
+        } else {
+          rod.style.flexDirection = 'row';
+          rod.innerHTML = `<span>${txtRod}</span><span><strong>${numTxt}</strong></span>`;
+        }
+
         areaUtil.appendChild(rod);
       }
 
@@ -1340,6 +1438,30 @@ export class EditorView {
 
       p.innerHTML = prefixoMarcador + resolverReferenciasCruzadas(b.texto || '', this.doc);
 
+            p.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            const rangeAntes = range.cloneRange();
+            rangeAntes.selectNodeContents(p);
+            rangeAntes.setEnd(range.startContainer, range.startOffset);
+            const divAntes = document.createElement('div');
+            divAntes.appendChild(rangeAntes.cloneContents());
+
+            const rangeDepois = range.cloneRange();
+            rangeDepois.selectNodeContents(p);
+            rangeDepois.setStart(range.endContainer, range.endOffset);
+            const divDepois = document.createElement('div');
+            divDepois.appendChild(rangeDepois.cloneContents());
+
+            this.dividirBlocoAtual(b.id, { textoAntes: divAntes.innerHTML, textoDepois: divDepois.innerHTML });
+          } else {
+            this.dividirBlocoAtual(b.id);
+          }
+        }
+      });
       p.addEventListener('blur', () => {
         b.texto = p.innerHTML;
         this.notificarMudancaRapida();
@@ -1351,6 +1473,7 @@ export class EditorView {
     else if (b.tipo === 'figura' || b.tipo === 'imagem') {
       const figBox = document.createElement('div');
       figBox.className = 'ath-composto-figura';
+      Object.assign(figBox.style, gerarCssMolduraBloco(b));
 
       // Título da Figura
       const tit = document.createElement('div');
@@ -1360,10 +1483,15 @@ export class EditorView {
       tit.addEventListener('blur', () => { b.titulo = tit.innerHTML; this.notificarMudancaRapida(); });
       figBox.appendChild(tit);
 
-      // Grid de Imagens
+      // Grid de Imagens (1 coluna ou subgrade lateral de 2 colunas)
       const grid = document.createElement('div');
       grid.className = 'ath-fig-grid';
       grid.dataset.layout = b.layout || '1';
+      if (b.subgrade_colunas === 2) {
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = '2fr 1fr';
+        grid.style.gap = '10px';
+      }
 
       const itens = Array.isArray(b.itens) ? b.itens : [{ url: b.src || '', legenda_sub: 'Visão Geral' }];
       itens.forEach((it, idx) => {
@@ -1379,20 +1507,24 @@ export class EditorView {
       figBox.appendChild(grid);
 
       // Legenda Geral
-      const leg = document.createElement('div');
-      leg.contentEditable = 'true';
-      leg.className = 'ath-fig-legenda-geral';
-      leg.innerHTML = b.legenda_geral || b.legenda || 'Legenda explicativa dos elementos representados.';
-      leg.addEventListener('blur', () => { b.legenda_geral = leg.innerHTML; this.notificarMudancaRapida(); });
-      figBox.appendChild(leg);
+      if (b.mostrar_legenda !== false) {
+        const leg = document.createElement('div');
+        leg.contentEditable = 'true';
+        leg.className = 'ath-fig-legenda-geral';
+        leg.innerHTML = b.legenda_geral || b.legenda || 'Legenda explicativa dos elementos representados.';
+        leg.addEventListener('blur', () => { b.legenda_geral = leg.innerHTML; this.notificarMudancaRapida(); });
+        figBox.appendChild(leg);
+      }
 
       // Fonte
-      const fonte = document.createElement('div');
-      fonte.contentEditable = 'true';
-      fonte.className = 'ath-bloco-fonte';
-      fonte.innerHTML = b.fonte || 'Fonte: Autores (2026).';
-      fonte.addEventListener('blur', () => { b.fonte = fonte.innerHTML; this.notificarMudancaRapida(); });
-      figBox.appendChild(fonte);
+      if (b.mostrar_fonte !== false) {
+        const fonte = document.createElement('div');
+        fonte.contentEditable = 'true';
+        fonte.className = 'ath-bloco-fonte';
+        fonte.innerHTML = b.fonte || 'Fonte: Autores (2026).';
+        fonte.addEventListener('blur', () => { b.fonte = fonte.innerHTML; this.notificarMudancaRapida(); });
+        figBox.appendChild(fonte);
+      }
 
       el.appendChild(figBox);
     }
@@ -1438,9 +1570,10 @@ export class EditorView {
       el.appendChild(mapaBox);
     }
 
-    // 5. TABELA (ABNT/IBGE - SEM BORDAS VERTICAIS NAS LATERAIS)
+    // 5. TABELA (ABNT/IBGE COM MODELO DE MOLDURA)
     else if (b.tipo === 'tabela') {
       const tabBox = document.createElement('div');
+      Object.assign(tabBox.style, gerarCssMolduraBloco(b));
 
       const tit = document.createElement('div');
       tit.contentEditable = 'true';
@@ -1476,7 +1609,7 @@ export class EditorView {
       table.appendChild(tbody);
       tabBox.appendChild(table);
 
-      if (b.notas) {
+      if (b.notas && b.mostrar_legenda !== false) {
         const notas = document.createElement('div');
         notas.contentEditable = 'true';
         notas.style.fontSize = '11px';
@@ -1485,19 +1618,22 @@ export class EditorView {
         tabBox.appendChild(notas);
       }
 
-      const fonte = document.createElement('div');
-      fonte.contentEditable = 'true';
-      fonte.className = 'ath-bloco-fonte';
-      fonte.innerHTML = b.fonte || 'Fonte: Elaborada pelos autores.';
-      fonte.addEventListener('blur', () => { b.fonte = fonte.innerHTML; this.notificarMudancaRapida(); });
-      tabBox.appendChild(fonte);
+      if (b.mostrar_fonte !== false) {
+        const fonte = document.createElement('div');
+        fonte.contentEditable = 'true';
+        fonte.className = 'ath-bloco-fonte';
+        fonte.innerHTML = b.fonte || 'Fonte: Elaborada pelos autores.';
+        fonte.addEventListener('blur', () => { b.fonte = fonte.innerHTML; this.notificarMudancaRapida(); });
+        tabBox.appendChild(fonte);
+      }
 
       el.appendChild(tabBox);
     }
 
-    // 6. QUADRO (ABNT - CAIXA TOTALMENTE FECHADA)
+    // 6. QUADRO (ABNT - CAIXA COM MODELO DE MOLDURA)
     else if (b.tipo === 'quadro') {
       const qBox = document.createElement('div');
+      Object.assign(qBox.style, gerarCssMolduraBloco(b));
 
       const tit = document.createElement('div');
       tit.contentEditable = 'true';
@@ -1533,24 +1669,47 @@ export class EditorView {
       table.appendChild(tbody);
       qBox.appendChild(table);
 
-      const fonte = document.createElement('div');
-      fonte.contentEditable = 'true';
-      fonte.className = 'ath-bloco-fonte';
-      fonte.innerHTML = b.fonte || 'Fonte: Referencial teórico.';
-      fonte.addEventListener('blur', () => { b.fonte = fonte.innerHTML; this.notificarMudancaRapida(); });
-      qBox.appendChild(fonte);
+      if (b.mostrar_fonte !== false) {
+        const fonte = document.createElement('div');
+        fonte.contentEditable = 'true';
+        fonte.className = 'ath-bloco-fonte';
+        fonte.innerHTML = b.fonte || 'Fonte: Referencial teórico.';
+        fonte.addEventListener('blur', () => { b.fonte = fonte.innerHTML; this.notificarMudancaRapida(); });
+        qBox.appendChild(fonte);
+      }
 
       el.appendChild(qBox);
     }
 
-    // 7. FÓRMULA MATEMÁTICA
+    // 7. FÓRMULA MATEMÁTICA (COM SLOTS DE APRESENTAÇÃO E NÚMERO)
     else if (b.tipo === 'formula') {
       const fBox = document.createElement('div');
       fBox.className = 'ath-bloco-formula';
-      fBox.innerHTML = `
-        <div class="ath-formula-corpo">${b.latex || b.formula || 'f(x) = \\int_{-\\infty}^{\\infty} e^{-x^2} dx'}</div>
-        <div class="ath-formula-numero">${b.numero_equacao || b.numero || '(1)'}</div>
-      `;
+      Object.assign(fBox.style, gerarCssMolduraBloco(b));
+
+      const posNum = b.posicao_numero || 'direita';
+      const numTxt = b.numero_equacao || b.numero || '(1)';
+      const corpoFormula = `<div class="ath-formula-corpo" style="flex:1; text-align:center;">${b.latex || b.formula || 'f(x) = \\int_{-\\infty}^{\\infty} e^{-x^2} dx'}</div>`;
+      const numBadge = posNum !== 'oculto' ? `<div class="ath-formula-numero" style="font-weight:700; color:#475569;">${numTxt}</div>` : '';
+
+      let linhaPrincipalHtml = '';
+      if (posNum === 'esquerda') {
+        linhaPrincipalHtml = `<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%;">${numBadge}${corpoFormula}</div>`;
+      } else if (posNum === 'abaixo') {
+        linhaPrincipalHtml = `<div style="display:flex; flex-direction:column; align-items:center; gap:6px; width:100%;">${corpoFormula}${numBadge}</div>`;
+      } else {
+        linhaPrincipalHtml = `<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%;">${corpoFormula}${numBadge}</div>`;
+      }
+
+      let extraHtml = '';
+      if (b.mostrar_legenda !== false && (b.legenda_formula || b.legenda)) {
+        extraHtml += `<div class="ath-formula-legenda" style="margin-top:6px; font-size:11px; color:#64748B; font-style:italic;">${b.legenda_formula || b.legenda}</div>`;
+      }
+      if (b.mostrar_fonte !== false && (b.fonte_formula || b.fonte)) {
+        extraHtml += `<div class="ath-bloco-fonte" style="margin-top:4px; font-size:10.5px; color:#94A3B8;">${b.fonte_formula || b.fonte}</div>`;
+      }
+
+      fBox.innerHTML = `${linhaPrincipalHtml}${extraHtml}`;
       el.appendChild(fBox);
     }
 
@@ -1705,8 +1864,20 @@ export class EditorView {
       <button type="button" class="rm-ic-sm" data-alin-rapido="justificado_esquerda" title="Justificado com última linha à esquerda">${svgIcone('alinhamento_jus_esq', 14)}</button>
       <button type="button" class="rm-ic-sm" data-alin-rapido="justificado_direita" title="Justificado com última linha à direita">${svgIcone('alinhamento_jus_dir', 14)}</button>
       <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 3px;"></span>
+      <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnContextDividir" title="Dividir este bloco de texto em dois no cursor">${svgIcone('divisor', 13)} Dividir</button>
       <button type="button" class="glx-btn glx-btn-xs glx-btn-primary" id="athBtnContextCitar" title="Inserir citação Zotero">Citar Zotero</button>
     `;
+
+    // Pill flutuante para quando o cursor está posicionado sem seleção
+    let pillCaret = document.getElementById('athPillDividirCaret');
+    if (!pillCaret) {
+      pillCaret = document.createElement('div');
+      pillCaret.id = 'athPillDividirCaret';
+      pillCaret.className = 'ath-pill-dividir';
+      pillCaret.style.display = 'none';
+      pillCaret.innerHTML = `${svgIcone('divisor', 12)} Dividir Bloco Aqui`;
+      document.body.appendChild(pillCaret);
+    }
 
     document.body.appendChild(barra);
 
@@ -1755,16 +1926,61 @@ export class EditorView {
       });
     });
 
+    
+    const acaoDividirRange = (range, editable) => {
+      if (!range || !editable) return;
+      const rangeAntes = range.cloneRange();
+      rangeAntes.selectNodeContents(editable);
+      rangeAntes.setEnd(range.startContainer, range.startOffset);
+      const divAntes = document.createElement('div');
+      divAntes.appendChild(rangeAntes.cloneContents());
+
+      const rangeDepois = range.cloneRange();
+      rangeDepois.selectNodeContents(editable);
+      rangeDepois.setStart(range.endContainer, range.endOffset);
+      const divDepois = document.createElement('div');
+      divDepois.appendChild(rangeDepois.cloneContents());
+
+      const bId = this.blocoSelecionado?.id;
+      if (bId) {
+        this.dividirBlocoAtual(bId, { textoAntes: divAntes.innerHTML, textoDepois: divDepois.innerHTML });
+      }
+    };
+
+    barra.querySelector('#athBtnContextDividir')?.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      const comum = range.commonAncestorContainer;
+      const elPai = comum.nodeType === Node.ELEMENT_NODE ? comum : comum.parentElement;
+      const editable = elPai?.closest('.ath-texto-editable, .ath-titulo-editable, [contenteditable="true"]');
+      acaoDividirRange(range, editable);
+    });
+
+    pillCaret?.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      const comum = range.commonAncestorContainer;
+      const elPai = comum.nodeType === Node.ELEMENT_NODE ? comum : comum.parentElement;
+      const editable = elPai?.closest('.ath-texto-editable, .ath-titulo-editable, [contenteditable="true"]');
+      pillCaret.style.display = 'none';
+      acaoDividirRange(range, editable);
+    });
+
     barra.querySelector('#athBtnContextCitar').addEventListener('mousedown', e => {
       e.preventDefault();
       this.abrirPainelZotero();
     });
 
-    // Monitora seleção de texto
+    // Monitora seleção de texto e posição do cursor
     const atualizarPosicaoBarra = () => {
       const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !sel.toString().trim()) {
+      if (!sel || sel.rangeCount === 0) {
         barra.style.display = 'none';
+        if (pillCaret) pillCaret.style.display = 'none';
         return;
       }
 
@@ -1775,18 +1991,43 @@ export class EditorView {
 
       if (!editable) {
         barra.style.display = 'none';
+        if (pillCaret) pillCaret.style.display = 'none';
         return;
       }
 
-      const rect = range.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) {
-        barra.style.display = 'none';
-        return;
+      // Se há texto selecionado, exibe a barra completa com formatação e botão de dividir
+      if (!sel.isCollapsed && sel.toString().trim()) {
+        if (pillCaret) pillCaret.style.display = 'none';
+        const rect = range.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          barra.style.display = 'flex';
+          barra.style.left = `${rect.left + rect.width / 2}px`;
+          barra.style.top = `${rect.top}px`;
+
+          // Reflete o estilo ativo do trecho
+          const spanEst = elPai.closest('.ath-estilo-span');
+          if (spanEst && spanEst.dataset.estiloId) {
+            selEstilo.value = spanEst.dataset.estiloId;
+          } else if (this.blocoSelecionado?.estiloId) {
+            selEstilo.value = this.blocoSelecionado.estiloId;
+          }
+          return;
+        }
       }
 
-      barra.style.display = 'flex';
-      barra.style.left = `${rect.left + rect.width / 2}px`;
-      barra.style.top = `${rect.top}px`;
+      // Se é apenas o cursor piscando (sem seleção), exibe o pill discreto "Dividir Bloco Aqui"
+      barra.style.display = 'none';
+      if (sel.isCollapsed && document.activeElement === editable) {
+        const rects = range.getClientRects();
+        const r = rects.length > 0 ? rects[0] : editable.getBoundingClientRect();
+        if (r && pillCaret) {
+          pillCaret.style.display = 'flex';
+          pillCaret.style.left = `${r.left}px`;
+          pillCaret.style.top = `${r.top}px`;
+        }
+      } else if (pillCaret) {
+        pillCaret.style.display = 'none';
+      }
     };
 
     document.addEventListener('selectionchange', atualizarPosicaoBarra);

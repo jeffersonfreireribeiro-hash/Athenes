@@ -8,7 +8,7 @@
  */
 
 import { svgIcone } from './athenes_icones.js';
-import { repaginarDocumento } from '../core/athenes_documento.js';
+import { repaginarDocumento, formatarNumeroPagina, criarElementoMestra } from '../core/athenes_documento.js';
 
 export class ModalEditorMestra {
   constructor(documento, mestraId, opcoes = {}) {
@@ -170,33 +170,39 @@ export class ModalEditorMestra {
             </div>
           </div>
 
-          <!-- 4. Elementos da Mestra (Nível Affinity Publisher / InDesign) -->
+          <!-- 4. Elementos da Mestra (Nível Editorial) -->
           <div class="rm-card" style="padding:14px; background:var(--ath-surface-elevated, #F8FAFC); border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:8px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
               <span style="font:800 12px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--ath-primary, #314F79);">
                 Elementos da Mestra (<span id="athContagemElementos">${this.rascunho.elementos_recorrentes?.length || 0}</span>)
               </span>
-              <span style="font-size:11px; color:var(--glx-muted, #6B7585);">Affinity / InDesign</span>
             </div>
 
-            <!-- Botões de Adição Rápida de Elementos na Mestra -->
-            <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; margin-bottom:10px;">
-              <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnAddElemMoldura" style="display:flex; align-items:center; gap:4px; justify-content:center;">
-                ${svgIcone('quadro', 13)} + Moldura / Grade
+            <!-- Botões de Adição Rápida de Elementos na Mestra (Quadrados Discretos com Tooltip) -->
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+              <button type="button" class="ath-btn-elem-quadrado" id="athBtnAddElemMoldura" title="Adicionar Moldura (Grade 2D ou Coordenadas mm)">
+                ${svgIcone('quadro', 16)}
               </button>
-              <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnAddElemTarja" style="display:flex; align-items:center; gap:4px; justify-content:center;">
-                ${svgIcone('divisor', 13)} + Tarja Decorativa
+              <button type="button" class="ath-btn-elem-quadrado" id="athBtnAddElemTarja" title="Adicionar Tarja Decorativa">
+                ${svgIcone('divisor', 16)}
               </button>
-              <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnAddElemRotulo" style="display:flex; align-items:center; gap:4px; justify-content:center;">
-                ${svgIcone('titulo', 13)} + Rótulo Fixo
+              <button type="button" class="ath-btn-elem-quadrado" id="athBtnAddElemRotulo" title="Adicionar Rótulo Fixo">
+                ${svgIcone('titulo', 16)}
               </button>
-              <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnAddElemMarca" style="display:flex; align-items:center; gap:4px; justify-content:center;">
-                ${svgIcone('imagem', 13)} + Marca d'Água
+              <button type="button" class="ath-btn-elem-quadrado" id="athBtnAddElemMarca" title="Adicionar Marca d'Água">
+                ${svgIcone('imagem', 16)}
+              </button>
+              <button type="button" class="ath-btn-elem-quadrado" id="athBtnAddElemFotoCapa" title="Adicionar Foto de Capa Livre (Coordenadas mm / Sangria Total)">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
               </button>
             </div>
 
             <!-- Lista dos Elementos Inseridos -->
-            <div id="athListaElementosMestra" style="display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto; padding-right:2px;"></div>
+            <div id="athListaElementosMestra" style="display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto; padding-right:2px;"></div>
           </div>
 
           <!-- 5. Cabeçalho e Rodapé -->
@@ -224,21 +230,62 @@ export class ModalEditorMestra {
             <div style="margin-top:12px; border-top:1px dashed var(--ath-primary-line, #C8D7E6); padding-top:10px;">
               <label class="rm-chk" style="font:700 12px var(--glx-font);">
                 <input type="checkbox" id="athMestraRodAtivo" ${this.rascunho.rodape?.ativo ? 'checked' : ''}>
-                Exibir Rodapé
+                Exibir Rodapé Institucional
               </label>
               <div id="athBoxRodCampos" style="margin-top:8px; display:${this.rascunho.rodape?.ativo ? 'flex' : 'none'}; flex-direction:column; gap:6px;">
                 <input type="text" id="athMestraRodTexto" class="glx-input" style="width:100%;" placeholder="Texto do rodapé institucional" value="${this.rascunho.rodape?.texto || ''}">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <label class="rm-chk" style="font-size:11px;">
-                    <input type="checkbox" id="athMestraRodNum" ${this.rascunho.rodape?.numeracao ? 'checked' : ''}> Numerar páginas
-                  </label>
-                  <label style="font-size:11px; color:var(--glx-muted);">Posição:
-                    <select id="athMestraRodPos" class="glx-select" style="padding:2px 8px; font-size:11px;">
-                      <option value="direita" ${this.rascunho.rodape?.posicao_numero === 'direita' ? 'selected' : ''}>Direita</option>
-                      <option value="centro" ${this.rascunho.rodape?.posicao_numero === 'centro' ? 'selected' : ''}>Centro</option>
-                      <option value="esquerda" ${this.rascunho.rodape?.posicao_numero === 'esquerda' ? 'selected' : ''}>Esquerda</option>
-                    </select>
-                  </label>
+                
+                <!-- Configurações Completas de Numeração de Página -->
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:4px; padding:10px; background:#fff; border-radius:6px; border:1px solid var(--ath-primary-line, #C8D7E6);">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label class="rm-chk" style="font-size:11.5px; font-weight:700;">
+                      <input type="checkbox" id="athMestraRodNum" ${this.rascunho.rodape?.numeracao !== false ? 'checked' : ''}> Numerar Páginas
+                    </label>
+                    <label class="rm-chk" style="font-size:11px;">
+                      <input type="checkbox" id="athMestraRodOcultarCapa" ${this.rascunho.rodape?.ocultar_na_capa !== false ? 'checked' : ''}> Ocultar na Capa
+                    </label>
+                  </div>
+
+                  <div id="athBoxRodNumOpcoes" style="display:${this.rascunho.rodape?.numeracao !== false ? 'flex' : 'none'}; flex-direction:column; gap:6px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                      <label style="font-size:11px; color:var(--glx-muted);">Formato:
+                        <select id="athMestraRodFormato" class="glx-select" style="width:100%; font-size:11px; padding:2px 6px;">
+                          <option value="apenas_numero" ${this.rascunho.rodape?.formato === 'apenas_numero' ? 'selected' : ''}>Apenas Número (ex: 3)</option>
+                          <option value="n_de_total" ${(!this.rascunho.rodape?.formato || this.rascunho.rodape?.formato === 'n_de_total') ? 'selected' : ''}>N de Total (ex: 3 de 27)</option>
+                          <option value="n_of_total" ${this.rascunho.rodape?.formato === 'n_of_total' ? 'selected' : ''}>N of Total (ex: 3 of 27 — MDPI)</option>
+                          <option value="pagina_n" ${this.rascunho.rodape?.formato === 'pagina_n' ? 'selected' : ''}>Página N (ex: Página 3)</option>
+                          <option value="pagina_n_de_total" ${this.rascunho.rodape?.formato === 'pagina_n_de_total' ? 'selected' : ''}>Página N de Total (ex: Página 3 de 27)</option>
+                          <option value="romano_min" ${this.rascunho.rodape?.formato === 'romano_min' ? 'selected' : ''}>Romano Minúsculo (ex: iii)</option>
+                          <option value="romano_mai" ${this.rascunho.rodape?.formato === 'romano_mai' ? 'selected' : ''}>Romano Maiúsculo (ex: III)</option>
+                          <option value="hifen" ${this.rascunho.rodape?.formato === 'hifen' ? 'selected' : ''}>Hífen (ex: - 3 -)</option>
+                          <option value="personalizado" ${this.rascunho.rodape?.formato === 'personalizado' ? 'selected' : ''}>Personalizado ({p}/{total})</option>
+                        </select>
+                      </label>
+                      <label style="font-size:11px; color:var(--glx-muted);">Alinhamento:
+                        <select id="athMestraRodPos" class="glx-select" style="width:100%; font-size:11px; padding:2px 6px;">
+                          <option value="direita" ${this.rascunho.rodape?.posicao_numero === 'direita' ? 'selected' : ''}>À Direita</option>
+                          <option value="centro" ${this.rascunho.rodape?.posicao_numero === 'centro' ? 'selected' : ''}>Centralizado</option>
+                          <option value="esquerda" ${this.rascunho.rodape?.posicao_numero === 'esquerda' ? 'selected' : ''}>À Esquerda</option>
+                          <option value="alternado" ${this.rascunho.rodape?.posicao_numero === 'alternado' ? 'selected' : ''}>Alternado (Espelhado / Livro)</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                      <label style="font-size:11px; color:var(--glx-muted);">Prefixo:
+                        <input type="text" id="athMestraRodPrefixo" class="glx-input" placeholder="Ex: Artigo · " value="${this.rascunho.rodape?.prefixo || ''}" style="width:100%; font-size:11px; padding:2px 6px;">
+                      </label>
+                      <label style="font-size:11px; color:var(--glx-muted);">Sufixo:
+                        <input type="text" id="athMestraRodSufixo" class="glx-input" placeholder="Ex:  · MDPI" value="${this.rascunho.rodape?.sufixo || ''}" style="width:100%; font-size:11px; padding:2px 6px;">
+                      </label>
+                    </div>
+
+                    <div id="athMestraBoxMascaraPers" style="display:${this.rascunho.rodape?.formato === 'personalizado' ? 'block' : 'none'};">
+                      <label style="font-size:11px; color:var(--glx-muted);">Máscara ({p} = pág, {total} = total):
+                        <input type="text" id="athMestraRodMascara" class="glx-input" placeholder="Ex: Folha {p}/{total}" value="${this.rascunho.rodape?.mascara || '{p} de {total}'}" style="width:100%; font-size:11px; padding:2px 6px;">
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -299,7 +346,7 @@ export class ModalEditorMestra {
       return;
     }
 
-    elems.forEach((elem, idx) => {
+    elems.forEach((elem) => {
       const item = document.createElement('div');
       item.className = `ath-mestra-elem-item ${elem.id === this.elementoSelecionadoId ? 'ativo' : ''}`;
       item.style.display = 'flex';
@@ -311,10 +358,13 @@ export class ModalEditorMestra {
       item.style.border = `1px solid ${elem.id === this.elementoSelecionadoId ? 'var(--ath-primary, #314F79)' : 'var(--ath-primary-line, #C8D7E6)'}`;
 
       let iconeNome = 'quadro';
-      let tipoRotulo = 'Moldura de Grade';
+      let tipoRotulo = 'Moldura';
       if (elem.tipo === 'tarja') { iconeNome = 'divisor'; tipoRotulo = 'Tarja Decorativa'; }
       else if (elem.tipo === 'rotulo_estatico') { iconeNome = 'titulo'; tipoRotulo = 'Rótulo Fixo'; }
       else if (elem.tipo === 'marca_dagua') { iconeNome = 'imagem'; tipoRotulo = 'Marca d\'Água'; }
+      else if (elem.tipo === 'foto_capa') { iconeNome = 'imagem'; tipoRotulo = 'Foto de Capa Livre'; }
+
+      const modoCoord = elem.posicionamento_modo === 'coordenadas' || elem.tipo === 'foto_capa';
 
       item.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -327,35 +377,117 @@ export class ModalEditorMestra {
           </button>
         </div>
 
-        <div style="display:flex; align-items:center; gap:8px; font-size:11px;">
-          ${elem.tipo === 'tarja' ? `
-            <label style="display:flex; align-items:center; gap:4px;">Posição:
-              <select class="glx-select" data-prop="posicao" style="padding:1px 6px; font-size:11px;">
-                <option value="topo" ${elem.posicao === 'topo' ? 'selected' : ''}>Topo</option>
-                <option value="base" ${elem.posicao === 'base' ? 'selected' : ''}>Base</option>
-                <option value="lateral_esquerda" ${elem.posicao === 'lateral_esquerda' ? 'selected' : ''}>Lateral Esq.</option>
-              </select>
-            </label>
-            <label style="display:flex; align-items:center; gap:4px;">Altura:
-              <input type="number" class="glx-input" data-prop="altura_mm" value="${elem.altura_mm || 8}" style="width:45px; padding:1px 4px; font-size:11px;">mm
-            </label>
+        ${elem.tipo === 'caixa_grade' ? `
+          <div style="display:flex; align-items:center; gap:6px; font-size:11px;">
+            <span style="color:var(--glx-muted);">Posicionamento:</span>
+            <select class="glx-select" data-prop="posicionamento_modo" style="padding:1px 6px; font-size:11px; flex:1;">
+              <option value="grade" ${elem.posicionamento_modo !== 'coordenadas' ? 'selected' : ''}>Grade 2D (Linhas / Colunas)</option>
+              <option value="coordenadas" ${elem.posicionamento_modo === 'coordenadas' ? 'selected' : ''}>Coordenadas Exatas (mm)</option>
+            </select>
+          </div>
+        ` : ''}
+
+        <div style="display:flex; flex-direction:column; gap:5px; font-size:11px;">
+          ${elem.tipo === 'foto_capa' ? `
+            <input type="text" class="glx-input" data-prop="url" value="${elem.url || ''}" placeholder="URL ou caminho da imagem (ex: capa.jpg)" style="width:100%; padding:2px 6px; font-size:11px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+              <label class="rm-chk" style="font-size:11px;">
+                <input type="checkbox" data-prop-chk="sangria" ${elem.sangria !== false ? 'checked' : ''}> Sangria Total (0 mm)
+              </label>
+              <label style="display:flex; align-items:center; gap:4px;">Camada:
+                <select class="glx-select" data-prop="camada" style="padding:1px 6px; font-size:11px;">
+                  <option value="fundo" ${elem.camada !== 'frente' ? 'selected' : ''}>No Fundo (Atrás)</option>
+                  <option value="frente" ${elem.camada === 'frente' ? 'selected' : ''}>Na Frente</option>
+                </select>
+              </label>
+            </div>
+            ${elem.sangria === false ? `
+              <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:4px;">
+                <label>X: <input type="number" class="glx-input" data-prop="x_mm" value="${elem.x_mm || 0}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
+                <label>Y: <input type="number" class="glx-input" data-prop="y_mm" value="${elem.y_mm || 0}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
+                <label>Larg: <input type="number" class="glx-input" data-prop="largura_mm" value="${elem.largura_mm || 210}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
+                <label>Alt: <input type="number" class="glx-input" data-prop="altura_mm" value="${elem.altura_mm || 140}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
+              </div>
+            ` : ''}
+            <div style="display:flex; align-items:center; gap:8px;">
+              <label style="display:flex; align-items:center; gap:4px; flex:1;">Opacidade:
+                <input type="number" class="glx-input" data-prop="opacidade" step="0.05" min="0.05" max="1" value="${elem.opacidade !== undefined ? elem.opacidade : 1}" style="width:48px; padding:1px 4px; font-size:11px;">
+              </label>
+              <label style="display:flex; align-items:center; gap:4px;">Ajuste:
+                <select class="glx-select" data-prop="ajuste" style="padding:1px 6px; font-size:11px;">
+                  <option value="cover" ${elem.ajuste !== 'contain' ? 'selected' : ''}>Cobrir (Cover)</option>
+                  <option value="contain" ${elem.ajuste === 'contain' ? 'selected' : ''}>Conter (Contain)</option>
+                </select>
+              </label>
+            </div>
+          ` : elem.tipo === 'tarja' ? `
+            <div style="display:flex; align-items:center; gap:6px;">
+              <label style="display:flex; align-items:center; gap:4px; flex:1;">Posição:
+                <select class="glx-select" data-prop="posicao" style="padding:1px 6px; font-size:11px; width:100%;">
+                  <option value="topo" ${elem.posicao === 'topo' ? 'selected' : ''}>Topo</option>
+                  <option value="base" ${elem.posicao === 'base' ? 'selected' : ''}>Base</option>
+                  <option value="lateral_esquerda" ${elem.posicao === 'lateral_esquerda' ? 'selected' : ''}>Lateral Esq.</option>
+                </select>
+              </label>
+              <label style="display:flex; align-items:center; gap:4px;">Altura:
+                <input type="number" class="glx-input" data-prop="altura_mm" value="${elem.altura_mm || 8}" style="width:45px; padding:1px 4px; font-size:11px;">mm
+              </label>
+              <input type="color" data-prop="cor" value="${elem.cor || '#314F79'}" style="width:24px; height:20px; border:none; background:none; cursor:pointer;" title="Cor">
+            </div>
           ` : elem.tipo === 'rotulo_estatico' ? `
-            <input type="text" class="glx-input" data-prop="texto" value="${elem.texto || ''}" placeholder="Texto fixo" style="flex:1; padding:2px 6px; font-size:11px;">
+            <input type="text" class="glx-input" data-prop="texto" value="${elem.texto || ''}" placeholder="Texto institucional fixo" style="width:100%; padding:2px 6px; font-size:11px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <label style="display:flex; align-items:center; gap:4px;">Afastamento Topo (Y):
+                <input type="number" class="glx-input" data-prop="y_mm" value="${elem.y_mm || 12}" style="width:45px; padding:1px 4px; font-size:11px;">mm
+              </label>
+              <label style="display:flex; align-items:center; gap:4px;">Tamanho:
+                <input type="number" class="glx-input" data-prop="tamanho_pt" value="${elem.tamanho_pt || 10}" style="width:40px; padding:1px 4px; font-size:11px;">pt
+              </label>
+              <input type="color" data-prop="cor" value="${elem.cor || '#314F79'}" style="width:24px; height:20px; border:none; background:none; cursor:pointer;" title="Cor">
+            </div>
           ` : elem.tipo === 'marca_dagua' ? `
-            <input type="text" class="glx-input" data-prop="texto" value="${elem.texto || 'RASCUNHO'}" style="flex:1; padding:2px 6px; font-size:11px;">
-            <label style="display:flex; align-items:center; gap:4px;">Opacidade:
-              <input type="number" class="glx-input" data-prop="opacidade" step="0.05" min="0.05" max="0.5" value="${elem.opacidade || 0.12}" style="width:50px; padding:1px 4px; font-size:11px;">
-            </label>
+            <input type="text" class="glx-input" data-prop="texto" value="${elem.texto || 'RASCUNHO'}" style="width:100%; padding:2px 6px; font-size:11px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <label style="display:flex; align-items:center; gap:4px; flex:1;">Opacidade:
+                <input type="number" class="glx-input" data-prop="opacidade" step="0.05" min="0.05" max="0.5" value="${elem.opacidade || 0.12}" style="width:50px; padding:1px 4px; font-size:11px;">
+              </label>
+              <input type="color" data-prop="cor" value="${elem.cor || '#314F79'}" style="width:24px; height:20px; border:none; background:none; cursor:pointer;" title="Cor">
+            </div>
           ` : `
-            <input type="text" class="glx-input" data-prop="titulo" value="${elem.titulo || 'Moldura'}" placeholder="Nome do Quadro" style="flex:1; padding:2px 6px; font-size:11px;">
-            <label style="display:flex; align-items:center; gap:4px;">Linha:
-              <input type="number" class="glx-input" data-prop="linha" min="1" max="12" value="${elem.linha || 1}" style="width:36px; padding:1px 4px; font-size:11px;">
-            </label>
-            <label style="display:flex; align-items:center; gap:4px;">Col:
-              <input type="number" class="glx-input" data-prop="coluna" min="1" max="12" value="${elem.coluna || 1}" style="width:36px; padding:1px 4px; font-size:11px;">
-            </label>
+            <input type="text" class="glx-input" data-prop="titulo" value="${elem.titulo || 'Moldura'}" placeholder="Nome do Quadro" style="width:100%; padding:2px 6px; font-size:11px;">
+            ${elem.posicionamento_modo === 'coordenadas' ? `
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                <label class="rm-chk" style="font-size:11px;">
+                  <input type="checkbox" data-prop-chk="sangria" ${elem.sangria ? 'checked' : ''}> Sangria Total (0 mm)
+                </label>
+                <input type="color" data-prop="cor" value="${elem.cor || '#314F79'}" style="width:24px; height:20px; border:none; background:none; cursor:pointer;" title="Cor da Borda">
+              </div>
+              ${!elem.sangria ? `
+                <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:4px;">
+                  <label>X: <input type="number" class="glx-input" data-prop="x_mm" value="${elem.x_mm || 20}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
+                  <label>Y: <input type="number" class="glx-input" data-prop="y_mm" value="${elem.y_mm || 20}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
+                  <label>Larg: <input type="number" class="glx-input" data-prop="largura_mm" value="${elem.largura_mm || 170}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
+                  <label>Alt: <input type="number" class="glx-input" data-prop="altura_mm" value="${elem.altura_mm || 50}" style="width:100%; padding:1px 3px; font-size:10.5px;">mm</label>
+                </div>
+              ` : ''}
+            ` : `
+              <div style="display:flex; align-items:center; gap:6px;">
+                <label style="display:flex; align-items:center; gap:4px;">Linha:
+                  <input type="number" class="glx-input" data-prop="linha" min="1" max="12" value="${elem.linha || 1}" style="width:36px; padding:1px 4px; font-size:11px;">
+                </label>
+                <label style="display:flex; align-items:center; gap:4px;">Col:
+                  <input type="number" class="glx-input" data-prop="coluna" min="1" max="12" value="${elem.coluna || 1}" style="width:36px; padding:1px 4px; font-size:11px;">
+                </label>
+                <label style="display:flex; align-items:center; gap:4px;">Span Lin:
+                  <input type="number" class="glx-input" data-prop="spanLinhas" min="1" max="6" value="${elem.spanLinhas || 1}" style="width:36px; padding:1px 4px; font-size:11px;">
+                </label>
+                <label style="display:flex; align-items:center; gap:4px;">Span Col:
+                  <input type="number" class="glx-input" data-prop="spanColunas" min="1" max="6" value="${elem.spanColunas || 3}" style="width:36px; padding:1px 4px; font-size:11px;">
+                </label>
+                <input type="color" data-prop="cor" value="${elem.cor || '#314F79'}" style="width:24px; height:20px; border:none; background:none; cursor:pointer;" title="Cor">
+              </div>
+            `}
           `}
-          <input type="color" data-prop="cor" value="${elem.cor || '#314F79'}" style="width:24px; height:20px; border:none; background:none; cursor:pointer;" title="Cor">
         </div>
       `;
 
@@ -375,18 +507,25 @@ export class ModalEditorMestra {
       });
 
       item.querySelectorAll('[data-prop]').forEach(inp => {
-        inp.addEventListener('input', e => {
+        const handler = () => {
           const prop = inp.dataset.prop;
           let val = inp.value;
           if (inp.type === 'number') val = parseFloat(val) || 0;
           elem[prop] = val;
+          if (prop === 'posicionamento_modo') {
+            this.renderizarListaElementos(modal);
+          }
           this.atualizarPreviaVisual();
-        });
-        inp.addEventListener('change', e => {
-          const prop = inp.dataset.prop;
-          let val = inp.value;
-          if (inp.type === 'number') val = parseFloat(val) || 0;
-          elem[prop] = val;
+        };
+        inp.addEventListener('input', handler);
+        inp.addEventListener('change', handler);
+      });
+
+      item.querySelectorAll('[data-prop-chk]').forEach(chk => {
+        chk.addEventListener('change', () => {
+          const prop = chk.dataset.propChk;
+          elem[prop] = chk.checked;
+          this.renderizarListaElementos(modal);
           this.atualizarPreviaVisual();
         });
       });
@@ -526,29 +665,49 @@ export class ModalEditorMestra {
       this.rascunho.rodape.texto = e.target.value;
       this.atualizarPreviaVisual();
     });
-    modal.querySelector('#athMestraRodNum').addEventListener('change', e => {
-      this.rascunho.rodape.numeracao = e.target.checked;
+    const chkRodNum = modal.querySelector('#athMestraRodNum');
+    const boxRodNumOpcoes = modal.querySelector('#athBoxRodNumOpcoes');
+    chkRodNum.addEventListener('change', () => {
+      this.rascunho.rodape.numeracao = chkRodNum.checked;
+      if (boxRodNumOpcoes) boxRodNumOpcoes.style.display = chkRodNum.checked ? 'flex' : 'none';
       this.atualizarPreviaVisual();
     });
-    modal.querySelector('#athMestraRodPos').addEventListener('change', e => {
+    modal.querySelector('#athMestraRodOcultarCapa')?.addEventListener('change', e => {
+      this.rascunho.rodape.ocultar_na_capa = e.target.checked;
+      this.atualizarPreviaVisual();
+    });
+    modal.querySelector('#athMestraRodFormato')?.addEventListener('change', e => {
+      this.rascunho.rodape.formato = e.target.value;
+      const boxMascara = modal.querySelector('#athMestraBoxMascaraPers');
+      if (boxMascara) boxMascara.style.display = e.target.value === 'personalizado' ? 'block' : 'none';
+      this.atualizarPreviaVisual();
+    });
+    modal.querySelector('#athMestraRodPos')?.addEventListener('change', e => {
       this.rascunho.rodape.posicao_numero = e.target.value;
       this.atualizarPreviaVisual();
     });
+    modal.querySelector('#athMestraRodPrefixo')?.addEventListener('input', e => {
+      this.rascunho.rodape.prefixo = e.target.value;
+      this.atualizarPreviaVisual();
+    });
+    modal.querySelector('#athMestraRodSufixo')?.addEventListener('input', e => {
+      this.rascunho.rodape.sufixo = e.target.value;
+      this.atualizarPreviaVisual();
+    });
+    modal.querySelector('#athMestraRodMascara')?.addEventListener('input', e => {
+      this.rascunho.rodape.mascara = e.target.value;
+      this.atualizarPreviaVisual();
+    });
 
-    // Ações de Adicionar Elementos (Affinity / InDesign level)
+    // Ações de Adicionar Elementos (Botões Quadrados)
     modal.querySelector('#athBtnAddElemMoldura').addEventListener('click', () => {
-      const novo = {
-        id: 'elem_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-        tipo: 'caixa_grade',
-        titulo: 'Moldura da Capa / Prancha',
-        linha: 1,
-        spanLinhas: 1,
+      const novo = criarElementoMestra('caixa_grade', {
+        titulo: 'Moldura',
         coluna: 1,
         spanColunas: this.rascunho.grade_2d?.colunas || 3,
-        cor: '#314F79',
-        borda: '1px solid #314F79',
-        fundo: 'rgba(49, 79, 121, 0.05)'
-      };
+        spanLinhas: 1,
+        cor: '#314F79'
+      });
       this.rascunho.elementos_recorrentes.push(novo);
       this.elementoSelecionadoId = novo.id;
       this.renderizarListaElementos(modal);
@@ -556,14 +715,12 @@ export class ModalEditorMestra {
     });
 
     modal.querySelector('#athBtnAddElemTarja').addEventListener('click', () => {
-      const novo = {
-        id: 'elem_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-        tipo: 'tarja',
+      const novo = criarElementoMestra('tarja', {
         titulo: 'Tarja Decorativa',
         posicao: 'topo',
         altura_mm: 8,
         cor: '#314F79'
-      };
+      });
       this.rascunho.elementos_recorrentes.push(novo);
       this.elementoSelecionadoId = novo.id;
       this.renderizarListaElementos(modal);
@@ -571,15 +728,13 @@ export class ModalEditorMestra {
     });
 
     modal.querySelector('#athBtnAddElemRotulo').addEventListener('click', () => {
-      const novo = {
-        id: 'elem_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-        tipo: 'rotulo_estatico',
+      const novo = criarElementoMestra('rotulo_estatico', {
         titulo: 'Rótulo Institucional',
         texto: 'UNIVERSIDADE / INSTITUTO DE PESQUISA',
         cor: '#314F79',
-        tamanho_pt: 11,
+        tamanho_pt: 10,
         y_mm: 12
-      };
+      });
       this.rascunho.elementos_recorrentes.push(novo);
       this.elementoSelecionadoId = novo.id;
       this.renderizarListaElementos(modal);
@@ -587,14 +742,29 @@ export class ModalEditorMestra {
     });
 
     modal.querySelector('#athBtnAddElemMarca').addEventListener('click', () => {
-      const novo = {
-        id: 'elem_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-        tipo: 'marca_dagua',
+      const novo = criarElementoMestra('marca_dagua', {
         titulo: 'Marca d\'Água',
         texto: 'VERSÃO PRELIMINAR',
         cor: '#314F79',
         opacidade: 0.12
-      };
+      });
+      this.rascunho.elementos_recorrentes.push(novo);
+      this.elementoSelecionadoId = novo.id;
+      this.renderizarListaElementos(modal);
+      this.atualizarPreviaVisual();
+    });
+
+    modal.querySelector('#athBtnAddElemFotoCapa').addEventListener('click', () => {
+      const paisagem = this.rascunho.orientacao === 'paisagem';
+      const novo = criarElementoMestra('foto_capa', {
+        titulo: 'Foto de Capa Livre',
+        sangria: true,
+        largura_mm: paisagem ? 297 : 210,
+        altura_mm: 140,
+        url: '',
+        opacidade: 1,
+        camada: 'fundo'
+      });
       this.rascunho.elementos_recorrentes.push(novo);
       this.elementoSelecionadoId = novo.id;
       this.renderizarListaElementos(modal);
@@ -694,13 +864,34 @@ export class ModalEditorMestra {
       `;
     }
 
-    // Renderização dos Elementos Recorrentes (Affinity / InDesign level)
+    // Renderização dos Elementos Recorrentes
     let elementosHtml = '';
     (r.elementos_recorrentes || []).forEach(elem => {
       const sel = elem.id === this.elementoSelecionadoId;
       const bordaSel = sel ? 'outline: 2px solid var(--ath-primary, #314F79); outline-offset: 1px;' : '';
 
-      if (elem.tipo === 'tarja') {
+      if (elem.tipo === 'foto_capa') {
+        const sangria = !!elem.sangria;
+        const topPx = sangria ? 0 : (elem.y_mm || 0) * escala;
+        const leftPx = sangria ? 0 : (elem.x_mm || 0) * escala;
+        const wPx = sangria ? larguraPx : (elem.largura_mm || 210) * escala;
+        const hPx = sangria ? alturaPx : (elem.altura_mm || 140) * escala;
+        const imgUrl = elem.url || '';
+
+        elementosHtml += `
+          <div style="position:absolute; top:${topPx}px; left:${leftPx}px; width:${wPx}px; height:${hPx}px; overflow:hidden; z-index:${elem.camada === 'frente' ? 4 : 0}; ${bordaSel} cursor:pointer; background:#CBD5E1;" data-elem-id="${elem.id}">
+            ${imgUrl ? `
+              <img src="${imgUrl}" style="width:100%; height:100%; object-fit:${elem.ajuste || 'cover'}; opacity:${elem.opacidade !== undefined ? elem.opacidade : 1}; display:block;" onerror="this.style.display='none';"/>
+            ` : `
+              <div style="width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; background:linear-gradient(135deg, #EEF4FA, #D5E3F0); color:#314F79; font-size:9px; font-weight:700; text-align:center; padding:8px; box-sizing:border-box;">
+                <span style="font-size:16px; margin-bottom:2px;">🖼</span>
+                <span>Foto de Capa Livre</span>
+                <span style="font-size:7.5px; opacity:0.8;">${sangria ? 'Sangria Total (Folha Inteira)' : `${elem.largura_mm || 210} × ${elem.altura_mm || 140} mm`}</span>
+              </div>
+            `}
+          </div>
+        `;
+      } else if (elem.tipo === 'tarja') {
         const altPx = (elem.altura_mm || 8) * escala;
         let posCss = '';
         if (elem.posicao === 'topo') posCss = `top:0; left:0; right:0; height:${altPx}px;`;
@@ -724,27 +915,48 @@ export class ModalEditorMestra {
           </div>
         `;
       } else if (elem.tipo === 'caixa_grade') {
-        const lin = r.grade_2d?.linhas || 3;
-        const col = r.grade_2d?.colunas || 3;
-        const cellH = (alturaPx - mT - mB) / lin;
-        const cellW = (larguraPx - mL - mR) / col;
-        const topPx = mT + ((elem.linha || 1) - 1) * cellH;
-        const leftPx = mL + ((elem.coluna || 1) - 1) * cellW;
-        const wPx = Math.max(cellW * (elem.spanColunas || 1) - 4, 20);
-        const hPx = Math.max(cellH * (elem.spanLinhas || 1) - 4, 20);
+        if (elem.posicionamento_modo === 'coordenadas') {
+          const sangria = !!elem.sangria;
+          const topPx = sangria ? 0 : (elem.y_mm || 20) * escala;
+          const leftPx = sangria ? 0 : (elem.x_mm || 20) * escala;
+          const wPx = sangria ? larguraPx : (elem.largura_mm || 170) * escala;
+          const hPx = sangria ? alturaPx : (elem.altura_mm || 50) * escala;
 
-        elementosHtml += `
-          <div style="
-            position:absolute; top:${topPx}px; left:${leftPx}px; width:${wPx}px; height:${hPx}px;
-            background:${elem.fundo || 'rgba(49, 79, 121, 0.05)'};
-            border: 1px solid ${elem.cor || '#314F79'};
-            border-radius: 3px; display:flex; align-items:flex-start; padding:4px;
-            font-size:7.5px; font-weight:700; color:${elem.cor || '#314F79'};
-            ${bordaSel} z-index:4; cursor:pointer; box-sizing:border-box;
-          " data-elem-id="${elem.id}">
-            <span>${elem.titulo || 'Quadro'}</span>
-          </div>
-        `;
+          elementosHtml += `
+            <div style="
+              position:absolute; top:${topPx}px; left:${leftPx}px; width:${wPx}px; height:${hPx}px;
+              background:${elem.fundo || 'rgba(49, 79, 121, 0.05)'};
+              border: 1px solid ${elem.cor || '#314F79'};
+              border-radius: 3px; display:flex; align-items:flex-start; padding:4px;
+              font-size:7.5px; font-weight:700; color:${elem.cor || '#314F79'};
+              ${bordaSel} z-index:${elem.camada === 'frente' ? 4 : 1}; cursor:pointer; box-sizing:border-box;
+            " data-elem-id="${elem.id}">
+              <span>${elem.titulo || 'Moldura'} (${sangria ? 'Sangria Total' : `${elem.largura_mm || 170}×${elem.altura_mm || 50}mm`})</span>
+            </div>
+          `;
+        } else {
+          const lin = r.grade_2d?.linhas || 3;
+          const col = r.grade_2d?.colunas || 3;
+          const cellH = (alturaPx - mT - mB) / lin;
+          const cellW = (larguraPx - mL - mR) / col;
+          const topPx = mT + ((elem.linha || 1) - 1) * cellH;
+          const leftPx = mL + ((elem.coluna || 1) - 1) * cellW;
+          const wPx = Math.max(cellW * (elem.spanColunas || 1) - 4, 20);
+          const hPx = Math.max(cellH * (elem.spanLinhas || 1) - 4, 20);
+
+          elementosHtml += `
+            <div style="
+              position:absolute; top:${topPx}px; left:${leftPx}px; width:${wPx}px; height:${hPx}px;
+              background:${elem.fundo || 'rgba(49, 79, 121, 0.05)'};
+              border: 1px solid ${elem.cor || '#314F79'};
+              border-radius: 3px; display:flex; align-items:flex-start; padding:4px;
+              font-size:7.5px; font-weight:700; color:${elem.cor || '#314F79'};
+              ${bordaSel} z-index:4; cursor:pointer; box-sizing:border-box;
+            " data-elem-id="${elem.id}">
+              <span>${elem.titulo || 'Quadro'}</span>
+            </div>
+          `;
+        }
       }
     });
 
@@ -766,18 +978,45 @@ export class ModalEditorMestra {
 
     let rodHtml = '';
     if (r.rodape?.ativo) {
+      const numExemplo = r.rodape.numeracao !== false
+        ? formatarNumeroPagina(2, 27, { ...r.rodape, ocultar_na_capa: false })
+        : '';
+      const pos = r.rodape.posicao_numero || 'direita';
+      let estiloFlex = 'justify-content:space-between;';
+      if (pos === 'centro') estiloFlex = 'justify-content:center; gap:16px;';
+      else if (pos === 'esquerda') estiloFlex = 'flex-direction:row-reverse; justify-content:space-between;';
+
       rodHtml = `
         <div style="
           position:absolute; bottom: ${mB - 14}px; left: ${mL}px; right: ${mR}px;
           font-size: 8px; color: var(--ath-text-secondary, #475569);
-          display:flex; justify-content:space-between; align-items:center;
+          display:flex; ${estiloFlex} align-items:center;
           border-top: 1px solid var(--ath-primary-line, #C8D7E6); padding-top: 2px; z-index:5;
         ">
           <span>${r.rodape.texto || 'Athenes'}</span>
-          <span>${r.rodape.numeracao ? 'Pág. 1' : ''}</span>
+          ${numExemplo ? `<strong>${numExemplo}</strong>` : ''}
         </div>
       `;
     }
+
+    container.innerHTML = `
+      ${elementosHtml}
+      ${cabHtml}
+      ${gradeHtml}
+      ${rodHtml}
+    `;
+
+    // Clique interativo nos elementos da folha mestra
+    container.querySelectorAll('[data-elem-id]').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        this.elementoSelecionadoId = el.dataset.elemId;
+        const modal = this.backdrop.querySelector('.ath-modal');
+        if (modal) this.renderizarListaElementos(modal);
+        this.atualizarPreviaVisual();
+      });
+    });
+  }
 
     container.innerHTML = `
       ${elementosHtml}

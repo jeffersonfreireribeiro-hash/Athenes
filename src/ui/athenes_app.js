@@ -84,6 +84,9 @@ export class AthenesApp {
       onAbrirExportar: () => {
         new PainelExportarModal(this.documentoAtivo);
       },
+      onDividirBloco: (bloco) => {
+        if (this.editorView) this.editorView.dividirBlocoAtual(bloco?.id);
+      },
       onAbrirZotero: () => {
         this.abrirModalZotero();
       },

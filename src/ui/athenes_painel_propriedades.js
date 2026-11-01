@@ -15,6 +15,7 @@ import {
   ROTULOS_FIGURA, calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
+import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 
 export class PainelPropriedades {
   constructor(containerEl, documento, opcoes = {}) {
@@ -24,6 +25,7 @@ export class PainelPropriedades {
     this.paginaSelecionada = null;
     this.onAlterado = opcoes.onAlterado || (() => {});
     this.onAbrirZotero = opcoes.onAbrirZotero || (() => {});
+    this.onDividirBloco = opcoes.onDividirBloco || (() => {});
 
     this.renderizar();
   }
@@ -528,6 +530,14 @@ export class PainelPropriedades {
           </div>
         </div>
 
+        
+        <!-- Divisão do Bloco de Texto -->
+        <div style="margin-top:6px;">
+          <button type="button" class="glx-btn glx-btn-sm glx-btn-secondary" id="athBtnDividirBlocoProps" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:700;" title="Dividir este bloco de texto em dois na posição atual do cursor ou ao meio">
+            ${svgIcone('divisor', 14)} Dividir Bloco de Texto
+          </button>
+        </div>
+
         <!-- Avançado: Entrelinha, Espaçamentos e Recuos -->
         <details class="rm-sec" style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:8px; padding:8px 10px; margin-top:4px;">
           <summary style="font:700 11.5px var(--glx-font); cursor:pointer; color:var(--ath-primary, #314F79);">
@@ -646,6 +656,10 @@ export class PainelPropriedades {
       });
 
       // Marcadores
+      box.querySelector('#athBtnDividirBlocoProps')?.addEventListener('click', () => {
+        this.onDividirBloco(b);
+      });
+
       box.querySelectorAll('[data-marcador]').forEach(btn => {
         btn.addEventListener('click', () => {
           b.marcador_tipo = b.marcador_tipo === btn.dataset.marcador ? null : btn.dataset.marcador;
@@ -739,6 +753,12 @@ export class PainelPropriedades {
     // 3. FIGURA (BLOCO COMPOSTO COM MULTI-ITENS)
     else if (b.tipo === 'figura' || b.tipo === 'imagem') {
       box.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--ath-primary-line, #C8D7E6);">
+          <span style="font-size:11px; font-weight:800; color:var(--ath-primary, #314F79); text-transform:uppercase;">Apresentação e Moldura</span>
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnConfigLayoutBloco" style="display:flex; align-items:center; gap:4px; font-size:11px; white-space:nowrap;">
+            ${svgIcone('quadro', 12)} Personalizar...
+          </button>
+        </div>
         <label>Identificação / Título
           <input type="text" id="rmFigTitulo" value="${b.titulo || ''}">
         </label>
@@ -761,6 +781,14 @@ export class PainelPropriedades {
         </label>
       `;
 
+      box.querySelector('#athBtnConfigLayoutBloco')?.addEventListener('click', () => {
+        new ModalLayoutBloco(this.doc, b, {
+          onSalvar: () => {
+            this.notificarMudanca();
+            this.notificarMudancaEstrutural();
+          }
+        });
+      });
       box.querySelector('#rmFigTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmFigLayout').addEventListener('change', e => { b.layout = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmFigLegenda').addEventListener('input', e => { b.legenda_geral = e.target.value; this.notificarMudanca(); });
@@ -801,6 +829,12 @@ export class PainelPropriedades {
     else if (b.tipo === 'tabela' || b.tipo === 'quadro') {
       const isQuadro = b.tipo === 'quadro';
       box.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--ath-primary-line, #C8D7E6);">
+          <span style="font-size:11px; font-weight:800; color:var(--ath-primary, #314F79); text-transform:uppercase;">Apresentação e Moldura</span>
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnConfigLayoutBloco" style="display:flex; align-items:center; gap:4px; font-size:11px; white-space:nowrap;">
+            ${svgIcone('quadro', 12)} Personalizar...
+          </button>
+        </div>
         <label>Identificação / Título
           <input type="text" id="rmTabTitulo" value="${b.titulo || ''}">
         </label>
@@ -823,14 +857,28 @@ export class PainelPropriedades {
         </label>
       `;
 
+      box.querySelector('#athBtnConfigLayoutBloco')?.addEventListener('click', () => {
+        new ModalLayoutBloco(this.doc, b, {
+          onSalvar: () => {
+            this.notificarMudanca();
+            this.notificarMudancaEstrutural();
+          }
+        });
+      });
       box.querySelector('#rmTabTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmTabNotas').addEventListener('input', e => { b.notas = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmTabFonte').addEventListener('input', e => { b.fonte = e.target.value; this.notificarMudanca(); });
     }
 
-    // 6. FÓRMULA MATEMÁTICA (LATEX)
+    // 6. FÓRMULA MATEMÁTICA (LATEX E SLOTS)
     else if (b.tipo === 'formula') {
       box.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed var(--ath-primary-line, #C8D7E6);">
+          <span style="font-size:11px; font-weight:800; color:var(--ath-primary, #314F79); text-transform:uppercase;">Apresentação e Moldura</span>
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnConfigLayoutBloco" style="display:flex; align-items:center; gap:4px; font-size:11px; white-space:nowrap;">
+            ${svgIcone('quadro', 12)} Personalizar...
+          </button>
+        </div>
         <label>Expressão Matemática (LaTeX)
           <textarea id="rmFormulaLatex" rows="3" style="font-family:var(--glx-font-mono); font-size:12px;">${b.latex || b.formula || ''}</textarea>
         </label>
@@ -838,15 +886,28 @@ export class PainelPropriedades {
           <label>Número da Equação
             <input type="text" id="rmFormulaNum" value="${b.numero_equacao || b.numero || '(1)'}">
           </label>
-          <label>Alinhamento
-            <select id="rmFormulaAlin" class="glx-select">
-              <option value="centro" ${b.alinhamento === 'centro' ? 'selected' : ''}>Centralizado</option>
-              <option value="esquerda" ${b.alinhamento === 'esquerda' ? 'selected' : ''}>À Esquerda</option>
+          <label>Posição do Número
+            <select id="rmFormulaPosNum" class="glx-select">
+              <option value="direita" ${(!b.posicao_numero || b.posicao_numero === 'direita') ? 'selected' : ''}>À Direita (Padrão)</option>
+              <option value="esquerda" ${b.posicao_numero === 'esquerda' ? 'selected' : ''}>À Esquerda</option>
+              <option value="abaixo" ${b.posicao_numero === 'abaixo' ? 'selected' : ''}>Abaixo (Centralizado)</option>
+              <option value="oculto" ${b.posicao_numero === 'oculto' ? 'selected' : ''}>Ocultar Número</option>
             </select>
           </label>
         </div>
+        <label>Legenda Explicativa ("onde:")
+          <textarea id="rmFormulaLegenda" rows="2" placeholder="Ex: onde x é o deslocamento e t é o tempo">${b.legenda_formula || b.legenda || ''}</textarea>
+        </label>
       `;
 
+      box.querySelector('#athBtnConfigLayoutBloco')?.addEventListener('click', () => {
+        new ModalLayoutBloco(this.doc, b, {
+          onSalvar: () => {
+            this.notificarMudanca();
+            this.notificarMudancaEstrutural();
+          }
+        });
+      });
       box.querySelector('#rmFormulaLatex').addEventListener('input', e => {
         b.latex = e.target.value;
         b.formula = b.latex;
@@ -857,8 +918,13 @@ export class PainelPropriedades {
         b.numero = b.numero_equacao;
         this.notificarMudanca();
       });
-      box.querySelector('#rmFormulaAlin').addEventListener('change', e => {
-        b.alinhamento = e.target.value;
+      box.querySelector('#rmFormulaPosNum').addEventListener('change', e => {
+        b.posicao_numero = e.target.value;
+        this.notificarMudanca();
+      });
+      box.querySelector('#rmFormulaLegenda').addEventListener('input', e => {
+        b.legenda_formula = e.target.value;
+        b.legenda = b.legenda_formula;
         this.notificarMudanca();
       });
     }

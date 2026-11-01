@@ -5,7 +5,7 @@
 
 import { TIPOS_DOCUMENTO, criarDocumento } from '../core/athenes_documento.js';
 import { PERFIS_FORMATACAO } from '../core/athenes_estilos.js';
-import { svgIcone } from './athenes_icones.js';
+import { svgIcone, svgLogo } from './athenes_icones.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {

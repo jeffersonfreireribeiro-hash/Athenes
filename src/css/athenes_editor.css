@@ -325,7 +325,7 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 
 
 /* ---- Grupo de linha na lista de blocos: painelzinho que reúne os blocos lado a lado ---- */
-.rm-grupo { list-style: none; margin: 8px 0 4px; padding: 8px 8px 6px; background: #EEF4FA; border: 1px solid #FFE3D6; border-radius: 18px; }
+.rm-grupo { list-style: none; margin: 8px 0 4px; padding: 8px 8px 6px; background: #EEF4FA; border: 1px solid #EEF4FA; border-radius: 18px; }
 .rm-grupo-cab { display: flex; align-items: center; gap: 8px; padding: 0 4px 6px; font: 800 10.5px var(--glx-font); text-transform: uppercase; letter-spacing: .07em; color: #1B2D47; }
 .rm-grupo-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .rm-grupo .rm-bl { background: #fff; }
@@ -436,7 +436,7 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 .rm-cond > .glx-select, .rm-cond > input { width: 100%; min-width: 0; box-sizing: border-box; height: 38px; }
 .rm-cond-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .rm-cond-topo .glx-select { min-width: 0; width: 84px; }
-.rm-cond-se { font-size: 12px; letter-spacing: .06em; color: var(--glx-orange, #314F79); }
+.rm-cond-se { font-size: 12px; letter-spacing: .06em; color: var(--ath-primary, #314F79); }
 .rm-filtro-doc { display: grid; gap: 8px; margin: 4px 0 8px; }
 .rm-filtro-doc-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; box-sizing: border-box; }
 .rm-filtro-doc-topo .rm-rot { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; min-width: 0; }
@@ -632,7 +632,7 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 
 .ath-bloco-folha.sel {
   border-color: #314F79;
-  background: #FFFBF9;
+  background: #F8FAFC;
   box-shadow: 0 0 0 3px rgba(49, 79, 121, 0.16);
 }
 
@@ -880,7 +880,7 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 }
 
 .ath-tag-ref:hover {
-  background: #FFE3D6;
+  background: #EEF4FA;
 }
 
 
@@ -958,26 +958,58 @@ html, body, button, input, select, textarea, option, summary, label, table,
 
 /* Botões da barra com menu (Figura ▾, Quadro ▾) */
 .rm-grupo-bt { position: relative; flex: none; }
-.rm-ic-bt.tem-menu { position: relative; }
-.rm-ic-bt.tem-menu > svg:first-child { transform: translate(-1.5px, -1px); }
+.rm-ic-bt.tem-menu { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.rm-ic-bt.tem-menu > svg:first-child { transform: translateY(-2px) !important; width: 16px !important; height: 16px !important; }
+.rm-ic-bt svg.rm-seta-dropdown-icone,
 .rm-seta-dropdown-icone {
-  position: absolute;
-  right: 3.5px;
-  bottom: 4px;
-  width: 7px;
-  height: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  color: var(--ath-primary, #314F79);
-  transition: transform .12s ease, color .12s ease;
+  position: absolute !important;
+  left: 50% !important;
+  bottom: 2px !important;
+  transform: translateX(-50%) !important;
+  width: 7px !important;
+  height: 4px !important;
+  max-width: 7px !important;
+  max-height: 4px !important;
+  stroke-width: 1.2 !important;
+  display: block !important;
+  pointer-events: none !important;
+  color: var(--ath-primary, #314F79) !important;
+  opacity: 0.85 !important;
+  transition: transform .12s ease, opacity .12s ease !important;
 }
 .rm-ic-bt.tem-menu:hover .rm-seta-dropdown-icone {
-  color: #1B2D47;
+  color: #1B2D47 !important;
+  opacity: 1 !important;
 }
 .rm-ic-bt.tem-menu[aria-expanded="true"] .rm-seta-dropdown-icone {
-  transform: rotate(180deg);
+  transform: translateX(-50%) rotate(180deg) !important;
+}
+
+/* Botões quadrados elegantes para adição de elementos na mestra */
+.ath-btn-elem-quadrado {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--ath-primary-line, #C8D7E6);
+  background: #fff;
+  color: var(--ath-primary, #314F79);
+  cursor: pointer;
+  transition: all .15s ease;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+.ath-btn-elem-quadrado:hover {
+  background: var(--ath-primary-soft, #EEF4FA);
+  border-color: var(--ath-primary, #314F79);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(49, 79, 121, 0.16);
+}
+.ath-btn-elem-quadrado:active {
+  transform: translateY(0);
 }
 .rm-cor-linha-badge {
   display: inline-flex !important;
@@ -1002,3 +1034,44 @@ html, body, button, input, select, textarea, option, summary, label, table,
 .rm-menu-texto { display: flex; flex-direction: column; min-width: 0; }
 .rm-menu-texto strong { font-size: 13px; font-weight: 800; color: #1F2733; }
 .rm-menu-texto small { font-size: 11px; color: #6B7585; }
+
+
+/* Pill flutuante para divisão de bloco no cursor */
+.ath-pill-dividir {
+  position: fixed;
+  z-index: 9000;
+  background: #FFFFFF;
+  border: 1px solid var(--ath-primary-line, #C8D7E6);
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(49, 79, 121, 0.18);
+  padding: 3px 10px;
+  font-family: var(--glx-font, 'Nunito', sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ath-primary, #314F79);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transform: translate(-50%, -100%);
+  margin-top: -6px;
+  user-select: none;
+  transition: transform .12s, box-shadow .12s, background .12s;
+}
+.ath-pill-dividir:hover {
+  background: var(--ath-primary-soft, #EEF4FA);
+  border-color: var(--ath-primary, #314F79);
+  transform: translate(-50%, -105%) scale(1.03);
+  box-shadow: 0 6px 18px rgba(49, 79, 121, 0.25);
+}
+
+/* Forçar azul da marca em botões selecionados/ativos */
+.rm-ic-bt.on, .rm-ic-bt[aria-pressed="true"], .rm-ic-bt.ativo {
+  background: var(--ath-primary, #314F79) !important;
+  border-color: var(--ath-primary, #314F79) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 3px 10px rgba(49, 79, 121, 0.35) !important;
+}
+.rm-ic-bt.on svg, .rm-ic-bt[aria-pressed="true"] svg, .rm-ic-bt.ativo svg {
+  stroke: #FFFFFF !important;
+}
