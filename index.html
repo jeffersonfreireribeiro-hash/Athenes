@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Athenes — Editor de Relatórios e Artigos Científicos</title>
+  <meta name="theme-color" content="#FF6B2C">
+  <meta name="description" content="Ambiente completo para escrever e diagramar relatórios, artigos científicos e documentos acadêmicos em blocos.">
+
+  <!-- Folhas de Estilo Athenes (Soft UI + Nunito + Clux.js) -->
+  <link rel="stylesheet" href="src/css/athenes_base.css">
+  <link rel="stylesheet" href="src/css/athenes_dashboard.css">
+  <link rel="stylesheet" href="src/css/athenes_editor.css">
+  <link rel="stylesheet" href="src/css/athenes_paineis.css">
+  <link rel="stylesheet" href="src/css/athenes_zotero.css">
+</head>
+<body>
+  <div id="athenesAppRoot"></div>
+
+  <script type="module">
+    import { AthenesApp } from './src/ui/athenes_app.js';
+    window.addEventListener('DOMContentLoaded', () => {
+      const root = document.getElementById('athenesAppRoot');
+      window.athenesApp = new AthenesApp(root);
+    });
+  </script>
+</body>
+</html>

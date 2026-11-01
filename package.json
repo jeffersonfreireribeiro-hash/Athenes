@@ -1,0 +1,28 @@
+{
+  "name": "athenes",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Athenes — Editor web de relatórios e artigos científicos baseado no Clux.js",
+  "main": "src/core/athenes_documento.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "keywords": [
+    "athenes",
+    "clux",
+    "editor",
+    "artigos",
+    "relatorios",
+    "pdf",
+    "docx",
+    "zotero",
+    "abnt",
+    "apa"
+  ],
+  "author": "Equipe Athenes / Clux.js",
+  "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": ">=20"
+  }
+}

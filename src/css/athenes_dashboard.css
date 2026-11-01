@@ -1,0 +1,165 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Athenes — Estilos da Área Inicial / Dashboard de Documentos */
+
+.ath-dashboard {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+.ath-dash-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1.5px solid var(--ath-line);
+}
+
+.ath-dash-titulo h1 {
+  margin: 0 0 6px 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--ath-text);
+  letter-spacing: -0.015em;
+}
+
+.ath-dash-titulo p {
+  margin: 0;
+  color: var(--ath-muted);
+  font-size: 13.5px;
+}
+
+.ath-dash-filtros {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.ath-busca-box {
+  position: relative;
+  flex: 1;
+  max-width: 380px;
+}
+
+.ath-busca-box .ath-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ath-muted);
+  pointer-events: none;
+}
+
+.ath-busca-box input {
+  padding-left: 36px;
+}
+
+.ath-docs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+/* Card do Documento */
+.ath-doc-card {
+  background: var(--ath-surface);
+  border: 1px solid var(--ath-line);
+  border-radius: var(--ath-radius);
+  padding: 18px;
+  box-shadow: var(--ath-shadow-sm);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease;
+  position: relative;
+  cursor: pointer;
+}
+
+.ath-doc-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ath-shadow);
+  border-color: #CBD5E1;
+}
+
+.ath-doc-card-capa-preview {
+  height: 150px;
+  background: var(--ath-bg);
+  border: 1px solid var(--ath-line-soft);
+  border-radius: var(--ath-radius-sm);
+  padding: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.ath-doc-card-capa-preview::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--ath-primary);
+}
+
+.ath-doc-card-capa-titulo {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ath-text);
+  line-height: 1.25;
+  margin-bottom: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ath-doc-card-capa-autor {
+  font-size: 10.5px;
+  color: var(--ath-muted);
+}
+
+.ath-doc-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.ath-doc-card-titulo {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ath-text);
+  line-height: 1.3;
+}
+
+.ath-doc-card-subtitulo {
+  margin: 4px 0 12px 0;
+  font-size: 12.5px;
+  color: var(--ath-text-secondary);
+  line-height: 1.35;
+  flex: 1;
+}
+
+.ath-doc-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--ath-line-soft);
+  font-size: 11.5px;
+  color: var(--ath-muted);
+}
+
+.ath-doc-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

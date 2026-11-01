@@ -1,0 +1,156 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Athenes — Estilos de Painéis, Inspetor de Tipografia e Modais */
+
+.ath-prop-grupo {
+  margin-bottom: 14px;
+}
+
+.ath-prop-grupo label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ath-text-secondary);
+  margin-bottom: 5px;
+}
+
+.ath-linha2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ath-linha3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.ath-linha4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+/* Grupo de Botões Segmentados (Alinhamento, etc) */
+.ath-btn-grupo {
+  display: flex;
+  border: 1px solid var(--ath-input-border);
+  border-radius: var(--ath-radius-sm);
+  background: var(--ath-input);
+  padding: 2px;
+  gap: 2px;
+}
+
+.ath-btn-seg {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 6px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--ath-muted);
+  transition: all 0.15s ease;
+}
+
+.ath-btn-seg:hover {
+  color: var(--ath-text);
+}
+
+.ath-btn-seg.ativo {
+  background: var(--ath-surface);
+  color: var(--ath-primary);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+/* Chips de Estilos de Texto */
+.ath-estilos-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ath-chip-estilo {
+  padding: 4px 10px;
+  border-radius: var(--ath-radius-full);
+  border: 1px solid var(--ath-line);
+  background: var(--ath-surface);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ath-chip-estilo:hover {
+  border-color: var(--ath-primary);
+}
+
+.ath-chip-estilo.ativo {
+  background: var(--ath-primary);
+  border-color: var(--ath-primary);
+  color: #FFFFFF;
+}
+
+/* Modais e Diálogos */
+.ath-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.ath-modal {
+  background: var(--ath-surface);
+  border-radius: var(--ath-radius);
+  box-shadow: var(--ath-shadow-lg);
+  width: 90%;
+  max-width: 600px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalEntrar 0.2s ease-out;
+}
+
+@keyframes modalEntrar {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.ath-modal-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ath-line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ath-modal-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ath-text);
+}
+
+.ath-modal-corpo {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.ath-modal-foot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--ath-line);
+  background: var(--ath-surface-elevated);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

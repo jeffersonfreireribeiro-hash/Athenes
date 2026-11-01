@@ -1,0 +1,201 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Athenes — Design System Soft UI, Tipografia Nunito e Variáveis Globais */
+
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url(../assets/fonts/nunito-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: italic;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url(../assets/fonts/nunito-italic-latin.woff2) format('woff2');
+}
+
+:root {
+  color-scheme: only light;
+
+  /* Paleta Soft UI Athenes / Clux.js */
+  --ath-bg: #EFF2F6;
+  --ath-bg-translucent: rgba(239, 242, 246, 0.92);
+  --ath-surface: #FFFFFF;
+  --ath-surface-elevated: #F8FAFC;
+  --ath-surface-hover: #F1F5F9;
+  --ath-input: #F4F5F8;
+  --ath-input-border: #E2E8F0;
+
+  /* Cores de Marca e Acentos */
+  --ath-primary: #FF6B2C;          /* Laranja canônico Clux / Athenes */
+  --ath-primary-hover: #FA5A1E;
+  --ath-primary-soft: #FFF1EB;
+  --ath-primary-line: #FFD9C7;
+  --ath-primary-ink: #D9531E;
+
+  /* Tipografia e Textos */
+  --ath-font: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ath-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ath-text: #1F2733;
+  --ath-text-secondary: #475569;
+  --ath-muted: #6B7585;
+  --ath-line: #E2E8F0;
+  --ath-line-soft: #F1F5F9;
+
+  /* Status e Tags */
+  --ath-ok: #10B981;
+  --ath-ok-soft: #ECFDF5;
+  --ath-warn: #F59E0B;
+  --ath-warn-soft: #FEF3C7;
+  --ath-danger: #EF4444;
+  --ath-danger-soft: #FEE2E2;
+  --ath-info: #3B82F6;
+  --ath-info-soft: #EFF6FF;
+
+  /* Raios e Sombras */
+  --ath-radius-sm: 6px;
+  --ath-radius: 12px;
+  --ath-radius-lg: 20px;
+  --ath-radius-full: 9999px;
+  --ath-shadow-sm: 0 1px 3px rgba(31, 39, 51, 0.05);
+  --ath-shadow: 0 4px 16px rgba(31, 39, 51, 0.06);
+  --ath-shadow-lg: 0 12px 36px rgba(31, 39, 51, 0.12);
+  --ath-shadow-sheet: 0 8px 30px rgba(15, 23, 42, 0.14);
+
+  /* Dimensões do Layout */
+  --ath-header-h: 56px;
+  --ath-sidebar-w: 260px;
+  --ath-inspector-w: 320px;
+  --ath-ruler-size: 24px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--ath-bg);
+  color: var(--ath-text);
+  font-family: var(--ath-font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* Botões */
+.ath-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--ath-radius-sm);
+  border: 1px solid var(--ath-line);
+  background: var(--ath-surface);
+  color: var(--ath-text);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.ath-btn:hover {
+  background: var(--ath-surface-hover);
+  border-color: #CBD5E1;
+}
+
+.ath-btn-primary {
+  background: var(--ath-primary);
+  border-color: var(--ath-primary);
+  color: #FFFFFF;
+}
+
+.ath-btn-primary:hover {
+  background: var(--ath-primary-hover);
+  border-color: var(--ath-primary-hover);
+}
+
+.ath-btn-soft {
+  background: var(--ath-primary-soft);
+  border-color: var(--ath-primary-line);
+  color: var(--ath-primary-ink);
+}
+
+.ath-btn-soft:hover {
+  background: #FFE4D6;
+}
+
+.ath-btn-icon {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: var(--ath-radius-sm);
+}
+
+.ath-btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+/* Campos de Formulário */
+.ath-input, .ath-select, .ath-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--ath-radius-sm);
+  border: 1px solid var(--ath-input-border);
+  background: var(--ath-input);
+  font-size: 13px;
+  color: var(--ath-text);
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ath-input:focus, .ath-select:focus, .ath-textarea:focus {
+  border-color: var(--ath-primary);
+  background: #FFFFFF;
+  box-shadow: 0 0 0 2px var(--ath-primary-soft);
+}
+
+/* Badges e Chips */
+.ath-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--ath-radius-full);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ath-badge-primary { background: var(--ath-primary-soft); color: var(--ath-primary-ink); }
+.ath-badge-ok { background: var(--ath-ok-soft); color: #065F46; }
+.ath-badge-warn { background: var(--ath-warn-soft); color: #92400E; }
+.ath-badge-info { background: var(--ath-info-soft); color: #1E40AF; }
+
+/* Ícones SVG em traço linear */
+.ath-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+  stroke: currentColor;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
