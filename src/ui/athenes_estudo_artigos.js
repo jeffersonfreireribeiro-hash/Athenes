@@ -484,6 +484,7 @@ export class EstudoArtigosView {
     this.ferramentaAtiva = 'cursor'; // Começa com seleção de texto ou caneta; permite alternar livremente
     this.modoLinhaReta = false; // Quando true, Caneta e Marca-Texto fazem retas perfeitas
     this.corTinta = '#314F79';
+    this.corGrifoAtiva = '#FDE047'; // Amarelo clássico por padrão; suporta verde, azul, coral, roxo, laranja
     this.espessuraTinta = 3;
     this.abaDireita = 'resumo'; // 'resumo' | 'citacoes' | 'zotero_drive'
     this.pinEditandoId = null; // ID da nota adesiva atualmente aberta para edição na folha
@@ -977,8 +978,17 @@ export class EstudoArtigosView {
           <div class="rm-prev-palco" id="athEstudioPalco">
             <!-- Pílula Contextual Flutuante ao Selecionar Texto no PDF -->
             <div class="ath-pdf-selecao-popover" id="athPdfSelecaoPopover" hidden>
+              <!-- Paleta de Cores para o Marcador / Grifo -->
+              <div class="ath-sel-pop-cores" id="athSelPopCores" title="Escolha a cor do marcador para este trecho">
+                <button type="button" class="ath-sel-cor-chip on" data-sel-cor="#FDE047" style="background:#FDE047;" title="Amarelo"></button>
+                <button type="button" class="ath-sel-cor-chip" data-sel-cor="#86EFAC" style="background:#86EFAC;" title="Verde"></button>
+                <button type="button" class="ath-sel-cor-chip" data-sel-cor="#93C5FD" style="background:#93C5FD;" title="Azul"></button>
+                <button type="button" class="ath-sel-cor-chip" data-sel-cor="#FCA5A5" style="background:#FCA5A5;" title="Rosa / Coral"></button>
+                <button type="button" class="ath-sel-cor-chip" data-sel-cor="#D8B4FE" style="background:#D8B4FE;" title="Roxo"></button>
+                <button type="button" class="ath-sel-cor-chip" data-sel-cor="#FDBA74" style="background:#FDBA74;" title="Laranja"></button>
+              </div>
               <button type="button" class="ath-sel-pop-btn" id="athSelBtnGrifar" title="Grifar o trecho selecionado na página">
-                <span class="ath-sel-cor-dot" style="background:#FDE047;"></span>
+                <span class="ath-sel-cor-dot" id="athSelCorDotAtivo" style="background:#FDE047;"></span>
                 <span>Grifar Texto</span>
               </button>
               <button type="button" class="ath-sel-pop-btn primario" id="athSelBtnCitar" title="Salvar trecho selecionado como Citação no Zotero com página">
@@ -1097,11 +1107,15 @@ export class EstudoArtigosView {
       });
     });
 
-    // Seleção de Cor da Tinta
+    // Seleção de Cor da Tinta e do Marcador
     root.querySelectorAll('[data-cor]').forEach(dot => {
       dot.addEventListener('click', () => {
         this.corTinta = dot.dataset.cor;
+        this.corGrifoAtiva = dot.dataset.cor;
         root.querySelectorAll('[data-cor]').forEach(d => d.classList.toggle('on', d.dataset.cor === this.corTinta));
+        const dotPopover = root.querySelector('#athSelCorDotAtivo');
+        if (dotPopover) dotPopover.style.background = this.corGrifoAtiva;
+        root.querySelectorAll('[data-sel-cor]').forEach(c => c.classList.toggle('on', c.dataset.selCor === this.corGrifoAtiva));
       });
     });
 
@@ -1897,14 +1911,26 @@ export class EstudoArtigosView {
       }
     });
 
-    // 1. Grifar Trecho no Texto (funciona tanto em PDF real multi-span quanto em folha textual)
-    popSel.querySelector('#athSelBtnGrifar').addEventListener('click', (e) => {
-      e.stopPropagation();
+    const extrairCorRgbaGrifo = (cor, alpha = 0.42) => {
+      if (!cor) return `rgba(250, 204, 21, ${alpha})`;
+      if (cor.startsWith('rgba')) return cor;
+      let c = cor.replace('#', '');
+      if (c.length === 3) c = c.split('').map(x => x + x).join('');
+      if (c.length >= 6) {
+        const r = parseInt(c.slice(0, 2), 16) || 250;
+        const g = parseInt(c.slice(2, 4), 16) || 204;
+        const b = parseInt(c.slice(4, 6), 16) || 21;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+      return `rgba(250, 204, 21, ${alpha})`;
+    };
+
+    const executarGrifoNoTrecho = (corEscolhida) => {
       if (!ultimaSelecao) return;
       const { numPag, range, folhaTextoEl } = ultimaSelecao;
       const folhaContainer = folhaTextoEl.closest('.ath-pdf-folha-container');
       const ehPdfReal = folhaTextoEl.classList.contains('ath-pdf-text-layer');
-      const corGrifo = this.corTinta === '#314F79' ? 'rgba(250, 204, 21, 0.45)' : `${this.corTinta}55`;
+      const corGrifo = extrairCorRgbaGrifo(corEscolhida || this.corGrifoAtiva || this.corTinta);
 
       if (ehPdfReal && folhaContainer) {
         const rectFolha = folhaContainer.getBoundingClientRect();
@@ -1943,6 +1969,24 @@ export class EstudoArtigosView {
       }
       window.getSelection()?.removeAllRanges();
       popSel.hidden = true;
+    };
+
+    // Cliques nos chips de cores no popover de seleção
+    popSel.querySelectorAll('[data-sel-cor]').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.corGrifoAtiva = chip.dataset.selCor;
+        popSel.querySelectorAll('[data-sel-cor]').forEach(c => c.classList.toggle('on', c === chip));
+        const dot = popSel.querySelector('#athSelCorDotAtivo');
+        if (dot) dot.style.background = this.corGrifoAtiva;
+        executarGrifoNoTrecho(this.corGrifoAtiva);
+      });
+    });
+
+    // 1. Grifar Trecho no Texto com a cor ativa
+    popSel.querySelector('#athSelBtnGrifar').addEventListener('click', (e) => {
+      e.stopPropagation();
+      executarGrifoNoTrecho(this.corGrifoAtiva);
     });
 
     // 2. + Citação Zotero (abre modal elegante preenchido com o trecho e a página)
@@ -2929,55 +2973,64 @@ export class EstudoArtigosView {
     const driveConectadoPainel = Boolean(cfgDrivePainel.accessToken);
     box.innerHTML = `
       <div class="ath-fichamento-bloco">
+        <!-- Vínculo de Metadados com o Zotero -->
         <div style="padding:10px 12px; border-radius:12px; background:#F8FAFC; border:1px solid #CBD5E1; margin-bottom:10px;">
-          <strong style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:#1F2733; text-transform:uppercase; margin-bottom:6px;">
+          <strong style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:#1F2733; text-transform:uppercase; margin-bottom:8px;">
             ${svgIcone('zotero', 13)} Vínculo de Metadados com o Zotero
           </strong>
-          <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnVincularRefExistenteZotero" style="width:100%; justify-content:center; margin-bottom:8px;">
-            ${svgIcone('zotero', 13)} Vincular a uma Referência já existente do Zotero
+          <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnVincularRefExistenteZotero" style="width:100%; justify-content:center; margin-bottom:8px; white-space:normal; height:auto; padding:6px 10px; line-height:1.2; text-align:center;">
+            ${svgIcone('zotero', 13)} Vincular com Referência do Zotero
           </button>
-          <label style="font-size:11px; font-weight:700; display:block; margin-bottom:6px;">Sua Zotero API Key
-            <input type="text" class="ath-input" id="athDirZoteroApiKey" value="${escapeHtml(this.zoteroClient.apiKey || '')}" placeholder="Ex.: KNEYoy8RTMlkaTuHx5WPc3bH" style="margin-top:3px; height:30px; font-size:11.5px;">
-          </label>
-          <label style="font-size:11px; font-weight:700; display:block; margin-bottom:6px;">Seu Zotero User ID (ex.: 18806479)
-            <input type="text" class="ath-input" id="athDirZoteroUserId" value="${escapeHtml(this.zoteroClient.userId || '')}" placeholder="Auto-detectado pela API Key" style="margin-top:3px; height:30px; font-size:11.5px;">
-          </label>
-          <label style="font-size:11px; font-weight:700; display:block; margin-bottom:6px;">Chave deste Item no Zotero (Item Key)
-            <input type="text" class="ath-input" id="athZoteroKeyArtigo" value="${escapeHtml(art.chaveZotero || '')}" style="margin-top:3px; height:30px; font-size:11.5px;">
-          </label>
-          <label style="font-size:11px; font-weight:700; display:block;">DOI / Identificador Permanente
-            <input type="text" class="ath-input" id="athDoiArtigo" value="${escapeHtml(art.doi || '')}" style="margin-top:3px; height:30px; font-size:11.5px;">
-          </label>
+          <div class="ath-card-grade-campos" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <label>API Key
+              <input type="text" class="ath-input" id="athDirZoteroApiKey" value="${escapeHtml(this.zoteroClient.apiKey || '')}" placeholder="Chave Zotero" style="margin-top:2px; height:28px; font-size:11px;">
+            </label>
+            <label>User ID
+              <input type="text" class="ath-input" id="athDirZoteroUserId" value="${escapeHtml(this.zoteroClient.userId || '')}" placeholder="ID Zotero" style="margin-top:2px; height:28px; font-size:11px;">
+            </label>
+            <label>Item Key
+              <input type="text" class="ath-input" id="athZoteroKeyArtigo" value="${escapeHtml(art.chaveZotero || '')}" placeholder="Ex.: JKCLFWH6" style="margin-top:2px; height:28px; font-size:11px;">
+            </label>
+            <label>DOI
+              <input type="text" class="ath-input" id="athDoiArtigo" value="${escapeHtml(art.doi || '')}" placeholder="Identificador" style="margin-top:2px; height:28px; font-size:11px;">
+            </label>
+          </div>
         </div>
 
+        <!-- Selecionar & Vincular PDF (Google Drive / Local) -->
         <div style="padding:10px 12px; border-radius:12px; background:#EEF4FA; border:1px solid #C8D7E6; margin-bottom:10px;">
-          <strong style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:#314F79; text-transform:uppercase; margin-bottom:6px;">
-            ${svgIcone('drive', 13)} Selecionar & Vincular PDF (Google Drive / Local)
+          <strong style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:#314F79; text-transform:uppercase; margin-bottom:8px;">
+            ${svgIcone('drive', 13)} Selecionar & Vincular PDF (Drive / Local)
           </strong>
           <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;">
-            <label class="ath-btn ath-btn-primary ath-btn-sm" style="width:100%; justify-content:center; cursor:pointer;">
-              ${svgIcone('upload', 13)} Selecionar Arquivo PDF (Computador / Pasta Drive)
+            <label class="ath-btn ath-btn-primary ath-btn-sm ath-btn-selecionar-pdf-painel" style="width:100%; justify-content:center; cursor:pointer; color:#FFFFFF !important; white-space:normal; height:auto; padding:7px 10px; line-height:1.2; text-align:center;">
+              ${svgIcone('upload', 13)} <span style="color:#FFFFFF !important; font-weight:700;">Selecionar Arquivo PDF (Computador / Pasta)</span>
               <input type="file" accept=".pdf,application/pdf" id="athPainelInputArquivoPdf" style="display:none;">
             </label>
-            <div style="display:flex; gap:6px;">
-              <button type="button" class="ath-btn ath-btn-sm" id="athBtnPainelEscolherPdfDrive" style="flex:1; justify-content:center;">
-                ${svgIcone('drive', 13)} Buscar PDF no Google Drive
+            <div style="display:grid; grid-template-columns: 1fr auto; gap:6px;">
+              <button type="button" class="ath-btn ath-btn-sm" id="athBtnPainelEscolherPdfDrive" style="justify-content:center; white-space:nowrap; padding:0 8px; font-size:11px;">
+                ${svgIcone('drive', 13)} Buscar no Drive
               </button>
-              <button type="button" class="ath-btn ${driveConectadoPainel ? 'ath-btn-zotero-ok' : ''} ath-btn-sm" id="athBtnPainelConectarDrive" title="Conectar conta do Google Drive">
-                ${driveConectadoPainel ? 'Drive OK ✓' : 'Conectar Drive'}
+              <button type="button" class="ath-btn ${driveConectadoPainel ? 'ath-btn-zotero-ok' : ''} ath-btn-sm" id="athBtnPainelConectarDrive" title="Conectar ou autorizar Google Drive" style="white-space:nowrap; padding:0 8px; font-size:11px;">
+                ${driveConectadoPainel ? 'Drive OK ✓' : 'Conectar'}
               </button>
             </div>
+            <button type="button" class="ath-btn ath-btn-sm" id="athBtnSalvarPdfNoDriveDireto" style="width:100%; justify-content:center; background:#F0FDF4; border-color:#86EFAC; color:#15803D; font-weight:700; font-size:11.5px; height:28px; white-space:nowrap;" title="Salvar este arquivo PDF diretamente na pasta do Google Drive">
+              ${svgIcone('drive', 13)} Salvar PDF na Pasta do Drive ↗
+            </button>
           </div>
-          <label style="font-size:11px; font-weight:700; display:block; margin-bottom:6px;">Arquivo PDF Selecionado
-            <input type="text" class="ath-input" id="athDriveNomeArqArtigo" value="${escapeHtml(art.driveFileName || '')}" placeholder="Ex.: Silva_2026_Planejamento.pdf" style="margin-top:3px; height:30px; font-size:11.5px;">
-          </label>
-          <label style="font-size:11px; font-weight:700; display:block;">ID / Link do PDF no Google Drive
-            <input type="text" class="ath-input" id="athDriveIdArqArtigo" value="${escapeHtml(art.driveFileId || '')}" placeholder="Preenchido ao escolher do Google Drive" style="margin-top:3px; height:30px; font-size:11.5px;">
-          </label>
+          <div class="ath-card-grade-campos" style="display:grid; grid-template-columns:1fr; gap:6px;">
+            <label>Nome do Arquivo PDF
+              <input type="text" class="ath-input" id="athDriveNomeArqArtigo" value="${escapeHtml(art.driveFileName || '')}" placeholder="Ex.: Silva_2026.pdf" style="margin-top:2px; height:28px; font-size:11px;">
+            </label>
+            <label>ID / Link do PDF no Google Drive
+              <input type="text" class="ath-input" id="athDriveIdArqArtigo" value="${escapeHtml(art.driveFileId || '')}" placeholder="ID do arquivo no Google Drive" style="margin-top:2px; height:28px; font-size:11px;">
+            </label>
+          </div>
         </div>
 
-        <button type="button" class="ath-btn ath-btn-primary" id="athBtnSyncCompletoPainel" style="width:100%; justify-content:center;">
-          ${svgIcone('salvar', 14)} Sincronizar Agora (Zotero + Drive + Supabase)
+        <button type="button" class="ath-btn ath-btn-primary" id="athBtnSyncCompletoPainel" style="width:100%; justify-content:center; color:#FFFFFF !important; font-weight:700;">
+          ${svgIcone('salvar', 14)} <span style="color:#FFFFFF !important;">Sincronizar Agora (Zotero + Drive + Supabase)</span>
         </button>
         <div id="athStatusSyncArtigo" style="font-size:11.5px; margin-top:8px; color:#15803D; font-weight:700;"></div>
       </div>
@@ -3004,15 +3057,61 @@ export class EstudoArtigosView {
             conteudoBlobOuTexto: fPdf,
             mimeType: 'application/pdf',
             accessToken: cfgDrivePainel.accessToken,
+            pastaId: cfgDrivePainel.pastaId || null,
             driveFileId: art.driveFileId || null
           });
           if (salvo?.id) {
             art.driveFileId = salvo.id;
+            art.driveFileName = salvo.name || fPdf.name;
             salvarArtigosEstudo(this.artigos);
           }
         } catch (_) {}
       }
       this.renderizar();
+    });
+
+    box.querySelector('#athBtnSalvarPdfNoDriveDireto')?.addEventListener('click', async () => {
+      const statusEl = box.querySelector('#athStatusSyncArtigo');
+      if (statusEl) {
+        statusEl.style.color = '#314F79';
+        statusEl.textContent = 'Enviando PDF para a pasta do Google Drive...';
+      }
+      try {
+        const cfgDrive = obterConfigGoogleDrive();
+        const token = cfgDrive.accessToken || await autenticarGoogleDrive(cfgDrive.clientId);
+        const pdfBlob = await obterPdfLocal(art.id) || art.pdfBlob;
+        if (!pdfBlob) {
+          if (statusEl) {
+            statusEl.style.color = '#B42318';
+            statusEl.textContent = 'Selecione ou carregue o PDF primeiro antes de enviar.';
+          }
+          return;
+        }
+        const nomeArquivo = art.driveFileName || `${(art.titulo || 'artigo').slice(0, 40).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+        const salvo = await salvarArquivoNoGoogleDrive({
+          nomeArquivo,
+          conteudoBlobOuTexto: pdfBlob,
+          mimeType: 'application/pdf',
+          accessToken: token,
+          pastaId: cfgDrive.pastaId || null,
+          driveFileId: art.driveFileId || null
+        });
+        if (salvo?.id) {
+          art.driveFileId = salvo.id;
+          art.driveFileName = salvo.name || nomeArquivo;
+          salvarArtigosEstudo(this.artigos);
+          if (statusEl) {
+            statusEl.style.color = '#15803D';
+            statusEl.textContent = '✓ PDF salvo com sucesso na sua pasta do Google Drive!';
+          }
+          this.renderizar();
+        }
+      } catch (err) {
+        if (statusEl) {
+          statusEl.style.color = '#B42318';
+          statusEl.textContent = `Atenção: ${err.message || err}`;
+        }
+      }
     });
 
     box.querySelector('#athBtnPainelEscolherPdfDrive')?.addEventListener('click', () => {
@@ -3201,9 +3300,29 @@ export class EstudoArtigosView {
           nomeArquivo: `${(art.driveFileName || 'Artigo').replace(/\.pdf$/i, '')}.athenes-pdf.json`,
           conteudoBlobOuTexto: art,
           accessToken: token,
+          pastaId: driveCfg.pastaId || null,
           driveFileId: art.driveAnnotationFileId || null
         });
         if (salvoDrive?.id) art.driveAnnotationFileId = salvoDrive.id;
+
+        // Se o PDF ainda não está salvo no Google Drive, faz o upload para a pasta indicada
+        if (!art.driveFileId) {
+          const pdfBlob = await obterPdfLocal(art.id) || art.pdfBlob;
+          if (pdfBlob) {
+            const nomePdf = art.driveFileName || `${(art.titulo || 'artigo').slice(0, 40).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+            const salvoPdf = await salvarArquivoNoGoogleDrive({
+              nomeArquivo: nomePdf,
+              conteudoBlobOuTexto: pdfBlob,
+              mimeType: 'application/pdf',
+              accessToken: token,
+              pastaId: driveCfg.pastaId || null
+            });
+            if (salvoPdf?.id) {
+              art.driveFileId = salvoPdf.id;
+              art.driveFileName = salvoPdf.name || nomePdf;
+            }
+          }
+        }
         resultados.push('Google Drive ✓');
       } catch (_) {}
     }

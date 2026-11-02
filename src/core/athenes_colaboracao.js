@@ -571,23 +571,31 @@ export function extrairIdPastaDrive(urlOuId) {
 }
 
 export function obterConfigGoogleDrive() {
+  const pastaUrlPadrao = 'https://drive.google.com/drive/folders/1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv?usp=drive_link';
+  const pastaIdPadrao = '1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv';
   try {
     if (typeof localStorage !== 'undefined') {
       const salvo = localStorage.getItem('athenes_gdrive_config');
       if (salvo) {
         const parsed = JSON.parse(salvo);
-        const pastaUrl = parsed.pastaUrl || '';
+        const pastaUrl = parsed.pastaUrl || pastaUrlPadrao;
         return {
           clientId: parsed.clientId || DEFAULT_GOOGLE_CLIENT_ID,
           apiKey: parsed.apiKey || '',
           accessToken: parsed.accessToken || '',
           pastaUrl,
-          pastaId: parsed.pastaId || extrairIdPastaDrive(pastaUrl)
+          pastaId: parsed.pastaId || extrairIdPastaDrive(pastaUrl) || pastaIdPadrao
         };
       }
     }
   } catch (_) {}
-  return { clientId: DEFAULT_GOOGLE_CLIENT_ID, apiKey: '', accessToken: '', pastaUrl: '', pastaId: '' };
+  return {
+    clientId: DEFAULT_GOOGLE_CLIENT_ID,
+    apiKey: '',
+    accessToken: '',
+    pastaUrl: pastaUrlPadrao,
+    pastaId: pastaIdPadrao
+  };
 }
 
 export function salvarConfigGoogleDrive(cfg) {
@@ -651,7 +659,8 @@ export async function salvarArquivoNoGoogleDrive({
   conteudoBlobOuTexto,
   mimeType = 'application/json',
   accessToken,
-  driveFileId = null
+  driveFileId = null,
+  pastaId = null
 }, fetchImpl = globalThis.fetch) {
   if (!accessToken) throw new Error('Token de acesso do Google Drive ausente.');
   if (typeof fetchImpl !== 'function') throw new Error('API fetch indisponível.');
@@ -661,22 +670,44 @@ export async function salvarArquivoNoGoogleDrive({
     mimeType
   };
 
+  // Se uma pasta do Google Drive foi indicada e é um novo upload, define a pasta de destino
+  const idDestinoPasta = (pastaId || obterConfigGoogleDrive().pastaId || '').trim();
+  if (idDestinoPasta && !driveFileId) {
+    metadados.parents = [idDestinoPasta];
+  }
+
   const boundary = '-------AthenesDriveBoundary' + Date.now().toString(16);
   const delimitador = `\r\n--${boundary}\r\n`;
   const fechamento = `\r\n--${boundary}--`;
 
-  const textoCorpo = typeof conteudoBlobOuTexto === 'string'
-    ? conteudoBlobOuTexto
-    : JSON.stringify(conteudoBlobOuTexto, null, 2);
+  let corpoMultipart;
+  const ehBlobOuArquivo = (typeof Blob !== 'undefined' && conteudoBlobOuTexto instanceof Blob) ||
+    (typeof File !== 'undefined' && conteudoBlobOuTexto instanceof File) ||
+    (conteudoBlobOuTexto && typeof conteudoBlobOuTexto === 'object' && typeof conteudoBlobOuTexto.arrayBuffer === 'function');
 
-  const corpoMultipart =
-    delimitador +
-    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-    JSON.stringify(metadados) +
-    delimitador +
-    `Content-Type: ${mimeType}\r\n\r\n` +
-    textoCorpo +
-    fechamento;
+  if (ehBlobOuArquivo && typeof Blob !== 'undefined') {
+    const parteMetadados = delimitador +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadados) +
+      delimitador +
+      `Content-Type: ${mimeType}\r\n\r\n`;
+    corpoMultipart = new Blob([parteMetadados, conteudoBlobOuTexto, fechamento], {
+      type: `multipart/related; boundary=${boundary}`
+    });
+  } else {
+    const textoCorpo = typeof conteudoBlobOuTexto === 'string'
+      ? conteudoBlobOuTexto
+      : JSON.stringify(conteudoBlobOuTexto, null, 2);
+
+    corpoMultipart =
+      delimitador +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadados) +
+      delimitador +
+      `Content-Type: ${mimeType}\r\n\r\n` +
+      textoCorpo +
+      fechamento;
+  }
 
   const url = driveFileId
     ? `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(driveFileId)}?uploadType=multipart`

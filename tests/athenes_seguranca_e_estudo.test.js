@@ -177,4 +177,26 @@ test('Google Drive & PDF no Estúdio de Artigos: popover organizado, extração 
   assert.equal(cssDash.includes('.ath-pdf-text-layer br::selection'), true);
   assert.equal(cssDash.includes('background: transparent !important;'), true);
   assert.equal(cssDash.includes('caret-color: transparent !important;'), true);
+
+  // Sem rolagem horizontal externa (eliminação de 100vw no estúdio full-screen)
+  assert.equal(cssDash.includes('width: 100vw !important'), false);
+  assert.equal(cssDash.includes('width: 100% !important;'), true);
+
+  // Suporte a pasta de destino no Google Drive e upload binário de PDF
+  assert.equal(codigoColab.includes('pastaId = null'), true);
+  assert.equal(codigoColab.includes('metadados.parents = [idDestinoPasta]'), true);
+  assert.equal(codigoColab.includes('multipart/related'), true);
+
+  // Paleta de cores para marcador / grifo no popover de seleção
+  assert.equal(codigoEstudo.includes('ath-sel-pop-cores'), true);
+  assert.equal(codigoEstudo.includes('data-sel-cor="#FDE047"'), true);
+  assert.equal(codigoEstudo.includes('data-sel-cor="#86EFAC"'), true);
+  assert.equal(codigoEstudo.includes('data-sel-cor="#93C5FD"'), true);
+  assert.equal(codigoEstudo.includes('athBtnSalvarPdfNoDriveDireto'), true);
+
+  // Editor: dropdown dinâmico de estilos e citação Zotero no cursor
+  const codigoEditor = fs.readFileSync(path.resolve('src/ui/athenes_editor.js'), 'utf8');
+  assert.equal(codigoEditor.includes('renderizarListaEstilosContextuais'), true);
+  assert.equal(codigoEditor.includes('abrirPainelZotero()'), true);
+  assert.equal(codigoEditor.includes('this.doc.referencias.push(ref)'), true);
 });

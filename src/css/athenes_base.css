@@ -89,7 +89,10 @@
 html, body {
   margin: 0;
   padding: 0;
+  width: 100%;
   height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
   background: var(--ath-bg);
   color: var(--ath-text);
   font-family: var(--ath-font);

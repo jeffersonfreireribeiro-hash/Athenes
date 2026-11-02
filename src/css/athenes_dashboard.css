@@ -941,11 +941,12 @@
 
 .ath-dashboard.ath-dashboard-estudio-full {
   max-width: none !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  width: 100% !important;
+  height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
+  box-sizing: border-box !important;
 }
 
 .ath-dashboard.ath-dashboard-estudio-full > .ath-dash-topbar,
@@ -955,8 +956,8 @@
 
 .ath-dashboard.ath-dashboard-estudio-full #athSecaoDashArtigosZotero,
 .ath-dashboard.ath-dashboard-estudio-full #athContainerEstudoArtigos {
-  width: 100vw !important;
-  height: 100vh !important;
+  width: 100% !important;
+  height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
   border: none !important;
@@ -964,12 +965,37 @@
   background: transparent !important;
   box-shadow: none !important;
   overflow: hidden !important;
+  box-sizing: border-box !important;
 }
 
 .ath-estudio-full-shell .rm-editor.rm-main {
-  padding: 12px 14px;
+  padding: 10px 12px;
   flex: 1 1 0;
   min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.ath-estudio-full-shell .rm-conteudo {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.ath-estudio-full-shell .rm-ed-grade {
+  grid-template-columns: 270px minmax(0, 1fr) 350px !important;
+  gap: 12px !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.ath-estudio-full-shell .rm-prev-palco {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .ath-estudio-full-shell #athEstudioColEsq {
@@ -1386,6 +1412,37 @@
   user-select: none !important;
 }
 
+.ath-sel-pop-cores {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 0 2px;
+  border-right: 1px solid #E2E8F0;
+  margin-right: 2px;
+}
+
+.ath-sel-cor-chip {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 0 0 1px #CBD5E1;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  flex-shrink: 0;
+}
+
+.ath-sel-cor-chip:hover {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 2px #314F79;
+}
+
+.ath-sel-cor-chip.on {
+  box-shadow: 0 0 0 2.5px #314F79;
+  transform: scale(1.15);
+}
+
 .ath-sel-pop-btn {
   display: inline-flex;
   align-items: center;
@@ -1501,3 +1558,27 @@ mark.ath-pdf-grifo-texto {
 }
 .ath-pdf-hl-rect { position: absolute; pointer-events: none; border-radius: 2px; mix-blend-mode: multiply; z-index: 2; }
 .ath-pdf-carregando { padding: 40px; text-align: center; font-weight: 700; color: #314F79; }
+
+/* Estilização refinada para a aba Zotero & Drive no Painel Direito */
+.ath-btn-selecionar-pdf-painel {
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.ath-btn-selecionar-pdf-painel:hover {
+  color: #FFFFFF !important;
+}
+
+.ath-btn-selecionar-pdf-painel svg {
+  stroke: #FFFFFF !important;
+}
+
+.ath-card-grade-campos label {
+  color: #334155;
+  font-weight: 700;
+  font-size: 11px;
+}

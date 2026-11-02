@@ -10,7 +10,7 @@
  */
 
 import { dimensoesPapelMm } from '../core/athenes_grid.js';
-import { estiloParaCss, FONTES_SISTEMA, PESOS_FONTE } from '../core/athenes_estilos.js';
+import { estiloParaCss, FONTES_SISTEMA, PESOS_FONTE, criarEstilosPadrao } from '../core/athenes_estilos.js';
 import {
   criarNovoBloco,
   modeloDaPagina,
@@ -2851,17 +2851,59 @@ export class EditorView {
     this.renderizar();
   }
 
+  abrirPainelZotero() {
+    if (typeof this.onAbrirZotero === 'function') {
+      this.onAbrirZotero();
+    }
+  }
+
   inserirCitacaoNoCursor(ref) {
     if (!ref) return;
-    const autor = (ref.autores?.[0]?.sobrenome || 'AUTOR').toUpperCase();
+    const autor = (ref.autores?.[0]?.sobrenome || ref.autor || 'AUTOR').toUpperCase();
     const ano = ref.ano || new Date().getFullYear();
     const tag = ` (${autor}, ${ano})`;
 
-    if (this.blocoSelecionado && this.blocoSelecionado.texto !== undefined) {
-      this.blocoSelecionado.texto += tag;
-      this.notificarMudanca();
-      this.renderizarFolhasPaginas();
+    // Garante que a referência bibliográfica seja incluída na lista do documento
+    if (!this.doc.referencias) this.doc.referencias = [];
+    if (!this.doc.referencias.some(r => (r.id && r.id === ref.id) || (r.chaveZotero && r.chaveZotero === ref.chaveZotero))) {
+      this.doc.referencias.push(ref);
     }
+
+    let inserido = false;
+    const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      const comum = range.commonAncestorContainer;
+      const elPai = comum?.nodeType === Node.ELEMENT_NODE ? comum : comum?.parentElement;
+      const editable = elPai?.closest('.ath-texto-editable, .ath-titulo-editable, [contenteditable="true"]');
+      if (editable) {
+        try {
+          if (typeof document !== 'undefined' && document.queryCommandSupported && document.queryCommandSupported('insertText')) {
+            document.execCommand('insertText', false, tag);
+            inserido = true;
+          } else {
+            range.deleteContents();
+            const node = document.createTextNode(tag);
+            range.insertNode(node);
+            range.setStartAfter(node);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            inserido = true;
+          }
+          if (this.blocoSelecionado) {
+            this.blocoSelecionado.texto = editable.innerHTML;
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (!inserido && this.blocoSelecionado && this.blocoSelecionado.texto !== undefined) {
+      this.blocoSelecionado.texto += tag;
+    }
+
+    this.notificarMudanca();
+    this.renderizarFolhasPaginas();
   }
 
   notificarMudanca() {
@@ -2949,16 +2991,11 @@ export class EditorView {
           <span id="athRotuloCtxEstilo" style="font-size:11px; font-weight:700; max-width:115px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Estilo</span>
           <span style="font-size:10px; opacity:0.8;">▾</span>
         </button>
-        <div class="ath-ctx-dropdown-menu" id="athMenuContextEstilo" hidden style="width:230px; max-height:260px; overflow-y:auto;">
-          <div style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; padding:4px 8px; border-bottom:1px solid #EEF2F6;">
+        <div class="ath-ctx-dropdown-menu" id="athMenuContextEstilo" hidden style="width:240px; max-height:280px; overflow-y:auto; padding:4px;">
+          <div style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; padding:4px 8px; border-bottom:1px solid #EEF2F6; margin-bottom:4px;">
             Estilos de Texto
           </div>
-          ${(this.doc.estilos || []).map(est => `
-            <button type="button" class="ath-ctx-menu-item" data-ctx-estilo-id="${est.id}" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px;">
-              <span style="font-weight:${est.peso || 400};">${est.nome}</span>
-              <small style="color:#64748B;">${est.tamanho_pt || 12}pt</small>
-            </button>
-          `).join('')}
+          <div id="athListaItensCtxEstilos" style="display:flex; flex-direction:column; gap:2px;"></div>
         </div>
       </div>
       <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 2px;"></span>
@@ -3112,11 +3149,52 @@ export class EditorView {
       if (menuAlin) menuAlin.hidden = true;
     };
 
+    const renderizarListaEstilosContextuais = () => {
+      const containerItens = barra.querySelector('#athListaItensCtxEstilos');
+      if (!containerItens) return;
+      if (!Array.isArray(this.doc.estilos) || this.doc.estilos.length === 0) {
+        this.doc.estilos = criarEstilosPadrao('abnt');
+      }
+      const estilos = this.doc.estilos;
+      const estiloAtivoId = this.blocoSelecionado?.estiloId;
+
+      containerItens.innerHTML = estilos.map(est => {
+        const ativo = est.id === estiloAtivoId;
+        return `
+          <button type="button" class="ath-ctx-menu-item ${ativo ? 'on' : ''}" data-ctx-estilo-id="${est.id}" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; cursor:pointer; width:100%; border:none; background:${ativo ? 'var(--ath-primary-soft, #EEF4FA)' : 'transparent'}; border-radius:6px; text-align:left;">
+            <span style="font-weight:${est.peso || 600}; font-size:12px; color:#1E293B;">${est.nome}</span>
+            <small style="color:#64748B; font-size:10.5px;">${est.tamanho_pt || 12}pt</small>
+          </button>
+        `;
+      }).join('');
+
+      containerItens.querySelectorAll('[data-ctx-estilo-id]').forEach(btn => {
+        btn.addEventListener('mousedown', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          const estiloId = btn.dataset.ctxEstiloId;
+          const estilo = (this.doc.estilos || []).find(x => x.id === estiloId);
+          if (estilo && this.blocoSelecionado) {
+            this.blocoSelecionado.estiloId = estilo.id;
+            const rotuloEl = barra.querySelector('#athRotuloCtxEstilo');
+            if (rotuloEl) rotuloEl.textContent = estilo.nome;
+            fecharDropdownsCtx();
+            this.notificarMudanca();
+            this.renderizar();
+            this.onSelecionarBloco(this.blocoSelecionado, null);
+          }
+        });
+      });
+    };
+
     btnEstiloMenu?.addEventListener('mousedown', e => {
       e.preventDefault();
       e.stopPropagation();
       const abrir = menuEstilo.hidden;
       fecharDropdownsCtx();
+      if (abrir) {
+        renderizarListaEstilosContextuais();
+      }
       menuEstilo.hidden = !abrir;
     });
 
@@ -3215,24 +3293,6 @@ export class EditorView {
       }
     });
 
-    // Eventos da barra flutuante: Aplicar Estilo
-    barra.querySelectorAll('[data-ctx-estilo-id]').forEach(btn => {
-      btn.addEventListener('mousedown', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        const estiloId = btn.dataset.ctxEstiloId;
-        const estilo = (this.doc.estilos || []).find(x => x.id === estiloId);
-        if (estilo && this.blocoSelecionado) {
-          this.blocoSelecionado.estiloId = estilo.id;
-          const rotuloEl = barra.querySelector('#athRotuloCtxEstilo');
-          if (rotuloEl) rotuloEl.textContent = estilo.nome;
-          fecharDropdownsCtx();
-          this.notificarMudanca();
-          this.renderizar();
-          this.onSelecionarBloco(this.blocoSelecionado, null);
-        }
-      });
-    });
     barra.querySelectorAll('[data-cmd]').forEach(btn => {
       btn.addEventListener('mousedown', e => {
         e.preventDefault();
