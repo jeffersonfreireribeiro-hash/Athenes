@@ -30,8 +30,6 @@ const CSS = `
 .ath-cfgpg input[type=color]{width:34px;height:26px;border:none;padding:0;cursor:pointer}
 .ath-cfgpg label.chk{display:flex;align-items:center;gap:6px;font:600 12px var(--glx-font,inherit);color:#334155;min-height:24px}
 .ath-cfgpg .campo{display:flex;flex-direction:column;gap:3px;flex:1;min-width:90px}
-.ath-cfgpg .vars{display:flex;gap:4px;flex-wrap:wrap}
-.ath-cfgpg .vars button{height:22px;padding:0 7px;border:1px solid #D5DEE9;border-radius:999px;background:#F1F5F9;font:700 10.5px var(--glx-font,inherit);cursor:pointer;color:#314F79}
 .ath-sel-lista{position:relative}
 .ath-sel-lista-btn{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:4px 10px;border:1px solid #D5DEE9;border-radius:8px;background:#fff;cursor:pointer;font:600 12px var(--glx-font,inherit);color:#1F2733;text-align:left}
 .ath-sel-lista-btn:hover,.ath-sel-lista.aberto .ath-sel-lista-btn{border-color:#314F79}
@@ -59,6 +57,19 @@ const CSS = `
 const clone = (o) => JSON.parse(JSON.stringify(o ?? null));
 const PX_MM = 3.7795;
 const ESCALA = 0.27;
+
+/** Variáveis aceitas nas zonas de cabeçalho/rodapé (nome legível + código inserido). */
+const VARIAVEIS = [
+  { valor: '{documento.titulo}', rotulo: 'Título do documento', detalhe: '{documento.titulo}' },
+  { valor: '{documento.subtitulo}', rotulo: 'Subtítulo do documento', detalhe: '{documento.subtitulo}' },
+  { valor: '{documento.autor_principal}', rotulo: 'Autor principal', detalhe: '{documento.autor_principal}' },
+  { valor: '{documento.instituicao}', rotulo: 'Instituição', detalhe: '{documento.instituicao}' },
+  { valor: '{documento.ano}', rotulo: 'Ano', detalhe: '{documento.ano}' },
+  { valor: '{secao}', rotulo: 'Nome da seção', detalhe: '{secao}' },
+  { valor: '{pagina}', rotulo: 'Número da página', detalhe: '{pagina}' },
+  { valor: '{total}', rotulo: 'Total de páginas', detalhe: '{total}' },
+  { valor: '{data}', rotulo: 'Data atual', detalhe: '{data}' }
+];
 
 export class ModalConfigPagina {
   /**
@@ -173,7 +184,7 @@ export class ModalConfigPagina {
    * Lista de opções recolhida: o campo mostra a opção atual (nome + exemplo) e abre a lista ao clicar.
    * @param {{valor:string, rotulo:string, icone?:string, detalhe?:string}[]} opcoes
    */
-  lista(opcoes, valor, aoMudar) {
+  lista(opcoes, valor, aoMudar, { placeholder = '' } = {}) {
     const wrap = document.createElement('div');
     wrap.className = 'ath-sel-lista';
     const btn = document.createElement('button');
@@ -190,6 +201,12 @@ export class ModalConfigPagina {
       if (o.detalhe) el.querySelector('.det').textContent = o.detalhe;
     };
     const mostrar = (v) => {
+      if (placeholder) {
+        // lista de ação (ex.: inserir variável): o campo mantém o texto-guia e nada fica "selecionado"
+        btn.innerHTML = `<span class="tx"></span><span class="seta">▾</span>`;
+        btn.querySelector('.tx').textContent = placeholder;
+        return;
+      }
       const o = opcoes.find(x => x.valor === v) || opcoes[0];
       preencher(btn, o);
       btn.insertAdjacentHTML('beforeend', '<span class="seta">▾</span>');
@@ -206,7 +223,7 @@ export class ModalConfigPagina {
         mostrar(o.valor);
         wrap.classList.remove('aberto');
         aoMudar(o.valor);
-        this.atualizarPrevia();
+        if (!placeholder) this.atualizarPrevia();
       });
       menu.appendChild(b);
     });
@@ -246,23 +263,17 @@ export class ModalConfigPagina {
     zonas.className = 'zonas';
     ['esquerda', 'centro', 'direita'].forEach(z => zonas.appendChild(this.campoTexto(a.zonas, z)));
     d.appendChild(zonas);
-    const vars = document.createElement('div');
-    vars.className = 'vars';
-    ['{documento.titulo}', '{documento.autor_principal}', '{secao}', '{pagina}', '{total}', '{data}'].forEach(v => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = v;
-      b.title = 'Inserir variável no campo selecionado';
-      b.addEventListener('mousedown', e => e.preventDefault());
-      b.addEventListener('click', () => {
-        const campo = this.campoAtivo;
-        if (!campo || !d.contains(campo)) return;
-        campo.value += v;
-        campo.dispatchEvent(new Event('input', { bubbles: true }));
-      });
-      vars.appendChild(b);
-    });
-    d.appendChild(vars);
+    // lista de variáveis: insere no ponto do cursor do campo de zona selecionado (ou no primeiro campo)
+    d.appendChild(this.lista(VARIAVEIS, '', (v) => {
+      const campos = [...zonas.querySelectorAll('input')];
+      const campo = this.campoAtivo && zonas.contains(this.campoAtivo) ? this.campoAtivo : campos[0];
+      const ini = campo.selectionStart ?? campo.value.length;
+      const fim = campo.selectionEnd ?? ini;
+      campo.value = campo.value.slice(0, ini) + v + campo.value.slice(fim);
+      campo.focus();
+      campo.setSelectionRange(ini + v.length, ini + v.length);
+      campo.dispatchEvent(new Event('input', { bubbles: true }));
+    }, { placeholder: 'Inserir variável…' }));
 
     // pares/ímpares diferentes
     const parBox = document.createElement('div');
