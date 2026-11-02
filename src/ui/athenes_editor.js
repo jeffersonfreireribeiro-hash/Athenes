@@ -9,6 +9,8 @@
  * - Coluna 3 (Direita): Inspetor de Bloco, Posição na Folha (12 colunas) e Blocos Compostos.
  */
 
+import { elementosMestraHtml, renderizadoPeloCanvas, contextoVariaveisPagina } from '../core/athenes_mestra_render.js';
+import { margensEfetivasMm, elementosEfetivosDaPagina, caixaEnvolvente, sobrescreverNoDocumento, restaurarNoDocumento } from '../core/athenes_mestra_canvas.js';
 import { dimensoesPapelMm } from '../core/athenes_grid.js';
 import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssNumeracao, localizarEstilo, FONTES_SISTEMA, PESOS_FONTE, criarEstilosPadrao } from '../core/athenes_estilos.js';
 import {
@@ -304,6 +306,29 @@ export class EditorView {
     const sec = this.obterSecaoAtiva();
     const mestraId = sec?.mestraId || 'corpo';
     return (this.doc.mestras || []).find(m => m.id === mestraId) || this.doc.mestras?.[0];
+  }
+
+  /** Popover de override de um elemento da mestra nesta página (não altera as demais páginas). */
+  abrirOverrideMestra(pag, mestra, base, ev) {
+    document.querySelector('.ath-override-mestra')?.remove();
+    const efetivo = elementosEfetivosDaPagina(mestra, pag).find(e => e.id === base.id) || base;
+    const pop = document.createElement('div');
+    pop.className = 'ath-override-mestra';
+    pop.style.cssText = `position:fixed;z-index:99999;left:${Math.min(ev.clientX, innerWidth - 270)}px;top:${Math.min(ev.clientY, innerHeight - 290)}px;width:250px;padding:12px;background:#fff;border:1px solid #C8D7E6;border-radius:12px;box-shadow:0 10px 30px rgba(15,23,42,.2);font:600 12px var(--glx-font,system-ui);display:flex;flex-direction:column;gap:8px`;
+    const campo = (k, rot) => `<label style="display:flex;flex-direction:column;gap:2px;font-size:10px;color:#64748B">${rot}<input type="number" step="0.5" data-k="${k}" value="${efetivo[k] ?? 0}" style="height:26px;border:1px solid #D5DEE9;border-radius:7px;padding:0 6px"></label>`;
+    pop.innerHTML = `<div style="font-weight:800;color:#314F79">${(base.titulo || base.tipo).replace(/</g, '&lt;')} — só nesta página</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${campo('x_mm', 'X (mm)')}${campo('y_mm', 'Y (mm)')}${campo('largura_mm', 'Largura')}${campo('altura_mm', 'Altura')}${campo('rotacao_graus', 'Rotação (°)')}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" data-a="ocultar" class="glx-btn glx-btn-soft glx-btn-sm">Ocultar aqui</button><button type="button" data-a="restaurar" class="glx-btn glx-btn-soft glx-btn-sm">Restaurar herança</button><button type="button" data-a="fechar" class="glx-btn glx-btn-primary glx-btn-sm">OK</button></div>`;
+    document.body.appendChild(pop);
+    const aplicar = (m) => { sobrescreverNoDocumento(this.doc, pag, base, m); this.notificarMudanca(); this.renderizarFolhasPaginas(); };
+    pop.addEventListener('input', (e) => { const k = e.target.dataset.k; if (k) aplicar({ [k]: parseFloat(e.target.value) || 0 }); });
+    pop.addEventListener('click', (e) => {
+      const a = e.target.dataset.a; if (!a) return;
+      if (a === 'ocultar') aplicar({ oculto: true });
+      if (a === 'restaurar') { restaurarNoDocumento(this.doc, pag, base.id); this.notificarMudanca(); this.renderizarFolhasPaginas(); }
+      pop.remove();
+    });
+    setTimeout(() => document.addEventListener('mousedown', function f(e2) { if (!pop.contains(e2.target)) { pop.remove(); document.removeEventListener('mousedown', f); } }), 0);
   }
 
   renderizar() {
@@ -2293,7 +2318,8 @@ export class EditorView {
     paginas.forEach(pag => {
       try {
       const mestraPag = modeloDaPagina(this.doc, pag);
-      const margens = mestraPag?.margens_mm || { t: 25, r: 20, b: 20, l: 25 };
+      const dimPag = dimensoesPapelMm(mestraPag?.formato, mestraPag?.orientacao);
+      const margens = margensEfetivasMm(mestraPag || {}, dimPag.largura_mm, dimPag.altura_mm);
 
       const folha = document.createElement('div');
       folha.className = `ath-folha-a4 ${mestraPag?.orientacao === 'paisagem' ? 'paisagem' : ''}`;
@@ -2325,7 +2351,15 @@ export class EditorView {
         wrapElemMestra.style.pointerEvents = 'none';
         wrapElemMestra.style.zIndex = '0';
 
+        const camadaCanvas = document.createElement('div');
+        camadaCanvas.className = 'ath-folha-elementos-livres';
+        camadaCanvas.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;';
+        camadaCanvas.innerHTML = elementosMestraHtml(mestraPag, pag, { larguraMm: dimPag.largura_mm, alturaMm: dimPag.altura_mm, margens },
+          contextoVariaveisPagina(this.doc, pag, paginas.length));
+        wrapElemMestra.appendChild(camadaCanvas);
+
         mestraPag.elementos_recorrentes.forEach(elem => {
+          if (renderizadoPeloCanvas(elem)) return;
           if (elem.tipo === 'foto_capa') {
             const sangria = !!elem.sangria;
             const respRecuo = !sangria && !!elem.respeitar_recuo;
@@ -2447,6 +2481,21 @@ export class EditorView {
         });
 
         folha.appendChild(wrapElemMestra);
+
+        // Shift+Ctrl+Clique num elemento herdado da mestra: destrava só nesta página (override)
+        folha.addEventListener('click', (ev) => {
+          if (!(ev.ctrlKey && ev.shiftKey)) return;
+          const r = folha.getBoundingClientRect();
+          const mx = (ev.clientX - r.left) / (r.width / dimPag.largura_mm);
+          const my = (ev.clientY - r.top) / (r.height / dimPag.altura_mm);
+          const topo = elementosEfetivosDaPagina(mestraPag, pag).filter(e => renderizadoPeloCanvas(e) && e.tipo !== 'quadro_texto').reverse().find(e => {
+            const c = caixaEnvolvente(e);
+            return mx >= c.x && mx <= c.x + c.w && my >= c.y && my <= c.y + c.h;
+          });
+          if (!topo) return;
+          ev.preventDefault(); ev.stopPropagation();
+          this.abrirOverrideMestra(pag, mestraPag, mestraPag.elementos_recorrentes.find(e => e.id === topo.id), ev);
+        }, true);
       }
 
       // Grade de 12 Colunas (se ativada na barra)

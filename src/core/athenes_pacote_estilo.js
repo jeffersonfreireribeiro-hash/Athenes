@@ -11,6 +11,7 @@
 import { criarEstilosPadrao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { criarModelosPaginaPadrao, MODOS_APLICACAO_MESTRA } from './athenes_documento.js';
 import { sanitizarNumeracao } from './athenes_paginacao.js';
+import { normalizarMestraCanvas, normalizarRegrasMestra } from './athenes_mestra_canvas.js';
 import { obterConfigNotas } from './athenes_notas_rodape.js';
 import { extrairEstiloFigura, sanitizarEstiloFigura, aplicarEstiloFiguraAoBloco, extrairTipografiaTituloFonte } from './athenes_figura_layout.js';
 import { extrairEstiloGlobalTabela, sanitizarEstiloTabela, garantirEstiloTabela } from './athenes_tabela_estilo.js';
@@ -60,7 +61,9 @@ export function exportarPacoteEstilo(documento, opcoes = {}) {
       espacoParagrafoPadraoPt: 6,
       // paginação padrão do documento (a mestra pode ter a sua em `numeracao_pagina`) e estilo das notas de rodapé
       ...(documento.paginacao ? { paginacao: sanitizarNumeracao(documento.paginacao) } : {}),
-      notas_rodape: obterConfigNotas(documento)
+      notas_rodape: obterConfigNotas(documento),
+      // "Mestre A nas páginas 1–3; Mestre B da 4 em diante"
+      ...(Array.isArray(documento.atribuicoes_mestra) && documento.atribuicoes_mestra.length ? { atribuicoes_mestra: normalizarRegrasMestra(documento.atribuicoes_mestra) } : {})
     },
     estilos: estilos,
     mestras: mestras,
@@ -219,10 +222,12 @@ export function validarPacoteEstilo(conteudo) {
       ...(obj.configuracaoGlobal?.paginacao && typeof obj.configuracaoGlobal.paginacao === 'object'
         ? { paginacao: sanitizarNumeracao(obj.configuracaoGlobal.paginacao) } : {}),
       ...(obj.configuracaoGlobal?.notas_rodape && typeof obj.configuracaoGlobal.notas_rodape === 'object'
-        ? { notas_rodape: obterConfigNotas({ notas_config: obj.configuracaoGlobal.notas_rodape }) } : {})
+        ? { notas_rodape: obterConfigNotas({ notas_config: obj.configuracaoGlobal.notas_rodape }) } : {}),
+      ...(Array.isArray(obj.configuracaoGlobal?.atribuicoes_mestra)
+        ? { atribuicoes_mestra: normalizarRegrasMestra(obj.configuracaoGlobal.atribuicoes_mestra) } : {})
     },
     estilos: obj.estilos,
-    mestras: Array.isArray(obj.mestras) && obj.mestras.length > 0 ? obj.mestras : criarModelosPaginaPadrao('abnt'),
+    mestras: (Array.isArray(obj.mestras) && obj.mestras.length > 0 ? obj.mestras : criarModelosPaginaPadrao('abnt')).map(m => normalizarMestraCanvas(m)),
     modelos_blocos: Array.isArray(obj.modelos_blocos) ? obj.modelos_blocos : [],
     layout_padrao_figuras: obj.layout_padrao_figuras || {}
   };
@@ -280,6 +285,8 @@ export function aplicarPacoteEstilo(documento, pacote, opcoes = {}) {
     documento.mestras = JSON.parse(JSON.stringify(p.mestras));
     documento.modelosPagina = documento.mestras;
   }
+
+  documento.atribuicoes_mestra = JSON.parse(JSON.stringify(p.configuracaoGlobal?.atribuicoes_mestra || []));
 
   // 3. Atualiza Modelos de Blocos Customizados
   if (Array.isArray(p.modelos_blocos) && p.modelos_blocos.length > 0) {
@@ -380,6 +387,15 @@ INSTRUÇÕES DE ANÁLISE:
      "estilo" ("arabico" | "romano_mai" | "romano_min" | "alfa_mai" | "alfa_min"); "iniciar_em"; "continuar" (false = reinicia a contagem na 1ª folha da seção); "ocultar_primeira".
    - Notas de rodapé ("configuracaoGlobal.notas_rodape"): "marcador" ("numerico" | "alfabetico" | "simbolos"); "reiniciar" ("documento" | "secao" | "pagina");
      "separador" { "comprimento_pct", "espessura_pt", "cor" }; "fonte"; "tamanho_pt" (ex.: 10); "entrelinha" (ex.: 1.15); "cor".
+
+   - Elementos livres da mestra ("elementos_recorrentes"): todos têm "id", "tipo", "x_mm", "y_mm", "largura_mm", "altura_mm" (origem no canto superior
+     esquerdo da folha), "rotacao_graus" (0-359), "bloqueado" (bool), "camada" ("fundo" | "frente") e "z" (ordem dentro da camada). Tipos livres:
+     "forma" ("forma": "retangulo" | "elipse" | "linha"; "fundo"; "borda_cor"; "borda_mm"; "raio_mm"; "opacidade"), "texto" ("texto" com variáveis {pagina}, {total},
+     {secao}, {data}, {documento.titulo}...; "tamanho_pt"; "cor"; "negrito"; "alinhamento"; "fonte"), "quadro_texto" (região de fluxo do corpo do texto; "colunas"; "gap_mm")
+     e os legados "foto_capa", "caixa_grade", "tarja", "marca_dagua", "rotulo_estatico". "quadro_texto_id" da mestra aponta o quadro primário (define as margens efetivas).
+     "espelhada": true usa o espelho horizontal dos elementos nas páginas pares (frente e verso). "guias": [{ "eixo": "v" | "h", "pos_mm" }] são guias de régua.
+     "grade_guia": { "visivel", "snap", "passo_mm" (malha regular), "colunas", "linhas", "calha_mm" } é a grade de diagramação da folha.
+   - Atribuição de mestras por página ("configuracaoGlobal.atribuicoes_mestra"): [{ "mestraId", "de", "ate" }] (páginas 1-based; "ate" omitido = até o fim; vence o intervalo mais específico).
 
 3. MOLDURAS DE ILUSTRAÇÕES, TABELAS E FÓRMULAS:
    - moldura_tipo: "limpo" (sem borda), "linha_lateral" (tarja lateral elegante), "cartao" (fundo suave), "borda_completa" (caixa fechada técnica), ou "esquadro".

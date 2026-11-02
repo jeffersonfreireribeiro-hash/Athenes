@@ -4,6 +4,7 @@
  * Arquitetura declarativa e reativa com repaginação automática e fluxo contínuo.
  */
 
+import { aplicarRegrasMestraNasPaginas, vincularOverridesAsPaginas } from './athenes_mestra_canvas.js';
 import { criarEstilosPadrao, PERFIS_FORMATACAO } from './athenes_estilos.js';
 import { obterLayoutFigura, CHAVES_ESTILO_FIGURA } from './athenes_figura_layout.js';
 import { geometriaCorpoMm, calcularNumerosExibidos } from './athenes_paginacao.js';
@@ -718,6 +719,8 @@ export function repaginarDocumento(doc) {
     while (notasPag.length && guarda++ < 50) fecharPagina();
   }
 
+  vincularOverridesAsPaginas(doc, paginasCalculadas);
+  aplicarRegrasMestraNasPaginas(doc, paginasCalculadas); // "Mestre B nas páginas 4 em diante"
   rotularNotas(doc, paginasCalculadas);
   doc.paginas = paginasCalculadas;
   const exibidos = calcularNumerosExibidos(doc);

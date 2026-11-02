@@ -8,6 +8,9 @@
  */
 
 import { svgIcone } from './athenes_icones.js';
+import { abrirCanvasMestra } from './athenes_mestra_canvas_ui.js';
+import { normalizarMestraCanvas } from '../core/athenes_mestra_canvas.js';
+import { elementosMestraHtml, renderizadoPeloCanvas } from '../core/athenes_mestra_render.js';
 import { repaginarDocumento, formatarNumeroPagina, criarElementoMestra, removerMestra } from '../core/athenes_documento.js';
 
 export class ModalEditorMestra {
@@ -32,6 +35,7 @@ export class ModalEditorMestra {
       this.rascunho.elementos_recorrentes = [];
     }
 
+    normalizarMestraCanvas(this.rascunho);
     this.elementoSelecionadoId = null;
     this.backdrop = null;
     this.montar();
@@ -294,9 +298,12 @@ export class ModalEditorMestra {
 
         <!-- COLUNA DIREITA: PRÉVIA INTERATIVA DA FOLHA MESTRA COM ELEMENTOS -->
         <div class="ath-mestra-previa-wrap" style="display:flex; flex-direction:column; align-items:center; background:#E5E9F0; border-radius:8px; padding:16px; overflow:hidden;">
-          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary-ink, #1B2D47); margin-bottom:10px; display:flex; justify-content:space-between; width:100%;">
-            <span>Prévia da Folha Mestra</span>
-            <span id="athPreviaDimensoes">A4 Retrato (210 × 297 mm)</span>
+          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary-ink, #1B2D47); margin-bottom:10px; display:flex; flex-direction:column; gap:8px; width:100%;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+              <span style="white-space:nowrap;">Prévia da Folha Mestra</span>
+              <span id="athPreviaDimensoes" style="font-weight:700; color:var(--ath-text-secondary, #475569); text-align:right;">A4 Retrato (210 × 297 mm)</span>
+            </div>
+            <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="athBtnCanvasMestra" style="width:100%; justify-content:center;" title="Arrastar, redimensionar, girar, réguas, guias, grade, alinhar e atribuir mestras a páginas">Editar no canvas</button>
           </div>
 
           <div style="flex:1; width:100%; display:grid; place-items:center; overflow:auto;">
@@ -820,7 +827,13 @@ export class ModalEditorMestra {
     });
 
     // Botão Salvar
+    modal.querySelector('#athBtnCanvasMestra').addEventListener('click', () => {
+      abrirCanvasMestra(this.doc, this.rascunho, { onFechar: () => { this.renderizarListaElementos(modal); this.atualizarPreviaVisual(); } });
+    });
+
     modal.querySelector('#athBtnSalvarMestra').addEventListener('click', () => {
+      if (!('quadro_texto_id' in this.rascunho)) delete this.mestraOriginal.quadro_texto_id;
+      if (!this.rascunho.espelhada) delete this.mestraOriginal.espelhada;
       Object.assign(this.mestraOriginal, this.rascunho);
       repaginarDocumento(this.doc);
       this.onSalvar(this.mestraOriginal);
@@ -915,6 +928,7 @@ export class ModalEditorMestra {
     // Renderização dos Elementos Recorrentes
     let elementosHtml = '';
     (r.elementos_recorrentes || []).forEach(elem => {
+      if (renderizadoPeloCanvas(elem)) return;
       const sel = elem.id === this.elementoSelecionadoId;
       const bordaSel = sel ? 'outline: 2px solid var(--ath-primary, #314F79); outline-offset: 1px;' : '';
 
@@ -1048,7 +1062,9 @@ export class ModalEditorMestra {
       `;
     }
 
+    const camadaLivre = `<div style="position:absolute;left:0;top:0;width:${larguraMm}mm;height:${alturaMm}mm;transform:scale(${escala / 3.7795});transform-origin:0 0;pointer-events:none;overflow:visible">${elementosMestraHtml(r, { numero: 1 }, { larguraMm, alturaMm, margens: m }, { pagina: 1, total: 10, secao: 'Seção' }, { editor: true })}</div>`;
     container.innerHTML = `
+      ${camadaLivre}
       ${elementosHtml}
       ${cabHtml}
       ${gradeHtml}

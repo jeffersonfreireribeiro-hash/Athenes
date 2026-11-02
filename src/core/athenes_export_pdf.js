@@ -5,6 +5,8 @@
  * automática e grid modular milimétrico herdado do Clux.js.
  */
 
+import { elementosMestraHtml, renderizadoPeloCanvas, contextoVariaveisPagina } from './athenes_mestra_render.js';
+import { margensEfetivasMm } from './athenes_mestra_canvas.js';
 import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssTipografia, estiloParaCssNumeracao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
@@ -349,7 +351,8 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
 
   const paginasHtml = (documento.paginas || []).map((pag, index) => {
     const modelo = modeloDaPagina(documento, pag);
-    const m = modelo.margens_mm || { t: 25, r: 20, b: 20, l: 25 };
+    const dimFolha = dimensoesPapelMm(modelo.formato, modelo.orientacao);
+    const m = margensEfetivasMm(modelo, dimFolha.largura_mm, dimFolha.altura_mm);
     const cols = modelo.grade?.colunas || 1;
     const gap = modelo.grade?.gap_mm || 0;
 
@@ -386,7 +389,9 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
     // Elementos recorrentes da página mestra (coordenadas mm, sangria total, capas e tarjas)
     let elemRecHtml = '';
     if (Array.isArray(modelo.elementos_recorrentes) && modelo.elementos_recorrentes.length > 0) {
-      elemRecHtml = modelo.elementos_recorrentes.map(elem => {
+      const htmlCanvas = elementosMestraHtml(modelo, pag, { larguraMm: largura_mm, alturaMm: altura_mm, margens: m }, contextoVariaveisPagina(documento, pag, documento.paginas.length));
+      elemRecHtml = htmlCanvas + modelo.elementos_recorrentes.map(elem => {
+        if (renderizadoPeloCanvas(elem)) return '';
         if (elem.tipo === 'foto_capa') {
           const sangria = !!elem.sangria;
           const respRecuo = !sangria && !!elem.respeitar_recuo;

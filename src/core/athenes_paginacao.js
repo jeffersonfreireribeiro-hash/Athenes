@@ -24,6 +24,9 @@ import { FONTES_SISTEMA } from './athenes_estilos.js';
 
 // ───────────────────────────── Estilos de numeração ─────────────────────────────
 
+import { dimensoesPapelMm } from './athenes_grid.js';
+import { margensEfetivasMm } from './athenes_mestra_canvas.js';
+
 export const ESTILOS_NUMERICOS = Object.freeze([
   { id: 'arabico', rotulo: 'Arábicos', exemplo: '1, 2, 3' },
   { id: 'romano_mai', rotulo: 'Romanos maiúsculos', exemplo: 'I, II, III' },
@@ -281,12 +284,13 @@ export function alturaAreaMm(area) {
  * da folha; se não couberem (com o respiro) a margem cresce — o corpo nunca é invadido.
  */
 export function geometriaCorpoMm(mestra) {
-  const m = mestra?.margens_mm || mestra?.margens || { t: 30, b: 20, l: 30, r: 20 };
+  const dim = dimensoesPapelMm(mestra?.formato, mestra?.orientacao, mestra?.formato_personalizado);
+  const m = margensEfetivasMm(mestra, dim.largura_mm, dim.altura_mm); // um quadro de texto na mestra define o corpo
   const cab = normalizarArea(mestra?.cabecalho);
   const rod = normalizarArea(mestra?.rodape);
   const topoCab = cab.ativo ? cab.distancia_borda_mm + alturaAreaMm(cab) + cab.respiro_mm : 0;
   const baseRod = rod.ativo ? rod.distancia_borda_mm + alturaAreaMm(rod) + rod.respiro_mm : 0;
-  const alturaFolha = mestra?.orientacao === 'paisagem' ? 210 : 297;
+  const alturaFolha = dim.altura_mm;
   const topo = Math.max(m.t || 0, topoCab);
   const base = Math.max(m.b || 0, baseRod);
   return { topoMm: topo, baseMm: base, alturaCorpoMm: Math.max(100, alturaFolha - topo - base), margemEsq: m.l || 0, margemDir: m.r || 0 };
