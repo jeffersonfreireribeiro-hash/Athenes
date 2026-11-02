@@ -29,6 +29,7 @@ export class DashboardView {
     this.documentos = [];
     this.onAbrirDocumento = opcoes.onAbrirDocumento || (() => {});
     this.onCriarDocumento = opcoes.onCriarDocumento || (() => {});
+    this.onLogout = opcoes.onLogout || (() => {});
     this.filtroBusca = '';
     this.filtroTipo = 'todos';
     this.abaAtiva = opcoes.abaInicial || 'escrita'; // 'escrita' | 'artigos_zotero'
@@ -252,6 +253,10 @@ export class DashboardView {
     }
   }
 
+  abrirModalLogin() {
+    this.abrirModalIdentificacaoLogin();
+  }
+
   abrirModalIdentificacaoLogin() {
     const p = obterPerfilColaborador();
     const driveCfg = obterConfigGoogleDrive();
@@ -408,6 +413,12 @@ export class DashboardView {
       } catch (err) {
         alert('Erro ao conectar com Google: ' + err.message);
       }
+    });
+
+    modal.querySelector('#athBtnModalSairConta')?.addEventListener('click', () => {
+      fechar();
+      encerrarSessao();
+      this.onLogout();
     });
 
     modal.querySelector('#athBtnModalDesconectarGoogle')?.addEventListener('click', () => {

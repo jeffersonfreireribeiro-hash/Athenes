@@ -1590,3 +1590,240 @@ mark.ath-pdf-grifo-texto {
   font-weight: 700;
   font-size: 11px;
 }
+
+
+/* ==========================================================================
+   TELA DE LOGIN E IDENTIFICAÇÃO EDITORIAL ATHENES
+   ========================================================================== */
+
+.ath-login-pagina {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 20%, #F8FAFC 0%, #EEF4FA 100%);
+  padding: 24px 16px;
+  box-sizing: border-box;
+  font-family: var(--glx-font, Nunito), system-ui, sans-serif;
+}
+
+.ath-login-card {
+  width: 100%;
+  max-width: 480px;
+  background: #FFFFFF;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 18px;
+  padding: 36px 32px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  box-sizing: border-box;
+  animation: athFadeIn 0.25s ease-out;
+}
+
+@keyframes athFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ath-login-header {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.ath-login-logo-box {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #EEF4FA;
+  color: #314F79;
+  display: inline-grid;
+  place-items: center;
+  margin-bottom: 12px;
+  border: 1px solid #C8D7E6;
+}
+
+.ath-login-header h1 {
+  margin: 0 0 6px 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: #1F2733;
+  letter-spacing: -0.02em;
+}
+
+.ath-login-subtitulo {
+  margin: 0;
+  font-size: 13px;
+  color: #64748B;
+  line-height: 1.45;
+}
+
+.ath-login-alerta {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.ath-login-alerta.info {
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1D4ED8;
+}
+
+.ath-login-alerta.sucesso {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #15803D;
+}
+
+.ath-login-alerta.erro {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #DC2626;
+}
+
+.ath-btn-google-login {
+  width: 100%;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #FFFFFF;
+  color: #1F2937;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.15s ease;
+}
+
+.ath-btn-google-login:hover {
+  background: #F8FAFC;
+  border-color: #94A3B8;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+
+.ath-login-divisor {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 16px 0;
+  color: #94A3B8;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ath-login-divisor::before,
+.ath-login-divisor::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #E2E8F0;
+}
+
+.ath-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ath-login-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ath-login-campo label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.ath-login-linha2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 440px) {
+  .ath-login-linha2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ath-login-lembrar-box {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 4px 0;
+}
+
+.ath-login-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ath-login-checkbox-label input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  accent-color: #314F79;
+  cursor: pointer;
+}
+
+.ath-login-checkbox-texto strong {
+  display: block;
+  font-size: 12.5px;
+  color: #1E293B;
+  font-weight: 700;
+}
+
+.ath-login-checkbox-texto span {
+  display: block;
+  font-size: 11px;
+  color: #64748B;
+  margin-top: 1px;
+}
+
+.ath-btn-entrar {
+  width: 100%;
+  height: 42px;
+  font-size: 14px;
+  font-weight: 800;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.ath-login-rodape {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid #F1F5F9;
+  text-align: center;
+}
+
+.ath-login-seguranca {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #64748B;
+}
+
+.ath-login-seguranca svg {
+  stroke: #314F79;
+  flex: none;
+}

@@ -337,8 +337,8 @@ private fun FolhaPdfRenderizada(
                         text = par,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = FontFamily.Serif,
-                            fontSize = 13.sp,
-                            lineHeight = 20.sp,
+                            fontSize = 14.5.sp,
+                            lineHeight = 22.sp,
                             color = Color(0xFF1E293B)
                         ),
                         modifier = Modifier

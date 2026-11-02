@@ -56,6 +56,60 @@ export function salvarPerfilColaborador(perfil) {
   return perfil;
 }
 
+/**
+ * Verifica se o usuário possui sessão ativa conectada no Athenes
+ * (seja por 'continuar conectado' em localStorage ou sessão temporária em sessionStorage)
+ */
+export function estaSessaoAtiva() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const sessaoPersistente = localStorage.getItem('athenes_sessao_ativa');
+      if (sessaoPersistente === 'conectado') return true;
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      const sessaoTemporaria = sessionStorage.getItem('athenes_sessao_ativa');
+      if (sessaoTemporaria === 'conectado') return true;
+    }
+    const p = obterPerfilColaborador();
+    if (p && p.conectado && p.continuarConectado) return true;
+  } catch (_) {}
+  return false;
+}
+
+/**
+ * Ativa a sessão do usuário no Athenes
+ * @param {boolean} continuarConectado Se true, persiste em localStorage; se false, apenas na sessão atual
+ */
+export function ativarSessao(continuarConectado = true) {
+  try {
+    if (continuarConectado) {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('athenes_sessao_ativa', 'conectado');
+      if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('athenes_sessao_ativa');
+    } else {
+      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('athenes_sessao_ativa', 'conectado');
+      if (typeof localStorage !== 'undefined') localStorage.removeItem('athenes_sessao_ativa');
+    }
+    const p = obterPerfilColaborador();
+    p.conectado = true;
+    p.continuarConectado = !!continuarConectado;
+    salvarPerfilColaborador(p);
+  } catch (_) {}
+}
+
+/**
+ * Encerra a sessão do usuário (Logout completo)
+ */
+export function encerrarSessao() {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem('athenes_sessao_ativa');
+    if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('athenes_sessao_ativa');
+    const p = obterPerfilColaborador();
+    p.conectado = false;
+    p.continuarConectado = false;
+    salvarPerfilColaborador(p);
+  } catch (_) {}
+}
+
 /* ==========================================================================
    PASSO 2: MOTOR DE SUGESTÕES E REVISÃO (ESTILO GOOGLE DOCS)
    ========================================================================== */
@@ -557,6 +611,7 @@ export class SessaoColaborativaRealtime {
    ========================================================================== */
 
 export const GOOGLE_DRIVE_ESCOPO = 'https://www.googleapis.com/auth/drive.file';
+export const GOOGLE_AUTH_ESCOPOS = 'openid email profile https://www.googleapis.com/auth/drive.file';
 export const DEFAULT_GOOGLE_CLIENT_ID = '948015162542-j898e50a80pf0a9fo69belsar291fh41.apps.googleusercontent.com';
 
 export function extrairIdPastaDrive(urlOuId) {
@@ -618,7 +673,7 @@ export function salvarConfigGoogleDrive(cfg) {
 /**
  * Solicita autenticação OAuth2 do Google Identity Services com escopo restrito `drive.file`.
  */
-export async function autenticarGoogleDrive(clientId = DEFAULT_GOOGLE_CLIENT_ID) {
+export async function autenticarGoogleDrive(clientId = DEFAULT_GOOGLE_CLIENT_ID, scope = GOOGLE_AUTH_ESCOPOS) {
   if (typeof window === 'undefined') throw new Error('Autenticação Google requer navegador.');
   const cid = (clientId || obterConfigGoogleDrive().clientId || DEFAULT_GOOGLE_CLIENT_ID).trim();
   if (!cid) throw new Error('Informe o Google Client ID para conectar ao Google Drive.');
@@ -632,7 +687,7 @@ export async function autenticarGoogleDrive(clientId = DEFAULT_GOOGLE_CLIENT_ID)
     try {
       const tokenClient = window.google.accounts.oauth2.initTokenClient({
         client_id: cid,
-        scope: GOOGLE_DRIVE_ESCOPO,
+        scope: scope || GOOGLE_AUTH_ESCOPOS,
         callback: (resp) => {
           if (resp.error) {
             reject(new Error(resp.error_description || resp.error));
@@ -821,19 +876,29 @@ export async function obterOuCriarEstruturaPastasAthenes(accessToken, pastaRaizI
   };
 
   const criarPasta = async (nome, parentId = null) => {
-    const body = {
-      name: nome,
-      mimeType: 'application/vnd.google-apps.folder',
-      ...(parentId ? { parents: [parentId] } : {})
-    };
-    const resp = await fetchImpl('https://www.googleapis.com/drive/v3/files', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
-    });
-    if (!resp.ok) throw new Error(`Falha ao criar pasta ${nome} no Drive`);
-    const data = await resp.json();
-    return data.id;
+    try {
+      const body = {
+        name: nome,
+        mimeType: 'application/vnd.google-apps.folder',
+        ...(parentId ? { parents: [parentId] } : {})
+      };
+      const resp = await fetchImpl('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      });
+      if (!resp.ok) {
+        let detalhe = '';
+        try { const errJson = await resp.json(); detalhe = errJson.error?.message || ''; } catch (_) {}
+        console.warn(`[Athenes Drive] Aviso ao criar pasta ${nome} (${resp.status}): ${detalhe}`);
+        return null;
+      }
+      const data = await resp.json();
+      return data.id;
+    } catch (err) {
+      console.warn(`[Athenes Drive] Erro de rede ao criar pasta ${nome}:`, err);
+      return null;
+    }
   };
 
   let raizId = pastaRaizId;
@@ -849,7 +914,8 @@ export async function obterOuCriarEstruturaPastasAthenes(accessToken, pastaRaizI
     pastaRaizId: raizId,
     pastaDocumentosId: documentosId,
     pastaZoteroId: zoteroId,
-    pastaRelatoriosId: relatoriosId
+    pastaRelatoriosId: relatoriosId,
+    sucesso: Boolean(raizId)
   };
 
   const cfgAtual = obterConfigGoogleDrive();

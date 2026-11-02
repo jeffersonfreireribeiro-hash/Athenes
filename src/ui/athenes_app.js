@@ -4,6 +4,8 @@
  */
 
 import { DashboardView } from './athenes_dashboard.js';
+import { TelaLoginView } from './athenes_login_view.js';
+import { estaSessaoAtiva, encerrarSessao } from '../core/athenes_colaboracao.js';
 import { criarDocumento } from '../core/athenes_documento.js';
 import { carregarDocumentoDoSupabase } from '../core/athenes_colaboracao.js';
 import { sanitizarDocumentoImportado } from '../core/athenes_seguranca.js';
@@ -20,6 +22,7 @@ export class AthenesApp {
     this.documentoAtivo = null;
     this.tela = 'dashboard'; // 'dashboard' | 'editor'
 
+    this.loginView = null;
     this.dashboardView = null;
     this.editorView = null;
     this.painelProps = null;
@@ -33,36 +36,74 @@ export class AthenesApp {
   iniciar() {
     const params = new URLSearchParams(window.location.search);
     const docIdLink = params.get('doc');
-    if (docIdLink) {
-      this.container.innerHTML = '<p style="padding:32px; font:600 14px Nunito, sans-serif; color:#314F79;">Abrindo documento compartilhado...</p>';
-      carregarDocumentoDoSupabase(docIdLink).then(remoto => {
-        if (!remoto) throw new Error('Documento não encontrado na nuvem.');
-        this.documentoAtivo = sanitizarDocumentoImportado(remoto);
-        this.autoSalvar();
-        this.navegarParaEditor();
-      }).catch(err => {
-        alert(`Não foi possível abrir o link: ${err.message}`);
-        this.navegarParaDashboard();
-      });
-      return;
-    }
-    if (params.get('tela') === 'editor' || params.get('editor') === '1') {
-      try {
-        const salvo = localStorage.getItem('athenes_docs_indice');
-        const lista = salvo ? JSON.parse(salvo) : [];
-        if (lista.length > 0) {
-          const docSalvo = localStorage.getItem(`athenes_doc_${lista[0].id}`);
-          if (docSalvo) this.documentoAtivo = JSON.parse(docSalvo);
-          else this.documentoAtivo = lista[0];
-        }
-      } catch (_) {}
-      if (!this.documentoAtivo) {
-        this.documentoAtivo = criarDocumento();
+    const forcarLogin = params.get('login') === '1';
+
+    // A primeira coisa exibida ao acessar o site é a tela de login (a menos que já esteja conectado)
+    if (!forcarLogin && estaSessaoAtiva()) {
+      if (docIdLink) {
+        this.abrirDocumentoCompartilhado(docIdLink);
+        return;
       }
-      this.navegarParaEditor();
+      if (params.get('tela') === 'editor' || params.get('editor') === '1') {
+        this.carregarUltimoDocENavegarEditor();
+        return;
+      }
+      this.navegarParaDashboard();
       return;
     }
-    this.navegarParaDashboard();
+
+    // Primeira tela no site: Login com opção de continuar conectado
+    this.navegarParaLogin(docIdLink);
+  }
+
+  abrirDocumentoCompartilhado(docIdLink) {
+    this.container.innerHTML = '<p style="padding:32px; font:600 14px Nunito, sans-serif; color:#314F79;">Abrindo documento compartilhado...</p>';
+    carregarDocumentoDoSupabase(docIdLink).then(remoto => {
+      if (!remoto) throw new Error('Documento não encontrado na nuvem.');
+      this.documentoAtivo = sanitizarDocumentoImportado(remoto);
+      this.autoSalvar();
+      this.navegarParaEditor();
+    }).catch(err => {
+      alert(`Não foi possível abrir o link: ${err.message}`);
+      this.navegarParaDashboard();
+    });
+  }
+
+  carregarUltimoDocENavegarEditor() {
+    try {
+      const salvo = localStorage.getItem('athenes_docs_indice');
+      const lista = salvo ? JSON.parse(salvo) : [];
+      if (lista.length > 0) {
+        const docSalvo = localStorage.getItem(`athenes_doc_${lista[0].id}`);
+        if (docSalvo) this.documentoAtivo = JSON.parse(docSalvo);
+        else this.documentoAtivo = lista[0];
+      }
+    } catch (_) {}
+    if (!this.documentoAtivo) {
+      this.documentoAtivo = criarDocumento();
+    }
+    this.navegarParaEditor();
+  }
+
+  navegarParaLogin(docIdLink = null) {
+    this.tela = 'login';
+    this.container.innerHTML = '<div id="athAppLogin"></div>';
+    const loginBox = this.container.querySelector('#athAppLogin');
+
+    this.loginView = new TelaLoginView(loginBox, {
+      onLoginSucesso: () => {
+        if (docIdLink) {
+          this.abrirDocumentoCompartilhado(docIdLink);
+        } else {
+          this.navegarParaDashboard();
+        }
+      }
+    });
+  }
+
+  fazerLogout() {
+    encerrarSessao();
+    this.navegarParaLogin();
   }
 
   navegarParaDashboard() {
@@ -74,6 +115,9 @@ export class AthenesApp {
       onAbrirDocumento: (doc) => {
         this.documentoAtivo = sanitizarDocumentoImportado(doc);
         this.navegarParaEditor();
+      },
+      onLogout: () => {
+        this.fazerLogout();
       }
     });
   }
