@@ -134,6 +134,23 @@ test('Estúdio de Artigos renderiza todas as páginas em rolagem contínua, supo
   assert.equal(diag.y, 240);
 });
 
+test('Estúdio de Artigos preserva folhas extras no PDF real e rolarParaPagina usa scroll do palco sem cortar topo', () => {
+  const codigoEstudo = fs.readFileSync(path.resolve('src/ui/athenes_estudo_artigos.js'), 'utf8');
+  const cssDash = fs.readFileSync(path.resolve('src/css/athenes_dashboard.css'), 'utf8');
+
+  // Verifica que rolarParaPagina não usa scrollIntoView genérico no elemento raiz/window
+  assert.equal(codigoEstudo.includes('wrapPag.scrollIntoView'), false);
+  assert.equal(codigoEstudo.includes('palco.scrollTo'), true);
+
+  // Verifica suporte a folha extra (classe visual e dot grid)
+  assert.equal(codigoEstudo.includes('ath-pdf-folha-extra-corpo'), true);
+  assert.equal(cssDash.includes('.ath-pdf-folha-extra-corpo'), true);
+
+  // Verifica que folhas extras não são sobrescritas pela contagem de páginas do PDF
+  assert.equal(codigoEstudo.includes('const extras = atuais.filter(p => p.extra);'), true);
+  assert.equal(codigoEstudo.includes('const ehPaginaPdfReal = Boolean(pdfInfo && idx < pdfInfo.n && !pagDados.extra);'), true);
+});
+
 test('DashboardView possui sincronização com Supabase e backup de espaço para multi-PC', () => {
   const codigoDash = fs.readFileSync(path.resolve('src/ui/athenes_dashboard.js'), 'utf8');
 
