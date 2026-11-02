@@ -3454,23 +3454,22 @@ export class EditorView {
       }).join('');
 
       containerItens.querySelectorAll('[data-ctx-estilo-id]').forEach(btn => {
-        btn.addEventListener('mousedown', e => {
+        const acao = (e) => {
           e.preventDefault();
           e.stopPropagation();
           const estiloId = btn.dataset.ctxEstiloId;
-          const estilo = (this.doc.estilos || []).find(x => x.id === estiloId);
-          if (estilo && this.blocoSelecionado) {
-            this.blocoSelecionado.estiloId = estilo.id;
-            const rotuloEl = barra.querySelector('#athRotuloCtxEstilo');
-            if (rotuloEl) rotuloEl.textContent = estilo.nome;
-            fecharDropdownsCtx();
-            this.notificarMudanca();
-            this.renderizar();
-            this.onSelecionarBloco(this.blocoSelecionado, null);
-          }
-        });
+          this.aplicarEstiloNoTextoSelecionado(estiloId, barra);
+          fecharDropdownsCtx();
+        };
+        btn.addEventListener('mousedown', acao);
+        btn.addEventListener('click', acao);
       });
     };
+
+    menuEstilo?.addEventListener('mousedown', e => e.stopPropagation());
+    menuEstilo?.addEventListener('click', e => e.stopPropagation());
+    menuAlin?.addEventListener('mousedown', e => e.stopPropagation());
+    menuAlin?.addEventListener('click', e => e.stopPropagation());
 
     btnEstiloMenu?.addEventListener('mousedown', e => {
       e.preventDefault();
@@ -3669,7 +3668,12 @@ export class EditorView {
 
     // Monitora seleção de texto e posição do cursor
     const atualizarPosicaoBarra = () => {
-      // Se o foco está dentro de um select/input do menu contextual da própria barra, mantém aberta
+      // Se algum menu dropdown da barra flutuante estiver aberto, não esconde nem reposiciona a barra
+      if ((menuEstilo && !menuEstilo.hidden) || (menuLista && !menuLista.hidden) || (menuAlin && !menuAlin.hidden)) {
+        return;
+      }
+
+      // Se o foco está dentro de um elemento interativo da própria barra, mantém aberta
       if (document.activeElement && barra.contains(document.activeElement)) {
         return;
       }
@@ -3702,6 +3706,19 @@ export class EditorView {
           barra.style.display = 'flex';
           barra.style.left = `${rect.left + rect.width / 2}px`;
           barra.style.top = `${rect.top}px`;
+
+          // Salva última seleção ativa para aplicar estilos pontuais mesmo com perda temporária de foco
+          const blocoEl = editable?.closest('[data-bloco-id]');
+          const blocoId = blocoEl?.dataset?.blocoId || this.blocoSelecionado?.id;
+          this._ultimaSelecaoAtiva = {
+            range: range.cloneRange(),
+            texto: sel.toString(),
+            blocoId: blocoId,
+            editable: editable
+          };
+          if (!this.blocoSelecionado && blocoId) {
+            this.blocoSelecionado = (this.doc.secoes || []).flatMap(s => s.blocos || []).find(b => b.id === blocoId) || null;
+          }
 
           // Reflete o estilo ativo do trecho ou do bloco
           const rotuloEstiloEl = barra.querySelector('#athRotuloCtxEstilo');
@@ -3793,8 +3810,140 @@ export class EditorView {
     };
 
     document.addEventListener('selectionchange', atualizarPosicaoBarra);
-    document.addEventListener('click', () => setTimeout(atualizarPosicaoBarra, 50));
+    document.addEventListener('click', (e) => {
+      if (barra && !barra.contains(e.target)) {
+        fecharDropdownsCtx();
+      }
+      setTimeout(atualizarPosicaoBarra, 50);
+    });
     document.addEventListener('keyup', () => setTimeout(atualizarPosicaoBarra, 50));
     window.addEventListener('scroll', atualizarPosicaoBarra, true);
+  }
+
+  /* ==========================================================================
+     APLICAR ESTILO DE TEXTO NA PARTE SELECIONADA OU NO BLOCO INTEIRO
+     ========================================================================== */
+  aplicarEstiloNoTextoSelecionado(estiloId, barraEl = null) {
+    if (!estiloId) return;
+    const estilo = (this.doc.estilos || []).find(x => x.id === estiloId);
+    if (!estilo) return;
+
+    // Recupera a seleção ativa
+    const sel = typeof window !== 'undefined' ? window.getSelection?.() : null;
+    let range = null;
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed && sel.toString().trim()) {
+      range = sel.getRangeAt(0);
+    } else if (this._ultimaSelecaoAtiva?.range && !this._ultimaSelecaoAtiva.range.collapsed && this._ultimaSelecaoAtiva.texto?.trim()) {
+      range = this._ultimaSelecaoAtiva.range;
+    }
+
+    // Localiza o bloco correspondente
+    let blocoId = this._ultimaSelecaoAtiva?.blocoId || this.blocoSelecionado?.id;
+    let editable = this._ultimaSelecaoAtiva?.editable;
+
+    if (range && !editable && typeof Node !== 'undefined') {
+      const comum = range.commonAncestorContainer;
+      const elPai = comum?.nodeType === Node.ELEMENT_NODE ? comum : comum?.parentElement;
+      editable = elPai?.closest?.('.ath-texto-editable, .ath-titulo-editable, [contenteditable="true"]');
+      const blocoEl = editable?.closest?.('[data-bloco-id]');
+      if (blocoEl?.dataset?.blocoId) blocoId = blocoEl.dataset.blocoId;
+    }
+
+    let bloco = (this.doc.secoes || []).flatMap(s => s.blocos || []).find(b => b.id === blocoId) || this.blocoSelecionado;
+    if (!this.blocoSelecionado && bloco) {
+      this.blocoSelecionado = bloco;
+    }
+
+    // Propriedades tipográficas do estilo para aplicação inline
+    const f = FONTES_SISTEMA[estilo.fonte] || FONTES_SISTEMA.nunito;
+    const familiaCss = f.familia || 'sans-serif';
+    const inlineProps = [
+      `font-family: ${familiaCss}`,
+      `font-size: ${estilo.tamanho_pt || 12}pt`,
+      `font-weight: ${estilo.peso || 400}`,
+      `color: ${estilo.cor || '#1F2733'}`
+    ];
+    if (estilo.italico) inlineProps.push('font-style: italic');
+    else inlineProps.push('font-style: normal');
+    if (estilo.sublinhado) inlineProps.push('text-decoration: underline');
+    if (estilo.caixa_alta) inlineProps.push('text-transform: uppercase');
+    if (estilo.espacamento_letras_em) inlineProps.push(`letter-spacing: ${estilo.espacamento_letras_em}em`);
+    if (estilo.entrelinha) inlineProps.push(`line-height: ${estilo.entrelinha}`);
+    const inlineCss = inlineProps.join('; ');
+
+    // Se temos um trecho específico selecionado
+    if (range && editable && !range.collapsed && range.toString().trim()) {
+      try {
+        const textoSel = range.toString().trim();
+        const textoBloco = (editable.textContent || '').trim();
+
+        // Se a seleção cobrir o bloco inteiro, aplica ao bloco todo
+        if (textoSel.length > 0 && textoSel === textoBloco && bloco) {
+          bloco.estiloId = estilo.id;
+          if (estilo.tipo === 'titulo' || estilo.id.startsWith('titulo')) {
+            bloco.tipo = 'titulo';
+            bloco.nivel = (estilo.id === 'titulo1' || estilo.id === 'titulo_1') ? 1 : (estilo.id === 'titulo2' || estilo.id === 'titulo_2') ? 2 : 3;
+          }
+          this.notificarMudanca();
+          this.renderizar();
+        } else {
+          // Aplica na parte selecionada (inline)
+          const comum = range.commonAncestorContainer;
+          const elPai = comum?.nodeType === Node.ELEMENT_NODE ? comum : comum?.parentElement;
+          const spanExistente = elPai?.closest?.('.ath-estilo-span');
+
+          if (spanExistente && spanExistente.textContent.trim() === textoSel) {
+            spanExistente.dataset.estiloId = estilo.id;
+            spanExistente.dataset.estiloNome = estilo.nome;
+            spanExistente.style.cssText = inlineCss;
+          } else {
+            const fragment = range.extractContents();
+            const span = document.createElement('span');
+            span.className = 'ath-estilo-span';
+            span.dataset.estiloId = estilo.id;
+            span.dataset.estiloNome = estilo.nome;
+            span.style.cssText = inlineCss;
+            span.appendChild(fragment);
+            range.insertNode(span);
+
+            if (sel && typeof document !== 'undefined') {
+              sel.removeAllRanges();
+              const novoRange = document.createRange();
+              novoRange.selectNodeContents(span);
+              sel.addRange(novoRange);
+            }
+          }
+
+          if (bloco && editable) {
+            bloco.texto = editable.innerHTML;
+          }
+        }
+      } catch (err) {
+        console.warn('[Athenes] Falha ao envelopar trecho com estilo:', err);
+        if (bloco) bloco.estiloId = estilo.id;
+      }
+    } else if (bloco) {
+      // Sem seleção de trecho, aplica ao bloco inteiro
+      bloco.estiloId = estilo.id;
+      if (estilo.tipo === 'titulo' || estilo.id.startsWith('titulo')) {
+        bloco.tipo = 'titulo';
+        bloco.nivel = (estilo.id === 'titulo1' || estilo.id === 'titulo_1') ? 1 : (estilo.id === 'titulo2' || estilo.id === 'titulo_2') ? 2 : 3;
+      }
+      this.renderizar();
+    }
+
+    const barra = barraEl || (typeof document !== 'undefined' ? document.getElementById('athBarraContextoTexto') : null);
+    if (barra) {
+      const rotuloEl = barra.querySelector('#athRotuloCtxEstilo');
+      if (rotuloEl) rotuloEl.textContent = estilo.nome;
+      const menuEst = barra.querySelector('#athMenuContextEstilo');
+      if (menuEst) menuEst.hidden = true;
+    }
+
+    if (bloco) {
+      this.sessaoRealtime?.transmitirAtualizacaoBloco(bloco);
+      this.notificarMudanca();
+      this.notificarMudancaRapida();
+    }
   }
 }

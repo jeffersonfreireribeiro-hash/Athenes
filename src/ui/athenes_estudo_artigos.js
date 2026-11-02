@@ -2192,21 +2192,21 @@ export class EstudoArtigosView {
       <!-- METADE SUPERIOR (50%): ARTIGOS DO ZOTERO -->
       <div class="rm-card-meio-a-meio">
         <div class="rm-card-meio-a-meio-topo">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:8px;">
-            <strong style="font:800 11.5px var(--glx-font); color:var(--glx-muted, #6B7585); text-transform:uppercase; letter-spacing:.06em;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:8px; min-width:0;">
+            <strong style="font:800 11.5px var(--glx-font); color:var(--glx-muted, #6B7585); text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;">
               Artigos do Zotero <span class="rm-contagem">(${this.artigos.length})</span>
             </strong>
-            <div style="display:flex; gap:4px;">
-              <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athEsqBtnSyncZotero" title="Sincronizar com Zotero API" style="height:24px; padding:0 8px; font-size:10.5px;">
-                ${svgIcone('zotero', 11)} Sync
+            <div style="display:flex; gap:4px; flex-shrink:0;">
+              <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athEsqBtnSyncZotero" title="Sincronizar com Zotero API" style="height:26px; padding:0 8px; font-size:11px; white-space:nowrap;">
+                ${svgIcone('zotero', 12)} Sync
               </button>
-              <button type="button" class="glx-btn glx-btn-primary glx-btn-xs" id="athEsqBtnNovoArtigo" title="Vincular novo artigo" style="height:24px; padding:0 8px; font-size:10.5px;">
+              <button type="button" class="glx-btn glx-btn-primary glx-btn-xs" id="athEsqBtnNovoArtigo" title="Vincular novo artigo" style="height:26px; padding:0 8px; font-size:11px; white-space:nowrap;">
                 + Artigo
               </button>
             </div>
           </div>
           <div style="margin-bottom:8px;">
-            <input type="search" id="athInputFiltroEsqArtigos" value="${escapeHtml(this.filtroLateralEsq)}" placeholder="Filtrar artigos da biblioteca..." style="height:32px; font-size:11.5px;">
+            <input type="search" id="athInputFiltroEsqArtigos" value="${escapeHtml(this.filtroLateralEsq)}" placeholder="Filtrar artigos da biblioteca..." style="height:34px; font-size:12px; padding:0 12px; border-radius:8px; width:100%; box-sizing:border-box;">
           </div>
         </div>
 
@@ -2215,18 +2215,18 @@ export class EstudoArtigosView {
             const isAtivo = item.id === artAtivo.id;
             const qtdCit = item.fichamento?.citacoesMarcadas?.length || 0;
             return `
-              <div class="rm-mestra-card ${isAtivo ? 'sel' : ''}" data-abrir-artigo-esq="${escapeHtml(item.id)}" style="display:flex; flex-direction:column; gap:4px; padding:8px 10px; border-radius:10px; border:1.5px solid ${isAtivo ? 'var(--ath-primary, #314F79)' : '#E2E8F0'}; background:${isAtivo ? '#EEF4FA' : '#FFFFFF'}; cursor:pointer; flex-shrink:0;">
-                <div style="display:flex; align-items:center; gap:6px; min-width:0;">
-                  <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:${isAtivo ? '#314F79' : '#E2E8F0'}; color:${isAtivo ? '#fff' : '#475569'}; font:800 10.5px var(--glx-font); flex:none;">
+              <div class="rm-mestra-card ${isAtivo ? 'sel' : ''}" data-abrir-artigo-esq="${escapeHtml(item.id)}" style="display:flex; flex-direction:column; gap:5px; padding:10px 12px; border-radius:10px; border:1.5px solid ${isAtivo ? 'var(--ath-primary, #314F79)' : '#E2E8F0'}; background:${isAtivo ? '#EEF4FA' : '#FFFFFF'}; cursor:pointer; flex-shrink:0;">
+                <div style="display:flex; align-items:flex-start; gap:8px; min-width:0;">
+                  <span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:${isAtivo ? '#314F79' : '#E2E8F0'}; color:${isAtivo ? '#fff' : '#475569'}; font:800 11px var(--glx-font); flex:none; margin-top:1px;">
                     ${idx + 1}
                   </span>
-                  <strong style="font-size:12px; font-weight:800; color:#1F2733; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;" title="${escapeHtml(item.titulo)}">
+                  <strong style="font-size:12.5px; font-weight:750; color:#1F2733; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; flex:1; min-width:0;" title="${escapeHtml(item.titulo)}">
                     ${escapeHtml(item.titulo)}
                   </strong>
                 </div>
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:2px;">
-                  <span class="rm-selo" style="font-size:9.5px; padding:2px 7px;">${escapeHtml(formatarCitacaoAbntDoArtigo(item))}</span>
-                  <span style="font-size:10.5px; color:#314F79; font-weight:700;">${qtdCit} citaç${qtdCit === 1 ? 'ão' : 'ões'}</span>
+                  <span class="rm-selo" style="font-size:10px; padding:3px 8px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(formatarCitacaoAbntDoArtigo(item))}</span>
+                  <span style="font-size:11px; color:#314F79; font-weight:700; white-space:nowrap;">${qtdCit} citaç${qtdCit === 1 ? 'ão' : 'ões'}</span>
                 </div>
               </div>
             `;
@@ -2237,11 +2237,11 @@ export class EstudoArtigosView {
       <!-- METADE INFERIOR (50%): PÁGINAS DO PDF & MARCAÇÕES -->
       <div class="rm-card-meio-a-meio">
         <div class="rm-card-meio-a-meio-topo">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:8px;">
-            <strong style="font:800 11.5px var(--glx-font); color:var(--glx-muted, #6B7585); text-transform:uppercase; letter-spacing:.06em;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:8px; min-width:0;">
+            <strong style="font:800 11.5px var(--glx-font); color:var(--glx-muted, #6B7585); text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;">
               Páginas do PDF <span class="rm-contagem">(${paginasPdf.length})</span>
             </strong>
-            <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athEsqBtnNovaFolha" style="height:24px; padding:0 9px; font-size:10.5px;">
+            <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athEsqBtnNovaFolha" style="height:26px; padding:0 9px; font-size:11px; white-space:nowrap; flex-shrink:0;">
               + Folha Extra
             </button>
           </div>
