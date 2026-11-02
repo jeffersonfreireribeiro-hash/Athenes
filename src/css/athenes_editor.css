@@ -727,10 +727,11 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 /* Barra flutuante de seleção rápida de estilos e tipos no bloco da página */
 .ath-bloco-barra-rapida {
   position: absolute;
-  bottom: -30px;
-  right: 6px;
-  left: auto;
-  max-width: calc(100% - 12px);
+  top: calc(100% + 4px);
+  bottom: auto;
+  left: 0;
+  right: 0;
+  width: auto;
   box-sizing: border-box;
   display: none;
   align-items: center;
@@ -744,8 +745,8 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
   font-family: var(--glx-font, Nunito), system-ui, sans-serif;
   user-select: none;
   white-space: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex-wrap: wrap; /* em blocos estreitos quebra em 2 linhas (cresce para baixo) em vez de cortar */
+  overflow: visible;
 }
 
 .ath-bloco-barra-rapida::-webkit-scrollbar {
@@ -753,7 +754,7 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 }
 
 .ath-bloco-folha.sel .ath-bloco-barra-rapida {
-  display: inline-flex;
+  display: flex;
 }
 
 .ath-bloco-folha.sel > .ath-bloco-alca.topo {
@@ -761,7 +762,9 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 }
 
 .ath-bloco-barra-rapida .ath-sel-rapido {
-  flex-shrink: 0;
+  flex: 1 1 64px;
+  min-width: 64px;
+  text-overflow: ellipsis;
   height: 23px;
   min-height: 23px;
   padding: 0 6px;
@@ -774,7 +777,6 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
   outline: none;
   cursor: pointer;
   white-space: nowrap;
-  max-width: 140px;
 }
 
 .ath-bloco-barra-rapida .ath-sel-rapido:hover,
@@ -784,7 +786,6 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 }
 
 .ath-bloco-barra-rapida .ath-btn-rapido {
-  flex-shrink: 0;
   height: 23px;
   min-height: 23px;
   padding: 0 7px;
@@ -801,7 +802,7 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
   gap: 4px;
   white-space: nowrap !important;
   line-height: 1;
-  flex-shrink: 0;
+  flex: 0 0 auto;
   transition: all 0.15s ease;
 }
 

@@ -62,10 +62,16 @@ test('Athenes — Hifenização Fonológica e Editorial em Língua Portuguesa (p
   });
 });
 
-test('Athenes — Posicionamento da Barra Rápida do Bloco no Topo Direito (Sem Sobreposição)', async t => {
-  await t.test('CSS define .ath-bloco-barra-rapida em right: 6px e left: auto para não sobrepor cursor', () => {
+test('Athenes — Barra Rápida do Bloco ocupa a largura do bloco, abaixo dele, sem cortar controles', async t => {
+  await t.test('CSS ancora .ath-bloco-barra-rapida em left:0/right:0, abaixo do bloco, com quebra de linha', () => {
     const css = fs.readFileSync(path.resolve('src/css/athenes_editor.css'), 'utf8');
-    assert.match(css, /\.ath-bloco-barra-rapida\s*\{[^}]*right:\s*6px;/);
-    assert.match(css, /\.ath-bloco-barra-rapida\s*\{[^}]*left:\s*auto;/);
+    assert.match(css, /\.ath-bloco-barra-rapida\s*\{[^}]*left:\s*0;[^}]*right:\s*0;/);
+    assert.match(css, /\.ath-bloco-barra-rapida\s*\{[^}]*top:\s*calc\(100% \+ 4px\);/);
+    assert.match(css, /\.ath-bloco-barra-rapida\s*\{[^}]*flex-wrap:\s*wrap;/);
+    assert.doesNotMatch(css, /\.ath-bloco-barra-rapida\s*\{[^}]*overflow-x:\s*auto;/, 'overflow não pode cortar controles');
+  });
+  await t.test('seletores da barra dividem o espaço com largura mínima legível', () => {
+    const css = fs.readFileSync(path.resolve('src/css/athenes_editor.css'), 'utf8');
+    assert.match(css, /\.ath-bloco-barra-rapida \.ath-sel-rapido\s*\{[^}]*flex:\s*1 1 64px;[^}]*min-width:\s*64px;/);
   });
 });
