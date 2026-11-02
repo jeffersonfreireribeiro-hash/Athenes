@@ -312,6 +312,9 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.numero_sequencial = dados.numero_sequencial || 1;
       b.largura_pct = dados.largura_pct || 90;
       b.moldura_tipo = dados.moldura_tipo || 'limpo';
+      b.linha_estilo = dados.linha_estilo || 'solida';
+      b.linha_cor = dados.linha_cor || '#314F79';
+      b.linha_largura_pt = dados.linha_largura_pt !== undefined ? dados.linha_largura_pt : 1.5;
       b.posicao_titulo = dados.posicao_titulo || 'topo';
       b.subgrade_colunas = dados.subgrade_colunas || 1;
       b.padding_pt = dados.padding_pt !== undefined ? dados.padding_pt : 4;
@@ -344,6 +347,9 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.bordas_abertas = true; // Estilo ABNT/IBGE (laterais verticais abertas)
       b.numero_sequencial = dados.numero_sequencial || 1;
       b.moldura_tipo = dados.moldura_tipo || 'limpo';
+      b.linha_estilo = dados.linha_estilo || 'solida';
+      b.linha_cor = dados.linha_cor || '#314F79';
+      b.linha_largura_pt = dados.linha_largura_pt !== undefined ? dados.linha_largura_pt : 1.0;
       b.posicao_titulo = dados.posicao_titulo || 'topo';
       b.padding_pt = dados.padding_pt !== undefined ? dados.padding_pt : 4;
       break;
@@ -363,6 +369,9 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.bordas_fechadas = true; // Estilo Quadro ABNT (caixa com todas as bordas fechadas)
       b.numero_sequencial = dados.numero_sequencial || 1;
       b.moldura_tipo = dados.moldura_tipo || 'caixa_borda';
+      b.linha_estilo = dados.linha_estilo || 'solida';
+      b.linha_cor = dados.linha_cor || '#CBD5E1';
+      b.linha_largura_pt = dados.linha_largura_pt !== undefined ? dados.linha_largura_pt : 1.0;
       b.posicao_titulo = dados.posicao_titulo || 'topo';
       b.padding_pt = dados.padding_pt !== undefined ? dados.padding_pt : 6;
       break;
@@ -389,6 +398,9 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.numero = b.numero_equacao;
       b.alinhamento = dados.alinhamento || 'centro';
       b.moldura_tipo = dados.moldura_tipo || 'limpo'; // 'limpo' (sem caixa/fundo), 'linha_esquerda', 'linhas_topo_base', 'cartao_suave', 'caixa_borda', 'personalizado'
+      b.linha_estilo = dados.linha_estilo || 'solida';
+      b.linha_cor = dados.linha_cor || '#314F79';
+      b.linha_largura_pt = dados.linha_largura_pt !== undefined ? dados.linha_largura_pt : 1.5;
       b.posicao_numero = dados.posicao_numero || 'direita'; // 'direita' | 'esquerda' | 'abaixo' | 'oculto'
       b.legenda_formula = dados.legenda_formula || '';
       b.mostrar_legenda = dados.mostrar_legenda !== undefined ? dados.mostrar_legenda : false;

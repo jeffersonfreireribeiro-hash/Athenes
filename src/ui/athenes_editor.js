@@ -46,6 +46,7 @@ import { svgIcone, svgLogo } from './athenes_icones.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 import { ModalEditorEstilo } from './athenes_editor_estilo_modal.js';
+import { ModalCentralEstilos } from './athenes_central_estilos_modal.js';
 import {
   MODOS_TRABALHO,
   obterPerfilColaborador,
@@ -385,6 +386,13 @@ export class EditorView {
                 <div class="rm-topo-popover rm-topo-popover-estilos" id="athPopoverEstilos" role="dialog" aria-label="Estilos de Texto" hidden></div>
               </div>
 
+              <div class="rm-menu-topo-item" data-menu="tema">
+                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuTema" title="Central de Estilos & Tema: Importar, Exportar ou Gerar com IA">
+                  ${svgIcone('paleta', 14)}
+                  <span>Tema & Estilos</span>
+                </button>
+              </div>
+
               <div class="rm-menu-topo-item" data-menu="nuvem">
                 <button type="button" class="rm-btn-menu-topo" id="athBtnMenuNuvem" aria-haspopup="dialog" aria-expanded="false" title="Supabase Nuvem, Google Drive e Revisões Colaborativas">
                   ${svgIcone('nuvem_ok', 14)}
@@ -632,6 +640,12 @@ export class EditorView {
       togglePopover('nuvem');
     });
 
+    root.querySelector('#athBtnMenuTema')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fecharTodos();
+      this.abrirModalCentralEstilos();
+    });
+
     // 1. Popover Arquivo & Margens
     popArquivo.innerHTML = `
       <div class="rm-popover-topo-head">
@@ -841,12 +855,22 @@ export class EditorView {
         <strong>Estilos de Texto <span class="rm-contagem">(${estilos.length})</span></strong>
         <button type="button" class="rm-ic" data-fechar-popover title="Fechar">${svgIcone('fechar', 13)}</button>
       </div>
+      <div style="display:flex; gap:6px; margin-top:6px; margin-bottom:8px;">
+        <button type="button" class="glx-btn glx-btn-primary glx-btn-xs" id="rmBtnCentralEstilosTopo" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; height:28px; font-weight:750;">
+          ${svgIcone('paleta', 13)} Central de Estilos & IA
+        </button>
+      </div>
       <ul class="rm-lista-estilos" id="rmListaEstilosTopo" style="max-height:220px; overflow-y:auto; margin-top:4px; margin-bottom:4px; padding:2px;"></ul>
       <div class="rm-estilo-previa" id="rmEstiloPreviaTopo" style="margin-top:6px; margin-bottom:6px;">Aa — Texto de exemplo do estilo</div>
       <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="rmBtnNovoEstiloTopo" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; margin-top:4px;">
         ${svgIcone('mais', 12)} Novo Estilo
       </button>
     `;
+
+    popEstilos.querySelector('#rmBtnCentralEstilosTopo')?.addEventListener('click', () => {
+      fecharTodos();
+      this.abrirModalCentralEstilos();
+    });
 
     const previaTopo = popEstilos.querySelector('#rmEstiloPreviaTopo');
     const atualizarPreviaTopo = (est) => {
@@ -3945,5 +3969,19 @@ export class EditorView {
       this.notificarMudanca();
       this.notificarMudancaRapida();
     }
+  }
+
+  /* ==========================================================================
+     ABRIR CENTRAL DE ESTILOS & IDENTIDADE VISUAL (IMPORTAR / EXPORTAR / IA)
+     ========================================================================== */
+  abrirModalCentralEstilos(abaInicial = 'exportar') {
+    new ModalCentralEstilos(this.doc, this, {
+      abaInicial,
+      onSucesso: () => {
+        this.notificarMudanca();
+        this.renderizar();
+        if (this.onAlterado) this.onAlterado();
+      }
+    });
   }
 }
