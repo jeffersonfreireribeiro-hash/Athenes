@@ -150,6 +150,9 @@ export class DashboardView {
 
         <!-- Identificação de Quem Está Mexendo / Login -->
         <div class="ath-dash-user-box" style="display:flex; align-items:center; gap:8px;">
+          <a href="/api/v1/app/download" class="ath-btn ath-btn-sm" id="athBtnBaixarAppWeb" style="height:32px; font-size:11.5px; display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#314F79; background:#fff; border:1px solid #C8D7E6;" title="Baixar Aplicativo Android Tablet Athenes (.apk)">
+            ${svgIcone('android', 15)} <span>Baixar App (APK)</span>
+          </a>
           ${driveCfg.pastaUrl ? `
             <a href="${driveCfg.pastaUrl}" target="_blank" rel="noopener noreferrer" class="ath-btn ath-btn-sm" style="height:32px; font-size:11.5px; display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#314F79; background:#fff; border:1px solid #C8D7E6;" title="Abrir sua pasta de PDFs e artigos no Google Drive Web">
               ${svgIcone('drive', 14)} Pasta Drive ↗
