@@ -6,6 +6,7 @@
  */
 
 import { elementosMestraHtml, renderizadoPeloCanvas, contextoVariaveisPagina } from './athenes_mestra_render.js';
+import { calcularNumeracaoSecoes, extrairItensSumario, sumarioHtml, configEfetivaSumario, removerNumeroManual, tagDoNivel, estiloIdDoTitulo, nivelDe } from './athenes_sumario.js';
 import { margensEfetivasMm } from './athenes_mestra_canvas.js';
 import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssTipografia, estiloParaCssNumeracao, FONTES_SISTEMA } from './athenes_estilos.js';
@@ -16,7 +17,7 @@ import { geometriaCorpoMm, resolverAreasPagina } from './athenes_paginacao.js';
 import { obterConfigNotas, aplicarRotulosNotasHtml, sanitizarHtmlNota } from './athenes_notas_rodape.js';
 import { descreverFigura, cssObjParaString, PLACEHOLDER_IMG } from './athenes_figura_layout.js';
 import { obterEstiloTabela, dimensoesTabela, resolverCelula, celulaParaCss, tabelaParaCss } from './athenes_tabela_estilo.js';
-import { rotuloDaFigura, gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento, obterTituloCompletoComNumeracao } from './athenes_documento.js';
+import { rotuloDaFigura, gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento, obterTituloCompletoComNumeracao, obterPrefixoNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
 
 export function escaparHtml(texto) {
   if (texto === undefined || texto === null) return '';
@@ -74,9 +75,12 @@ function cssTextoPapel(bloco, papel, estilosMap, estPadrao, extraPadrao = '') {
 function tituloComNumeracaoHtml(bloco, estilosMap) {
   const completo = obterTituloCompletoComNumeracao(bloco) || '';
   const est = estilosMap[bloco.numeracao_estilo_id];
-  const m = /^(.*?\d+\s*[—–-]\s*)([\s\S]*)$/.exec(completo);
-  if (!est || !m) return completo;
-  return `<span style="${estiloParaCssNumeracao(est)}">${m[1]}</span>${m[2]}`;
+  const pref = obterPrefixoNumeracao(bloco); // "Tabela 1 — " com o separador escolhido
+  if (!est || !completo.startsWith(pref.trimEnd())) return completo;
+  const resto = completo.slice(pref.trimEnd().length);
+  const espacos = pref.length - pref.trimEnd().length;
+  const sep = resto.slice(0, resto.length - resto.trimStart().length) || '';
+  return `<span style="${estiloParaCssNumeracao(est)}">${pref.trimEnd()}${sep}</span>${resto.slice(sep.length)}`;
 }
 
 /** Tabela/quadro com estilo declarativo (bordas, zebra, fundos, alinhamento) resolvido por célula. */
@@ -100,7 +104,7 @@ function gerarTabelaHtmlEstilizada(bloco, classe, estilosMap = {}) {
 }
 
 export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
-  const estBase = estilosMap[bloco.estiloId] || estilosMap.corpo || {};
+  const estBase = estilosMap[bloco.tipo === 'titulo' ? estiloIdDoTitulo(estilosMap, bloco) : bloco.estiloId] || estilosMap.corpo || {};
   const est = {
     ...estBase,
     ...(bloco.fonte ? { fonte: bloco.fonte } : {}),
@@ -123,8 +127,12 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
 
   switch (bloco.tipo) {
     case 'titulo': {
-      const tag = `h${Math.min(4, Math.max(1, bloco.nivel || 1))}`;
-      return `<${tag} class="ath-bloco ath-titulo" style="${estiloCss}" data-id="${bloco.id}">${textoFormatado}</${tag}>`;
+      const nivel = nivelDe(bloco);
+      const tag = tagDoNivel(nivel);
+      const num = opcoes.prefixosSecoes?.get(bloco.id);
+      const corpoTitulo = num ? removerNumeroManual(textoFormatado) || textoFormatado : textoFormatado;
+      const prefixo = num ? `<span class="ath-num-secao">${num.prefixo}</span> ` : '';
+      return `<${tag} id="ath-b-${bloco.id}" class="ath-bloco ath-titulo ath-nivel-${nivel}" ${nivel > 6 ? `role="heading" aria-level="${nivel}" ` : ''}style="${estiloCss}" data-id="${bloco.id}">${prefixo}${corpoTitulo}</${tag}>`;
     }
 
     case 'subtitulo':
@@ -196,7 +204,7 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
         if (it.subrotulo && !it.subrotulo.interno) {
           legenda = '<span style="' + cssSub + '"><span style="margin-right:4px; display:inline; text-indent:0; margin-left:0; padding:0; ' + cssRotulo + '">' + escaparHtml(it.subrotulo.texto) + '</span>' + escaparHtml(it.legenda_sub) + '</span>';
         } else if (it.legenda_sub && d.qtd > 1) {
-          legenda = '<span style="' + cssSub + '">' + escaparHtml(rot + ' ' + (bloco.numero_sequencial || 1) + String.fromCharCode(97 + it.idx) + ' — ' + it.legenda_sub) + '</span>';
+          legenda = '<span style="' + cssSub + '">' + escaparHtml(rot + ' ' + (bloco.numero_sequencial || 1) + String.fromCharCode(97 + it.idx) + (bloco.legenda_sep ?? ' — ') + it.legenda_sub) + '</span>';
         }
         return '<div style="' + cssObjParaString(it.celula) + '">' +
           '<div style="' + cssObjParaString(it.moldura) + '">' +
@@ -294,21 +302,10 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       </div>`;
 
     case 'sumario': {
-      const itensSumario = gerarSumarioDinamico(documento);
-      const linhasSumario = itensSumario.map(it => {
-        const recuo = (it.nivel - 1) * 6;
-        const peso = it.nivel === 1 ? '700' : '400';
-        return `<div class="ath-sumario-linha" style="padding-left:${recuo}mm; font-weight:${peso};">
-          <span class="ath-sumario-txt">${it.texto}</span>
-          <span class="ath-sumario-pontos"></span>
-          <span class="ath-sumario-num">${it.pagina}</span>
-        </div>`;
-      }).join('\n');
-
-      return `<div class="ath-bloco ath-sumario" data-id="${bloco.id}">
-        <h2 style="${estiloParaCss(estilosMap.titulo1)} text-align:center; margin-bottom:14px;">${bloco.titulo || 'SUMÁRIO'}</h2>
-        <div class="ath-sumario-lista">${linhasSumario}</div>
-      </div>`;
+      const cfg = configEfetivaSumario(documento, bloco);
+      const itens = extrairItensSumario(documento, { profundidade: cfg.profundidade_max, mapa: opcoes.prefixosSecoes });
+      const estTit = estilosMap.titulo1 ? `${estiloParaCss(estilosMap.titulo1)};` : '';
+      return `<div class="ath-bloco ath-sumario-bloco" data-id="${bloco.id}" style="${estiloCss}">${sumarioHtml(itens, cfg, { estiloTitulo: estTit })}</div>`;
     }
 
     case 'referencias': {
@@ -346,11 +343,13 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
   // Sugestões pendentes saem como "proposta aceita" (texto inserido mantido, excluído descartado); `sugestoes: 'manter'` preserva as marcas
   if (opcoes.sugestoes !== 'manter') documento = documentoComSugestoesResolvidas(documento, 'aceitar');
   if (!documento.paginas || documento.paginas.length === 0) repaginarDocumento(documento);
+  recalcularNumeracaoAutomatica(documento); // legendas com o separador escolhido
   const estilosMap = {};
   for (const est of (documento.estilos || [])) {
     estilosMap[est.id] = est;
   }
 
+  const prefixosSecoes = calcularNumeracaoSecoes(documento);
   const paginasHtml = (documento.paginas || []).map((pag, index) => {
     const modelo = modeloDaPagina(documento, pag);
     const dimFolha = dimensoesPapelMm(modelo.formato, modelo.orientacao);
@@ -363,7 +362,7 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
     const cabHtml = areaPaginaHtml(areas.cabecalho, m);
 
     // Blocos da página
-    const opcoesPag = { ...opcoes, margens_mm: m, rotulosNotas: pag.rotulosNotas };
+    const opcoesPag = { ...opcoes, margens_mm: m, rotulosNotas: pag.rotulosNotas, prefixosSecoes };
     const blocosPag = pag.blocos || [];
     const partes = [];
     for (let i = 0; i < blocosPag.length; i++) {
@@ -500,6 +499,9 @@ return `<section class="ath-pagina" style="position:relative; width:${largura_mm
       height: 1px;
     }
     .ath-sumario-num { flex-shrink: 0; }
+    .ath-num-secao { margin-right: .4em; }
+    .ath-toc-item { break-inside: avoid; }
+    .ath-toc-link { color: inherit; text-decoration: none; }
 
     sup.ath-nota-ref { font-weight: 700; }
     ${opcoes.cssExtra || ''}

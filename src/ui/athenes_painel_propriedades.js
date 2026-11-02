@@ -12,11 +12,13 @@
 import { FONTES_SISTEMA, PESOS_FONTE, estiloParaCss, alinhamentoCss, ALINHAMENTOS } from '../core/athenes_estilos.js';
 import {
   modeloDaPagina, recalcularNumeracaoAutomatica, resolverReferenciasCruzadas,
-  ROTULOS_FIGURA, rotuloDaFigura, aplicarNumeracaoNoTitulo, removerPrefixoNumeracaoTitulo,
+  SEPARADORES_LEGENDA, idSeparadorLegenda, ROTULOS_FIGURA, rotuloDaFigura, aplicarNumeracaoNoTitulo, removerPrefixoNumeracaoTitulo,
   obterTextoPuroTitulo, rotuloDoBloco, obterPrefixoNumeracao, obterTituloCompletoComNumeracao,
   calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
+import { montarPainelSumario } from './athenes_sumario_painel.js';
+import { NIVEL_MAX, nivelDe, blocoNumerado, normalizarNumeracaoSecoes, REGEX_NUMERO_MANUAL } from '../core/athenes_sumario.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 import { montarPainelFiguraVisual, montarPainelTipografiaBloco, papeisTipografiaFigura } from './athenes_figura_ui.js';
 import { qtdSlotsDoLayout, ajustarItensAoLayout } from '../core/athenes_figura_layout.js';
@@ -359,9 +361,7 @@ export class PainelPropriedades {
         <div class="rm-linha2">
           <label style="font:700 12px var(--glx-font);">Nível
             <select id="rmCampoNivel" class="glx-select" style="width:100%; margin-top:4px;">
-              <option value="1" ${b.nivel === 1 ? 'selected' : ''}>1 (Seção Primária)</option>
-              <option value="2" ${b.nivel === 2 ? 'selected' : ''}>2 (Subseção)</option>
-              <option value="3" ${b.nivel === 3 ? 'selected' : ''}>3 (Sub-subseção)</option>
+              ${Array.from({ length: NIVEL_MAX }, (_, i) => `<option value="${i + 1}" ${nivelDe(b) === i + 1 ? 'selected' : ''}>${i + 1} (${['Seção primária', 'Seção secundária', 'Seção terciária', 'Seção quaternária', 'Seção quinária', 'Seção senária', 'Nível 7', 'Nível 8', 'Nível 9'][i]})</option>`).join('')}
             </select>
           </label>
           <div>
@@ -490,10 +490,42 @@ export class PainelPropriedades {
           <input type="checkbox" id="rmCampoManter" ${b.manterComProximo ? 'checked' : ''}>
           Manter título com o parágrafo seguinte (evitar órfão)
         </label>
+        ${b.tipo === 'titulo' ? `
+        <div style="display:flex; flex-direction:column; gap:8px; padding:10px; border:1px solid #E2E8F0; border-radius:10px; background:#F8FAFC;">
+          <strong style="font:800 10.5px var(--glx-font); letter-spacing:.06em; text-transform:uppercase; color:var(--ath-primary,#314F79);">Numeração e sumário</strong>
+          <label style="font:700 11px var(--glx-font); color:#475569;">Numeração desta seção
+            <select id="rmCampoNumerar" class="glx-select" style="width:100%; margin-top:3px;">
+              <option value="" ${b.numerar_secao === undefined ? 'selected' : ''}>Seguir o documento (${normalizarNumeracaoSecoes(this.doc.numeracao_secoes).ativa ? 'automática' : 'manual'})</option>
+              <option value="sim" ${b.numerar_secao === true ? 'selected' : ''}>Automática (1.1.1…)</option>
+              <option value="nao" ${b.numerar_secao === false ? 'selected' : ''}>Manual / sem número automático</option>
+            </select>
+          </label>
+          <label class="rm-chk" style="font-size:12px;"><input type="checkbox" id="rmCampoNumDoc" ${normalizarNumeracaoSecoes(this.doc.numeracao_secoes).ativa ? 'checked' : ''}> Numerar todas as seções do documento automaticamente</label>
+          <label class="rm-chk" style="font-size:12px;"><input type="checkbox" id="rmCampoForaSumario" ${b.ocultar_no_sumario ? 'checked' : ''}> Ocultar este título do sumário</label>
+          ${blocoNumerado(this.doc, b) && REGEX_NUMERO_MANUAL.test((b.texto || '').replace(/<[^>]*>/g, '')) ? '<button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="rmBtnTirarNumeroManual">Remover o número digitado à mão no início do texto</button>' : ''}
+        </div>` : ''}
       `;
 
       box.querySelector('#rmCampoTexto').addEventListener('input', e => { b.texto = e.target.value; this.notificarMudanca(); });
-      box.querySelector('#rmCampoNivel').addEventListener('change', e => { b.nivel = parseInt(e.target.value, 10); this.notificarMudanca(); });
+      box.querySelector('#rmCampoNivel').addEventListener('change', e => {
+        b.nivel = parseInt(e.target.value, 10);
+        if (/^titulo\d$/.test(b.estiloId || '')) b.estiloId = `titulo${Math.min(6, b.nivel)}`; // o estilo acompanha o nível
+        this.notificarMudanca(true);
+        this.renderizar?.();
+      });
+      box.querySelector('#rmCampoNumerar')?.addEventListener('change', e => {
+        if (e.target.value === '') delete b.numerar_secao; else b.numerar_secao = e.target.value === 'sim';
+        this.notificarMudanca(true); this.renderizar?.();
+      });
+      box.querySelector('#rmCampoNumDoc')?.addEventListener('change', e => {
+        this.doc.numeracao_secoes = normalizarNumeracaoSecoes({ ...(this.doc.numeracao_secoes || {}), ativa: e.target.checked });
+        this.notificarMudanca(true); this.renderizar?.();
+      });
+      box.querySelector('#rmCampoForaSumario')?.addEventListener('change', e => { if (e.target.checked) b.ocultar_no_sumario = true; else delete b.ocultar_no_sumario; this.notificarMudanca(true); });
+      box.querySelector('#rmBtnTirarNumeroManual')?.addEventListener('click', () => {
+        b.texto = String(b.texto || '').replace(REGEX_NUMERO_MANUAL, '');
+        this.notificarMudanca(true); this.renderizar?.();
+      });
       box.querySelector('#rmCampoEstilo').addEventListener('change', e => { b.estiloId = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmCampoFonte').addEventListener('change', e => { b.fonte = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmCampoManter').addEventListener('change', e => { b.manterComProximo = e.target.checked; this.notificarMudanca(); });
@@ -1218,7 +1250,7 @@ export class PainelPropriedades {
         <label style="margin-top:6px;">Nome / Identificação da Ilustração
           <div style="display:flex; align-items:center; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:8px; overflow:hidden; background:#fff; margin-top:3px;">
             <span style="background:#EEF4FA; color:var(--ath-primary, #314F79); font:800 11.5px var(--glx-font); padding:6px 10px; border-right:1px solid #CBD5E1; user-select:none; white-space:nowrap;" title="Prefixo e numeração automáticos gerados pela posição no documento">
-              ${rotuloAtual} ${numAtual} —
+              ${obterPrefixoNumeracao(b).trimEnd()}
             </span>
             <input type="text" id="rmFigTitulo" value="${escapeHtml(textoPuro)}" placeholder="Escreva apenas o nome da ilustração..." style="border:none; padding:6px 10px; flex:1; outline:none; font-size:12px; margin:0;">
           </div>
@@ -1306,6 +1338,7 @@ export class PainelPropriedades {
         this.notificarMudanca();
       });
 
+      this.inserirSeletorSeparador(box, '#rmFigTitulo', b);
       box.querySelector('#rmFigTitulo').addEventListener('input', e => {
         b.titulo = removerPrefixoNumeracaoTitulo(e.target.value);
         this.notificarMudanca();
@@ -1398,7 +1431,7 @@ export class PainelPropriedades {
         <label>Identificação / Título
           <div style="display:flex; align-items:center; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:8px; overflow:hidden; background:#fff; margin-top:3px;">
             <span style="background:#EEF4FA; color:var(--ath-primary, #314F79); font:800 11.5px var(--glx-font); padding:6px 10px; border-right:1px solid #CBD5E1; user-select:none; white-space:nowrap;">
-              Mapa ${b.numero_sequencial || 1} —
+              ${obterPrefixoNumeracao(b).trimEnd()}
             </span>
             <input type="text" id="rmMapaTitulo" value="${escapeHtml(obterTextoPuroTitulo(b))}" placeholder="Descrição do mapa territorial" style="border:none; padding:6px 10px; flex:1; outline:none; font-size:12px; margin:0;">
           </div>
@@ -1429,6 +1462,7 @@ export class PainelPropriedades {
           }
         });
       });
+      this.inserirSeletorSeparador(box, '#rmMapaTitulo', b);
       box.querySelector('#rmMapaTitulo').addEventListener('input', e => {
         b.titulo = removerPrefixoNumeracaoTitulo(e.target.value);
         this.notificarMudanca();
@@ -1454,7 +1488,7 @@ export class PainelPropriedades {
         <label>Identificação / Título
           <div style="display:flex; align-items:center; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:8px; overflow:hidden; background:#fff; margin-top:3px;">
             <span style="background:#EEF4FA; color:var(--ath-primary, #314F79); font:800 11.5px var(--glx-font); padding:6px 10px; border-right:1px solid #CBD5E1; user-select:none; white-space:nowrap;">
-              ${rotuloTab} ${b.numero_sequencial || 1} —
+              ${obterPrefixoNumeracao(b).trimEnd()}
             </span>
             <input type="text" id="rmTabTitulo" value="${escapeHtml(obterTextoPuroTitulo(b))}" placeholder="Descrição da ${isQuadro ? 'estrutura' : 'tabela'}" style="border:none; padding:6px 10px; flex:1; outline:none; font-size:12px; margin:0;">
           </div>
@@ -1487,6 +1521,7 @@ export class PainelPropriedades {
           }
         });
       });
+      this.inserirSeletorSeparador(box, '#rmTabTitulo', b);
       box.querySelector('#rmTabTitulo').addEventListener('input', e => {
         b.titulo = removerPrefixoNumeracaoTitulo(e.target.value);
         this.notificarMudanca();
@@ -1705,6 +1740,9 @@ export class PainelPropriedades {
         b.altura_pt = Math.max(4, parseFloat(e.target.value) || 24);
         this.notificarMudanca();
       });
+    }
+    else if (b.tipo === 'sumario') {
+      box.appendChild(montarPainelSumario(this.doc, b, () => this.notificarMudanca(true)));
     }
     else if (b.tipo === 'quebra_pagina') {
       box.innerHTML = `
@@ -1973,6 +2011,41 @@ export class PainelPropriedades {
     });
 
     wrapper.appendChild(box);
+  }
+
+  /**
+   * "Separador entre o número e o título" (Tabela 1 — / : / . …): escolha do bloco, com atalho para
+   * tornar a escolha o padrão do documento. Entra logo abaixo do campo de título.
+   */
+  inserirSeletorSeparador(box, seletorTitulo, b) {
+    const alvo = box.querySelector(seletorTitulo)?.closest('label');
+    if (!alvo) return;
+    const docId = idSeparadorLegenda(this.doc, null);
+    const padraoDoc = SEPARADORES_LEGENDA.find(x => x.id === docId);
+    const atual = b.separador_legenda || '';
+    const wrap = document.createElement('div');
+    wrap.className = 'ath-sep-legenda';
+    wrap.style.cssText = 'display:flex; flex-direction:column; gap:6px; margin-top:6px;';
+    wrap.innerHTML = `
+      <label style="font:700 11px var(--glx-font); color:#475569; display:flex; flex-direction:column; gap:3px;">Separador entre o número e o título
+        <select class="glx-select" data-sep style="width:100%;">
+          <option value="" ${atual === '' ? 'selected' : ''}>Padrão do documento (${padraoDoc.exemplo})</option>
+          ${SEPARADORES_LEGENDA.map(x => `<option value="${x.id}" ${atual === x.id ? 'selected' : ''}>${x.rotulo} — ${x.exemplo.replace('Tabela', rotuloDoBloco(b))}</option>`).join('')}
+        </select>
+      </label>
+      <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" data-sep-todos style="align-self:flex-start;">Usar este separador em todo o documento</button>`;
+    alvo.insertAdjacentElement('afterend', wrap);
+    wrap.querySelector('[data-sep]').addEventListener('change', e => {
+      if (e.target.value) b.separador_legenda = e.target.value; else delete b.separador_legenda;
+      this.notificarMudanca(true);
+      this.renderizar?.();
+    });
+    wrap.querySelector('[data-sep-todos]').addEventListener('click', () => {
+      this.doc.separador_legenda = idSeparadorLegenda(this.doc, b);
+      for (const sec of this.doc.secoes || []) for (const x of sec.blocos || []) delete x.separador_legenda;
+      this.notificarMudanca(true);
+      this.renderizar?.();
+    });
   }
 
   notificarMudanca(estrutural = false) {

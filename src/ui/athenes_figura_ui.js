@@ -282,7 +282,7 @@ export function construirGradeFiguraDom(b, opc = {}) {
         leg.appendChild(r);
         leg.appendChild(document.createTextNode(it.legenda_sub));
       } else if (d.qtd > 1) {
-        leg.textContent = `${rot} ${b.numero_sequencial || 1}${String.fromCharCode(97 + it.idx)} — ${it.legenda_sub}`;
+        leg.textContent = `${rot} ${b.numero_sequencial || 1}${String.fromCharCode(97 + it.idx)}${b.legenda_sep ?? ' — '}${it.legenda_sub}`;
       }
       if (leg.textContent) {
         if (estSub || d.cfg.sublegenda_alinhamento !== 'estilo') leg.style.cssText += ';' + estiloParaCssComAlinhamento(estSub, d.cfg.sublegenda_alinhamento);

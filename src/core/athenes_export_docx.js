@@ -7,11 +7,12 @@
 import { ZipBuilder } from './zip_builder.js';
 import { MM_PARA_DXA } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
-import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao } from './athenes_documento.js';
+import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
 import { resolverAreasPagina, normalizarNumeracao, normalizarArea, estiloEfetivoNumeracao } from './athenes_paginacao.js';
 import { obterConfigNotas, obterNota, sanitizarHtmlNota, idsNotasDoBloco } from './athenes_notas_rodape.js';
 import { nomeFonteDocx } from './athenes_tabela_estilo.js';
+import { calcularNumeracaoSecoes, extrairItensSumario, configEfetivaSumario, removerNumeroManual, aplicarTransformacao, nivelDe, NIVEL_MAX } from './athenes_sumario.js';
 import { obterEstiloTabela, dimensoesTabela, resolverCelula, celulaParaDocx, PADDINGS_CELULA } from './athenes_tabela_estilo.js';
 
 /** Tabela/quadro OOXML com bordas por célula, sombreamento, alinhamento e zebra do estilo declarativo. */
@@ -288,6 +289,7 @@ function construirCabecalhoRodapeDocx(documento, mestrasMap) {
 export async function exportarParaDocx(documento) {
   // Sugestões pendentes saem como "proposta aceita", sem marcações <ins>/<del> cruas no Word
   documento = documentoComSugestoesResolvidas(documento, 'aceitar');
+  recalcularNumeracaoAutomatica(documento); // legendas com o separador escolhido
   const mestrasMapDoc = new Map((documento.mestras || documento.modelosPagina || []).map(m => [m.id, m]));
   ctxDocx = { documento, notas: new Map(), hf: construirCabecalhoRodapeDocx(documento, mestrasMapDoc) };
   const zip = new ZipBuilder();
@@ -439,6 +441,108 @@ export async function exportarParaDocx(documento) {
       <w:sz w:val="20"/>
     </w:rPr>
   </w:style>
+
+  <w:style w:type="paragraph" w:styleId="Heading4">
+    <w:name w:val="heading 4"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:spacing w:before="140" w:after="60"/>
+      <w:ind w:firstLine="0"/>
+      <w:outlineLvl w:val="3"/>
+    </w:pPr>
+    <w:rPr>
+      <w:b/>
+      <w:sz w:val="24"/>
+    </w:rPr>
+  </w:style>
+
+  <w:style w:type="paragraph" w:styleId="Heading5">
+    <w:name w:val="heading 5"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:spacing w:before="140" w:after="60"/>
+      <w:ind w:firstLine="0"/>
+      <w:outlineLvl w:val="4"/>
+    </w:pPr>
+    <w:rPr>
+      <w:i/>
+      <w:sz w:val="24"/>
+    </w:rPr>
+  </w:style>
+
+  <w:style w:type="paragraph" w:styleId="Heading6">
+    <w:name w:val="heading 6"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:spacing w:before="140" w:after="60"/>
+      <w:ind w:firstLine="0"/>
+      <w:outlineLvl w:val="5"/>
+    </w:pPr>
+    <w:rPr>
+      <w:b/>
+      <w:sz w:val="22"/>
+    </w:rPr>
+  </w:style>
+
+  <w:style w:type="paragraph" w:styleId="Heading7">
+    <w:name w:val="heading 7"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:spacing w:before="140" w:after="60"/>
+      <w:ind w:firstLine="0"/>
+      <w:outlineLvl w:val="6"/>
+    </w:pPr>
+    <w:rPr>
+      <w:i/>
+      <w:sz w:val="22"/>
+    </w:rPr>
+  </w:style>
+
+  <w:style w:type="paragraph" w:styleId="Heading8">
+    <w:name w:val="heading 8"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:spacing w:before="140" w:after="60"/>
+      <w:ind w:firstLine="0"/>
+      <w:outlineLvl w:val="7"/>
+    </w:pPr>
+    <w:rPr>
+      <w:b/>
+      <w:sz w:val="22"/>
+    </w:rPr>
+  </w:style>
+
+  <w:style w:type="paragraph" w:styleId="Heading9">
+    <w:name w:val="heading 9"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:spacing w:before="140" w:after="60"/>
+      <w:ind w:firstLine="0"/>
+      <w:outlineLvl w:val="8"/>
+    </w:pPr>
+    <w:rPr>
+      <w:i/>
+      <w:sz w:val="22"/>
+    </w:rPr>
+  </w:style>
 </w:styles>`;
   zip.add('word/styles.xml', stylesXml);
 
@@ -491,6 +595,8 @@ export async function exportarParaDocx(documento) {
       }];
 
   const mestrasMap = new Map((documento.mestras || documento.modelosPagina || []).map(m => [m.id, m]));
+  const prefixosSecoes = calcularNumeracaoSecoes(documento);
+  let contadorMarcadores = 0;
 
   for (let sIdx = 0; sIdx < secoes.length; sIdx++) {
     const sec = secoes[sIdx];
@@ -512,10 +618,14 @@ export async function exportarParaDocx(documento) {
       }
 
       if (b.tipo === 'titulo') {
-        const nivel = Math.min(3, Math.max(1, b.nivel || 1));
+        const nivel = nivelDe(b);
         const estiloId = `Heading${nivel}`;
-        const runs = htmlParaRunsDocx(b.texto);
-        bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="${estiloId}"/><w:keepNext/></w:pPr>${runs.join('')}</w:p>`);
+        const num = prefixosSecoes.get(b.id);
+        const runs = htmlParaRunsDocx(num ? (removerNumeroManual(b.texto) || b.texto) : b.texto);
+        const runsNum = num ? `<w:r><w:t xml:space="preserve">${escaparXml(num.prefixo)} </w:t></w:r>` : '';
+        const idMarca = ++contadorMarcadores;
+        // marcador _Toc_<id>: destino dos links do sumário
+        bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="${estiloId}"/><w:keepNext/></w:pPr><w:bookmarkStart w:id="${idMarca}" w:name="_Toc_${escaparXml(b.id)}"/>${runsNum}${runs.join('')}<w:bookmarkEnd w:id="${idMarca}"/></w:p>`);
       } else if (b.tipo === 'subtitulo') {
         const runs = htmlParaRunsDocx(b.texto, { cor: '#64748B', tamanhoPt: 13 });
         bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr>${runs.join('')}</w:p>`);
@@ -666,11 +776,25 @@ export async function exportarParaDocx(documento) {
       } else if (b.tipo === 'anexo') {
         bodyXmlParts.push(`<w:p><w:pPr><w:pBdr><w:left w:val="single" w:sz="12" w:space="8" w:color="2563EB"/></w:pPr><w:shd w:val="clear" w:color="auto" w:fill="EFF6FF"/><w:ind w:left="240" w:right="240"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/><w:color w:val="1E40AF"/></w:rPr><w:t>ANEXO: ${escaparXml(b.titulo || b.nome || 'Arquivo')} </w:t></w:r><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="475569"/></w:rPr><w:t>(${escaparXml(b.nome_arquivo || b.descricao || 'Documento complementar')})</w:t></w:r></w:p>`);
       } else if (b.tipo === 'sumario') {
-        bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/><w:jc w:val="center"/></w:pPr><w:r><w:t>${escaparXml(b.titulo || 'SUMÁRIO')}</w:t></w:r></w:p>`);
-        const itensSumario = gerarSumarioDinamico(documento);
-        for (const it of itensSumario) {
-          const recuo = (it.nivel - 1) * 360;
-          bodyXmlParts.push(`<w:p><w:pPr><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="8500"/></w:tabs><w:ind w:left="${recuo}"/><w:spacing w:after="60"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:b/></w:r><w:t>${escaparXml(it.texto)}</w:t></w:r><w:r><w:tab/></w:r><w:r><w:rPr><w:sz w:val="22"/></w:rPr><w:t>${it.pagina}</w:t></w:r></w:p>`);
+        const cfg = configEfetivaSumario(documento, b);
+        const mg = mestra.margens_mm || mestra.margens || { l: 30, r: 20 };
+        const larguraDxa = (mestra.orientacao === 'paisagem' ? 16838 : 11906) - Math.round(((mg.l || 30) + (mg.r || 20)) * MM_PARA_DXA);
+        const mm = (v) => Math.round(v * MM_PARA_DXA);
+        const jcTit = { esquerda: 'left', centro: 'center', direita: 'right' }[cfg.titulo.alinhamento];
+        if (cfg.titulo.texto) bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="${jcTit}"/><w:spacing w:after="240"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>${escaparXml(cfg.titulo.texto)}</w:t></w:r></w:p>`);
+        const lider = { pontos: 'dot', tracos: 'hyphen', linha: 'underscore', nenhum: 'none' }[cfg.preenchimento.tipo];
+        const rpr = (nv, cor) => {
+          const f = nv.fonte; const fam = f.familia ? nomeFonteDocx(f.familia) : null;
+          return `<w:rPr>${fam ? `<w:rFonts w:ascii="${escaparXml(fam)}" w:hAnsi="${escaparXml(fam)}" w:cs="${escaparXml(fam)}"/>` : ''}${f.negrito ? '<w:b/>' : ''}${f.italico ? '<w:i/>' : ''}${f.sublinhado ? '<w:u w:val="single"/>' : ''}<w:color w:val="${cor.replace('#', '')}"/><w:sz w:val="${Math.round(f.tamanho_pt * 2)}"/></w:rPr>`;
+        };
+        for (const it of extrairItensSumario(documento, { profundidade: cfg.profundidade_max, mapa: prefixosSecoes })) {
+          const nv = cfg.niveis[Math.min(NIVEL_MAX, it.nivel)]; const f = nv.fonte;
+          const texto = aplicarTransformacao(it.texto, nv.transformacao);
+          const rPre = it.prefixo ? `<w:r>${rpr(nv, f.cor_numero || f.cor)}<w:t xml:space="preserve">${escaparXml(it.prefixo)}  </w:t></w:r>` : '';
+          const rTxt = `<w:r>${rpr(nv, f.cor)}<w:t xml:space="preserve">${escaparXml(texto)}</w:t></w:r>`;
+          const rPag = nv.mostrar_pagina ? `<w:r>${rpr(nv, f.cor_pagina || f.cor)}<w:tab/></w:r><w:r>${rpr(nv, f.cor_pagina || f.cor)}<w:t>${escaparXml(it.pagina)}</w:t></w:r>` : '';
+          const tabs = nv.mostrar_pagina ? `<w:tabs><w:tab w:val="right" w:leader="${lider}" w:pos="${larguraDxa}"/></w:tabs>` : '';
+          bodyXmlParts.push(`<w:p><w:pPr>${tabs}<w:spacing w:before="${mm(nv.espacamento.margem_superior_mm)}" w:after="${mm(nv.espacamento.margem_inferior_mm)}" w:line="${Math.round(nv.espacamento.entrelinha * 240)}" w:lineRule="auto"/><w:ind w:left="${mm(nv.recuo_mm)}"/></w:pPr><w:hyperlink w:anchor="_Toc_${escaparXml(it.id)}" w:history="1">${rPre}${rTxt}${rPag}</w:hyperlink></w:p>`);
         }
       } else if (b.tipo === 'referencias') {
         if (b.titulo) {

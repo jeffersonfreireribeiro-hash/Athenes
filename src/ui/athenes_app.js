@@ -119,6 +119,7 @@ export class AthenesApp {
   }
 
   navegarParaDashboard() {
+    this.editorView?.desmontarAtalhos?.(); // remove os listeners globais do editor que está saindo
     this.tela = 'dashboard';
     this.container.innerHTML = '<div id="athAppDashboard"></div>';
     const dashBox = this.container.querySelector('#athAppDashboard');
@@ -135,6 +136,7 @@ export class AthenesApp {
   }
 
   navegarParaEditor() {
+    this.editorView?.desmontarAtalhos?.();
     this.tela = 'editor';
     this.container.innerHTML = '<div id="athAppEditor"></div>';
     const editorBox = this.container.querySelector('#athAppEditor');

@@ -1126,7 +1126,7 @@ export function adicionarSubpastaDriveLocal({ parentId, id, nome, tipo = 'relato
   return novaSub;
 }
 
-export function adicionarPastaCompartilhadaDriveLocal({ id, nome, url, dono = 'Colega / Orientador', tipo = 'compartilhada' }) {
+export function adicionarPastaCompartilhadaDriveLocal({ id, nome, url, dono = 'Colega / Orientador', tipo = 'compartilhada', permissao = 'leitura' }) {
   const pastas = obterPastasDriveLocais();
   const pastaId = id || extrairIdPastaDrive(url);
   if (!pastaId) throw new Error('ID ou link da pasta inválido.');
@@ -1141,6 +1141,7 @@ export function adicionarPastaCompartilhadaDriveLocal({ id, nome, url, dono = 'C
     dono,
     tipo: tipo || 'compartilhada',
     origem: 'compartilhada',
+    permissao: ['leitura', 'comentario', 'edicao', 'admin'].includes(permissao) ? permissao : 'leitura', // define se dá para mover/criar arquivos nela
     subpastas: []
   };
 

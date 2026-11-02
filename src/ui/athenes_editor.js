@@ -63,6 +63,8 @@ import { construirGradeFiguraDom, criarBarraItemFigura, criarBotaoLayoutFigura }
 import { descreverFigura } from '../core/athenes_figura_layout.js';
 import { ModalEditorEstilo } from './athenes_editor_estilo_modal.js';
 import { ModalCentralEstilos } from './athenes_central_estilos_modal.js';
+import { AtalhosDoEditor } from './athenes_atalhos_editor.js';
+import { calcularNumeracaoSecoes, extrairItensSumario, sumarioHtml, configEfetivaSumario, tagDoNivel, nivelDe, estiloIdDoTitulo } from '../core/athenes_sumario.js';
 import {
   MODOS_TRABALHO,
   modoSomenteLeitura,
@@ -178,6 +180,7 @@ export class EditorView {
     this.renderizar();
     this.inicializarBarraContextualTexto();
     this.iniciarSessaoColaborativa();
+    this.iniciarAtalhos();
   }
 
   iniciarSessaoColaborativa() {
@@ -254,6 +257,64 @@ export class EditorView {
     }
   }
 
+  /** HTML do sumário vivo de um bloco: itens atuais do documento, links que rolam até o título. */
+  htmlSumario(b) {
+    const cfg = configEfetivaSumario(this.doc, b);
+    const itens = extrairItensSumario(this.doc, { profundidade: cfg.profundidade_max, mapa: this.mapaNumSecoes });
+    const tit = (this.doc.estilos || []).find(e => e.id === 'titulo1');
+    return sumarioHtml(itens, cfg, { href: (id) => `#ath-b-${id}`, estiloTitulo: tit ? `${estiloParaCss(tit)};` : '' });
+  }
+
+  montarSumarioVivo(b, cssEstilo) {
+    const box = document.createElement('div');
+    box.className = 'ath-sumario-vivo';
+    box.dataset.sumarioBloco = b.id;
+    box.contentEditable = 'false';
+    box.style.cssText = `${cssEstilo}; user-select:none;`;
+    box.innerHTML = this.htmlSumario(b);
+    box.addEventListener('click', (ev) => {
+      const a = ev.target.closest('[data-sumario-alvo]');
+      if (!a) return;
+      ev.preventDefault(); ev.stopPropagation();
+      this.irParaBloco(a.dataset.sumarioAlvo);
+    });
+    return box;
+  }
+
+  /** Rola até o bloco (modo edição ou leitura) e o destaca por um instante. */
+  irParaBloco(id) {
+    const alvo = this.container.querySelector(`.ath-bloco-folha[data-bloco-id="${id}"]`);
+    if (!alvo) return;
+    alvo.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    alvo.classList.add('ath-bloco-destaque-salto');
+    setTimeout(() => alvo.classList.remove('ath-bloco-destaque-salto'), 1400);
+    const bloco = this.buscarBlocoPorId(id);
+    if (bloco && this.blocoSelecionado?.id !== id) { this.blocoSelecionado = bloco; this.onSelecionarBloco?.(bloco, null); }
+  }
+
+  /** Atualiza os sumários já desenhados (texto e números dos títulos) sem redesenhar a folha. */
+  atualizarSumariosAoVivo() {
+    clearTimeout(this._tSumario);
+    this._tSumario = setTimeout(() => {
+      this.mapaNumSecoes = calcularNumeracaoSecoes(this.doc);
+      this.container.querySelectorAll('.ath-sumario-vivo').forEach(box => {
+        const b = this.buscarBlocoPorId(box.dataset.sumarioBloco);
+        if (b) box.innerHTML = this.htmlSumario(b);
+      });
+    }, 350);
+  }
+
+  /** Liga (uma vez) o subsistema de atalhos de teclado deste editor. */
+  iniciarAtalhos() {
+    if (this.atalhos) return;
+    this.atalhos = new AtalhosDoEditor(this);
+  }
+
+  desmontarAtalhos() {
+    this.atalhos?.destruir();
+    this.atalhos = null;
+  }
+
   setDocumento(doc) {
     this.doc = doc;
     repaginarDocumento(this.doc);
@@ -264,6 +325,7 @@ export class EditorView {
   salvarSnapshot() {
     podarNotasOrfas(this.doc);
     const snap = JSON.stringify(this.doc);
+    this._edicaoNativa = false; // edição consolidada: o próximo Ctrl+Z volta um estado do documento
     if (this.historicoIndice >= 0 && this.historico[this.historicoIndice] === snap) return;
 
     this.historico = this.historico.slice(0, this.historicoIndice + 1);
@@ -504,6 +566,7 @@ export class EditorView {
             <button type="button" class="rm-ic-bt" id="rmAddNota" data-tip="Nota" title="Inserir nota de rodapé (Ctrl+Alt+F)">${svgIcone('nota', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddDivisor" data-tip="Divisor" title="Inserir Divisor">${svgIcone('divisor', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddEspaco" data-tip="Espaço" title="Inserir Espaçamento">${svgIcone('espacamento', 16)}</button>
+            <button type="button" class="rm-ic-bt" id="rmAddSumario" data-tip="Sumário" title="Inserir Sumário automático (títulos em todos os níveis)">${svgIcone('sumario', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddQuebra" data-tip="Quebra" title="Inserir Quebra de Página">${svgIcone('quebra_pagina', 16)}</button>
 
             <!-- Botão de Grade à Direita -->
@@ -671,6 +734,7 @@ export class EditorView {
     }, true);
     root.querySelector('#rmAddDivisor').addEventListener('click', () => adicionar('divisor', {}));
     root.querySelector('#rmAddEspaco').addEventListener('click', () => adicionar('espaco', { altura_pt: 24 }));
+    root.querySelector('#rmAddSumario').addEventListener('click', () => adicionar('sumario', {}));
     root.querySelector('#rmAddQuebra').addEventListener('click', () => adicionar('quebra_pagina', {}));
 
     // Alternar Guia Grade
@@ -1962,6 +2026,7 @@ export class EditorView {
     li.className = `rm-bl ${b.id === this.blocoSelecionado?.id ? 'sel' : ''}`;
     li.dataset.blocoId = b.id;
     li.draggable = true;
+    if (b.tipo === 'titulo') li.style.setProperty('--ath-outline-recuo', `${(nivelDe(b) - 1) * 10}px`); // mapa do documento: recuo por nível
     li.innerHTML = `
       <button type="button" class="rm-bl-nome">
         <strong>${rotuloDoBloco(b, this.doc)}</strong>
@@ -2305,6 +2370,7 @@ export class EditorView {
 
     repaginarDocumento(this.doc);
     recalcularNumeracaoAutomatica(this.doc);
+    this.mapaNumSecoes = calcularNumeracaoSecoes(this.doc);
 
     const paginas = this.doc.paginas || [];
     const infoPrev = this.container.querySelector('#rmPrevInfo');
@@ -2793,7 +2859,8 @@ export class EditorView {
       this.sessaoRealtime?.informarCursorBloco(b.id);
     });
 
-    const estilo = (this.doc.estilos || []).find(e => e.id === b.estiloId) || {};
+    const idEstilo = b.tipo === 'titulo' ? estiloIdDoTitulo(Object.fromEntries((this.doc.estilos || []).map(e => [e.id, e])), b) : b.estiloId;
+    const estilo = (this.doc.estilos || []).find(e => e.id === idEstilo) || {};
     const mestraPag = modeloDaPagina(this.doc, pag);
 
     // Suporte a grade bidimensional 2D para páginas com mestra Fixa
@@ -2835,10 +2902,13 @@ export class EditorView {
 
     // 1. TÍTULO
     if (b.tipo === 'titulo' || b.tipo === 'subtitulo') {
-      const tag = b.nivel === 1 ? 'h1' : b.nivel === 2 ? 'h2' : 'h3';
+      const tag = b.tipo === 'titulo' ? tagDoNivel(nivelDe(b)) : (b.nivel === 1 ? 'h1' : b.nivel === 2 ? 'h2' : 'h3');
       const heading = document.createElement(tag);
       heading.contentEditable = ehSomenteLeitura ? 'false' : 'true';
       heading.className = 'ath-titulo-editable';
+      const numSecao = b.tipo === 'titulo' ? this.mapaNumSecoes?.get(b.id) : null;
+      if (numSecao) { heading.dataset.prefixo = numSecao.prefixo; heading.classList.add('ath-titulo-numerado'); } // o número é CSS: não entra no texto editado
+      if (b.tipo === 'titulo' && nivelDe(b) > 6) { heading.setAttribute('role', 'heading'); heading.setAttribute('aria-level', String(nivelDe(b))); }
       heading.setAttribute('lang', 'pt-BR');
       const hifAtivoTit = Boolean(estiloMesclado.hifenizacao);
       heading.style.cssText = `${cssEstilo}; margin:0; outline:none;`;
@@ -2949,7 +3019,7 @@ export class EditorView {
       tit.className = 'ath-fig-titulo';
       const rot = rotuloDaFigura(b);
       const num = b.numero_sequencial || 1;
-      const prefixoStr = `${rot} ${num} — `;
+      const prefixoStr = obterPrefixoNumeracao(b);
       const textoPuro = obterTextoPuroTitulo(b) || 'Descrição da Ilustração';
 
       tit.innerHTML = `
@@ -3059,7 +3129,7 @@ export class EditorView {
 
       const tit = document.createElement('div');
       tit.className = 'ath-mapa-titulo';
-      const prefixoMapa = `Mapa ${b.numero_sequencial || 1} — `;
+      const prefixoMapa = obterPrefixoNumeracao(b);
       const textoPuroMapa = obterTextoPuroTitulo(b) || 'Delimitação territorial';
       tit.innerHTML = `
         <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoMapa}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuroMapa}</span>
@@ -3107,7 +3177,7 @@ export class EditorView {
 
       const tit = document.createElement('div');
       tit.className = 'ath-tab-titulo';
-      const prefixoTab = `Tabela ${b.numero_sequencial || 1} — `;
+      const prefixoTab = obterPrefixoNumeracao(b);
       const textoPuroTab = obterTextoPuroTitulo(b) || 'Dados apresentados';
       tit.innerHTML = `
         <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoTab}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuroTab}</span>
@@ -3153,7 +3223,7 @@ export class EditorView {
 
       const tit = document.createElement('div');
       tit.className = 'ath-quadro-titulo';
-      const prefixoQuadro = `Quadro ${b.numero_sequencial || 1} — `;
+      const prefixoQuadro = obterPrefixoNumeracao(b);
       const textoPuroQuadro = obterTextoPuroTitulo(b) || 'Categorias conceituais';
       tit.innerHTML = `
         <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoQuadro}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuroQuadro}</span>
@@ -3248,6 +3318,11 @@ export class EditorView {
       const sp = document.createElement('div');
       sp.style.height = `${b.altura_pt || 24}px`;
       el.appendChild(sp);
+    }
+
+    // 10b. SUMÁRIO AUTOMÁTICO (vivo, com links para os títulos)
+    else if (b.tipo === 'sumario') {
+      el.appendChild(this.montarSumarioVivo(b, cssEstilo));
     }
 
     // 11. OUTROS BLOCOS (CITAÇÃO, NOTAS, ETC.)
@@ -3384,6 +3459,7 @@ export class EditorView {
 
   notificarMudancaRapida() {
     this.agendarSnapshot();
+    this.atualizarSumariosAoVivo();
     this.onAlterado(this.doc);
   }
 
@@ -4149,7 +4225,7 @@ export class EditorView {
       onSucesso: () => {
         this.notificarMudanca();
         this.renderizar();
-        if (this.onAlterado) this.onAlterado();
+        if (this.onAlterado) this.onAlterado(this.doc);
       }
     });
   }

@@ -280,6 +280,72 @@ export function criarEstilosPadrao(perfilId = 'abnt') {
       manter_com_proximo: true
     },
     {
+      id: 'titulo4',
+      nome: 'Título 4 (Seção Quaternária)',
+      tipo: 'paragrafo',
+      fonte: baseFonte,
+      tamanho_pt: baseCorpoPt,
+      peso: 600,
+      cor: '#334155',
+      italico: false,
+      sublinhado: false,
+      caixa_alta: false,
+      alinhamento: 'esquerda',
+      entrelinha: 1.3,
+      espaco_antes_pt: 8,
+      espaco_depois_pt: 4,
+      recuo_primeira_linha_mm: 0,
+      recuo_esquerdo_mm: 0,
+      recuo_deslocado_mm: 0,
+      espacamento_letras_em: 0,
+      hifenizacao: false,
+      manter_com_proximo: true
+    },
+    {
+      id: 'titulo5',
+      nome: 'Título 5 (Seção Quinária)',
+      tipo: 'paragrafo',
+      fonte: baseFonte,
+      tamanho_pt: baseCorpoPt,
+      peso: 400,
+      cor: '#334155',
+      italico: true,
+      sublinhado: false,
+      caixa_alta: false,
+      alinhamento: 'esquerda',
+      entrelinha: 1.3,
+      espaco_antes_pt: 6,
+      espaco_depois_pt: 3,
+      recuo_primeira_linha_mm: 0,
+      recuo_esquerdo_mm: 0,
+      recuo_deslocado_mm: 0,
+      espacamento_letras_em: 0,
+      hifenizacao: false,
+      manter_com_proximo: true
+    },
+    {
+      id: 'titulo6',
+      nome: 'Título 6 (Seção Senária)',
+      tipo: 'paragrafo',
+      fonte: baseFonte,
+      tamanho_pt: baseCorpoPt,
+      peso: 400,
+      cor: '#475569',
+      italico: false,
+      sublinhado: false,
+      caixa_alta: false,
+      alinhamento: 'esquerda',
+      entrelinha: 1.3,
+      espaco_antes_pt: 6,
+      espaco_depois_pt: 3,
+      recuo_primeira_linha_mm: 0,
+      recuo_esquerdo_mm: 0,
+      recuo_deslocado_mm: 0,
+      espacamento_letras_em: 0,
+      hifenizacao: false,
+      manter_com_proximo: true
+    },
+    {
       id: 'subtitulo',
       nome: 'Subtítulo do Documento',
       tipo: 'paragrafo',
@@ -612,4 +678,18 @@ export function alinhamentoCss(valor, padrao = 'left') {
     justificado_direita: 'justify'
   };
   return map[valor] || padrao;
+}
+
+/** Garante os estilos Título 4–6 em documentos criados antes do suporte a seções profundas (não altera os existentes). */
+export function garantirEstilosDeTitulos(doc) {
+  if (!doc || !Array.isArray(doc.estilos)) return doc;
+  const ids = new Set(doc.estilos.map(e => e.id));
+  const padrao = criarEstilosPadrao(doc.perfil || 'abnt');
+  for (const n of [4, 5, 6]) {
+    if (!ids.has(`titulo${n}`)) {
+      const e = padrao.find(x => x.id === `titulo${n}`);
+      if (e) doc.estilos.push(JSON.parse(JSON.stringify(e)));
+    }
+  }
+  return doc;
 }

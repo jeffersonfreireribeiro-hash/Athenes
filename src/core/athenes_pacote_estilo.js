@@ -9,8 +9,9 @@
  */
 
 import { criarEstilosPadrao, FONTES_SISTEMA } from './athenes_estilos.js';
-import { criarModelosPaginaPadrao, MODOS_APLICACAO_MESTRA } from './athenes_documento.js';
+import { criarModelosPaginaPadrao, MODOS_APLICACAO_MESTRA, SEPARADORES_LEGENDA } from './athenes_documento.js';
 import { sanitizarNumeracao } from './athenes_paginacao.js';
+import { normalizarConfigSumario, normalizarNumeracaoSecoes } from './athenes_sumario.js';
 import { normalizarMestraCanvas, normalizarRegrasMestra } from './athenes_mestra_canvas.js';
 import { obterConfigNotas } from './athenes_notas_rodape.js';
 import { extrairEstiloFigura, sanitizarEstiloFigura, aplicarEstiloFiguraAoBloco, extrairTipografiaTituloFonte } from './athenes_figura_layout.js';
@@ -21,6 +22,13 @@ export const VERSAO_SCHEMA_TEMA = 'athenes-tema-v1';
 /**
  * Extrai o pacote de estilo completo do documento ativo em um objeto pronto para exportação JSON
  */
+/** Configuração de sumário a exportar: o padrão do documento ou a do primeiro bloco de sumário que tenha a sua. */
+function configSumarioDoDocumento(documento) {
+  if (documento.sumario_config_padrao) return documento.sumario_config_padrao;
+  for (const sec of documento.secoes || []) for (const b of sec.blocos || []) if (b.tipo === 'sumario' && b.sumario_config) return b.sumario_config;
+  return null;
+}
+
 export function exportarPacoteEstilo(documento, opcoes = {}) {
   if (!documento) {
     throw new Error('Documento inválido para exportação de estilo');
@@ -62,6 +70,11 @@ export function exportarPacoteEstilo(documento, opcoes = {}) {
       // paginação padrão do documento (a mestra pode ter a sua em `numeracao_pagina`) e estilo das notas de rodapé
       ...(documento.paginacao ? { paginacao: sanitizarNumeracao(documento.paginacao) } : {}),
       notas_rodape: obterConfigNotas(documento),
+      // separador da legenda numerada ("Tabela 1 — Título")
+      ...(documento.separador_legenda ? { separador_legenda: documento.separador_legenda } : {}),
+      // sumário (tipografia por nível, preenchimento) e numeração decimal das seções
+      ...(configSumarioDoDocumento(documento) ? { sumario: normalizarConfigSumario(configSumarioDoDocumento(documento)) } : {}),
+      ...(documento.numeracao_secoes ? { numeracao_secoes: normalizarNumeracaoSecoes(documento.numeracao_secoes) } : {}),
       // "Mestre A nas páginas 1–3; Mestre B da 4 em diante"
       ...(Array.isArray(documento.atribuicoes_mestra) && documento.atribuicoes_mestra.length ? { atribuicoes_mestra: normalizarRegrasMestra(documento.atribuicoes_mestra) } : {})
     },
@@ -223,6 +236,11 @@ export function validarPacoteEstilo(conteudo) {
         ? { paginacao: sanitizarNumeracao(obj.configuracaoGlobal.paginacao) } : {}),
       ...(obj.configuracaoGlobal?.notas_rodape && typeof obj.configuracaoGlobal.notas_rodape === 'object'
         ? { notas_rodape: obterConfigNotas({ notas_config: obj.configuracaoGlobal.notas_rodape }) } : {}),
+      ...(SEPARADORES_LEGENDA.some(x => x.id === obj.configuracaoGlobal?.separador_legenda) ? { separador_legenda: obj.configuracaoGlobal.separador_legenda } : {}),
+      ...(obj.configuracaoGlobal?.sumario && typeof obj.configuracaoGlobal.sumario === 'object'
+        ? { sumario: normalizarConfigSumario(obj.configuracaoGlobal.sumario) } : {}),
+      ...(obj.configuracaoGlobal?.numeracao_secoes && typeof obj.configuracaoGlobal.numeracao_secoes === 'object'
+        ? { numeracao_secoes: normalizarNumeracaoSecoes(obj.configuracaoGlobal.numeracao_secoes) } : {}),
       ...(Array.isArray(obj.configuracaoGlobal?.atribuicoes_mestra)
         ? { atribuicoes_mestra: normalizarRegrasMestra(obj.configuracaoGlobal.atribuicoes_mestra) } : {})
     },
@@ -287,6 +305,16 @@ export function aplicarPacoteEstilo(documento, pacote, opcoes = {}) {
   }
 
   documento.atribuicoes_mestra = JSON.parse(JSON.stringify(p.configuracaoGlobal?.atribuicoes_mestra || []));
+  if (p.configuracaoGlobal?.separador_legenda) {
+    documento.separador_legenda = p.configuracaoGlobal.separador_legenda;
+    if (aplicarNosBlocosExistentes) for (const sec of documento.secoes || []) for (const b of sec.blocos || []) delete b.separador_legenda;
+  }
+  if (p.configuracaoGlobal?.sumario) {
+    documento.sumario_config_padrao = JSON.parse(JSON.stringify(p.configuracaoGlobal.sumario));
+    // blocos com configuração própria passam a seguir o tema quando o usuário pede para propagar
+    if (aplicarNosBlocosExistentes) for (const sec of documento.secoes || []) for (const b of sec.blocos || []) if (b.tipo === 'sumario') delete b.sumario_config;
+  }
+  if (p.configuracaoGlobal?.numeracao_secoes) documento.numeracao_secoes = JSON.parse(JSON.stringify(p.configuracaoGlobal.numeracao_secoes));
 
   // 3. Atualiza Modelos de Blocos Customizados
   if (Array.isArray(p.modelos_blocos) && p.modelos_blocos.length > 0) {
@@ -396,6 +424,16 @@ INSTRUÇÕES DE ANÁLISE:
      "espelhada": true usa o espelho horizontal dos elementos nas páginas pares (frente e verso). "guias": [{ "eixo": "v" | "h", "pos_mm" }] são guias de régua.
      "grade_guia": { "visivel", "snap", "passo_mm" (malha regular), "colunas", "linhas", "calha_mm" } é a grade de diagramação da folha.
    - Atribuição de mestras por página ("configuracaoGlobal.atribuicoes_mestra"): [{ "mestraId", "de", "ate" }] (páginas 1-based; "ate" omitido = até o fim; vence o intervalo mais específico).
+
+   - Separador da legenda numerada ("configuracaoGlobal.separador_legenda"): "travessao" (Tabela 1 — Título) | "meio_traco" (–) | "hifen" (-) | "dois_pontos" (Tabela 1: Título) | "ponto" (Tabela 1. Título) | "espaco" (Tabela 1 Título). Vale para figuras, tabelas, quadros e mapas.
+   - Títulos em N níveis ("nivel" 1 a 9; estilos "titulo1" a "titulo6", os níveis 7+ usam "titulo6") e numeração decimal progressiva
+     ("configuracaoGlobal.numeracao_secoes": { "ativa", "separador": "." | "-" | "", "ate_nivel" (1-9), "iniciar_em" }), ex.: 1, 1.1, 1.1.1, 1.1.1.1.
+   - Sumário ("configuracaoGlobal.sumario"): "profundidade_max" (1-9); "titulo": { "texto", "alinhamento": "esquerda" | "centro" | "direita" };
+     "preenchimento": { "tipo": "pontos" | "tracos" | "linha" | "nenhum", "cor", "espessura_pt", "densidade": "denso" | "normal" | "aberto" };
+     "niveis": { "1": {...}, "2": {...}, ... "9": {...} } com, por nível: "mostrar_pagina" (bool), "recuo_mm", "transformacao" ("none" | "uppercase" | "lowercase" | "capitalize"),
+     "fonte": { "familia" (id de fonte ou ""), "tamanho_pt", "negrito", "italico", "sublinhado", "cor", "cor_numero", "cor_pagina" } e
+     "espacamento": { "entrelinha", "margem_superior_mm", "margem_inferior_mm" }. Na ABNT: nível 1 em CAIXA ALTA negrito, nível 2 em CAIXA ALTA sem negrito,
+     nível 3 em negrito, nível 4 em itálico e recuos crescentes (0, 5, 10, 15 mm…).
 
 3. MOLDURAS DE ILUSTRAÇÕES, TABELAS E FÓRMULAS:
    - moldura_tipo: "limpo" (sem borda), "linha_lateral" (tarja lateral elegante), "cartao" (fundo suave), "borda_completa" (caixa fechada técnica), ou "esquadro".

@@ -17,6 +17,7 @@ import {
   salvarConfigGoogleDrive,
   listarDocumentosDoSupabase,
   carregarDocumentoDoSupabase,
+  salvarDocumentoNoSupabase,
   autenticarGoogleDrive,
   obterInfoUsuarioGoogle,
   obterOuCriarEstruturaPastasAthenes,
@@ -33,6 +34,7 @@ import {
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { EstudoArtigosView, carregarArtigosEstudo } from './athenes_estudo_artigos.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
+import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -48,6 +50,7 @@ export class DashboardView {
     this.pastasDrive = obterPastasDriveLocais();
     this.perfilUsuario = obterPerfilColaborador();
     this.estudoView = null;
+    this.arquivos = new GerenciadorArquivosUI(this); // duplicar, mover, seleção em lote, arrastar e soltar
 
     this.carregarDocumentosLocais();
     this.renderizar();
@@ -94,6 +97,46 @@ export class DashboardView {
     try {
       localStorage.setItem('athenes_docs_indice', JSON.stringify(this.documentos));
     } catch (_) {}
+  }
+
+  /**
+   * Grava a lista local e, para documentos na nuvem, o registro remoto. Rejeita em caso de falha
+   * (cota do navegador cheia, Supabase indisponível) para o gerenciador de arquivos desfazer a ação.
+   */
+  async persistirDocumentos(docs = []) {
+    localStorage.setItem('athenes_docs_indice', JSON.stringify(this.documentos));
+    for (const d of docs) {
+      if (d.salvoNuvem) await salvarDocumentoNoSupabase(d, this.perfilUsuario);
+    }
+  }
+
+  /** Abre um documento (baixando da nuvem antes, se preciso). */
+  async abrirDocumento(doc, card = null) {
+    let docParaAbrir = doc;
+    if (doc.precisaCarregarConteudo) {
+      const btnAbrir = card?.querySelector('.ath-btn-abrir');
+      if (btnAbrir) btnAbrir.textContent = 'Baixando...';
+      try {
+        const remoto = await carregarDocumentoDoSupabase(doc.id);
+        if (remoto) {
+          docParaAbrir = remoto;
+          docParaAbrir.salvoNuvem = true;
+          docParaAbrir.precisaCarregarConteudo = false;
+          const idx = this.documentos.findIndex(d => String(d.id) === String(doc.id));
+          if (idx >= 0) this.documentos[idx] = docParaAbrir;
+          this.salvarDocumentosLocais();
+        }
+      } catch (e) {
+        alert(`Falha ao abrir documento da nuvem: ${e.message}`);
+        if (btnAbrir) btnAbrir.textContent = 'Abrir';
+        return;
+      }
+    }
+    this.onAbrirDocumento(docParaAbrir);
+  }
+
+  abrirDocumentoDoCard(doc) {
+    return this.abrirDocumento(doc, this.container.querySelector(`[data-doc-id="${doc.id}"]`));
   }
 
   obterIniciais(nome) {
@@ -754,6 +797,7 @@ export class DashboardView {
     });
 
     container.appendChild(item);
+    if (!ehAbaBib) this.arquivos.tornarAlvoDeSolta(item, pasta.id);
 
     if (Array.isArray(pasta.subpastas) && pasta.subpastas.length > 0) {
       for (const sub of pasta.subpastas) {
@@ -993,6 +1037,14 @@ export class DashboardView {
             <label>Nome / Identificação da Pasta</label>
             <input type="text" class="ath-input" id="athCompNome" placeholder="Ex.: Bibliografia Urbanismo - Prof. Carlos">
           </div>
+          <div class="ath-prop-grupo">
+            <label>Sua permissão nesta pasta</label>
+            <select class="ath-select" id="athCompPerm">
+              <option value="leitura">Somente leitura</option>
+              <option value="comentario">Comentar</option>
+              <option value="edicao">Edição (pode mover e criar arquivos aqui)</option>
+            </select>
+          </div>
           <div class="ath-linha2">
             <div class="ath-prop-grupo">
               <label>Quem Compartilhou</label>
@@ -1031,13 +1083,15 @@ export class DashboardView {
       const nome = modal.querySelector('#athCompNome').value.trim() || 'Pasta Compartilhada';
       const dono = modal.querySelector('#athCompDono').value.trim() || 'Colega / Orientador';
       const tipo = modal.querySelector('#athCompTipo').value;
+      const permissao = modal.querySelector('#athCompPerm').value;
 
       const comp = adicionarPastaCompartilhadaDriveLocal({
         id: pastaId,
         nome,
         url: urlOuId.startsWith('http') ? urlOuId : `https://drive.google.com/drive/folders/${pastaId}`,
         dono,
-        tipo
+        tipo,
+        permissao
       });
 
       this.pastasDrive = obterPastasDriveLocais();
@@ -1082,6 +1136,7 @@ export class DashboardView {
       return;
     }
 
+    const ordemIds = filtrados.map(d => d.id);
     for (const doc of filtrados) {
       const card = document.createElement('div');
       card.className = 'ath-doc-card';
@@ -1121,37 +1176,19 @@ export class DashboardView {
       `;
 
       card.addEventListener('click', async (ev) => {
+        if (this.arquivos.aoClicarCard(ev, doc)) return; // seleção (Ctrl/Shift/checkbox) e menu "···"
         if (ev.target.closest('.ath-btn-excluir')) {
           ev.stopPropagation();
           this.documentos = this.documentos.filter(d => d.id !== doc.id);
           this.salvarDocumentosLocais();
           this.atualizarGrid();
+          this.renderizarPastasLateral();
           return;
         }
-
-        let docParaAbrir = doc;
-        if (doc.precisaCarregarConteudo) {
-          const btnAbrir = card.querySelector('.ath-btn-abrir');
-          if (btnAbrir) btnAbrir.textContent = 'Baixando...';
-          try {
-            const remoto = await carregarDocumentoDoSupabase(doc.id);
-            if (remoto) {
-              docParaAbrir = remoto;
-              docParaAbrir.salvoNuvem = true;
-              docParaAbrir.precisaCarregarConteudo = false;
-              const idx = this.documentos.findIndex(d => String(d.id) === String(doc.id));
-              if (idx >= 0) this.documentos[idx] = docParaAbrir;
-              this.salvarDocumentosLocais();
-            }
-          } catch (e) {
-            alert(`Falha ao abrir documento da nuvem: ${e.message}`);
-            if (btnAbrir) btnAbrir.textContent = 'Abrir';
-            return;
-          }
-        }
-        this.onAbrirDocumento(docParaAbrir);
+        await this.abrirDocumento(doc, card);
       });
 
+      this.arquivos.decorarCard(card, doc, ordemIds);
       gridEl.appendChild(card);
     }
   }
@@ -1244,6 +1281,7 @@ export class DashboardView {
         novo.metadados.autores[0].nome = this.perfilUsuario.nome;
       }
       novo.pastaId = pastaEscolhida;
+      novo.proprietario = novo.proprietario || { id: this.perfilUsuario?.id, nome: this.perfilUsuario?.nome };
       this.documentos.unshift(novo);
       this.salvarDocumentosLocais();
       fechar();
@@ -1266,6 +1304,7 @@ export class DashboardView {
       try {
         const json = JSON.parse(ev.target.result);
         if (json && (Array.isArray(json.paginas) || Array.isArray(json.secoes))) {
+          json.proprietario = { id: this.perfilUsuario?.id, nome: this.perfilUsuario?.nome }; // importar = arquivo novo, do usuário
           this.documentos.unshift(json);
           this.salvarDocumentosLocais();
           this.atualizarGrid();

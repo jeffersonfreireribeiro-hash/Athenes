@@ -2597,3 +2597,12 @@ ins.ath-sug-ins:hover, del.ath-sug-del:hover { outline: 1.5px solid var(--ath-su
 .ath-rev-quadro-topo { flex: none; padding: 6px 12px; font: 800 11px var(--glx-font, inherit); text-transform: uppercase; letter-spacing: .04em; color: #475569; background: #F8FAFC; border-bottom: 1px solid #D5DEE9; }
 .ath-rev-quadro.esq .ath-rev-quadro-topo { color: #991B1B; background: #FEF2F2; }
 .ath-rev-quadro.dir .ath-rev-quadro-topo { color: #166534; background: #F0FDF4; }
+
+/* Seções numeradas automaticamente: o número é pseudo-elemento (não faz parte do texto editável) */
+.ath-titulo-numerado::before { content: attr(data-prefixo) " "; margin-right: .35em; user-select: none; pointer-events: none; }
+/* Mapa do documento: recuo proporcional ao nível do título */
+.rm-bl .rm-bl-nome { padding-left: var(--ath-outline-recuo, 0px); }
+/* Salto a partir do sumário */
+.ath-bloco-destaque-salto { outline: 2px solid #2F7BD0; outline-offset: 4px; border-radius: 4px; transition: outline-color .3s; }
+.ath-sumario-vivo .ath-toc-link { cursor: pointer; }
+.ath-sumario-vivo .ath-toc-link:hover .ath-toc-txt { text-decoration: underline; }

@@ -4,6 +4,8 @@
  * Arquitetura declarativa e reativa com repaginação automática e fluxo contínuo.
  */
 
+import { extrairItensSumario } from './athenes_sumario.js';
+import { garantirEstilosDeTitulos } from './athenes_estilos.js';
 import { aplicarRegrasMestraNasPaginas, vincularOverridesAsPaginas } from './athenes_mestra_canvas.js';
 import { criarEstilosPadrao, PERFIS_FORMATACAO } from './athenes_estilos.js';
 import { obterLayoutFigura, CHAVES_ESTILO_FIGURA } from './athenes_figura_layout.js';
@@ -490,6 +492,8 @@ export function criarNovoBloco(tipo, dados = {}) {
  * Estima a altura de um bloco em pontos tipográficos (pt)
  * 1 mm ≈ 2.83465 pt
  */
+let TITULOS_NO_DOC = 8;
+
 export function estimarAlturaBlocoPt(bloco) {
   if (!bloco) return 20;
 
@@ -566,7 +570,7 @@ export function estimarAlturaBlocoPt(bloco) {
       return 28;
 
     case 'sumario':
-      return 220;
+      return Math.min(640, 70 + TITULOS_NO_DOC * 20); // cresce com o número de títulos (definido a cada repaginação)
 
     case 'referencias':
       return 180;
@@ -585,6 +589,8 @@ export function estimarAlturaBlocoPt(bloco) {
  */
 export function repaginarDocumento(doc) {
   if (!doc) return [];
+  garantirEstilosDeTitulos(doc);
+  TITULOS_NO_DOC = (doc.secoes || []).reduce((t, sec) => t + (sec.blocos || []).filter(b => b.tipo === 'titulo').length, 0);
 
   // Garante coleções mínimas
   if (!Array.isArray(doc.mestras) || doc.mestras.length === 0) {
@@ -1032,30 +1038,11 @@ export function reordenarBlocosNaPagina(doc, paginaId, novaOrdemIds) {
 }
 
 /**
- * Gera sumário dinâmico baseado nos títulos das páginas
+ * Gera o sumário dinâmico a partir dos títulos (`titulo`, qualquer nível) das páginas já calculadas.
+ * Cada item: { id, texto, nivel, prefixo, pagina }. Veja `extrairItensSumario` para as regras.
  */
-export function gerarSumarioDinamico(doc) {
-  if (!doc || !Array.isArray(doc.paginas)) return [];
-
-  const itens = [];
-  for (const pag of doc.paginas) {
-    if (pag.mestraId === 'capa' || pag.modeloId === 'capa' || pag.mestraId === 'sumario' || pag.modeloId === 'sumario') {
-      continue;
-    }
-    const blocos = Array.isArray(pag.blocos) ? pag.blocos : [];
-    for (const b of blocos) {
-      if (b.tipo === 'titulo' || b.tipo === 'subtitulo') {
-        itens.push({
-          id: b.id,
-          nivel: b.nivel || 1,
-          texto: b.texto || 'Seção',
-          pagina: pag.numero || 1
-        });
-      }
-    }
-  }
-
-  return itens;
+export function gerarSumarioDinamico(doc, opcoes = {}) {
+  return extrairItensSumario(doc, opcoes);
 }
 
 /**
@@ -1106,6 +1093,29 @@ export const calcularEstatisticasDocumento = calcularEstatisticas;
 /**
  * Recalcula numeração automática e sequencial separada para Figuras, Mapas, Tabelas, Quadros e Equações.
  */
+/** Separadores entre o número e o título da legenda ("Tabela 1 — Título"). */
+export const SEPARADORES_LEGENDA = Object.freeze([
+  { id: 'travessao', rotulo: 'Travessão', exemplo: 'Tabela 1 — Título', valor: ' — ' },
+  { id: 'meio_traco', rotulo: 'Meio-traço', exemplo: 'Tabela 1 – Título', valor: ' – ' },
+  { id: 'hifen', rotulo: 'Hífen', exemplo: 'Tabela 1 - Título', valor: ' - ' },
+  { id: 'dois_pontos', rotulo: 'Dois-pontos', exemplo: 'Tabela 1: Título', valor: ': ' },
+  { id: 'ponto', rotulo: 'Ponto', exemplo: 'Tabela 1. Título', valor: '. ' },
+  { id: 'espaco', rotulo: 'Somente espaço', exemplo: 'Tabela 1 Título', valor: ' ' }
+]);
+export const SEPARADOR_LEGENDA_PADRAO = 'travessao';
+const REG_SEP = '[-—–:]';
+
+/** Id do separador em vigor: o do bloco, senão o do documento, senão o travessão. */
+export function idSeparadorLegenda(doc, bloco) {
+  const ok = (id) => SEPARADORES_LEGENDA.some(x => x.id === id) ? id : null;
+  return ok(bloco?.separador_legenda) || ok(doc?.separador_legenda) || SEPARADOR_LEGENDA_PADRAO;
+}
+
+/** Texto do separador em vigor (com os espaços): " — ", ": ", ". "… */
+export function separadorLegenda(doc, bloco) {
+  return SEPARADORES_LEGENDA.find(x => x.id === idSeparadorLegenda(doc, bloco)).valor;
+}
+
 export function recalcularNumeracaoAutomatica(doc) {
   const vazio = { figuras: 0, mapas: 0, tabelas: 0, quadros: 0, formulas: 0, porSubtipo: {} };
   if (!doc || !Array.isArray(doc.secoes)) return vazio;
@@ -1113,15 +1123,18 @@ export function recalcularNumeracaoAutomatica(doc) {
   const cont = { mapa: 0, tabela: 0, quadro: 0, formula: 0 };
   const porSubtipo = {};
   const nomes = Object.values(ROTULOS_FIGURA).join('|');
-  const prefixoFigura = new RegExp('^(' + nomes + ')\\s+\\d+\\s*[-—]', 'i');
-  const renumerar = (texto, rotulo, n, regex, forcarAuto = false) => {
-    if (!texto) return forcarAuto ? `${rotulo} ${n} —` : texto;
+  const prefixoFigura = new RegExp('^(' + nomes + ')\\s+\\d+\\s*(?:' + REG_SEP + '|\\.(?=\\s))', 'i');
+  const renumerar = (texto, rotulo, n, regex, forcarAuto = false, sep = ' — ', sepAnterior = null) => {
+    if (!texto) return forcarAuto ? `${rotulo} ${n}${sep.trimEnd()}` : texto;
     const puro = removerPrefixoNumeracaoTitulo(texto);
-    if (forcarAuto || regex.test(texto)) {
-      return puro ? `${rotulo} ${n} — ${puro}` : `${rotulo} ${n} —`;
+    // com "somente espaço" não há sinal entre número e título: o separador anterior identifica o prefixo
+    const prefixoSoEspaco = sepAnterior === ' ' && new RegExp('^' + rotulo + '\\s+\\d+\\s', 'i').test(texto);
+    if (forcarAuto || regex.test(texto) || prefixoSoEspaco) {
+      return puro ? `${rotulo} ${n}${sep}${puro}` : `${rotulo} ${n}${sep.trimEnd()}`;
     }
     return texto;
   };
+  const regRot = (r) => new RegExp('^' + r + '\\s+\\d+\\s*(?:' + REG_SEP + '|\\.(?=\\s))', 'i');
 
   for (const sec of doc.secoes) {
     for (const b of sec.blocos || []) {
@@ -1131,17 +1144,25 @@ export function recalcularNumeracaoAutomatica(doc) {
         porSubtipo[sub] = (porSubtipo[sub] || 0) + 1;
         b.numero_sequencial = porSubtipo[sub];
         const rotulo = ROTULOS_FIGURA[sub];
-        b.titulo = renumerar(b.titulo, rotulo, b.numero_sequencial, prefixoFigura, forcarAuto);
-        b.legenda = renumerar(b.legenda, rotulo, b.numero_sequencial, prefixoFigura, forcarAuto && !b.titulo);
+        const sepAnt = b.legenda_sep;
+        b.legenda_sep = separadorLegenda(doc, b);
+        b.titulo = renumerar(b.titulo, rotulo, b.numero_sequencial, prefixoFigura, forcarAuto, b.legenda_sep, sepAnt);
+        b.legenda = renumerar(b.legenda, rotulo, b.numero_sequencial, prefixoFigura, forcarAuto && !b.titulo, b.legenda_sep, sepAnt);
       } else if (b.tipo === 'mapa') {
         b.numero_sequencial = ++cont.mapa;
-        b.titulo = renumerar(b.titulo, 'Mapa', cont.mapa, /^Mapa\s+\d+\s*[-—]/i, forcarAuto);
+        const sepAnt = b.legenda_sep;
+        b.legenda_sep = separadorLegenda(doc, b);
+        b.titulo = renumerar(b.titulo, 'Mapa', cont.mapa, regRot('Mapa'), forcarAuto, b.legenda_sep, sepAnt);
       } else if (b.tipo === 'tabela') {
         b.numero_sequencial = ++cont.tabela;
-        b.titulo = renumerar(b.titulo, 'Tabela', cont.tabela, /^Tabela\s+\d+\s*[-—]/i, forcarAuto);
+        const sepAnt = b.legenda_sep;
+        b.legenda_sep = separadorLegenda(doc, b);
+        b.titulo = renumerar(b.titulo, 'Tabela', cont.tabela, regRot('Tabela'), forcarAuto, b.legenda_sep, sepAnt);
       } else if (b.tipo === 'quadro') {
         b.numero_sequencial = ++cont.quadro;
-        b.titulo = renumerar(b.titulo, 'Quadro', cont.quadro, /^Quadro\s+\d+\s*[-—]/i, forcarAuto);
+        const sepAnt = b.legenda_sep;
+        b.legenda_sep = separadorLegenda(doc, b);
+        b.titulo = renumerar(b.titulo, 'Quadro', cont.quadro, regRot('Quadro'), forcarAuto, b.legenda_sep, sepAnt);
       } else if (b.tipo === 'formula') {
         b.numero_sequencial = ++cont.formula;
         b.numero_equacao = '(' + cont.formula + ')';
@@ -1177,7 +1198,9 @@ export function aplicarNumeracaoNoTitulo(bloco, doc) {
   }
 
   const baseTexto = removerPrefixoNumeracaoTitulo(bloco.titulo);
-  bloco.titulo = baseTexto ? `${rotulo} ${num} — ${baseTexto}` : `${rotulo} ${num} —`;
+  const sep = separadorLegenda(doc, bloco);
+  bloco.legenda_sep = sep;
+  bloco.titulo = baseTexto ? `${rotulo} ${num}${sep}${baseTexto}` : `${rotulo} ${num}${sep.trimEnd()}`;
   bloco.numeracao_automatica = true;
   return bloco.titulo;
 }
@@ -1189,7 +1212,7 @@ export function removerPrefixoNumeracaoTitulo(titulo, tipo = 'figura', subtipo =
   if (!titulo) return '';
   let limpo = String(titulo).trim();
   const todosRotulos = ['Figura', 'Gráfico', 'Grafico', 'Fotografia', 'Diagrama', 'Fluxograma', 'Ilustração', 'Ilustracao', 'Foto', 'Tabela', 'Quadro', 'Mapa', 'Fórmula', 'Formula', 'Equação', 'Equacao'];
-  const regex = new RegExp(`^(${todosRotulos.join('|')})\\s*\\d*\\s*[-—:]*\\s*`, 'i');
+  const regex = new RegExp(`^(${todosRotulos.join('|')})\\s*\\d*\\s*(?:[-—–:]+|\\.(?=\\s))?\\s*`, 'i');
   let anterior = '';
   // Remove prefixos encadeados para desarmar repetições como "Figura 1 — Figura 1asdasdasd"
   while (limpo && limpo !== anterior && regex.test(limpo)) {
@@ -1225,7 +1248,7 @@ export function rotuloDoBloco(bloco) {
 export function obterPrefixoNumeracao(bloco) {
   const rot = rotuloDoBloco(bloco);
   const num = bloco?.numero_sequencial || 1;
-  return `${rot} ${num} — `;
+  return `${rot} ${num}${bloco?.legenda_sep ?? ' — '}`;
 }
 
 /**
@@ -1265,7 +1288,7 @@ function encontrarPaginaDoBloco(doc, blocoId) {
 export function gerarListaIlustracoes(doc, subtipo = 'figura') {
   recalcularNumeracaoAutomatica(doc);
   const rotulo = ROTULOS_FIGURA[subtipo] || ROTULOS_FIGURA.figura;
-  const prefixo = new RegExp('^' + rotulo + '\\s+\\d+\\s*[-—]\\s*', 'i');
+  const prefixo = new RegExp('^' + rotulo + '\\s+\\d+\\s*(?:' + REG_SEP + '|\\.(?=\\s))?\\s*', 'i');
   const lista = [];
   for (const sec of doc.secoes || []) {
     for (const b of sec.blocos || []) {
@@ -1298,7 +1321,7 @@ export function gerarListaMapas(doc) {
           tipo: 'mapa',
           numero: b.numero_sequencial || 1,
           rotulo: `Mapa ${b.numero_sequencial || 1}`,
-          titulo: (b.titulo || 'Mapa').replace(/^Mapa\s+\d+\s*[-—]\s*/i, ''),
+          titulo: (b.titulo || 'Mapa').replace(/^Mapa\s+\d+\s*(?:[-—–:]|\.(?=\s))?\s*/i, ''),
           pagina: encontrarPaginaDoBloco(doc, b.id)
         });
       }
@@ -1318,7 +1341,7 @@ export function gerarListaTabelas(doc) {
           tipo: 'tabela',
           numero: b.numero_sequencial || 1,
           rotulo: `Tabela ${b.numero_sequencial || 1}`,
-          titulo: (b.titulo || 'Tabela').replace(/^Tabela\s+\d+\s*[-—]\s*/i, ''),
+          titulo: (b.titulo || 'Tabela').replace(/^Tabela\s+\d+\s*(?:[-—–:]|\.(?=\s))?\s*/i, ''),
           pagina: encontrarPaginaDoBloco(doc, b.id)
         });
       }
@@ -1338,7 +1361,7 @@ export function gerarListaQuadros(doc) {
           tipo: 'quadro',
           numero: b.numero_sequencial || 1,
           rotulo: `Quadro ${b.numero_sequencial || 1}`,
-          titulo: (b.titulo || 'Quadro').replace(/^Quadro\s+\d+\s*[-—]\s*/i, ''),
+          titulo: (b.titulo || 'Quadro').replace(/^Quadro\s+\d+\s*(?:[-—–:]|\.(?=\s))?\s*/i, ''),
           pagina: encontrarPaginaDoBloco(doc, b.id)
         });
       }
