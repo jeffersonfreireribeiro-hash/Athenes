@@ -2586,7 +2586,7 @@ export class EditorView {
       heading.contentEditable = ehSomenteLeitura ? 'false' : 'true';
       heading.className = 'ath-titulo-editable';
       heading.setAttribute('lang', 'pt-BR');
-      const hifAtivoTit = b.hifenizacao !== undefined ? b.hifenizacao : (estilos.find(e => e.id === b.estiloId)?.hifenizacao ?? false);
+      const hifAtivoTit = Boolean(estiloMesclado.hifenizacao);
       heading.style.cssText = `${cssEstilo}; margin:0; outline:none;`;
       heading.innerHTML = hifAtivoTit ? hifenizarHtml(b.texto || 'Título da Seção') : removerHifensCondicionais(b.texto || 'Título da Seção');
 
@@ -2604,7 +2604,7 @@ export class EditorView {
       p.contentEditable = ehSomenteLeitura ? 'false' : 'true';
       p.className = 'ath-texto-editable';
       p.setAttribute('lang', 'pt-BR');
-      const hifAtivoP = b.hifenizacao !== undefined ? b.hifenizacao : (estilos.find(e => e.id === b.estiloId)?.hifenizacao ?? false);
+      const hifAtivoP = Boolean(estiloMesclado.hifenizacao);
       p.style.cssText = `${cssEstilo}; outline:none;`;
 
       let conteudoHtml = b.texto || 'Escreva diretamente neste bloco...';
