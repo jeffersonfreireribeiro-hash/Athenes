@@ -2420,7 +2420,10 @@ export class EditorView {
         selMod.className = 'ath-sel-rapido';
         selMod.title = 'Modelos de Apresentação';
         const modAtivo = b.modelo_layout_id || (b.moldura_tipo === 'cartao_suave' ? 'figura_cartao' : (b.subgrade_colunas === 2 ? 'figura_legenda_lateral' : 'figura_abnt'));
-        selMod.innerHTML = modelosFig.map(m => `<option value="${escapeHtml(m.id)}" ${modAtivo === m.id ? 'selected' : ''}>${escapeHtml(m.nome)}</option>`).join('');
+        selMod.innerHTML = modelosFig.map(m => {
+          const rotulo = m.nome.replace(' (Limpo)', '').replace(' com Fundo', '').replace(' (Legenda ao Lado)', '');
+          return `<option value="${escapeHtml(m.id)}" ${modAtivo === m.id ? 'selected' : ''}>${escapeHtml(rotulo)}</option>`;
+        }).join('');
         selMod.addEventListener('change', e => {
           aplicarModeloLayoutBloco(b, e.target.value, this.doc);
           this.notificarMudanca();
@@ -2476,7 +2479,10 @@ export class EditorView {
         selMod.className = 'ath-sel-rapido';
         selMod.title = 'Modelos de Apresentação';
         const modAtivo = b.modelo_layout_id || (b.moldura_tipo === 'cartao_suave' ? (b.tipo === 'formula' ? 'formula_cartao' : 'tabela_cartao') : (b.tipo === 'formula' ? 'formula_limpo' : 'tabela_abnt'));
-        selMod.innerHTML = modelosBloco.map(m => `<option value="${escapeHtml(m.id)}" ${modAtivo === m.id ? 'selected' : ''}>${escapeHtml(m.nome)}</option>`).join('');
+        selMod.innerHTML = modelosBloco.map(m => {
+          const rotulo = m.nome.replace(' (Limpo)', '').replace(' com Fundo', '').replace(' (Legenda ao Lado)', '');
+          return `<option value="${escapeHtml(m.id)}" ${modAtivo === m.id ? 'selected' : ''}>${escapeHtml(rotulo)}</option>`;
+        }).join('');
         selMod.addEventListener('change', e => {
           aplicarModeloLayoutBloco(b, e.target.value, this.doc);
           this.notificarMudanca();

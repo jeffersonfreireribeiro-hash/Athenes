@@ -701,7 +701,7 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 /* Barra flutuante de seleção rápida de estilos e tipos no bloco da página */
 .ath-bloco-barra-rapida {
   position: absolute;
-  top: -34px;
+  bottom: -34px;
   right: 6px;
   left: auto;
   display: none;
@@ -727,6 +727,7 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 }
 
 .ath-bloco-barra-rapida .ath-sel-rapido {
+  flex-shrink: 0;
   height: 26px;
   min-height: 26px;
   padding: 0 8px;
@@ -749,6 +750,7 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 }
 
 .ath-bloco-barra-rapida .ath-btn-rapido {
+  flex-shrink: 0;
   height: 26px;
   min-height: 26px;
   padding: 0 8px;
