@@ -53,15 +53,16 @@ fun ReaderTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f, fill = false)
             ) {
-                // Voltar para a Biblioteca
+                // Voltar para a Biblioteca usando seta "v deitado" (<)
                 IconButton(
                     onClick = onVoltarBiblioteca,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(38.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        imageVector = Icons.Rounded.ChevronLeft,
                         contentDescription = "Voltar à Biblioteca",
-                        tint = AthenesPrimary
+                        tint = AthenesPrimary,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
 
@@ -188,8 +189,8 @@ fun ReaderTopBar(
                 OutlinedButton(
                     onClick = onAbrirPdfClick,
                     shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(36.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = AthenesPrimary
                     )
@@ -199,12 +200,12 @@ fun ReaderTopBar(
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Abrir PDF",
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
+                            fontSize = 12.sp
                         )
                     )
                 }
@@ -213,8 +214,8 @@ fun ReaderTopBar(
                 Button(
                     onClick = onSalvarDriveZoteroClick,
                     shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                    modifier = Modifier.height(36.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AthenesPrimary,
                         contentColor = Color.White
@@ -225,12 +226,12 @@ fun ReaderTopBar(
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Salvar no Drive & Zotero",
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
+                            fontSize = 12.sp
                         )
                     )
                 }

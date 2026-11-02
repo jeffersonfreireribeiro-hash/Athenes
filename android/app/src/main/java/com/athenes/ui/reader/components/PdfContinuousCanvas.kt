@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.StickyNote2
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -108,71 +109,71 @@ fun PdfContinuousCanvas(
                     .padding(bottom = 60.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Botão 1: Grifar Texto com a cor ativa
                     val corDot = parseHexColor(corAtiva)
                     Button(
                         onClick = onGrifarTexto,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFF8FAFC),
                             contentColor = AthenesTextDark
                         ),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(32.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(38.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(10.dp)
+                                .size(12.dp)
                                 .background(corDot, androidx.compose.foundation.shape.CircleShape)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "Grifar Texto", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "Grifar Texto", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
 
                     // Botão 2: + Citação Zotero
                     Button(
                         onClick = onCriarCitacao,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFF8FAFC),
                             contentColor = AthenesTextDark
                         ),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(32.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(38.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.FormatQuote,
                             contentDescription = null,
                             tint = AthenesPrimary,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "+ Citação Zotero", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "+ Citação Zotero", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
 
                     // Botão 3: Criar Nota
                     Button(
                         onClick = onCriarNota,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFF8FAFC),
                             contentColor = AthenesTextDark
                         ),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(32.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(38.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.StickyNote2,
+                            imageVector = Icons.AutoMirrored.Rounded.StickyNote2,
                             contentDescription = null,
                             tint = Color(0xFFF59E0B),
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Criar Nota", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Criar Nota", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
 
                     // Botão 4: Copiar ABNT
@@ -185,27 +186,34 @@ fun PdfContinuousCanvas(
                             Toast.makeText(context, "Citação copiada em formato ABNT!", Toast.LENGTH_SHORT).show()
                             onFecharPopupSelecao()
                         },
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFF8FAFC),
                             contentColor = AthenesTextDark
                         ),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(32.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(38.dp)
                     ) {
-                        Text(text = "Copiar ABNT", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Icon(
+                            imageVector = Icons.Rounded.ContentCopy,
+                            contentDescription = null,
+                            tint = AthenesPrimary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Copiar ABNT", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
 
                     // Fechar Popup
                     IconButton(
                         onClick = onFecharPopupSelecao,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
                             contentDescription = "Fechar Popover",
                             tint = AthenesTextMuted,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }

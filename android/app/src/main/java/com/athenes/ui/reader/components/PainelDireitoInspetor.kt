@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,7 +64,7 @@ fun PainelDireitoInspetor(
                 ) {
                     ItemAbaInspetor(
                         titulo = "Resumo & Notas",
-                        icone = Icons.Rounded.Article,
+                        icone = Icons.AutoMirrored.Rounded.Article,
                         selecionada = abaAtiva == AbaInspetorDireito.RESUMO_NOTAS,
                         onClick = { onSelecionarAba(AbaInspetorDireito.RESUMO_NOTAS) },
                         modifier = Modifier.weight(1f)
@@ -132,7 +133,7 @@ private fun ItemAbaInspetor(
         modifier = modifier.padding(horizontal = 2.dp)
     ) {
         Row(
-            modifier = Modifier.padding(vertical = 6.dp, horizontal = 4.dp),
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
@@ -140,15 +141,15 @@ private fun ItemAbaInspetor(
                 imageVector = icone,
                 contentDescription = null,
                 tint = if (selecionada) Color.White else AthenesTextDark,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(15.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(5.dp))
             Text(
                 text = titulo,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = if (selecionada) FontWeight.Bold else FontWeight.Medium,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = if (selecionada) FontWeight.Bold else FontWeight.SemiBold,
                     color = if (selecionada) Color.White else AthenesTextDark,
-                    fontSize = 10.sp
+                    fontSize = 11.5.sp
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

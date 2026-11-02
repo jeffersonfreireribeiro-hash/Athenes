@@ -701,16 +701,16 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 /* Barra flutuante de seleção rápida de estilos e tipos no bloco da página */
 .ath-bloco-barra-rapida {
   position: absolute;
-  top: -32px;
+  top: -34px;
   left: 6px;
   display: none;
   align-items: center;
   gap: 6px;
   background: #FFFFFF;
-  border: 1px solid #CBD5E1;
+  border: 1.5px solid #CBD5E1;
   border-radius: 8px;
   padding: 3px 8px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.14);
   z-index: 50;
   font-family: var(--glx-font, Nunito), system-ui, sans-serif;
   user-select: none;
@@ -719,6 +719,10 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 
 .ath-bloco-folha.sel .ath-bloco-barra-rapida {
   display: inline-flex;
+}
+
+.ath-bloco-folha.sel > .ath-bloco-alca.topo {
+  display: none !important;
 }
 
 .ath-bloco-barra-rapida .ath-sel-rapido {

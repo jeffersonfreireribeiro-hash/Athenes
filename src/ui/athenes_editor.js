@@ -2362,6 +2362,25 @@ export class EditorView {
       selLay.innerHTML = layouts.map(l => `<option value="${l.id}" ${(b.layout || '1') === l.id ? 'selected' : ''}>${l.nome}</option>`).join('');
       selLay.addEventListener('change', e => {
         b.layout = e.target.value;
+        const q = (b.layout === '2_lado' || b.layout === '2_empilhado') ? 2
+          : (b.layout === '3_linha' || b.layout === '3_misto') ? 3
+          : (b.layout === '4_grade') ? 4
+          : (b.layout === '6_grade') ? 6 : 1;
+
+        if (!Array.isArray(b.itens)) {
+          b.itens = [{ url: b.src || '', legenda_sub: 'Item A' }];
+        }
+        if (b.itens.length > q) {
+          // Quando muda para menos imagens, remove e limpa os slots excedentes
+          b.itens = b.itens.slice(0, q);
+        } else {
+          while (b.itens.length < q) {
+            b.itens.push({ url: '', legenda_sub: `Item ${String.fromCharCode(97 + b.itens.length).toUpperCase()}` });
+          }
+        }
+        if (q === 1 && b.itens[0]) {
+          b.src = b.itens[0].url || '';
+        }
         this.notificarMudanca();
         this.renderizar();
       });
@@ -2679,7 +2698,7 @@ export class EditorView {
       }
       const spanEditavel = tit.querySelector('.ath-titulo-texto-editavel');
       spanEditavel.addEventListener('blur', () => {
-        b.titulo = spanEditavel.innerText.trim();
+        b.titulo = removerPrefixoNumeracaoTitulo(spanEditavel.innerText.trim());
         this.notificarMudancaRapida();
       });
 
@@ -2708,6 +2727,10 @@ export class EditorView {
         : (b.layout === '4_grade') ? 4
         : (b.layout === '6_grade') ? 6 : 1;
 
+      // Se o bloco tiver itens excedentes em relação ao layout ativo, limpa imediatamente
+      if (Array.isArray(b.itens) && b.itens.length > qtdSlots) {
+        b.itens = b.itens.slice(0, qtdSlots);
+      }
       const itens = (Array.isArray(b.itens) ? b.itens : [{ url: b.src || '', legenda_sub: 'Visão Geral' }]).slice(0, qtdSlots);
       itens.forEach((it, idx) => {
         const itEl = document.createElement('div');
@@ -2815,7 +2838,7 @@ export class EditorView {
       `;
       const spanEditavelMapa = tit.querySelector('.ath-titulo-texto-editavel');
       spanEditavelMapa.addEventListener('blur', () => {
-        b.titulo = spanEditavelMapa.innerText.trim();
+        b.titulo = removerPrefixoNumeracaoTitulo(spanEditavelMapa.innerText.trim());
         this.notificarMudancaRapida();
       });
       mapaBox.appendChild(tit);
@@ -2863,7 +2886,7 @@ export class EditorView {
       `;
       const spanEditavelTab = tit.querySelector('.ath-titulo-texto-editavel');
       spanEditavelTab.addEventListener('blur', () => {
-        b.titulo = spanEditavelTab.innerText.trim();
+        b.titulo = removerPrefixoNumeracaoTitulo(spanEditavelTab.innerText.trim());
         this.notificarMudancaRapida();
       });
       tabBox.appendChild(tit);
@@ -2930,7 +2953,7 @@ export class EditorView {
       `;
       const spanEditavelQuadro = tit.querySelector('.ath-titulo-texto-editavel');
       spanEditavelQuadro.addEventListener('blur', () => {
-        b.titulo = spanEditavelQuadro.innerText.trim();
+        b.titulo = removerPrefixoNumeracaoTitulo(spanEditavelQuadro.innerText.trim());
         this.notificarMudancaRapida();
       });
       qBox.appendChild(tit);
@@ -3118,11 +3141,12 @@ export class EditorView {
     }
   }
 
-  inserirCitacaoNoCursor(ref) {
+  inserirCitacaoNoCursor(ref, formato = 'parentese') {
     if (!ref) return;
-    const autor = (ref.autores?.[0]?.sobrenome || ref.autor || 'AUTOR').toUpperCase();
+    const autorSobrenome = (ref.autores?.[0]?.sobrenome || ref.autor || 'AUTOR');
+    const autor = formato === 'narrativa' ? autorSobrenome : autorSobrenome.toUpperCase();
     const ano = ref.ano || new Date().getFullYear();
-    const tag = ` (${autor}, ${ano})`;
+    const tag = formato === 'narrativa' ? ` ${autor} (${ano})` : ` (${autor}, ${ano})`;
 
     // Garante que a referência bibliográfica seja incluída na lista do documento
     if (!this.doc.referencias) this.doc.referencias = [];

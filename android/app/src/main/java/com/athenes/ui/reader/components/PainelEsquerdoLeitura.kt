@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -168,7 +169,7 @@ fun PainelEsquerdoLeitura(
                             Column(modifier = Modifier.padding(8.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
-                                        imageVector = Icons.Rounded.Article,
+                                        imageVector = Icons.AutoMirrored.Rounded.Article,
                                         contentDescription = null,
                                         tint = if (ehAtivo) AthenesPrimary else AthenesTextDark,
                                         modifier = Modifier.size(16.dp)

@@ -163,9 +163,9 @@ export class AthenesApp {
 
     const corpo = modal.querySelector('#athModalZoteroCorpo');
     new PainelZotero(corpo, this.documentoAtivo, {
-      onInserirCitacao: (ref) => {
+      onInserirCitacao: (ref, formato) => {
         fechar();
-        this.editorView.inserirCitacaoNoCursor(ref);
+        this.editorView.inserirCitacaoNoCursor(ref, formato);
       },
       onAlterado: () => {
         this.autoSalvar();

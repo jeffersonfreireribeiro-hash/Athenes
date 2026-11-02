@@ -92,12 +92,14 @@ export class PainelZotero {
     let nLiv = 0;
     let nTese = 0;
     let nConf = 0;
+    let nEstudo = 0;
     for (const r of this.referenciasCache) {
       const cat = classificarTipoRef(r).id;
       if (cat === 'artigo') nArt++;
       else if (cat === 'livro') nLiv++;
       else if (cat === 'tese') nTese++;
       else if (cat === 'conferencia') nConf++;
+      if (r.fichamento || r.temPdf || r.pdfUrl || r.citacoesMarcadas?.length) nEstudo++;
     }
 
     root.innerHTML = `
@@ -140,6 +142,9 @@ export class PainelZotero {
         </button>
         <button type="button" class="glx-btn glx-btn-xs ${this.filtroTipo === 'conferencia' ? 'glx-btn-primary' : 'glx-btn-soft'}" data-tipo="conferencia" style="border-radius:12px; font-size:10.5px; white-space:nowrap; padding:2px 8px;">
           Conferências (${nConf})
+        </button>
+        <button type="button" class="glx-btn glx-btn-xs ${this.filtroTipo === 'fichados' ? 'glx-btn-primary' : 'glx-btn-soft'}" data-tipo="fichados" style="border-radius:12px; font-size:10.5px; white-space:nowrap; padding:2px 8px;">
+          Fichados / PDF (${nEstudo})
         </button>
       </div>
 
@@ -216,9 +221,42 @@ export class PainelZotero {
 
     this.container.appendChild(root);
 
-    // Carrega dados iniciais
-    if (this.doc.referencias && this.doc.referencias.length > 0) {
-      this.referenciasCache = [...this.doc.referencias];
+    // Carrega dados iniciais e integra artigos com fichamento do estúdio
+    const refsMap = new Map();
+    (this.doc.referencias || []).forEach(r => refsMap.set(r.id || r.chaveZotero, r));
+
+    try {
+      const salvoEstudo = localStorage.getItem('athenes_estudo_artigos');
+      if (salvoEstudo) {
+        const artigosEstudo = JSON.parse(salvoEstudo);
+        if (Array.isArray(artigosEstudo)) {
+          for (const a of artigosEstudo) {
+            const chave = a.id || a.zoteroKey;
+            if (chave && !refsMap.has(chave)) {
+              const autoresArr = a.autores ? a.autores.split(/,| e /).map(s => ({ sobrenome: s.trim() })) : [{ sobrenome: a.autor || 'Autor' }];
+              refsMap.set(chave, {
+                id: a.id || ('ref_' + Math.random().toString(36).slice(2, 9)),
+                chaveZotero: a.zoteroKey || '',
+                titulo: a.titulo || 'Artigo sem título',
+                autores: autoresArr,
+                ano: a.ano || '2024',
+                publicacao: a.periodico || a.categoria || 'Estúdio de Artigos',
+                tipo: 'artigo',
+                temPdf: !!(a.pdfUrl || a.driveArquivoId),
+                fichamento: a.fichamento || a.resumo || '',
+                resumo: a.resumo || '',
+                citacoesMarcadas: a.citacoesMarcadas || [],
+                palavrasChave: a.tags || []
+              });
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    this.referenciasCache = Array.from(refsMap.values());
+
+    if (this.referenciasCache.length > 0) {
       this.atualizarListaItens();
     } else if (this.client.userId && this.client.apiKey) {
       this.sincronizarZotero();
@@ -273,7 +311,9 @@ export class PainelZotero {
     }
 
     // 2. Filtro por Categoria / Tipo
-    if (this.filtroTipo !== 'todos') {
+    if (this.filtroTipo === 'fichados') {
+      lista = lista.filter(r => r.fichamento || r.temPdf || r.pdfUrl || r.citacoesMarcadas?.length);
+    } else if (this.filtroTipo !== 'todos') {
       lista = lista.filter(r => classificarTipoRef(r).id === this.filtroTipo);
     }
 
@@ -362,18 +402,23 @@ export class PainelZotero {
         </div>
         <div class="ath-ref-card-titulo" style="font-size:12.5px; font-weight:700; color:#0F172A; line-height:1.35; margin-bottom:4px;">${ref.titulo}</div>
         <div class="ath-ref-card-autores" style="font-size:11.5px; color:#475569; margin-bottom:6px;">${autoresTxt || 'Autoria não informada'}</div>
-        <div class="ath-ref-card-meta" style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F1F5F9; padding-top:6px; margin-top:4px;">
-          <span style="font-size:10.5px; color:#64748B; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:260px;" title="${ref.publicacao || ref.editora || ''}">
+        <div class="ath-ref-card-meta" style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #F1F5F9; padding-top:6px; margin-top:4px; gap:8px;">
+          <span style="font-size:10.5px; color:#64748B; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px;" title="${ref.publicacao || ref.editora || ''}">
             ${ref.publicacao || ref.editora || 'Biblioteca Geral'}
           </span>
-          <button type="button" class="glx-btn glx-btn-xs glx-btn-primary ath-btn-citar" style="padding:2px 10px; font-weight:700; border-radius:6px;" title="Inserir Citação deste autor no texto ativo">Citar</button>
+          <div style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-primary ath-btn-citar" data-formato="parentese" style="padding:2px 8px; font-weight:700; border-radius:6px; font-size:10.5px;" title="Citação Indireta ABNT: (AUTOR, Ano)">(AUTOR, Ano)</button>
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft ath-btn-citar" data-formato="narrativa" style="padding:2px 8px; font-weight:700; border-radius:6px; font-size:10.5px; border:1px solid #CBD5E1;" title="Citação Direta/Narrativa ABNT: Autor (Ano)">Autor (Ano)</button>
+          </div>
         </div>
       `;
 
       card.addEventListener('click', ev => {
-        if (ev.target.classList.contains('ath-btn-citar')) {
+        const btnCitar = ev.target.closest('.ath-btn-citar');
+        if (btnCitar) {
           ev.stopPropagation();
-          this.inserirCitacaoNoDocumento(ref);
+          const formato = btnCitar.dataset.formato || 'parentese';
+          this.inserirCitacaoNoDocumento(ref, formato);
           return;
         }
         this.selecionarItem(ref);
@@ -418,12 +463,12 @@ export class PainelZotero {
     });
   }
 
-  inserirCitacaoNoDocumento(ref) {
+  inserirCitacaoNoDocumento(ref, formato = 'parentese') {
     if (!this.doc.referencias.some(r => r.id === ref.id)) {
       this.doc.referencias.push(ref);
       this.onAlterado();
     }
-    this.onInserirCitacao(ref);
+    this.onInserirCitacao(ref, formato);
   }
 
   abrirModalConfig() {
