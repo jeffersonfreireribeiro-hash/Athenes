@@ -357,7 +357,7 @@ INSTRUÇÕES DE ANÁLISE:
    - coluna_cabecalho { ativo, fundo, negrito, borda_direita }: primeira coluna destacada.
    - zebra { ativo, cor_impar, cor_par }: preenchimento alternado das linhas de dados.
    - padding: "compacto" (2pt) | "normal" (4pt) | "expandido" (8pt); quebra: "normal" | "forcada".
-   - camadas.tabela { fundo, h: "esquerda"|"centro"|"direita"|"justificado", v: "topo"|"centro"|"base" }: fundo e alinhamento padrão das células.
+   - camadas.tabela { fundo, h: "esquerda"|"centro"|"direita"|"justificado", v: "topo"|"centro"|"base", fonte (id: "nunito"|"times"|"arial"|"georgia"|"garamond"|"cambria"|"calibri"|"consolas"), tamanho_pt (6-72), negrito, italico, riscado (booleanos), cor_texto (#RRGGBB), wrap: "quebrar"|"nao_quebrar", rotacao: "horizontal"|"cima"|"baixo" }: fundo, alinhamento e tipografia padrão das células.
 
 FORMATO EXATO DE RESPOSTA:
 Responda EXCLUSIVAMENTE com o bloco JSON válido abaixo, sem texto antes ou depois, pronto para ser colado no importador do Athenes:

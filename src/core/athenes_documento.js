@@ -2023,6 +2023,17 @@ export function aplicarLayoutATodosBlocos(doc, tipo, config) {
 }
 
 /**
+ * A "Linha de borda" está ligada? Valor explícito (`borda_ativa`) sempre vence; sem ele, as molduras
+ * com linha própria (lateral, topo/base, caixa, cartão, técnica) assumem ligada e "limpo"/"personalizado" desligada.
+ * Fonte única para o CSS do bloco e para o checkbox do modal (evita checkbox marcado sem borda visível).
+ */
+export function bordaAtivaEfetiva(b) {
+  if (b && b.borda_ativa !== undefined && b.borda_ativa !== null) return !!b.borda_ativa;
+  const tipo = b?.moldura_tipo || 'limpo';
+  return tipo !== 'limpo' && tipo !== 'personalizado';
+}
+
+/**
  * Gera as propriedades CSS do estilo de caixa / moldura do bloco
  */
 export function gerarCssMolduraBloco(b) {
@@ -2047,23 +2058,29 @@ export function gerarCssMolduraBloco(b) {
     : (linhaEstilo === 'dupla' || linhaEstilo === 'double') ? 'double'
     : 'solid';
 
+  const bordaOn = bordaAtivaEfetiva(b);
+
   if (tipo === 'linha_esquerda' || tipo === 'linha_lateral') {
-    borderLeft = `${largLinha}px ${cssEstilo} ${corBorda}`;
+    if (bordaOn) borderLeft = `${largLinha}px ${cssEstilo} ${corBorda}`;
     if (linhaEstilo === 'quadriculada_reta') {
       extraCss.borderRadius = '0px';
     }
   } else if (tipo === 'linhas_topo_base') {
-    borderTop = `${largLinha}px ${cssEstilo} ${corBorda}`;
-    borderBottom = `${largLinha}px ${cssEstilo} ${corBorda}`;
-  } else if (tipo === 'caixa_borda' || (tipo === 'cartao_suave' && b.borda_ativa !== false)) {
-    border = `${largLinha}px ${cssEstilo} ${corBorda}`;
+    if (bordaOn) {
+      borderTop = `${largLinha}px ${cssEstilo} ${corBorda}`;
+      borderBottom = `${largLinha}px ${cssEstilo} ${corBorda}`;
+    }
+  } else if (tipo === 'caixa_borda' || tipo === 'cartao_suave') {
+    if (bordaOn) border = `${largLinha}px ${cssEstilo} ${corBorda}`;
   } else if (tipo === 'moldura_tecnica') {
-    border = `1.5px solid ${corBorda}`;
-    extraCss.outline = '1px dashed #CBD5E1';
-    extraCss.outlineOffset = '3px';
+    if (bordaOn) {
+      border = `1.5px solid ${corBorda}`;
+      extraCss.outline = '1px dashed #CBD5E1';
+      extraCss.outlineOffset = '3px';
+    }
   } else if (tipo === 'personalizado') {
-    if (b.borda_ativa) {
-      const estilo = b.borda_estilo || 'solida';
+    if (bordaOn) {
+      const estilo = b.borda_estilo || linhaEstilo;
       const cssEstiloP = estilo === 'tracejada' ? 'dashed' : estilo === 'pontilhada' ? 'dotted' : estilo === 'dupla' ? 'double' : 'solid';
       const larg = b.borda_largura_px || 1;
       const pos = b.borda_posicao || 'todas';
@@ -2072,6 +2089,9 @@ export function gerarCssMolduraBloco(b) {
       else if (pos === 'topo') { borderTop = `${larg}px ${cssEstiloP} ${corBorda}`; }
       else border = `${larg}px ${cssEstiloP} ${corBorda}`;
     }
+  } else if (bordaOn) {
+    // "limpo" com a linha de borda ligada explicitamente: contorno completo
+    border = `${largLinha}px ${cssEstilo} ${corBorda}`;
   }
 
   return {

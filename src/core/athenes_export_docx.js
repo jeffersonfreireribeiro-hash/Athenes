@@ -23,8 +23,7 @@ function gerarTabelaDocxEstilizada(b) {
 
   const celula = (texto, r, c, ehCab) => {
     const res = resolverCelula(estilo, dim, r, c);
-    const { tcPr, jc } = celulaParaDocx(res);
-    const rPr = `${res.negrito || ehCab ? '<w:b/>' : ''}${res.cor_texto ? `<w:color w:val="${res.cor_texto.replace('#', '')}"/>` : ''}<w:sz w:val="20"/>`;
+    const { tcPr, jc, rPr } = celulaParaDocx(res);
     return `<w:tc>${tcPr}<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:after="0"/></w:pPr><w:r><w:rPr>${rPr}</w:rPr><w:t xml:space="preserve">${escaparXml(texto)}</w:t></w:r></w:p></w:tc>`;
   };
 

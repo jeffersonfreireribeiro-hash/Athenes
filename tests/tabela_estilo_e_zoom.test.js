@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { criarDocumento, criarNovoBloco } from '../src/core/athenes_documento.js';
+import { criarDocumento, criarNovoBloco, gerarCssMolduraBloco, bordaAtivaEfetiva } from '../src/core/athenes_documento.js';
 import {
   obterEstiloTabela, garantirEstiloTabela, dimensoesTabela, resolverCelula,
-  aplicarPresetBorda, aplicarCamadaSelecao, sanitizarEstiloTabela, celulaParaCss, celulaParaDocx
+  aplicarPresetBorda, aplicarCamadaSelecao, sanitizarEstiloTabela, celulaParaCss, celulaParaDocx,
+  lerNumeroPtBr, ajustarCasasDecimais, formatarNumeroPtBr
 } from '../src/core/athenes_tabela_estilo.js';
 import { renderizarBlocoHtml } from '../src/core/athenes_export_pdf.js';
 import {
@@ -241,4 +242,81 @@ test('Zoom do canvas: clamp 25%–400%, suavidade e ancoragem no cursor', () => 
   const scroll = 300, offset = 200, z0 = 1, z1 = 2;
   const novoScroll = scrollAncorado(scroll, offset, z0, z1);
   assert.equal((novoScroll + offset) / z1, (scroll + offset) / z0);
+});
+
+test('Formatação de texto por célula: fonte, tamanho, B/I/S, cor, quebra e rotação (CSS, PDF e DOCX)', () => {
+  const b = novaTabela();
+  const dim = dimensoesTabela(b);
+  aplicarCamadaSelecao(b, { r0: 1, c0: 1, r1: 2, c1: 2 }, {
+    fonte: 'times', tamanho_pt: 12, negrito: true, italico: true, riscado: true,
+    cor_texto: '#c00000', wrap: 'nao_quebrar', rotacao: 'cima'
+  });
+  const e = obterEstiloTabela(b);
+  const dentro = resolverCelula(e, dim, 1, 1);
+  const fora = resolverCelula(e, dim, 1, 0);
+  assert.equal(dentro.fonte, 'times'); assert.equal(dentro.tamanho_pt, 12);
+  assert.equal(fora.fonte, null, 'fora da seleção não muda');
+  const css = celulaParaCss(dentro, e);
+  assert.match(css, /font-family:'Times New Roman'/);
+  assert.match(css, /font-size:12pt/);
+  assert.match(css, /font-style:italic/);
+  assert.match(css, /text-decoration:line-through/);
+  assert.match(css, /color:#C00000/);
+  assert.match(css, /white-space:nowrap/);
+  assert.match(css, /writing-mode:sideways-lr/);
+
+  // negrito explícito vence o padrão do cabeçalho; desligar na seleção remove o negrito
+  aplicarCamadaSelecao(b, { r0: 0, c0: 0, r1: 0, c1: 2 }, { negrito: false });
+  assert.equal(resolverCelula(obterEstiloTabela(b), dim, 0, 1).negrito, false);
+
+  const docx = celulaParaDocx(dentro);
+  assert.match(docx.rPr, /<w:rFonts w:ascii="Times New Roman"/);
+  assert.match(docx.rPr, /<w:i\/>/); assert.match(docx.rPr, /<w:strike\/>/);
+  assert.match(docx.rPr, /<w:color w:val="C00000"\/>/);
+  assert.match(docx.rPr, /<w:sz w:val="24"\/>/);
+  assert.match(docx.tcPr, /<w:noWrap\/>/);
+  assert.match(docx.tcPr, /<w:textDirection w:val="btLr"\/>/);
+
+  const html = renderizarBlocoHtml(b, {}, criarDocumento({ titulo: 'T' }));
+  assert.match(html, /font-size:12pt/);
+  assert.match(html, /line-through/);
+});
+
+test('Formato numérico pt-BR: leitura, casas decimais, moeda e porcentagem', () => {
+  assert.equal(lerNumeroPtBr('R$ 1.234,56'), 1234.56);
+  assert.equal(lerNumeroPtBr('12,5%'), 12.5);
+  assert.equal(lerNumeroPtBr('1.234'), 1234);
+  assert.equal(lerNumeroPtBr('Amostra A'), null);
+  assert.equal(ajustarCasasDecimais('12,5', 1), '12,50');
+  assert.equal(ajustarCasasDecimais('12,50', -1), '12,5');
+  assert.equal(ajustarCasasDecimais('7', 1), '7,0');
+  assert.equal(ajustarCasasDecimais('7', -1), '7', 'não vai abaixo de 0 casas');
+  assert.equal(ajustarCasasDecimais('1.234,5', 1), '1.234,50');
+  assert.equal(ajustarCasasDecimais('15,2%', 1), '15,20%');
+  assert.equal(ajustarCasasDecimais('texto', 1), 'texto');
+  assert.equal(formatarNumeroPtBr('1234,5', { formato: 'moeda' }), 'R$ 1.234,50');
+  assert.equal(formatarNumeroPtBr('12', { formato: 'porcentagem' }), '12%');
+  assert.equal(formatarNumeroPtBr('R$ 1.234,50', { formato: 'automatico' }), '1234,5');
+  assert.equal(formatarNumeroPtBr('abc', { formato: 'moeda' }), 'abc');
+});
+
+test('Sanitização rejeita fonte, tamanho e rotação inválidos nas camadas', () => {
+  const e = sanitizarEstiloTabela({ camadas: { tabela: { fonte: 'comic', tamanho_pt: 900, rotacao: 'diagonal', wrap: 'x', cor_texto: 'red', negrito: 'sim' } } });
+  assert.deepEqual(e.camadas.tabela, { h: 'esquerda', v: 'topo' });
+  const ok = sanitizarEstiloTabela({ camadas: { tabela: { fonte: 'arial', tamanho_pt: 11.3, rotacao: 'baixo' } } });
+  assert.equal(ok.camadas.tabela.fonte, 'arial'); assert.equal(ok.camadas.tabela.tamanho_pt, 11.5); assert.equal(ok.camadas.tabela.rotacao, 'baixo');
+});
+
+test('"Linha de borda" funciona em todas as molduras (ligada, desligada e indefinida)', () => {
+  const temLinha = (css) => ['border', 'borderLeft', 'borderTop', 'borderBottom'].some(k => css[k] && css[k] !== 'none');
+  const tipos = ['limpo', 'linha_esquerda', 'linhas_topo_base', 'cartao_suave', 'caixa_borda', 'moldura_tecnica', 'personalizado'];
+  for (const moldura_tipo of tipos) {
+    assert.equal(temLinha(gerarCssMolduraBloco({ moldura_tipo, borda_ativa: false })), false, `${moldura_tipo}: desligada não desenha`);
+    assert.equal(temLinha(gerarCssMolduraBloco({ moldura_tipo, borda_ativa: true })), true, `${moldura_tipo}: ligada desenha`);
+    // o checkbox do modal e o CSS concordam também quando o valor está indefinido
+    const b = { moldura_tipo };
+    assert.equal(temLinha(gerarCssMolduraBloco(b)), bordaAtivaEfetiva(b), `${moldura_tipo}: indefinida coerente com o checkbox`);
+  }
+  assert.equal(bordaAtivaEfetiva({ moldura_tipo: 'limpo' }), false);
+  assert.equal(bordaAtivaEfetiva({ moldura_tipo: 'caixa_borda' }), true);
 });

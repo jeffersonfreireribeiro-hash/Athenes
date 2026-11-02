@@ -16,9 +16,11 @@ import {
   salvarModeloLayoutCustomizado,
   aplicarLayoutATodosBlocos,
   gerarCssMolduraBloco,
+  bordaAtivaEfetiva,
   rotuloDaFigura
 } from '../core/athenes_documento.js';
 import { criarSeletorSimbolosMatematica } from './athenes_simbolos_matematica.js';
+import { construirTabelaDom, instalarSelecaoCelulas, montarBarraFormatacaoTabela, montarSecoesEstiloTabela } from './athenes_tabela_ui.js';
 
 export class ModalLayoutBloco {
   constructor(documento, bloco, opcoes = {}) {
@@ -44,6 +46,9 @@ export class ModalLayoutBloco {
     }
 
     this.backdrop = null;
+    this._selTabela = null;
+    this._barraTabela = null;
+    this._ctxTabela = null;
     this.montar();
   }
 
@@ -85,6 +90,8 @@ export class ModalLayoutBloco {
         </div>
         <button type="button" class="rm-ic" id="athModalFechar" title="Fechar">${svgIcone('fechar', 14)}</button>
       </div>
+
+      ${this.ehTabelaOuQuadro() ? '<div id="athBarraTabela" style="flex:none; margin:12px 20px 0 20px;"></div>' : ''}
 
       <div class="ath-modal-body" style="flex:1; min-height:0; display:grid; grid-template-columns:440px 1fr; gap:16px; padding:16px 20px; background:#F8FAFC;">
         <!-- Painel Esquerdo: Controles, Presets, Molduras e Subgrade -->
@@ -138,7 +145,7 @@ export class ModalLayoutBloco {
 
             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
               <label class="rm-chk" style="font-size:12px; margin:0;">
-                <input type="checkbox" id="athBordaAtiva" ${this.rascunho.borda_ativa !== false ? 'checked' : ''}> Linha de borda
+                <input type="checkbox" id="athBordaAtiva" ${bordaAtivaEfetiva(this.rascunho) ? 'checked' : ''}> Linha de borda
               </label>
               <input type="color" id="athBordaCor" value="${this.rascunho.borda_cor || '#314F79'}" style="width:32px; height:24px; border:none; cursor:pointer;">
             </div>
@@ -162,6 +169,8 @@ export class ModalLayoutBloco {
               </label>
             </div>
           </div>
+
+          ${this.ehTabelaOuQuadro() ? '<div id="athSecEstiloTabela" style="background:#fff; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:12px; padding:12px;"></div>' : ''}
 
           <!-- Subgrade e Variáveis do Bloco (Estilo Glaux Desk) -->
           <div style="background:#fff; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;" id="athSecVariaveis"></div>
@@ -196,8 +205,30 @@ export class ModalLayoutBloco {
     this.renderizarPresets();
     this.renderizarListaMolduras();
     this.renderizarSecaoVariaveis();
+    this.montarControlesTabela();
     this.atualizarPrevia();
     this.ligarEventos();
+  }
+
+  ehTabelaOuQuadro() {
+    return this.rascunho.tipo === 'tabela' || this.rascunho.tipo === 'quadro';
+  }
+
+  /** Barra de formatação (estilo planilha) + seções de bordas/fundos operando sobre a prévia real. */
+  montarControlesTabela() {
+    if (!this.ehTabelaOuQuadro()) return;
+    const barra = this.backdrop.querySelector('#athBarraTabela');
+    const secoes = this.backdrop.querySelector('#athSecEstiloTabela');
+    if (!barra || !secoes) return;
+    this._ctxTabela = {
+      bloco: this.rascunho,
+      obterTabela: () => this.backdrop.querySelector('#athPreviaFolhaSlot table'),
+      obterSelecao: () => this._selTabela,
+      aoAlterar: () => {}, // a prévia é atualizada no próprio DOM; o bloco só é gravado em "Salvar e Aplicar"
+      estado: { escopo: 'selecao' }
+    };
+    this._barraTabela = montarBarraFormatacaoTabela(barra, this._ctxTabela);
+    montarSecoesEstiloTabela(secoes, this._ctxTabela);
   }
 
   renderizarPresets() {
@@ -660,7 +691,7 @@ export class ModalLayoutBloco {
     if (corFundo) corFundo.value = this.rascunho.fundo_cor || '#F4F7FB';
 
     const chkBorda = this.backdrop.querySelector('#athBordaAtiva');
-    if (chkBorda) chkBorda.checked = this.rascunho.borda_ativa !== false;
+    if (chkBorda) chkBorda.checked = bordaAtivaEfetiva(this.rascunho);
     const corBorda = this.backdrop.querySelector('#athBordaCor');
     if (corBorda) corBorda.value = this.rascunho.borda_cor || '#314F79';
   }
@@ -675,7 +706,7 @@ export class ModalLayoutBloco {
     Object.assign(box.style, cssCaixa);
 
     // Se for moldura técnica, desenha esquadros nos 4 cantos
-    if (this.rascunho.moldura_tipo === 'moldura_tecnica') {
+    if (this.rascunho.moldura_tipo === 'moldura_tecnica' && bordaAtivaEfetiva(this.rascunho)) {
       box.style.position = 'relative';
       const cantosHtml = `
         <div style="position:absolute; top:2px; left:2px; width:8px; height:8px; border-top:2px solid #314F79; border-left:2px solid #314F79;"></div>
@@ -783,21 +814,7 @@ export class ModalLayoutBloco {
       const rotuloTab = isQuadro ? 'Quadro' : 'Tabela';
       const posTit = this.rascunho.posicao_titulo || 'topo';
       const titHtml = `<strong style="display:block; font-size:12px; font-weight:800; color:#1F2733; margin-bottom:4px;">${this.rascunho.titulo || `${rotuloTab} 1 — Dados Apresentados`}</strong>`;
-      const tabHtml = `
-        <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">
-          <thead>
-            <tr style="border-top:1.5px solid #1F2733; border-bottom:1px solid #1F2733;">
-              <th style="padding:4px 6px;">Parâmetro</th>
-              <th style="padding:4px 6px;">Valor A</th>
-              <th style="padding:4px 6px;">Valor B</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td style="padding:3px 6px;">Indicador 1</td><td style="padding:3px 6px;">12,5</td><td style="padding:3px 6px;">24,8</td></tr>
-            <tr style="border-bottom:1.5px solid #1F2733;"><td style="padding:3px 6px;">Indicador 2</td><td style="padding:3px 6px;">8,1</td><td style="padding:3px 6px;">19,3</td></tr>
-          </tbody>
-        </table>
-      `;
+      const tabHtml = '<div data-mount-tabela></div>';
       const fonteHtml = `<small style="font-size:10px; color:#64748B; margin-top:4px; display:block;">${this.rascunho.fonte || 'Fonte: IBGE / Autores.'}</small>`;
 
       if (posTit === 'topo') {
@@ -808,6 +825,17 @@ export class ModalLayoutBloco {
     }
 
     slot.appendChild(box);
+
+    // Tabela/quadro real do rascunho (editável e selecionável), preservando a seleção entre reconstruções
+    const mount = box.querySelector('[data-mount-tabela]');
+    if (mount) {
+      const rectAnterior = this._selTabela ? this._selTabela.obterRetangulo() : null;
+      const tabela = construirTabelaDom(this.rascunho, this.rascunho.tipo === 'quadro' ? 'ath-quadro-abnt' : 'ath-tabela-abnt', null);
+      mount.replaceWith(tabela);
+      this._selTabela = instalarSelecaoCelulas(tabela, () => this._barraTabela?.atualizar());
+      if (rectAnterior) this._selTabela.selecionar(rectAnterior);
+      this._barraTabela?.atualizar();
+    }
   }
 
   ligarEventos() {

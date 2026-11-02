@@ -22,6 +22,13 @@ export const PRESETS_BORDA = [
   'topo', 'base', 'esquerda', 'direita', 'nenhuma'
 ];
 
+import { FONTES_SISTEMA } from './athenes_estilos.js';
+
+export const ROTACOES = ['horizontal', 'cima', 'baixo'];
+export const WRAPS = ['quebrar', 'nao_quebrar'];
+export const TAMANHO_MIN_PT = 6;
+export const TAMANHO_MAX_PT = 72;
+
 const COR_TEXTO_PADRAO = '#1F2733';
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
@@ -94,6 +101,14 @@ function sanitizarCamada(c) {
   if (f) o.fundo = f;
   if (ALINHAMENTOS_H.includes(c.h)) o.h = c.h;
   if (ALINHAMENTOS_V.includes(c.v)) o.v = c.v;
+  if (c.fonte in FONTES_SISTEMA) o.fonte = c.fonte;
+  const tam = Number(c.tamanho_pt);
+  if (tam >= TAMANHO_MIN_PT && tam <= TAMANHO_MAX_PT) o.tamanho_pt = Math.round(tam * 2) / 2;
+  for (const k of ['negrito', 'italico', 'riscado']) if (typeof c[k] === 'boolean') o[k] = c[k];
+  const ct = corValida(c.cor_texto);
+  if (ct) o.cor_texto = ct;
+  if (WRAPS.includes(c.wrap)) o.wrap = c.wrap;
+  if (ROTACOES.includes(c.rotacao)) o.rotacao = c.rotacao;
   return o;
 }
 
@@ -234,12 +249,16 @@ export function resolverCelula(estilo, dim, r, c) {
   const cam = estilo.camadas;
   let h = 'esquerda';
   let v = 'topo';
+  const texto = {};
   const camadasOrdem = [cam.tabela, cam.colunas[c], cam.linhas[r], cam.celulas[`${r}:${c}`]];
   for (const l of camadasOrdem) {
     if (!l) continue;
     if (l.fundo) fundo = l.fundo;
     if (l.h) h = l.h;
     if (l.v) v = l.v;
+    for (const k of ['fonte', 'tamanho_pt', 'negrito', 'italico', 'riscado', 'cor_texto', 'wrap', 'rotacao']) {
+      if (l[k] !== undefined) texto[k] = l[k];
+    }
   }
 
   // Bordas: uma aresta é "compartilhada" com a célula vizinha; resolvemos sempre pelo mesmo critério
@@ -256,8 +275,16 @@ export function resolverCelula(estilo, dim, r, c) {
     h, v,
     bordas,
     padding_pt: PADDINGS_CELULA[estilo.padding] ?? 4,
-    negrito: ehCab ? !!estilo.cabecalho.negrito : ehRod ? !!estilo.rodape.negrito : ehColChave ? !!estilo.coluna_cabecalho.negrito : false,
-    cor_texto: ehCab ? estilo.cabecalho.cor_texto || null : null,
+    // negrito/cor do cabeçalho são padrões; a formatação explícita da seleção tem precedência
+    negrito: texto.negrito !== undefined ? texto.negrito
+      : ehCab ? !!estilo.cabecalho.negrito : ehRod ? !!estilo.rodape.negrito : ehColChave ? !!estilo.coluna_cabecalho.negrito : false,
+    italico: !!texto.italico,
+    riscado: !!texto.riscado,
+    cor_texto: texto.cor_texto || (ehCab ? estilo.cabecalho.cor_texto || null : null),
+    fonte: texto.fonte || null,
+    tamanho_pt: texto.tamanho_pt || null,
+    wrap: texto.wrap || 'quebrar',
+    rotacao: texto.rotacao || 'horizontal',
     tipo: ehCab ? 'cabecalho' : ehRod ? 'rodape' : 'dados'
   };
 }
@@ -474,9 +501,16 @@ export function celulaParaCss(res, estilo) {
     `border-right:${bordaParaCss(res.bordas.r)}`
   ];
   if (res.fundo) decl.push(`background-color:${res.fundo}`);
-  if (res.negrito) decl.push('font-weight:800');
+  decl.push(`font-weight:${res.negrito ? 800 : 400}`);
+  if (res.italico) decl.push('font-style:italic');
+  if (res.riscado) decl.push('text-decoration:line-through');
   if (res.cor_texto) decl.push(`color:${res.cor_texto}`);
-  if (estilo.quebra === 'forcada') decl.push('overflow-wrap:anywhere', 'word-break:break-word');
+  if (res.fonte && FONTES_SISTEMA[res.fonte]) decl.push(`font-family:${FONTES_SISTEMA[res.fonte].familia.replace(/"/g, "'")}`);
+  if (res.tamanho_pt) decl.push(`font-size:${res.tamanho_pt}pt`);
+  if (res.rotacao === 'baixo') decl.push('writing-mode:vertical-rl');
+  else if (res.rotacao === 'cima') decl.push('writing-mode:sideways-lr');
+  if (res.wrap === 'nao_quebrar') decl.push('white-space:nowrap');
+  else if (estilo.quebra === 'forcada') decl.push('overflow-wrap:anywhere', 'word-break:break-word');
   else decl.push('overflow-wrap:break-word');
   return decl.join(';');
 }
@@ -502,5 +536,71 @@ export function celulaParaDocx(res) {
   const shd = res.fundo ? `<w:shd w:val="clear" w:color="auto" w:fill="${res.fundo.replace('#', '').toUpperCase().padEnd(6, '0').slice(0, 6)}"/>` : '';
   const valign = `<w:vAlign w:val="${{ topo: 'top', centro: 'center', base: 'bottom' }[res.v]}"/>`;
   const jc = { esquerda: 'left', centro: 'center', direita: 'right', justificado: 'both' }[res.h];
-  return { tcPr: `<w:tcPr>${xml}${shd}${valign}</w:tcPr>`, jc };
+  const noWrap = res.wrap === 'nao_quebrar' ? '<w:noWrap/>' : '';
+  const dir = res.rotacao === 'cima' ? '<w:textDirection w:val="btLr"/>' : res.rotacao === 'baixo' ? '<w:textDirection w:val="tbRl"/>' : '';
+  return { tcPr: `<w:tcPr>${xml}${shd}${noWrap}${dir}${valign}</w:tcPr>`, jc, rPr: rPrDocx(res) };
+}
+
+/** Nome da fonte para OOXML (primeiro nome da pilha CSS). */
+export function nomeFonteDocx(id) {
+  const f = FONTES_SISTEMA[id];
+  return f ? f.familia.split(',')[0].replace(/['"]/g, '').trim() : null;
+}
+
+/** <w:rPr> da célula: fonte, tamanho (meios-pontos), negrito, itálico, tachado e cor. */
+export function rPrDocx(res) {
+  const nome = nomeFonteDocx(res.fonte);
+  const cor = res.cor_texto ? res.cor_texto.replace('#', '').toUpperCase().padEnd(6, '0').slice(0, 6) : null;
+  return (nome ? `<w:rFonts w:ascii="${nome}" w:hAnsi="${nome}" w:cs="${nome}"/>` : '')
+    + (res.negrito ? '<w:b/>' : '')
+    + (res.italico ? '<w:i/>' : '')
+    + (res.riscado ? '<w:strike/>' : '')
+    + (cor ? `<w:color w:val="${cor}"/>` : '')
+    + `<w:sz w:val="${Math.round((res.tamanho_pt || 10) * 2)}"/>`;
+}
+
+// ───────────────────────────── Formato numérico (pt-BR) ─────────────────────────────
+
+/** Converte "R$ 1.234,56", "12,5%", "1234.5" em número; null se não for numérico. */
+export function lerNumeroPtBr(texto) {
+  if (typeof texto !== 'string') return null;
+  let t = texto.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim().replace(/^R\$\s*/i, '').replace(/\s*%$/, '').replace(/\s/g, '');
+  if (!t || !/^-?[\d.,]+$/.test(t)) return null;
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Casas decimais exibidas no texto (parte após a vírgula). */
+export function casasDecimais(texto) {
+  const m = String(texto).match(/,(\d+)\s*%?\s*$/);
+  return m ? m[1].length : 0;
+}
+
+export const FORMATOS_NUMERO = ['automatico', 'numero', 'porcentagem', 'moeda'];
+
+/**
+ * Reformata o texto de uma célula numérica. Células não numéricas voltam intactas.
+ * @param {string} texto
+ * @param {{formato?:string, casas?:number}} opc  `casas` omitido preserva as casas atuais
+ */
+export function formatarNumeroPtBr(texto, { formato = 'numero', casas } = {}) {
+  const n = lerNumeroPtBr(texto);
+  if (n === null) return texto;
+  const c = Math.max(0, Math.min(10, casas !== undefined ? casas : casasDecimais(texto)));
+  const fmt = (min, max) => n.toLocaleString('pt-BR', { minimumFractionDigits: min, maximumFractionDigits: max });
+  if (formato === 'automatico') return String(n).replace('.', ',');
+  if (formato === 'moeda') return `R$ ${fmt(casas !== undefined ? c : 2, casas !== undefined ? c : 2)}`;
+  if (formato === 'porcentagem') return `${fmt(c, c)}%`;
+  return fmt(c, c);
+}
+
+/** Aumenta/diminui casas decimais mantendo o formato (moeda/%) já presente no texto. */
+export function ajustarCasasDecimais(texto, delta) {
+  const n = lerNumeroPtBr(texto);
+  if (n === null) return texto;
+  const atual = casasDecimais(texto);
+  const formato = /^\s*R\$/i.test(texto) ? 'moeda' : /%\s*$/.test(texto) ? 'porcentagem' : 'numero';
+  return formatarNumeroPtBr(texto, { formato, casas: Math.max(0, atual + delta) });
 }
