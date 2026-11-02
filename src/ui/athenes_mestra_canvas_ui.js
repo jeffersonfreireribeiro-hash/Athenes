@@ -14,6 +14,8 @@ import {
 import { elementosMestraHtml, renderizadoPeloCanvas } from '../core/athenes_mestra_render.js';
 import { dimensoesPapelMm } from '../core/athenes_grid.js';
 import { svgIcone } from './athenes_icones.js';
+import { lerImagemComprimida } from './athenes_imagem_util.js';
+import { mostrarAviso } from './athenes_aviso.js';
 
 const PX_MM = 96 / 25.4;
 const CSS = `
@@ -362,6 +364,14 @@ export class CanvasMestra {
         <label class="ath-mc-chk"><input type="checkbox" data-f="primario" ${primario ? 'checked' : ''}> Fluxo principal do corpo</label>
         <div class="ath-mc-g2"><label>Colunas<input type="number" min="1" max="4" data-p="colunas" value="${e.colunas || 1}"></label><label>Espaço (mm)<input type="number" min="0" step="0.5" data-p="gap_mm" value="${e.gap_mm ?? 4.5}"></label></div></div>`;
     }
+    if (e.tipo === 'foto_capa') {
+      const incorporada = (e.url || '').startsWith('data:');
+      return `<div class="ath-mc-sec"><h4>Imagem</h4>
+        <div class="ath-mc-dica">${incorporada ? 'Imagem incorporada ao documento.' : (e.url ? 'Endereço: ' + String(e.url).replace(/</g, '&lt;') : 'Nenhuma imagem escolhida.')}</div>
+        <div style="display:flex;gap:6px"><button type="button" class="ath-mc-b" data-up-foto style="flex:1">Escolher imagem…</button>${e.url ? '<button type="button" class="ath-mc-b" data-rm-foto>Remover</button>' : ''}</div>
+        <div class="ath-mc-g2"><label>Ajuste<select data-p="ajuste">${[['cover', 'Preencher (corta)'], ['contain', 'Caber inteira']].map(([v, r]) => `<option value="${v}" ${v === (e.ajuste || 'cover') ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
+        <label>Opacidade<input type="number" min="0" max="1" step="0.05" data-p="opacidade" value="${e.opacidade ?? 1}"></label></div></div>`;
+    }
     return `<div class="ath-mc-sec"><h4>${(e.titulo || e.tipo).replace(/</g, '&lt;')}</h4><div class="ath-mc-dica">Transformação disponível; demais propriedades no painel clássico.</div></div>`;
   }
 
@@ -590,6 +600,15 @@ export class CanvasMestra {
 
   aoClicarPainel(ev) {
     const t = ev.target;
+    if (t.closest('[data-up-foto]')) {
+      const e = this.primario(); if (!e) return;
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+      inp.addEventListener('change', async () => {
+        try { e.url = await lerImagemComprimida(inp.files[0]); this.atualizarTudo(); } catch (err) { mostrarAviso(err.message); }
+      });
+      inp.click(); return;
+    }
+    if (t.closest('[data-rm-foto]')) { const e = this.primario(); if (e) { e.url = ''; this.atualizarTudo(); } return; }
     const anc = t.closest('[data-anc]'); if (anc) { this.ancora = anc.dataset.anc; this.painel(); return; }
     const rot = t.closest('[data-rot]'); if (rot) { const e = this.primario(); if (e && !e.bloqueado) { e.rotacao_graus = Number(rot.dataset.rot); this.atualizarTudo(); } return; }
     const cam = t.closest('[data-cam]');

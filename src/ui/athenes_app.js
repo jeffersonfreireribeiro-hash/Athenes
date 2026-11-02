@@ -16,6 +16,8 @@ import { PainelConexoes } from './athenes_painel_conexoes.js';
 import { PainelExportarModal } from './athenes_painel_exportar.js';
 import { ReguasController } from './athenes_reguas.js';
 
+import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
+
 export class AthenesApp {
   constructor(appContainer) {
     this.container = appContainer;
@@ -271,6 +273,11 @@ export class AthenesApp {
         lista.unshift(this.documentoAtivo);
       }
       localStorage.setItem('athenes_docs_indice', JSON.stringify(lista));
-    } catch (_) {}
+    } catch (e) {
+      // antes falhava em silêncio e o documento voltava sem as alterações ao reabrir
+      mostrarAviso(eErroDeCota(e)
+        ? 'Não foi possível salvar: o armazenamento do navegador está cheio (imagens grandes ocupam muito espaço). Faça um backup, exclua documentos antigos ou use imagens menores.'
+        : `Não foi possível salvar o documento neste navegador: ${e.message}`);
+    }
   }
 }

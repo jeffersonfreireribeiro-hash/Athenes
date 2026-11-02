@@ -35,6 +35,7 @@ import { escapeHtml } from '../core/athenes_seguranca.js';
 import { EstudoArtigosView, carregarArtigosEstudo } from './athenes_estudo_artigos.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
+import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -96,7 +97,9 @@ export class DashboardView {
   salvarDocumentosLocais() {
     try {
       localStorage.setItem('athenes_docs_indice', JSON.stringify(this.documentos));
-    } catch (_) {}
+    } catch (e) {
+      mostrarAviso(eErroDeCota(e) ? 'Armazenamento do navegador cheio: as últimas alterações não foram salvas. Faça um backup ou exclua documentos antigos.' : `Não foi possível salvar: ${e.message}`);
+    }
   }
 
   /**

@@ -29,6 +29,8 @@ import {
   moverBlocoPorLinha,
   duplicarBlocoNaSecao,
   dividirBlocoTexto,
+  colapsoEntreBlocosPt,
+  margensTextoPt,
   adicionarSecao,
   removerSecao,
   removerMestra,
@@ -257,6 +259,22 @@ export class EditorView {
     }
   }
 
+  /**
+   * Rola SÓ o palco das folhas até o elemento. `scrollIntoView` também rola os ancestrais (inclusive os
+   * com overflow:hidden), o que empurrava o app inteiro para cima e cortava o cabeçalho e a folha.
+   */
+  rolarNoPalco(el, bloco = 'nearest', suave = true) {
+    const palco = this.container?.querySelector('#rmPrevPalco');
+    if (!palco || !el) return;
+    const p = palco.getBoundingClientRect(); const r = el.getBoundingClientRect();
+    let delta = 0;
+    if (bloco === 'start') delta = r.top - p.top - 16;
+    else if (bloco === 'center') delta = r.top - p.top - (p.height - r.height) / 2;
+    else if (r.top < p.top) delta = r.top - p.top - 12;
+    else if (r.bottom > p.bottom) delta = r.bottom - p.bottom + 12;
+    if (Math.abs(delta) > 1) palco.scrollBy({ top: delta, behavior: suave ? 'smooth' : 'auto' });
+  }
+
   /** HTML do sumário vivo de um bloco: itens atuais do documento, links que rolam até o título. */
   htmlSumario(b) {
     const cfg = configEfetivaSumario(this.doc, b);
@@ -285,7 +303,7 @@ export class EditorView {
   irParaBloco(id) {
     const alvo = this.container.querySelector(`.ath-bloco-folha[data-bloco-id="${id}"]`);
     if (!alvo) return;
-    alvo.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    this.rolarNoPalco(alvo, 'center');
     alvo.classList.add('ath-bloco-destaque-salto');
     setTimeout(() => alvo.classList.remove('ath-bloco-destaque-salto'), 1400);
     const bloco = this.buscarBlocoPorId(id);
@@ -701,7 +719,7 @@ export class EditorView {
       requestAnimationFrame(() => {
         const elFolha = this.container?.querySelector(`.ath-bloco-folha[data-bloco-id="${b.id}"]`);
         if (elFolha) {
-          try { elFolha.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+          try { this.rolarNoPalco(elFolha, 'nearest'); } catch (_) {}
         }
       });
     };
@@ -1658,7 +1676,7 @@ export class EditorView {
           if (pagSec) {
             const folhaEl = this.container?.querySelector(`.ath-folha-a4[data-pagina-id="${pagSec.id}"]`);
             if (folhaEl) {
-              try { folhaEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+              try { this.rolarNoPalco(folhaEl, 'start'); } catch (_) {}
             }
           }
         });
@@ -1735,7 +1753,7 @@ export class EditorView {
         if (pagSec) {
           const folhaEl = this.container?.querySelector(`.ath-folha-a4[data-pagina-id="${pagSec.id}"]`);
           if (folhaEl) {
-            try { folhaEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+            try { this.rolarNoPalco(folhaEl, 'start'); } catch (_) {}
           }
         }
       });
@@ -2103,7 +2121,7 @@ export class EditorView {
       const match = node.dataset.blocoId === blocoId;
       node.classList.toggle('sel', match);
       if (match) {
-        try { node.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {}
+        try { this.rolarNoPalco(node, 'nearest'); } catch (_) {}
       }
     });
   }
@@ -2261,7 +2279,7 @@ export class EditorView {
     if (opcoes.scrollPage && b && this.container) {
       const elFolha = this.container.querySelector(`.ath-bloco-folha[data-bloco-id="${b.id}"]`);
       if (elFolha) {
-        try { elFolha.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {}
+        try { this.rolarNoPalco(elFolha, 'nearest'); } catch (_) {}
       }
     }
   }
@@ -2594,11 +2612,14 @@ export class EditorView {
       const gradeBlocos = document.createElement('div');
       gradeBlocos.style.display = 'grid';
       gradeBlocos.style.gridTemplateColumns = 'repeat(12, 1fr)';
-      gradeBlocos.style.gap = '10px 12px';
+      gradeBlocos.style.gap = '0 12px'; // o espaço vertical vem dos estilos (igual ao PDF); antes havia 10px extras entre os blocos
       gradeBlocos.style.alignContent = 'start';
 
-      (pag.blocos || []).forEach(b => {
+      const estilosPorId = Object.fromEntries((this.doc.estilos || []).map(e => [e.id, e]));
+      (pag.blocos || []).forEach((b, k, todos) => {
         const blocoEl = this.renderizarBlocoNaFolha(b, pag);
+        const colapso = k > 0 ? colapsoEntreBlocosPt(todos[k - 1], b, estilosPorId) : (margensTextoPt(b, estilosPorId)?.antes || 0); // entre parágrafos vale o maior espaço; no topo da página, nenhum
+        if (colapso) blocoEl.style.marginTop = `${Math.max(0, (margensTextoPt(b, estilosPorId)?.antes || 0) - colapso)}pt`;
         gradeBlocos.appendChild(blocoEl);
       });
 

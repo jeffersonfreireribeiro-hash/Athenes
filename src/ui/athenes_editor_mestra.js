@@ -8,6 +8,8 @@
  */
 
 import { svgIcone } from './athenes_icones.js';
+import { lerImagemComprimida } from './athenes_imagem_util.js';
+import { mostrarAviso } from './athenes_aviso.js';
 import { abrirCanvasMestra } from './athenes_mestra_canvas_ui.js';
 import { normalizarMestraCanvas } from '../core/athenes_mestra_canvas.js';
 import { elementosMestraHtml, renderizadoPeloCanvas } from '../core/athenes_mestra_render.js';
@@ -401,7 +403,11 @@ export class ModalEditorMestra {
 
         <div style="display:flex; flex-direction:column; gap:5px; font-size:11px;">
           ${elem.tipo === 'foto_capa' ? `
-            <input type="text" class="glx-input" data-prop="url" value="${elem.url || ''}" placeholder="URL ou caminho da imagem (ex: capa.jpg)" style="width:100%; padding:2px 6px; font-size:11px;">
+            <div style="display:flex; gap:6px; align-items:center;">
+              <input type="text" class="glx-input" data-prop="url" value="${(elem.url || '').startsWith('data:') ? '' : (elem.url || '')}" ${(elem.url || '').startsWith('data:') ? 'readonly' : ''} placeholder="${(elem.url || '').startsWith('data:') ? 'Imagem incorporada ao documento' : 'URL da imagem ou use Escolher imagem'}" style="flex:1; min-width:0; padding:2px 6px; font-size:11px;">
+              <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" data-upload-foto style="white-space:nowrap;">Escolher imagem…</button>
+              <input type="file" accept="image/*" hidden data-file-foto>
+            </div>
             <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
               <label class="rm-chk" style="font-size:11px;">
                 <input type="checkbox" data-prop-chk="sangria" ${elem.sangria !== false ? 'checked' : ''}> Sangria Total (0 mm)
@@ -550,6 +556,15 @@ export class ModalEditorMestra {
           this.renderizarListaElementos(modal);
           this.atualizarPreviaVisual();
         });
+      });
+
+      item.querySelector('[data-upload-foto]')?.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); item.querySelector('[data-file-foto]').click(); });
+      item.querySelector('[data-file-foto]')?.addEventListener('change', async (e) => {
+        try {
+          elem.url = await lerImagemComprimida(e.target.files[0]); // reduz antes de guardar no documento
+          this.renderizarListaElementos(modal);
+          this.atualizarPreviaVisual();
+        } catch (err) { mostrarAviso(err.message); }
       });
 
       item.querySelectorAll('[data-toggle-recuo]').forEach(btn => {

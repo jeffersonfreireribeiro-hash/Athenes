@@ -20,7 +20,10 @@
 
   <script type="module">
     import { AthenesApp } from './src/ui/athenes_app.js';
-    window.addEventListener('DOMContentLoaded', () => {
+    import { carregarFontesImportadas } from './src/ui/athenes_fontes_ui.js';
+    window.addEventListener('DOMContentLoaded', async () => {
+      // fontes importadas pelo usuário (ex.: Aptos) precisam existir antes do primeiro desenho dos documentos
+      try { await Promise.race([carregarFontesImportadas(), new Promise(r => setTimeout(r, 2500))]); } catch (_) {}
       const root = document.getElementById('athenesAppRoot');
       window.athenesApp = new AthenesApp(root);
     });

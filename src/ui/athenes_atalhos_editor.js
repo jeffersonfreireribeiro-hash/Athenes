@@ -113,7 +113,7 @@ export class AtalhosDoEditor {
   focarBloco(id, idx = null) {
     const el = this.ed.container.querySelector(`.ath-bloco-folha[data-bloco-id="${id}"] [contenteditable="true"], .ath-bloco-folha[data-bloco-id="${id}"][contenteditable="true"]`);
     if (!el) return;
-    el.focus();
+    el.focus({ preventScroll: true });
     const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let resta = idx ?? Infinity; let n; let ultimo = null;
     while ((n = w.nextNode())) { ultimo = n; if (resta <= n.length) { this.posicionar(n, resta); return; } resta -= n.length; }
@@ -369,7 +369,7 @@ export class AtalhosDoEditor {
     }
     const n = this.pop?.querySelector('.n');
     if (n) n.textContent = B.ranges.length ? `${B.atual + 1} de ${B.ranges.length}` : (B.termo ? 'Nenhum' : '');
-    if (B.atual >= 0) B.ranges[B.atual].r.startContainer.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (B.atual >= 0) this.ed.rolarNoPalco(B.ranges[B.atual].r.startContainer.parentElement, 'center');
   }
 
   limparDestaques() { if (typeof CSS !== 'undefined' && CSS.highlights) { CSS.highlights.delete('ath-busca'); CSS.highlights.delete('ath-busca-atual'); } }
@@ -462,7 +462,7 @@ export class AtalhosDoEditor {
       const n = Math.max(1, Math.min(total, parseInt(inp.value, 10) || 1));
       this.fecharPop(fundo);
       const pg = this.palco.querySelectorAll('[data-pagina-id]')[n - 1];
-      pg?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      this.ed.rolarNoPalco(pg, 'start');
     };
     fundo.querySelector('[data-ok]').addEventListener('click', ir);
     inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); ir(); } if (e.key === 'Escape') this.fecharPop(fundo); });

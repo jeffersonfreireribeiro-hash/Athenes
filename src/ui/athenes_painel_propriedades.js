@@ -189,7 +189,21 @@ export class PainelPropriedades {
     `;
 
     const lns = secLinha.querySelector('.rm-lns');
-    for (let i = 1; i <= info.total; i++) {
+    // com muitas linhas, só a vizinhança da linha atual vira botão (± DESLOCAMENTO); o resto fica na lista abaixo
+    const DESLOCAMENTO = 6;
+    const compacto = info.total > 21;
+    const de = compacto ? Math.max(1, info.numero - DESLOCAMENTO) : 1;
+    const ate = compacto ? Math.min(info.total, info.numero + DESLOCAMENTO) : info.total;
+    const reticencias = (qtd, rot) => {
+      const r = document.createElement('span');
+      r.className = 'rm-ln rm-ln-mais';
+      r.textContent = '…';
+      r.title = `${qtd} ${qtd === 1 ? 'linha' : 'linhas'} ${rot} (use a lista abaixo)`;
+      r.style.cssText = 'display:inline-grid;place-items:center;color:#94A3B8;cursor:default;border-style:dashed;';
+      return r;
+    };
+    if (de > 1) lns.appendChild(reticencias(de - 1, 'antes'));
+    for (let i = de; i <= ate; i++) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `rm-ln ${i === info.numero ? 'on' : ''}`;
@@ -202,6 +216,7 @@ export class PainelPropriedades {
       });
       lns.appendChild(btn);
     }
+    if (ate < info.total) lns.appendChild(reticencias(info.total - ate, 'depois'));
     const nova = document.createElement('button');
     nova.type = 'button';
     nova.className = 'rm-ln rm-ln-nova';
@@ -212,6 +227,30 @@ export class PainelPropriedades {
       if (moverParaLinha(this.doc, b.id, info.total + 1)) this.notificarMudanca(true);
     });
     lns.appendChild(nova);
+
+    if (compacto) {
+      const resumo = (linha) => {
+        const x = linha[0];
+        const txt = String(x.texto || x.titulo || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 26);
+        const nomes = { titulo: 'Título', paragrafo: 'Texto', tabela: 'Tabela', figura: 'Figura', imagem: 'Imagem', quadro: 'Quadro', mapa: 'Mapa', formula: 'Fórmula', citacao: 'Citação', lista: 'Lista', sumario: 'Sumário', referencias: 'Referências', quebra_pagina: 'Quebra de página', divisor: 'Divisor', espaco: 'Espaço' };
+        return `${nomes[x.tipo] || x.tipo}${txt ? ` — ${txt}` : ''}${linha.length > 1 ? ` (+${linha.length - 1})` : ''}`;
+      };
+      const wrapSel = document.createElement('label');
+      wrapSel.style.cssText = 'display:flex;flex-direction:column;gap:3px;margin-top:8px;font:700 11px var(--glx-font);color:#475569;';
+      wrapSel.innerHTML = `Ir para outra linha<select class="glx-select" style="width:100%;">
+        <option value="">Escolher entre as ${info.total} linhas…</option>
+        ${linhas.map((l, i) => {
+          const n = i + 1; const cheia = l.length >= LIMITE_BLOCOS_POR_LINHA && n !== info.numero;
+          return `<option value="${n}" ${cheia ? 'disabled' : ''} ${n === info.numero ? 'selected' : ''}>Linha ${n}${n === info.numero ? ' (atual)' : ''} · ${escapeHtml(resumo(l))}${cheia ? ' · cheia' : ''}</option>`;
+        }).join('')}
+        <option value="${info.total + 1}" ${info.quantidade === 1 ? 'disabled' : ''}>Nova linha ao final</option>
+      </select>`;
+      wrapSel.querySelector('select').addEventListener('change', (e) => {
+        const alvo = parseInt(e.target.value, 10);
+        if (alvo && alvo !== info.numero && moverParaLinha(this.doc, b.id, alvo)) this.notificarMudanca(true);
+      });
+      secLinha.appendChild(wrapSel);
+    }
 
     if (info.quantidade > 1) {
       const igual = document.createElement('button');

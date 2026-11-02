@@ -4,7 +4,8 @@
  * Inspiração: Controles tipográficos do Affinity Publisher e InDesign adaptados para a Web.
  */
 
-export const FONTES_SISTEMA = Object.freeze({
+// Não congelado: as fontes importadas pelo usuário entram aqui em tempo de execução (athenes_fontes.js)
+export const FONTES_SISTEMA = {
   nunito: {
     id: 'nunito',
     rotulo: 'Nunito (Glaux/Athenes)',
@@ -54,6 +55,14 @@ export const FONTES_SISTEMA = Object.freeze({
     serif: false,
     incorporavel: true
   },
+  aptos: {
+    id: 'aptos',
+    rotulo: 'Aptos (Microsoft 365)',
+    // usa a Aptos instalada (Word/Office 365); sem ela, cai em fontes de aparência próxima. Para embutir, importe o arquivo em Fontes.
+    familia: "Aptos, 'Aptos Display', 'Segoe UI Variable Text', 'Segoe UI', Calibri, sans-serif",
+    serif: false,
+    incorporavel: false
+  },
   consolas: {
     id: 'consolas',
     rotulo: 'Consolas (Mono)',
@@ -61,7 +70,7 @@ export const FONTES_SISTEMA = Object.freeze({
     serif: false,
     incorporavel: true
   }
-});
+};
 
 export const PESOS_FONTE = Object.freeze([
   { valor: 300, rotulo: '300 — Light' },

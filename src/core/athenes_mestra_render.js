@@ -5,6 +5,7 @@
  * que se vê ao arrastar é o que sai no papel. Módulo puro (gera strings).
  */
 
+import { FONTES_SISTEMA } from './athenes_estilos.js';
 import {
   elementosEfetivosDaPagina, resolverVariaveisTexto, espelharElemento, normalizarElemento, TIPOS_LIVRES
 } from './athenes_mestra_canvas.js';
@@ -41,7 +42,7 @@ export function elementoMestraHtml(el, geo, ctx = {}, { editor = false } = {}) {
   if (el.tipo === 'texto') {
     const texto = esc(resolverVariaveisTexto(el.texto, ctx)).replace(/\n/g, '<br>');
     const just = { esquerda: 'left', centro: 'center', direita: 'right', justificado: 'justify' }[el.alinhamento] || 'left';
-    const fonte = el.fonte ? `font-family:${el.fonte};` : '';
+    const fonte = el.fonte ? `font-family:${(FONTES_SISTEMA[el.fonte]?.familia || el.fonte).replace(/"/g, "'")};` : ''; // id de fonte do catálogo ou pilha CSS
     return `<div${dado} style="${base}${z}${op}overflow:hidden;font-size:${el.tamanho_pt || 10}pt;line-height:1.25;color:${el.cor || '#314F79'};font-weight:${el.negrito ? 800 : 400};text-align:${just};${fonte}">${texto}</div>`;
   }
   if (el.tipo === 'quadro_texto') {

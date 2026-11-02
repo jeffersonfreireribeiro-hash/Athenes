@@ -7,6 +7,7 @@
 
 import { elementosMestraHtml, renderizadoPeloCanvas, contextoVariaveisPagina } from './athenes_mestra_render.js';
 import { calcularNumeracaoSecoes, extrairItensSumario, sumarioHtml, configEfetivaSumario, removerNumeroManual, tagDoNivel, estiloIdDoTitulo, nivelDe } from './athenes_sumario.js';
+import { cssFontesImportadas } from './athenes_fontes.js';
 import { margensEfetivasMm } from './athenes_mestra_canvas.js';
 import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssTipografia, estiloParaCssNumeracao, FONTES_SISTEMA } from './athenes_estilos.js';
@@ -17,7 +18,7 @@ import { geometriaCorpoMm, resolverAreasPagina } from './athenes_paginacao.js';
 import { obterConfigNotas, aplicarRotulosNotasHtml, sanitizarHtmlNota } from './athenes_notas_rodape.js';
 import { descreverFigura, cssObjParaString, PLACEHOLDER_IMG } from './athenes_figura_layout.js';
 import { obterEstiloTabela, dimensoesTabela, resolverCelula, celulaParaCss, tabelaParaCss } from './athenes_tabela_estilo.js';
-import { rotuloDaFigura, gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento, obterTituloCompletoComNumeracao, obterPrefixoNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
+import { rotuloDaFigura, gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento, colapsoEntreBlocosPt, margensTextoPt, obterTituloCompletoComNumeracao, obterPrefixoNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
 
 export function escaparHtml(texto) {
   if (texto === undefined || texto === null) return '';
@@ -377,7 +378,9 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
         i++;
         continue;
       }
-      partes.push(`<div class="ath-bloco-grid" style="${gridCol}">${renderizarBlocoHtml(b, estilosMap, documento, opcoesPag)}</div>`);
+      // margens colapsadas (maior de "depois" e "antes"), como no Word: sem isso o espaço entre parágrafos dobrava
+      const colapso = cols === 1 ? (i > 0 ? colapsoEntreBlocosPt(blocosPag[i - 1], b, estilosMap) : (margensTextoPt(b, estilosMap)?.antes || 0)) : 0; // topo da página: sem espaço antes
+      partes.push(`<div class="ath-bloco-grid" style="${gridCol}${colapso ? ` margin-top:-${colapso}pt;` : ''}">${renderizarBlocoHtml(b, estilosMap, documento, opcoesPag)}</div>`);
     }
     const blocosHtml = partes.join('\n');
 
@@ -499,11 +502,14 @@ return `<section class="ath-pagina" style="position:relative; width:${largura_mm
       height: 1px;
     }
     .ath-sumario-num { flex-shrink: 0; }
+    /* sem isso, estilo com espaço 0 recebia a margem padrão de <p>/<h1> (1em) e os parágrafos ficavam muito afastados */
+    .ath-bloco { margin-top: 0; margin-bottom: 0; }
     .ath-num-secao { margin-right: .4em; }
     .ath-toc-item { break-inside: avoid; }
     .ath-toc-link { color: inherit; text-decoration: none; }
 
     sup.ath-nota-ref { font-weight: 700; }
+    ${cssFontesImportadas(documento)}
     ${opcoes.cssExtra || ''}
 
     @media print {

@@ -492,10 +492,54 @@ export function criarNovoBloco(tipo, dados = {}) {
  * Estima a altura de um bloco em pontos tipográficos (pt)
  * 1 mm ≈ 2.83465 pt
  */
+const TIPOS_DE_TEXTO = ['paragrafo', 'titulo', 'subtitulo', 'citacao'];
+
+/** Espaço antes/depois (pt) de um bloco de texto: o do bloco, senão o do estilo. null para os demais tipos. */
+export function margensTextoPt(bloco, estilos) {
+  if (!bloco || !TIPOS_DE_TEXTO.includes(bloco.tipo)) return null;
+  const est = estilos[bloco.estiloId] || (bloco.tipo === 'titulo' ? estilos[`titulo${Math.min(6, bloco.nivel || 1)}`] : null) || estilos.corpo || {};
+  return { antes: bloco.espaco_antes_pt ?? est.espaco_antes_pt ?? 0, depois: bloco.espaco_depois_pt ?? est.espaco_depois_pt ?? 0 };
+}
+
+/**
+ * Colapso de margens verticais, como no Word e no CSS: entre dois parágrafos seguidos o espaço entre eles é
+ * o MAIOR entre "depois" do primeiro e "antes" do segundo, e não a soma. Retorna o quanto subtrair (pt).
+ */
+export function colapsoEntreBlocosPt(anterior, atual, estilos) {
+  if (!anterior || !atual || anterior.grupo || atual.grupo) return 0;
+  const a = margensTextoPt(anterior, estilos); const b = margensTextoPt(atual, estilos);
+  return a && b ? Math.min(a.depois, b.antes) : 0;
+}
+
 let TITULOS_NO_DOC = 8;
 
-export function estimarAlturaBlocoPt(bloco) {
+/**
+ * Altura de um bloco de TEXTO conforme o estilo (tamanho, entrelinha, espaços) e a largura útil da coluna.
+ * Antes, todo parágrafo valia "80 caracteres por linha a 18 pt", o que empurrava para a página seguinte
+ * texto que cabia (um modelo de 11 pt com entrelinha simples ocupava quase o dobro do real).
+ */
+function alturaTextoPorEstilo(bloco, ctx) {
+  const est = ctx.estilos[bloco.estiloId] || (bloco.tipo === 'titulo' ? ctx.estilos[`titulo${Math.min(6, bloco.nivel || 1)}`] : null) || ctx.estilos.corpo;
+  if (!est) return null;
+  const tam = bloco.tamanho_pt ?? est.tamanho_pt ?? 12;
+  const ent = bloco.entrelinha ?? est.entrelinha ?? 1.4;
+  const antes = bloco.espaco_antes_pt ?? est.espaco_antes_pt ?? 0;
+  const depois = bloco.espaco_depois_pt ?? est.espaco_depois_pt ?? 0;
+  const recuoMm = bloco.recuo_esquerdo_mm ?? est.recuo_esquerdo_mm ?? 0;
+  const larg = Math.max(40, ctx.larguraPt * Math.min(12, Math.max(1, bloco.span || 12)) / 12 - recuoMm * PT_POR_MM);
+  const largChar = tam * (est.caixa_alta ? 0.64 : 0.52) * ((est.peso || 400) >= 700 ? 1.06 : 1); // largura média do caractere
+  const porLinha = Math.max(6, Math.floor(larg / largChar));
+  const partes = String(bloco.texto || '').replace(/<sup[^>]*>.*?<\/sup>/g, '*').split(/<br\s*\/?>|<\/p>|<\/div>|<\/li>/i).map(t => t.replace(/<[^>]+>/g, ''));
+  const linhas = partes.reduce((t, x) => t + Math.max(1, Math.ceil(x.length / porLinha)), 0);
+  return linhas * tam * ent + antes + depois;
+}
+
+export function estimarAlturaBlocoPt(bloco, ctx = null) {
   if (!bloco) return 20;
+  if (ctx?.estilos && (bloco.tipo === 'paragrafo' || bloco.tipo === 'titulo' || bloco.tipo === 'citacao')) {
+    const h = alturaTextoPorEstilo(bloco, ctx);
+    if (h !== null) return h;
+  }
 
   switch (bloco.tipo) {
     case 'titulo':
@@ -642,6 +686,7 @@ export function repaginarDocumento(doc) {
     const geo = geometriaCorpoMm(mestra);
     const alturaUtilPt = geo.alturaCorpoMm * PT_POR_MM;
     const larguraPt = ((paisagem ? 297 : 210) - geo.margemEsq - geo.margemDir) * PT_POR_MM;
+    const estilosPorId = Object.fromEntries((doc.estilos || []).map(e => [e.id, e]));
 
     let blocosPag = [];
     let alturaAcumuladaPt = 0;
@@ -697,11 +742,14 @@ export function repaginarDocumento(doc) {
         blocosPag.push(b);
         continue;
       }
-      const altPt = alturaDaLinha(blocosDaSecao, bIdx);
+      const altPt = alturaDaLinha(blocosDaSecao, bIdx, { estilos: estilosPorId, larguraPt });
       const novas = idsDaLinha(blocosDaSecao, bIdx).filter(id => !notasPag.some(x => x.id === id)).map(segmentoDe);
       const alturaNovasPt = novas.reduce((t, x) => t + alturaSegmentoPt(x.html, cfgNotas, larguraPt), 0)
         + (notasPag.length === 0 && novas.length ? alturaSeparadorPt(cfgNotas) : 0);
-      const totalPt = alturaAcumuladaPt + altPt + alturaNotasPag() + alturaNovasPt;
+      // espaço antes é ignorado no topo da página (como no Word); entre parágrafos vale o maior dos dois espaços
+      const antesTopo = margensTextoPt(b, estilosPorId)?.antes || 0;
+      const altEf = altPt - (blocosPag.length ? colapsoEntreBlocosPt(blocosPag[blocosPag.length - 1], b, estilosPorId) : antesTopo);
+      const totalPt = alturaAcumuladaPt + altEf + alturaNotasPag() + alturaNovasPt;
 
       // manterComProximo: título não fica no fim da folha sem espaço para o próximo bloco
       const exigeNovaPagina = blocosPag.length > 0
@@ -710,11 +758,11 @@ export function repaginarDocumento(doc) {
       if (exigeNovaPagina) {
         fecharPagina();
         blocosPag = [b];
-        alturaAcumuladaPt = altPt;
+        alturaAcumuladaPt = altPt - antesTopo;
         notasPag = [...notasPag, ...novas];
       } else {
         blocosPag.push(b);
-        alturaAcumuladaPt += altPt;
+        alturaAcumuladaPt += altEf;
         notasPag.push(...novas);
       }
     }
@@ -1419,12 +1467,12 @@ export function calcularLinhas(blocos) {
   return linhas;
 }
 
-function alturaDaLinha(blocos, inicio) {
+function alturaDaLinha(blocos, inicio, ctx = null) {
   const primeiro = blocos[inicio];
-  let altura = estimarAlturaBlocoPt(primeiro);
+  let altura = estimarAlturaBlocoPt(primeiro, ctx);
   if (!primeiro.grupo) return altura;
   for (let i = inicio + 1; i < blocos.length && blocos[i].grupo === primeiro.grupo; i++) {
-    altura = Math.max(altura, estimarAlturaBlocoPt(blocos[i]));
+    altura = Math.max(altura, estimarAlturaBlocoPt(blocos[i], ctx));
   }
   return altura;
 }

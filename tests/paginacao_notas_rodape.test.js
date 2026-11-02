@@ -213,11 +213,11 @@ test('Notas — renumeração automática em cascata ao inserir, excluir ou move
 test('Paginação — o espaço das notas é reservado antes de decidir a quebra', () => {
   const semNotas = docComNotas(0).doc;
   const corpoSemNotas = secCorpo(semNotas);
-  corpoSemNotas.blocos = Array.from({ length: 15 }, (_, i) => criarNovoBloco('paragrafo', { texto: `Parágrafo ${i} do artigo, com texto suficiente para ocupar espaço.` }));
+  corpoSemNotas.blocos = Array.from({ length: 24 }, (_, i) => criarNovoBloco('paragrafo', { texto: `Parágrafo ${i} do artigo, com texto suficiente para ocupar espaço.` }));
   repaginarDocumento(semNotas);
   const pagsSem = semNotas.paginas.filter(p => p.secaoId === corpoSemNotas.id);
 
-  const { doc, sec } = docComNotas(15, () => 'Nota explicativa de tamanho razoável para consumir algumas linhas do rodapé da página corrente.');
+  const { doc, sec } = docComNotas(24, () => 'Nota explicativa de tamanho razoável para consumir algumas linhas do rodapé da página corrente.');
   const pagsCom = doc.paginas.filter(p => p.secaoId === sec.id);
   assert.ok(pagsCom.length > pagsSem.length || pagsCom[0].blocos.length < pagsSem[0].blocos.length, 'notas reduzem o texto por página');
   // toda nota fica na MESMA página do seu marcador
@@ -264,7 +264,7 @@ test('Paginação — nota longa não quebra a paginação: continua no rodapé 
 });
 
 test('Notas — reinício por página e por seção', () => {
-  const { doc } = docComNotas(14, () => 'Nota curta com texto médio para ocupar espaço no rodapé da página corrente do documento.');
+  const { doc } = docComNotas(24, () => 'Nota curta com texto médio para ocupar espaço no rodapé da página corrente do documento.');
   assert.ok(doc.paginas.length >= 2);
   doc.notas_config = { reiniciar: 'pagina', marcador: 'simbolos' };
   repaginarDocumento(doc);

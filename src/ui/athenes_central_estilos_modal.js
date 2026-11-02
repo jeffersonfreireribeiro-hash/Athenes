@@ -8,6 +8,10 @@
  * - Prompt mestre com 1 clique para extração via IA (ChatGPT / Claude / Gemini)
  */
 
+import { importarArquivoDeFonte, excluirFonteImportada } from './athenes_fontes_ui.js';
+import { listarFontesImportadas, nomeSugerido } from '../core/athenes_fontes.js';
+import { FONTES_SISTEMA as FONTES } from '../core/athenes_estilos.js';
+import { comprimirImagensDoPacote } from './athenes_imagem_util.js';
 import { svgIcone } from './athenes_icones.js';
 import {
   exportarPacoteEstilo,
@@ -76,6 +80,9 @@ export class ModalCentralEstilos {
         <button type="button" class="ath-tab-btn ${this.abaAtiva === 'ia' ? 'ativo' : ''}" data-aba="ia" style="display:flex; align-items:center; gap:6px; padding:10px 16px; border:none; background:transparent; font-size:12.5px; font-weight:750; color:${this.abaAtiva === 'ia' ? '#314F79' : '#64748B'}; border-bottom:2px solid ${this.abaAtiva === 'ia' ? '#314F79' : 'transparent'}; cursor:pointer;">
           ${svgIcone('lapis', 14)} <span>Extrair de Doc com IA</span> <span style="background:#E0E7FF; color:#4338CA; font-size:10px; font-weight:800; padding:1px 6px; border-radius:999px;">Prompt Pronto</span>
         </button>
+        <button type="button" class="ath-tab-btn ${this.abaAtiva === 'fontes' ? 'ativo' : ''}" data-aba="fontes" style="display:flex; align-items:center; gap:6px; padding:10px 16px; border:none; background:transparent; font-size:12.5px; font-weight:750; color:${this.abaAtiva === 'fontes' ? '#314F79' : '#64748B'}; border-bottom:2px solid ${this.abaAtiva === 'fontes' ? '#314F79' : 'transparent'}; cursor:pointer;">
+          ${svgIcone('titulo', 14)} Fontes
+        </button>
       </div>
 
       <!-- Conteúdo da Aba -->
@@ -120,6 +127,8 @@ export class ModalCentralEstilos {
       this.renderizarAbaExportar(corpo);
     } else if (this.abaAtiva === 'importar') {
       this.renderizarAbaImportar(corpo);
+    } else if (this.abaAtiva === 'fontes') {
+      this.renderizarAbaFontes(corpo);
     } else {
       this.renderizarAbaIa(corpo);
     }
@@ -356,7 +365,7 @@ export class ModalCentralEstilos {
 
     txtArea.addEventListener('input', validarEAtualizarPrevia);
 
-    btnConfirmar.addEventListener('click', () => {
+    btnConfirmar.addEventListener('click', async () => {
       validarEAtualizarPrevia();
       if (!this.pacoteValidado) {
         alert('Por favor, carregue ou cole um JSON de tema válido antes de aplicar.');
@@ -366,6 +375,8 @@ export class ModalCentralEstilos {
       const propagar = corpo.querySelector('#athChkPropagarBlocos')?.checked !== false;
 
       try {
+        // banners e logos do tema entram reduzidos: a imagem original de um tema lotava o armazenamento local
+        await comprimirImagensDoPacote(this.pacoteValidado);
         const resultado = aplicarPacoteEstilo(this.doc, this.pacoteValidado, { aplicarNosBlocosExistentes: propagar });
         this.editor?.notificarMudanca?.();
         this.editor?.renderizar?.();
@@ -377,6 +388,71 @@ export class ModalCentralEstilos {
         alert('Falha ao aplicar estilo: ' + err.message);
       }
     });
+  }
+
+  /* ==========================================================================
+     ABA: FONTES (importar arquivos de fonte, ex.: Aptos)
+     ========================================================================== */
+  renderizarAbaFontes(corpo) {
+    const importadas = listarFontesImportadas();
+    const sistema = Object.values(FONTES).filter(f => !f.importada);
+    corpo.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div style="background:#fff; border:1px solid #E2E8F0; border-radius:12px; padding:16px;">
+          <h4 style="margin:0 0 4px; font-size:14px; font-weight:800; color:#1E293B;">Importar fonte</h4>
+          <p style="margin:0 0 12px; font-size:12px; color:#64748B; line-height:1.5;">
+            Escolha o arquivo da fonte (.ttf, .otf, .woff ou .woff2). Ela fica guardada neste navegador, aparece em todas as listas de fonte e vai embutida no PDF exportado.
+            <br><strong>Aptos:</strong> a fonte padrão do Word atual. Quem tem o Microsoft 365 encontra o arquivo em
+            <code style="background:#F1F5F9; padding:1px 5px; border-radius:5px;">%LOCALAPPDATA%\\Microsoft\\FontCache\\4\\CloudFonts\\Aptos</code>.
+            O Athenes já traz "Aptos (Microsoft 365)" na lista e usa a instalada no seu computador; importe o arquivo para ela aparecer igual em qualquer máquina. Respeite a licença de cada fonte.
+          </p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end;">
+            <label style="font:700 11.5px var(--glx-font); color:#475569; display:flex; flex-direction:column; gap:4px;">Arquivo da fonte
+              <input type="file" id="athFonteArq" accept=".ttf,.otf,.woff,.woff2" style="font-size:12px;">
+            </label>
+            <label style="font:700 11.5px var(--glx-font); color:#475569; display:flex; flex-direction:column; gap:4px;">Nome da família
+              <input type="text" id="athFonteNome" class="glx-input" placeholder="Ex.: Aptos" style="height:32px;">
+            </label>
+          </div>
+          <div style="display:flex; align-items:center; gap:14px; margin-top:12px;">
+            <label class="rm-chk" style="font-size:12px;"><input type="checkbox" id="athFonteSerif"> Fonte com serifa (reserva: Georgia)</label>
+            <span style="flex:1"></span>
+            <span id="athFonteMsg" style="font-size:12px; color:#64748B;"></span>
+            <button type="button" class="glx-btn glx-btn-primary" id="athFonteImportar" disabled>Importar</button>
+          </div>
+        </div>
+        <div style="background:#fff; border:1px solid #E2E8F0; border-radius:12px; padding:16px;">
+          <h4 style="margin:0 0 10px; font-size:14px; font-weight:800; color:#1E293B;">Fontes importadas (${importadas.length})</h4>
+          ${importadas.length ? importadas.map(f => `
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #F1F5F9;">
+              <span style="font-family:${FONTES[f.id]?.familia || 'inherit'}; font-size:16px; flex:1;">${escapeHtml(f.nome)} — Aa Bb Cc 123</span>
+              <small style="color:#94A3B8;">.${f.formato}</small>
+              <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" data-excluir-fonte="${escapeHtml(f.id)}">Remover</button>
+            </div>`).join('') : '<p style="margin:0; font-size:12px; color:#94A3B8;">Nenhuma fonte importada ainda.</p>'}
+        </div>
+        <div style="font-size:11.5px; color:#64748B;">Fontes do sistema disponíveis: ${sistema.map(f => escapeHtml(f.rotulo)).join(' · ')}</div>
+      </div>`;
+    const arq = corpo.querySelector('#athFonteArq'); const nome = corpo.querySelector('#athFonteNome');
+    const msg = corpo.querySelector('#athFonteMsg'); const btn = corpo.querySelector('#athFonteImportar');
+    arq.addEventListener('change', () => {
+      const f = arq.files[0];
+      if (f && !nome.value) nome.value = nomeSugerido(f.name);
+      btn.disabled = !f; msg.textContent = '';
+    });
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; msg.style.color = '#64748B'; msg.textContent = 'Importando…';
+      try {
+        const entrada = await importarArquivoDeFonte(arq.files[0], { nome: nome.value, serif: corpo.querySelector('#athFonteSerif').checked });
+        this.editor?.renderizar?.();
+        this.renderizarAbaFontes(corpo);
+        corpo.querySelector('#athFonteMsg').textContent = `"${entrada.rotulo}" pronta para usar nos estilos.`;
+      } catch (e) { msg.style.color = '#B42318'; msg.textContent = e.message; btn.disabled = false; }
+    });
+    corpo.querySelectorAll('[data-excluir-fonte]').forEach(b => b.addEventListener('click', async () => {
+      await excluirFonteImportada(b.dataset.excluirFonte);
+      this.editor?.renderizar?.();
+      this.renderizarAbaFontes(corpo);
+    }));
   }
 
   /* ==========================================================================
