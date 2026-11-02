@@ -22,10 +22,18 @@ export const ROTULOS_FIGURA = Object.freeze({
   grafico: 'Gráfico',
   fotografia: 'Fotografia',
   diagrama: 'Diagrama',
-  fluxograma: 'Fluxograma'
+  fluxograma: 'Fluxograma',
+  esquema: 'Esquema',
+  croqui: 'Croqui',
+  desenho: 'Desenho',
+  ilustracao: 'Ilustração',
+  personalizado: 'Personalizado'
 });
 
 export function rotuloDaFigura(bloco) {
+  if (bloco?.prefixo_customizado && String(bloco.prefixo_customizado).trim()) {
+    return String(bloco.prefixo_customizado).trim();
+  }
   return ROTULOS_FIGURA[bloco?.subtipo] || ROTULOS_FIGURA.figura;
 }
 
@@ -1080,8 +1088,10 @@ export function recalcularNumeracaoAutomatica(doc) {
   const prefixoFigura = new RegExp('^(' + nomes + ')\\s+\\d+\\s*[-—]', 'i');
   const renumerar = (texto, rotulo, n, regex, forcarAuto = false) => {
     if (!texto) return forcarAuto ? `${rotulo} ${n} —` : texto;
-    if (regex.test(texto)) return texto.replace(regex, `${rotulo} ${n} —`);
-    if (forcarAuto) return `${rotulo} ${n} — ${texto}`;
+    const puro = removerPrefixoNumeracaoTitulo(texto);
+    if (forcarAuto || regex.test(texto)) {
+      return puro ? `${rotulo} ${n} — ${puro}` : `${rotulo} ${n} —`;
+    }
     return texto;
   };
 
@@ -1129,30 +1139,16 @@ export function aplicarNumeracaoNoTitulo(bloco, doc) {
   if (!bloco) return '';
   recalcularNumeracaoAutomatica(doc);
   const tipo = bloco.tipo;
-  let rotulo = 'Figura';
-  let regex = /^Figura\s+\d+\s*[-—]\s*/i;
-  let num = bloco.numero_sequencial || 1;
+  const rotulo = rotuloDoBloco(bloco);
+  const num = bloco.numero_sequencial || 1;
 
-  if (tipo === 'figura' || tipo === 'imagem') {
-    const sub = ROTULOS_FIGURA[bloco.subtipo] ? bloco.subtipo : 'figura';
-    rotulo = ROTULOS_FIGURA[sub];
-    regex = new RegExp('^(' + Object.values(ROTULOS_FIGURA).join('|') + ')\\s+\\d+\\s*[-—]\\s*', 'i');
-  } else if (tipo === 'tabela') {
-    rotulo = 'Tabela';
-    regex = /^Tabela\s+\d+\s*[-—]\s*/i;
-  } else if (tipo === 'quadro') {
-    rotulo = 'Quadro';
-    regex = /^Quadro\s+\d+\s*[-—]\s*/i;
-  } else if (tipo === 'mapa') {
-    rotulo = 'Mapa';
-    regex = /^Mapa\s+\d+\s*[-—]\s*/i;
-  } else if (tipo === 'formula') {
+  if (tipo === 'formula') {
     bloco.numero_equacao = `(${num})`;
     bloco.numero = bloco.numero_equacao;
     return bloco.numero_equacao;
   }
 
-  const baseTexto = (bloco.titulo || '').replace(regex, '').trim();
+  const baseTexto = removerPrefixoNumeracaoTitulo(bloco.titulo);
   bloco.titulo = baseTexto ? `${rotulo} ${num} — ${baseTexto}` : `${rotulo} ${num} —`;
   bloco.numeracao_automatica = true;
   return bloco.titulo;
@@ -1163,9 +1159,55 @@ export function aplicarNumeracaoNoTitulo(bloco, doc) {
  */
 export function removerPrefixoNumeracaoTitulo(titulo, tipo = 'figura', subtipo = 'figura') {
   if (!titulo) return '';
-  const todosRotulos = ['Figura', 'Gráfico', 'Fotografia', 'Diagrama', 'Fluxograma', 'Ilustração', 'Foto', 'Tabela', 'Quadro', 'Mapa', 'Fórmula'];
-  const regex = new RegExp(`^(${todosRotulos.join('|')})\\s+\\d+\\s*[-—:]\\s*`, 'i');
-  return titulo.replace(regex, '').trim();
+  let limpo = String(titulo).trim();
+  const todosRotulos = ['Figura', 'Gráfico', 'Grafico', 'Fotografia', 'Diagrama', 'Fluxograma', 'Ilustração', 'Ilustracao', 'Foto', 'Tabela', 'Quadro', 'Mapa', 'Fórmula', 'Formula', 'Equação', 'Equacao'];
+  const regex = new RegExp(`^(${todosRotulos.join('|')})\\s*\\d*\\s*[-—:]*\\s*`, 'i');
+  let anterior = '';
+  // Remove prefixos encadeados para desarmar repetições como "Figura 1 — Figura 1asdasdasd"
+  while (limpo && limpo !== anterior && regex.test(limpo)) {
+    anterior = limpo;
+    limpo = limpo.replace(regex, '').trim();
+  }
+  return limpo;
+}
+
+/**
+ * Retorna apenas o texto descritivo do título do bloco, expurgando qualquer prefixo sequencial
+ */
+export function obterTextoPuroTitulo(bloco) {
+  if (!bloco) return '';
+  return removerPrefixoNumeracaoTitulo(bloco.titulo || '');
+}
+
+/**
+ * Retorna o rótulo descritivo da categoria do bloco (Figura, Gráfico, Tabela, Quadro, Mapa, Equação)
+ */
+export function rotuloDoBloco(bloco) {
+  if (!bloco) return 'Figura';
+  if (bloco.tipo === 'tabela') return 'Tabela';
+  if (bloco.tipo === 'quadro') return 'Quadro';
+  if (bloco.tipo === 'mapa') return 'Mapa';
+  if (bloco.tipo === 'formula') return 'Equação';
+  return rotuloDaFigura(bloco);
+}
+
+/**
+ * Retorna o prefixo oficial intrínseco à posição (ex: "Figura 1 — ")
+ */
+export function obterPrefixoNumeracao(bloco) {
+  const rot = rotuloDoBloco(bloco);
+  const num = bloco?.numero_sequencial || 1;
+  return `${rot} ${num} — `;
+}
+
+/**
+ * Retorna o título completo formatado combinando o prefixo intrínseco e a descrição pura
+ */
+export function obterTituloCompletoComNumeracao(bloco) {
+  if (!bloco) return '';
+  const prefixo = obterPrefixoNumeracao(bloco);
+  const textoPuro = obterTextoPuroTitulo(bloco);
+  return textoPuro ? `${prefixo}${textoPuro}` : prefixo.trim();
 }
 
 /**

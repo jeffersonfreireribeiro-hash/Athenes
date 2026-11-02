@@ -16,7 +16,11 @@ import {
   carregarDocumentoDoSupabase,
   salvarArquivoNoGoogleDrive,
   listarArquivosDoGoogleDrive,
-  SessaoColaborativaRealtime
+  SessaoColaborativaRealtime,
+  obterInfoUsuarioGoogle,
+  obterOuCriarEstruturaPastasAthenes,
+  salvarNotaZoteroNoGoogleDrive,
+  salvarRelatorioPdfNoGoogleDrive
 } from '../src/core/athenes_colaboracao.js';
 
 describe('Athenes — Colaboração, Modos Google Docs, Supabase e Google Drive', () => {
@@ -178,5 +182,72 @@ describe('Athenes — Colaboração, Modos Google Docs, Supabase e Google Drive'
 
     assert.equal(blocoRemotoRecebido.texto, 'Parágrafo atualizado síncrono');
     sessao.encerrar();
+  });
+  it('6. Login Google e sincronização da pasta Hub Athenes (Documentos, Zotero e Relatórios)', async () => {
+    // 6.1 Consulta de perfil do usuário Gmail
+    const mockUserInfoFetch = async (url, init) => {
+      assert.equal(url, 'https://www.googleapis.com/oauth2/v3/userinfo');
+      assert.equal(init.headers.Authorization, 'Bearer token_google_valido');
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          sub: '10987654321',
+          name: 'Pesquisador Acadêmico',
+          email: 'pesquisador@gmail.com',
+          picture: 'https://lh3.googleusercontent.com/avatar_exemplo.png'
+        })
+      };
+    };
+    const perfilGoogle = await obterInfoUsuarioGoogle('token_google_valido', mockUserInfoFetch);
+    assert.equal(perfilGoogle.name, 'Pesquisador Acadêmico');
+    assert.equal(perfilGoogle.email, 'pesquisador@gmail.com');
+
+    // 6.2 Criação e resolução da estrutura de pastas Athenes no Drive
+    const pastasCriadas = [];
+    const mockPastasFetch = async (url, init) => {
+      if (init?.method === 'POST') {
+        const body = JSON.parse(init.body);
+        pastasCriadas.push(body.name);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ id: 'pasta_' + body.name, name: body.name })
+        };
+      }
+      // Busca de pasta existente (retorna vazio para forçar criação ordenada)
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ files: [] })
+      };
+    };
+
+    const estrutura = await obterOuCriarEstruturaPastasAthenes('token_google_valido', null, mockPastasFetch);
+    assert.ok(estrutura.pastaRaizId);
+    assert.ok(estrutura.pastaDocumentosId);
+    assert.ok(estrutura.pastaZoteroId);
+    assert.ok(estrutura.pastaRelatoriosId);
+    assert.deepEqual(pastasCriadas, ['Athenes', 'Documentos', 'Zotero_Notas', 'Relatorios_PDF']);
+
+    // 6.3 Salvar nota do Zotero na pasta Zotero_Notas
+    let uploadZoteroChamado = false;
+    const mockUploadZotero = async (url, init) => {
+      uploadZoteroChamado = true;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'file_zotero_123', name: 'Zotero_Sintese_Acustica.json' })
+      };
+    };
+    const resNota = await salvarNotaZoteroNoGoogleDrive({
+      chaveOuId: 'ABC1234',
+      titulo: 'Sintese_Acustica',
+      conteudo: { resumo: 'Estudo sobre conforto acústico', autor: 'Silva' },
+      accessToken: 'token_google_valido',
+      pastaZoteroId: estrutura.pastaZoteroId
+    }, mockUploadZotero);
+    assert.equal(resNota.id, 'file_zotero_123');
+    assert.ok(uploadZoteroChamado);
   });
 });

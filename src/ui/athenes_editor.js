@@ -37,7 +37,11 @@ import {
   formatarNumeroPagina,
   gerarCssMolduraBloco,
   buscarSecaoDoBloco,
-  removerPrefixoNumeracaoTitulo
+  removerPrefixoNumeracaoTitulo,
+  obterTextoPuroTitulo,
+  rotuloDoBloco,
+  obterPrefixoNumeracao,
+  obterTituloCompletoComNumeracao
 } from '../core/athenes_documento.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
@@ -60,7 +64,9 @@ import {
   autenticarGoogleDrive,
   salvarArquivoNoGoogleDrive,
   listarArquivosDoGoogleDrive,
-  baixarArquivoDoGoogleDrive
+  baixarArquivoDoGoogleDrive,
+  obterInfoUsuarioGoogle,
+  obterOuCriarEstruturaPastasAthenes
 } from '../core/athenes_colaboracao.js';
 
 const TIPO_ROTULO = {
@@ -941,11 +947,30 @@ export class EditorView {
           <button type="button" class="rm-ic" data-fechar-popover title="Fechar">${svgIcone('fechar', 13)}</button>
         </div>
 
-        <!-- Identificação do Colaborador / Professor Orientador -->
+        <!-- Identificação do Colaborador com Login Google / Gmail -->
         <div style="padding:8px 10px; border-radius:10px; background:#F8FAFC; border:1px solid #E2E8F0; display:flex; flex-direction:column; gap:6px;">
-          <span style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase;">Seu Perfil na Colaboração</span>
-          <div style="display:grid; grid-template-columns:1fr 115px; gap:6px; align-items:end;">
-            <label style="font-size:11px;">Nome exibido no cursor/sugestões
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase;">Identificação / Conta Google</span>
+            ${perfilColab.autenticadoGoogle ? '<span style="font-size:9.5px; color:#15803D; font-weight:800; background:#DCFCE7; padding:1px 6px; border-radius:999px;">Conectado</span>' : ''}
+          </div>
+
+          ${perfilColab.autenticadoGoogle ? `
+            <div class="ath-google-user-badge">
+              <img src="${perfilColab.foto || 'https://lh3.googleusercontent.com/avatar_exemplo.png'}" class="ath-google-user-avatar" alt="Avatar">
+              <div style="display:flex; flex-direction:column; flex:1; min-width:0;">
+                <span style="font-size:11.5px; font-weight:700; color:#1F2733; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${perfilColab.nome}</span>
+                <span style="font-size:10px; color:#64748B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${perfilColab.email}</span>
+              </div>
+              <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnDesconectarGoogle" style="font-size:10px; height:22px; padding:0 6px;" title="Sair da conta Google">Sair</button>
+            </div>
+          ` : `
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-primary" id="athBtnLoginGmail" style="height:32px; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:700;">
+              ${svgIcone('google', 14)} Entrar com o Google / Gmail
+            </button>
+          `}
+
+          <div style="display:grid; grid-template-columns:1fr 115px; gap:6px; align-items:end; margin-top:2px;">
+            <label style="font-size:11px;">Nome no cursor/sugestões
               <input type="text" id="athColabNome" value="${perfilColab.nome || 'Autor'}" style="height:28px; font-size:11.5px; padding:3px 8px;">
             </label>
             <label style="font-size:11px;">Papel
@@ -996,13 +1021,9 @@ export class EditorView {
               ${svgIcone('drive', 13)} Abrir do Drive
             </button>
           </div>
-          <details style="font-size:11px; color:#475569;">
-            <summary style="cursor:pointer; font-weight:700; font-size:10.5px;">Configurar Client ID Google Cloud (OAuth2)</summary>
-            <div style="display:flex; flex-direction:column; gap:4px; margin-top:6px;">
-              <input type="text" id="athInputDriveClientId" value="${driveCfg.clientId || ''}" placeholder="Ex: 123456-abc.apps.googleusercontent.com" style="font-size:11px; height:26px; padding:2px 6px;">
-              <small style="font-size:10px; color:#64748B;">Escopo <code>drive.file</code>: acessa apenas arquivos criados pelo Athenes.</small>
-            </div>
-          </details>
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnSincronizarHubDrive" style="height:28px; display:flex; align-items:center; justify-content:center; gap:5px; font-weight:700; background:#fff;" title="Garante a estrutura sincronizada da pasta Athenes no Drive (Documentos, Zotero e Relatórios)">
+            ${svgIcone('pasta', 13)} Sincronizar Pasta Hub (Athenes)
+          </button>
           <div id="athListaArquivosDrive" hidden style="max-height:120px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;"></div>
         </div>
 
@@ -1120,9 +1141,46 @@ export class EditorView {
       });
 
       // Eventos Google Drive
-      popNuvem.querySelector('#athInputDriveClientId')?.addEventListener('change', e => {
-        const cfg = obterConfigGoogleDrive();
-        salvarConfigGoogleDrive({ ...cfg, clientId: e.target.value.trim() });
+      // Eventos de Autenticação Google e Pasta Hub
+      popNuvem.querySelector('#athBtnLoginGmail')?.addEventListener('click', async () => {
+        try {
+          const cfg = obterConfigGoogleDrive();
+          const token = await autenticarGoogleDrive(cfg.clientId);
+          if (token) {
+            const info = await obterInfoUsuarioGoogle(token).catch(() => null);
+            if (info) {
+              this.perfilColaborador.nome = info.name || this.perfilColaborador.nome;
+              this.perfilColaborador.email = info.email;
+              this.perfilColaborador.foto = info.picture;
+              this.perfilColaborador.autenticadoGoogle = true;
+              salvarPerfilColaborador(this.perfilColaborador);
+            }
+            // Cria ou localiza a pasta raiz 'Athenes' e subpastas no Drive
+            await obterOuCriarEstruturaPastasAthenes(token);
+            this.renderizar();
+          }
+        } catch (err) {
+          alert('Erro na autenticação Google: ' + err.message);
+        }
+      });
+
+      popNuvem.querySelector('#athBtnDesconectarGoogle')?.addEventListener('click', () => {
+        this.perfilColaborador.autenticadoGoogle = false;
+        delete this.perfilColaborador.email;
+        delete this.perfilColaborador.foto;
+        salvarPerfilColaborador(this.perfilColaborador);
+        this.renderizar();
+      });
+
+      popNuvem.querySelector('#athBtnSincronizarHubDrive')?.addEventListener('click', async () => {
+        try {
+          const cfg = obterConfigGoogleDrive();
+          const token = cfg.accessToken || await autenticarGoogleDrive(cfg.clientId);
+          const est = await obterOuCriarEstruturaPastasAthenes(token);
+          alert('Pasta Hub Athenes pronta no Google Drive!\n- Documentos: ' + est.pastaDocumentosId + '\n- Zotero: ' + est.pastaZoteroId + '\n- Relatórios: ' + est.pastaRelatoriosId);
+        } catch (err) {
+          alert('Erro ao sincronizar pasta Hub: ' + err.message);
+        }
       });
 
       popNuvem.querySelector('#athBtnSalvarDrive')?.addEventListener('click', async () => {
@@ -2207,6 +2265,146 @@ export class EditorView {
     });
   }
 
+  construirBarraRapidaDoBloco(b, pag) {
+    const barra = document.createElement('div');
+    barra.className = 'ath-bloco-barra-rapida';
+    barra.addEventListener('click', e => e.stopPropagation());
+
+    const ehTexto = b.tipo === 'titulo' || b.tipo === 'subtitulo' || b.tipo === 'paragrafo' || b.tipo === 'texto' || b.tipo === 'citacao';
+    const ehFigura = b.tipo === 'figura' || b.tipo === 'imagem';
+
+    if (ehTexto) {
+      // 1. Dropdown elegante de estilos diretamente na folha
+      const selEst = document.createElement('select');
+      selEst.className = 'ath-sel-rapido';
+      selEst.title = 'Estilo tipográfico deste bloco';
+      const estilos = this.doc.estilos || [];
+      selEst.innerHTML = estilos.map(e => `<option value="${e.id}" ${(b.estiloId || 'corpo') === e.id ? 'selected' : ''}>${e.nome}</option>`).join('');
+      selEst.addEventListener('change', e => {
+        b.estiloId = e.target.value;
+        this.notificarMudanca();
+        this.renderizar();
+      });
+      barra.appendChild(selEst);
+
+      // 2. Botão toggle de hifenização automática (exem-plo)
+      const btnHifen = document.createElement('button');
+      btnHifen.type = 'button';
+      const hifAtivo = b.hifenizacao !== undefined ? b.hifenizacao : (estilos.find(e => e.id === b.estiloId)?.hifenizacao ?? false);
+      btnHifen.className = `ath-btn-rapido ${hifAtivo ? 'ativo' : ''}`;
+      btnHifen.title = hifAtivo ? 'Hifenização automática ATIVA (exem-plo) — clique para desativar' : 'Hifenização automática DESATIVADA — clique para ativar';
+      btnHifen.innerHTML = 'a-b';
+      btnHifen.addEventListener('click', () => {
+        b.hifenizacao = !hifAtivo;
+        this.notificarMudanca();
+        this.renderizar();
+      });
+      barra.appendChild(btnHifen);
+
+      // 3. Botão para abrir o painel lateral focado exclusivamente em EDIÇÃO
+      const btnEdit = document.createElement('button');
+      btnEdit.type = 'button';
+      btnEdit.className = 'ath-btn-rapido';
+      btnEdit.title = 'Editar propriedades deste estilo no painel lateral';
+      btnEdit.innerHTML = `${svgIcone('lapis', 12)} Editar`;
+      btnEdit.addEventListener('click', () => {
+        const est = (this.doc.estilos || []).find(e => e.id === b.estiloId) || this.doc.estilos?.[0];
+        if (est) this.onEditarEstilo(est);
+      });
+      barra.appendChild(btnEdit);
+    } else if (ehFigura) {
+      // 1. Dropdown de Rótulo / Subtipo da Ilustração
+      const selSub = document.createElement('select');
+      selSub.className = 'ath-sel-rapido';
+      selSub.title = 'Rótulo da ilustração';
+      const subtipos = [
+        { id: 'figura', nome: 'Figura' },
+        { id: 'grafico', nome: 'Gráfico' },
+        { id: 'fotografia', nome: 'Fotografia' },
+        { id: 'diagrama', nome: 'Diagrama' },
+        { id: 'fluxograma', nome: 'Fluxograma' },
+        { id: 'esquema', nome: 'Esquema' },
+        { id: 'croqui', nome: 'Croqui' },
+        { id: 'desenho', nome: 'Desenho' },
+        { id: 'ilustracao', nome: 'Ilustração' }
+      ];
+      selSub.innerHTML = subtipos.map(s => `<option value="${s.id}" ${(b.subtipo || 'figura') === s.id ? 'selected' : ''}>${s.nome}</option>`).join('');
+      selSub.addEventListener('change', e => {
+        b.subtipo = e.target.value;
+        b.titulo = obterTituloCompletoComNumeracao(b);
+        this.notificarMudanca();
+        this.renderizar();
+      });
+      barra.appendChild(selSub);
+
+      // 2. Dropdown de Layout de Imagens
+      const selLay = document.createElement('select');
+      selLay.className = 'ath-sel-rapido';
+      selLay.title = 'Layout de slots de imagens';
+      const layouts = [
+        { id: '1', nome: '1 Imagem' },
+        { id: '2_lado', nome: '2 Lado a Lado' },
+        { id: '2_empilhado', nome: '2 Empilhado' },
+        { id: '3_linha', nome: '3 em Linha' },
+        { id: '4_grade', nome: '4 em Grade (2×2)' },
+        { id: '6_grade', nome: '6 em Grade (2×3)' }
+      ];
+      selLay.innerHTML = layouts.map(l => `<option value="${l.id}" ${(b.layout || '1') === l.id ? 'selected' : ''}>${l.nome}</option>`).join('');
+      selLay.addEventListener('change', e => {
+        b.layout = e.target.value;
+        this.notificarMudanca();
+        this.renderizar();
+      });
+      barra.appendChild(selLay);
+
+      // 3. Dropdown de Subgrade / Legenda
+      const selSubgrade = document.createElement('select');
+      selSubgrade.className = 'ath-sel-rapido';
+      selSubgrade.title = 'Estrutura da legenda';
+      selSubgrade.innerHTML = `
+        <option value="1" ${(!b.subgrade_colunas || b.subgrade_colunas === 1) ? 'selected' : ''}>Vertical</option>
+        <option value="2" ${b.subgrade_colunas === 2 ? 'selected' : ''}>Legenda ao Lado</option>
+      `;
+      selSubgrade.addEventListener('change', e => {
+        b.subgrade_colunas = parseInt(e.target.value, 10);
+        this.notificarMudanca();
+        this.renderizar();
+      });
+      barra.appendChild(selSubgrade);
+
+      // 4. Botão de edição fina no painel lateral
+      const btnEdit = document.createElement('button');
+      btnEdit.type = 'button';
+      btnEdit.className = 'ath-btn-rapido';
+      btnEdit.title = 'Editar propriedades avançadas no painel lateral';
+      btnEdit.innerHTML = `${svgIcone('lapis', 12)} Editar`;
+      btnEdit.addEventListener('click', () => {
+        this.onSelecionarBloco(b, pag);
+      });
+      barra.appendChild(btnEdit);
+    } else {
+      // Outros blocos compostos (Tabela, Quadro, Mapa, Fórmula)
+      const crachaTxt = document.createElement('span');
+      crachaTxt.style.fontSize = '11px';
+      crachaTxt.style.fontWeight = '800';
+      crachaTxt.style.color = '#314F79';
+      crachaTxt.textContent = (TIPO_ROTULO[b.tipo] || b.tipo).toUpperCase();
+      barra.appendChild(crachaTxt);
+
+      const btnEdit = document.createElement('button');
+      btnEdit.type = 'button';
+      btnEdit.className = 'ath-btn-rapido';
+      btnEdit.title = 'Editar propriedades no painel lateral';
+      btnEdit.innerHTML = `${svgIcone('lapis', 12)} Editar`;
+      btnEdit.addEventListener('click', () => {
+        this.onSelecionarBloco(b, pag);
+      });
+      barra.appendChild(btnEdit);
+    }
+
+    return barra;
+  }
+
   renderizarBlocoNaFolha(b, pag) {
     const el = document.createElement('div');
     el.className = `ath-bloco-folha ${b.id === this.blocoSelecionado?.id ? 'sel' : ''}`;
@@ -2223,6 +2421,8 @@ export class EditorView {
       cracha.textContent = (TIPO_ROTULO[b.tipo] || b.tipo).toUpperCase();
     }
     el.appendChild(cracha);
+    el.appendChild(this.construirBarraRapidaDoBloco(b, pag));
+    el.setAttribute('lang', 'pt-BR');
 
     // Seleção dinâmica bidirecional ao clicar no bloco na página
     el.addEventListener('click', e => {
@@ -2262,7 +2462,8 @@ export class EditorView {
       ...(b.recuo_esquerdo_mm !== undefined ? { recuo_esquerdo_mm: b.recuo_esquerdo_mm } : {}),
       ...(b.recuo_direito_mm !== undefined ? { recuo_direito_mm: b.recuo_direito_mm } : {}),
       ...(b.espacamento_letras_em !== undefined ? { espacamento_letras_em: b.espacamento_letras_em } : {}),
-      ...(b.espacamento_palavras_em !== undefined ? { espacamento_palavras_em: b.espacamento_palavras_em } : {})
+      ...(b.espacamento_palavras_em !== undefined ? { espacamento_palavras_em: b.espacamento_palavras_em } : {}),
+      ...(b.hifenizacao !== undefined ? { hifenizacao: b.hifenizacao } : {})
     };
     const cssEstilo = estiloParaCss(estiloMesclado);
 
@@ -2432,11 +2633,17 @@ export class EditorView {
       const estLeg = (this.doc.estilos || []).find(e => e.id === b.legenda_estilo_id);
       const estFonte = (this.doc.estilos || []).find(e => e.id === b.fonte_estilo_id);
 
-      // Título da Figura
+      // Título da Figura com Prefixo Intrínseco não-editável
       const tit = document.createElement('div');
-      tit.contentEditable = 'true';
       tit.className = 'ath-fig-titulo';
-      tit.innerHTML = b.titulo || `${rotuloDaFigura(b)} ${b.numero_sequencial || 1} — Descrição da Ilustração`;
+      const rot = rotuloDaFigura(b);
+      const num = b.numero_sequencial || 1;
+      const prefixoStr = `${rot} ${num} — `;
+      const textoPuro = obterTextoPuroTitulo(b) || 'Descrição da Ilustração';
+
+      tit.innerHTML = `
+        <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoStr}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuro}</span>
+      `;
       if (estTit) {
         tit.style.fontFamily = FONTES_SISTEMA[estTit.fonte]?.familia || 'inherit';
         tit.style.fontSize = `${estTit.tamanho_pt || 12}pt`;
@@ -2446,9 +2653,13 @@ export class EditorView {
       if (b.titulo_alinhamento && b.titulo_alinhamento !== 'estilo') {
         tit.style.textAlign = b.titulo_alinhamento;
       }
-      tit.addEventListener('blur', () => { b.titulo = tit.innerHTML; this.notificarMudancaRapida(); });
+      const spanEditavel = tit.querySelector('.ath-titulo-texto-editavel');
+      spanEditavel.addEventListener('blur', () => {
+        b.titulo = spanEditavel.innerText.trim();
+        this.notificarMudancaRapida();
+      });
 
-      // Grid de Imagens
+      // Grid de Imagens (limitado estritamente à quantidade de slots do layout ativo)
       const grid = document.createElement('div');
       grid.className = 'ath-fig-grid';
       grid.dataset.layout = b.layout || '1';
@@ -2468,7 +2679,12 @@ export class EditorView {
       }
       const inlineImgStyle = imgStyleArr.join(' ');
 
-      const itens = Array.isArray(b.itens) ? b.itens : [{ url: b.src || '', legenda_sub: 'Visão Geral' }];
+      const qtdSlots = (b.layout === '2_lado' || b.layout === '2_empilhado') ? 2
+        : (b.layout === '3_linha' || b.layout === '3_misto') ? 3
+        : (b.layout === '4_grade') ? 4
+        : (b.layout === '6_grade') ? 6 : 1;
+
+      const itens = (Array.isArray(b.itens) ? b.itens : [{ url: b.src || '', legenda_sub: 'Visão Geral' }]).slice(0, qtdSlots);
       itens.forEach((it, idx) => {
         const itEl = document.createElement('div');
         itEl.className = 'ath-fig-item';
@@ -2479,7 +2695,7 @@ export class EditorView {
         else itEl.style.alignItems = 'center';
 
         const imgUrl = it.url || b.src || 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80';
-        const subLegHtml = (itens.length > 1 && it.legenda_sub) 
+        const subLegHtml = (qtdSlots > 1 && it.legenda_sub) 
           ? `<span class="ath-fig-sublegenda">${rotuloDaFigura(b)} ${b.numero_sequencial || 1}${String.fromCharCode(97 + idx)} — ${it.legenda_sub}</span>`
           : '';
 
@@ -2567,10 +2783,17 @@ export class EditorView {
       mapaBox.className = 'ath-composto-mapa';
 
       const tit = document.createElement('div');
-      tit.contentEditable = 'true';
       tit.className = 'ath-mapa-titulo';
-      tit.innerHTML = b.titulo || `Mapa ${b.numero_sequencial || 1} — Delimitação territorial`;
-      tit.addEventListener('blur', () => { b.titulo = tit.innerHTML; this.notificarMudancaRapida(); });
+      const prefixoMapa = `Mapa ${b.numero_sequencial || 1} — `;
+      const textoPuroMapa = obterTextoPuroTitulo(b) || 'Delimitação territorial';
+      tit.innerHTML = `
+        <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoMapa}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuroMapa}</span>
+      `;
+      const spanEditavelMapa = tit.querySelector('.ath-titulo-texto-editavel');
+      spanEditavelMapa.addEventListener('blur', () => {
+        b.titulo = spanEditavelMapa.innerText.trim();
+        this.notificarMudancaRapida();
+      });
       mapaBox.appendChild(tit);
 
       const canvasBox = document.createElement('div');
@@ -2608,10 +2831,17 @@ export class EditorView {
       Object.assign(tabBox.style, gerarCssMolduraBloco(b));
 
       const tit = document.createElement('div');
-      tit.contentEditable = 'true';
       tit.className = 'ath-tab-titulo';
-      tit.innerHTML = b.titulo || `Tabela ${b.numero_sequencial || 1} — Dados apresentados`;
-      tit.addEventListener('blur', () => { b.titulo = tit.innerHTML; this.notificarMudancaRapida(); });
+      const prefixoTab = `Tabela ${b.numero_sequencial || 1} — `;
+      const textoPuroTab = obterTextoPuroTitulo(b) || 'Dados apresentados';
+      tit.innerHTML = `
+        <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoTab}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuroTab}</span>
+      `;
+      const spanEditavelTab = tit.querySelector('.ath-titulo-texto-editavel');
+      spanEditavelTab.addEventListener('blur', () => {
+        b.titulo = spanEditavelTab.innerText.trim();
+        this.notificarMudancaRapida();
+      });
       tabBox.appendChild(tit);
 
       const table = document.createElement('table');
@@ -2668,10 +2898,17 @@ export class EditorView {
       Object.assign(qBox.style, gerarCssMolduraBloco(b));
 
       const tit = document.createElement('div');
-      tit.contentEditable = 'true';
       tit.className = 'ath-quadro-titulo';
-      tit.innerHTML = b.titulo || `Quadro ${b.numero_sequencial || 1} — Categorias conceituais`;
-      tit.addEventListener('blur', () => { b.titulo = tit.innerHTML; this.notificarMudancaRapida(); });
+      const prefixoQuadro = `Quadro ${b.numero_sequencial || 1} — `;
+      const textoPuroQuadro = obterTextoPuroTitulo(b) || 'Categorias conceituais';
+      tit.innerHTML = `
+        <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoQuadro}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuroQuadro}</span>
+      `;
+      const spanEditavelQuadro = tit.querySelector('.ath-titulo-texto-editavel');
+      spanEditavelQuadro.addEventListener('blur', () => {
+        b.titulo = spanEditavelQuadro.innerText.trim();
+        this.notificarMudancaRapida();
+      });
       qBox.appendChild(tit);
 
       const table = document.createElement('table');

@@ -13,6 +13,7 @@ import { FONTES_SISTEMA, PESOS_FONTE, estiloParaCss, alinhamentoCss, ALINHAMENTO
 import {
   modeloDaPagina, recalcularNumeracaoAutomatica, resolverReferenciasCruzadas,
   ROTULOS_FIGURA, rotuloDaFigura, aplicarNumeracaoNoTitulo, removerPrefixoNumeracaoTitulo,
+  obterTextoPuroTitulo, rotuloDoBloco, obterPrefixoNumeracao, obterTituloCompletoComNumeracao,
   calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
@@ -434,6 +435,15 @@ export class PainelPropriedades {
           </div>
         </div>
 
+        <!-- Hifenização Automática no Bloco -->
+        <div style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-top:2px; margin-bottom:4px;">
+          <label class="rm-chk" style="font-size:12px; margin:0; display:flex; align-items:center; gap:8px; cursor:pointer;" title="Quebra automática de palavras com hífen ao fim da linha (exem-plo)">
+            <input type="checkbox" id="rmCampoHifenizacao" ${b.hifenizacao !== undefined ? (b.hifenizacao ? 'checked' : '') : (estiloAtivo.hifenizacao ? 'checked' : '')}>
+            <span>Hifenização automática (exem-plo)</span>
+          </label>
+          <span style="font-size:10px; color:var(--glx-muted);">${b.hifenizacao !== undefined ? 'local' : 'do estilo'}</span>
+        </div>
+
         <!-- Fundo atrás do texto (Soft UI Badge com amostra e hex visíveis) -->
         <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
           <label class="rm-chk" style="font-size:12.5px; margin:0; display:flex; align-items:center; gap:8px; cursor:pointer;">
@@ -512,6 +522,12 @@ export class PainelPropriedades {
           this.renderizar();
         });
       }
+
+      box.querySelector('#rmCampoHifenizacao')?.addEventListener('change', e => {
+        b.hifenizacao = e.target.checked;
+        this.notificarMudanca();
+        this.renderizar();
+      });
 
       box.querySelector('#athBtnEditarEstiloDoBloco')?.addEventListener('click', () => {
         const est = (this.doc.estilos || []).find(e => e.id === b.estiloId) || this.doc.estilos?.[0];
@@ -1156,7 +1172,8 @@ export class PainelPropriedades {
     // 3. FIGURA (BLOCO COMPOSTO COM MULTI-ITENS, SLOTS, ENQUADRAMENTO E TIPOGRAFIA)
     else if (b.tipo === 'figura' || b.tipo === 'imagem') {
       const rotuloAtual = rotuloDaFigura(b);
-      const isNumAuto = b.numeracao_automatica !== false;
+      const numAtual = b.numero_sequencial || 1;
+      const textoPuro = obterTextoPuroTitulo(b);
 
       // Garante lista de itens de imagem
       if (!Array.isArray(b.itens) || b.itens.length === 0) {
@@ -1167,8 +1184,15 @@ export class PainelPropriedades {
         : (b.layout === '4_grade') ? 4
         : (b.layout === '6_grade') ? 6 : 1;
 
-      while (b.itens.length < qtdSlots) {
-        b.itens.push({ url: '', legenda_sub: `Item ${String.fromCharCode(97 + b.itens.length).toUpperCase()}` });
+      if (b.itens.length > qtdSlots) {
+        b.itens = b.itens.slice(0, qtdSlots);
+      } else {
+        while (b.itens.length < qtdSlots) {
+          b.itens.push({ url: '', legenda_sub: `Item ${String.fromCharCode(97 + b.itens.length).toUpperCase()}` });
+        }
+      }
+      if (qtdSlots === 1 && b.itens[0]) {
+        b.src = b.itens[0].url || b.src || '';
       }
 
       const estilosTexto = this.doc.estilos || [];
@@ -1181,27 +1205,38 @@ export class PainelPropriedades {
           </button>
         </div>
 
-        <!-- Categoria / Subtipo -->
-        <label>Categoria / Rótulo
+        <!-- Categoria / Subtipo (Prefixo do Elemento) -->
+        <label>Prefixo / Tipo do Elemento
           <select id="rmFigSubtipo" class="glx-select">
-            <option value="figura" ${(!b.subtipo || b.subtipo === 'figura') ? 'selected' : ''}>Figura (Geral)</option>
-            <option value="grafico" ${b.subtipo === 'grafico' ? 'selected' : ''}>Gráfico (Estatístico)</option>
+            <option value="figura" ${(!b.subtipo || b.subtipo === 'figura') ? 'selected' : ''}>Figura (Padrão ABNT)</option>
             <option value="fotografia" ${b.subtipo === 'fotografia' ? 'selected' : ''}>Fotografia</option>
+            <option value="grafico" ${b.subtipo === 'grafico' ? 'selected' : ''}>Gráfico</option>
             <option value="diagrama" ${b.subtipo === 'diagrama' ? 'selected' : ''}>Diagrama</option>
             <option value="fluxograma" ${b.subtipo === 'fluxograma' ? 'selected' : ''}>Fluxograma</option>
+            <option value="esquema" ${b.subtipo === 'esquema' ? 'selected' : ''}>Esquema</option>
+            <option value="croqui" ${b.subtipo === 'croqui' ? 'selected' : ''}>Croqui</option>
+            <option value="mapa" ${b.subtipo === 'mapa' ? 'selected' : ''}>Mapa</option>
+            <option value="desenho" ${b.subtipo === 'desenho' ? 'selected' : ''}>Desenho</option>
+            <option value="ilustracao" ${b.subtipo === 'ilustracao' ? 'selected' : ''}>Ilustração</option>
+            <option value="personalizado" ${b.subtipo === 'personalizado' ? 'selected' : ''}>Personalizado...</option>
           </select>
         </label>
 
-        <!-- Botão Booleano (Toggle Switch) de Numeração no Nome -->
-        <div style="margin-top:6px; margin-bottom:8px;">
-          <button type="button" class="glx-btn glx-btn-sm ${isNumAuto ? 'glx-btn-primary' : 'glx-btn-soft'}" id="athToggleFigNumAuto" style="font-weight:700; width:100%; display:flex; align-items:center; justify-content:center; gap:6px;" title="Clique para ativar ou desativar a numeração automática no nome">
-            ${isNumAuto ? svgIcone('check', 14) : svgIcone('fechar', 14)}
-            <span>Numeração no Nome: ${isNumAuto ? 'Ativada (Automática)' : 'Desativada (Livre)'}</span>
-          </button>
-        </div>
+        ${b.subtipo === 'personalizado' ? `
+          <label style="margin-top:4px;">Prefixo Personalizado
+            <input type="text" id="rmFigPrefixoCustom" class="glx-input" value="${escapeHtml(b.prefixo_customizado || '')}" placeholder="Ex: Detalhe, Planta, Corte...">
+          </label>
+        ` : ''}
 
-        <label>Identificação / Título
-          <input type="text" id="rmFigTitulo" value="${b.titulo || ''}" placeholder="Ex: ${rotuloAtual} 1 — Descrição">
+        <!-- Identificação / Nome Puro da Ilustração -->
+        <label style="margin-top:6px;">Nome / Identificação da Ilustração
+          <div style="display:flex; align-items:center; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:8px; overflow:hidden; background:#fff; margin-top:3px;">
+            <span style="background:#EEF4FA; color:var(--ath-primary, #314F79); font:800 11.5px var(--glx-font); padding:6px 10px; border-right:1px solid #CBD5E1; user-select:none; white-space:nowrap;" title="Prefixo e numeração automáticos gerados pela posição no documento">
+              ${rotuloAtual} ${numAtual} —
+            </span>
+            <input type="text" id="rmFigTitulo" value="${escapeHtml(textoPuro)}" placeholder="Escreva apenas o nome da ilustração..." style="border:none; padding:6px 10px; flex:1; outline:none; font-size:12px; margin:0;">
+          </div>
+          <span style="font-size:10px; color:var(--ath-muted, #64748B); display:block; margin-top:3px;">A numeração é sequencial e automática. Escreva apenas o nome descritivo.</span>
         </label>
 
         <!-- Configuração de Disposição (Layout de Grade) -->
@@ -1362,31 +1397,21 @@ export class PainelPropriedades {
         });
       });
 
-      // Alternar Booleano Numeração Automática (Ativada / Desativada)
-      box.querySelector('#athToggleFigNumAuto')?.addEventListener('click', () => {
-        b.numeracao_automatica = (b.numeracao_automatica === false);
-        if (b.numeracao_automatica) {
-          aplicarNumeracaoNoTitulo(b, this.doc);
-        } else {
-          b.titulo = removerPrefixoNumeracaoTitulo(b.titulo, b.tipo, b.subtipo);
-        }
+      box.querySelector('#rmFigSubtipo').addEventListener('change', e => {
+        b.subtipo = e.target.value;
+        recalcularNumeracaoAutomatica(this.doc);
         this.notificarMudanca();
         this.renderizar();
       });
 
-      box.querySelector('#rmFigSubtipo').addEventListener('change', e => {
-        b.subtipo = e.target.value;
-        if (b.numeracao_automatica !== false) {
-          aplicarNumeracaoNoTitulo(b, this.doc);
-        } else {
-          recalcularNumeracaoAutomatica(this.doc);
-        }
+      box.querySelector('#rmFigPrefixoCustom')?.addEventListener('input', e => {
+        b.prefixo_customizado = e.target.value;
+        recalcularNumeracaoAutomatica(this.doc);
         this.notificarMudanca();
-        this.renderizar();
       });
 
       box.querySelector('#rmFigTitulo').addEventListener('input', e => {
-        b.titulo = e.target.value;
+        b.titulo = removerPrefixoNumeracaoTitulo(e.target.value);
         this.notificarMudanca();
       });
 
@@ -1396,8 +1421,17 @@ export class PainelPropriedades {
           : (b.layout === '3_linha' || b.layout === '3_misto') ? 3
           : (b.layout === '4_grade') ? 4
           : (b.layout === '6_grade') ? 6 : 1;
-        while (b.itens.length < q) {
-          b.itens.push({ url: '', legenda_sub: `Item ${String.fromCharCode(97 + b.itens.length).toUpperCase()}` });
+        
+        // Se reduziu a quantidade de slots, trunca o array eliminando as imagens excedentes
+        if (b.itens.length > q) {
+          b.itens = b.itens.slice(0, q);
+        } else {
+          while (b.itens.length < q) {
+            b.itens.push({ url: '', legenda_sub: `Item ${String.fromCharCode(97 + b.itens.length).toUpperCase()}` });
+          }
+        }
+        if (q === 1 && b.itens[0]) {
+          b.src = b.itens[0].url || '';
         }
         this.notificarMudanca();
         this.renderizar();
@@ -1502,14 +1536,16 @@ export class PainelPropriedades {
             ${svgIcone('quadro', 12)} Personalizar...
           </button>
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <label style="flex:1;">Identificação / Título
-            <input type="text" id="rmMapaTitulo" value="${escapeHtml(b.titulo || '')}">
-          </label>
-          <button type="button" class="glx-btn glx-btn-xs glx-btn-secondary" id="rmBtnMapaAtualizarNum" style="height:32px; margin-top:14px; margin-left:6px; font-weight:700;" title="Prefixar numeração automática">
-            + Mapa #
-          </button>
-        </div>
+        <!-- Identificação / Título com Prefixo Estático Intrínseco -->
+        <label>Identificação / Título
+          <div style="display:flex; align-items:center; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:8px; overflow:hidden; background:#fff; margin-top:3px;">
+            <span style="background:#EEF4FA; color:var(--ath-primary, #314F79); font:800 11.5px var(--glx-font); padding:6px 10px; border-right:1px solid #CBD5E1; user-select:none; white-space:nowrap;">
+              Mapa ${b.numero_sequencial || 1} —
+            </span>
+            <input type="text" id="rmMapaTitulo" value="${escapeHtml(obterTextoPuroTitulo(b))}" placeholder="Descrição do mapa territorial" style="border:none; padding:6px 10px; flex:1; outline:none; font-size:12px; margin:0;">
+          </div>
+          <span style="font-size:10px; color:var(--ath-muted, #64748B); display:block; margin-top:3px;">Numeração automática intrínseca à posição.</span>
+        </label>
         <div class="rm-linha2">
           <label>Escala Nominal
             <input type="text" id="rmMapaEscala" value="${escapeHtml(b.escala || '1:10.000')}">
@@ -1535,14 +1571,10 @@ export class PainelPropriedades {
           }
         });
       });
-      box.querySelector('#rmBtnMapaAtualizarNum').addEventListener('click', () => {
-        b.numeracao_automatica = true;
-        aplicarNumeracaoNoTitulo(b, this.doc);
-        box.querySelector('#rmMapaTitulo').value = b.titulo;
+      box.querySelector('#rmMapaTitulo').addEventListener('input', e => {
+        b.titulo = removerPrefixoNumeracaoTitulo(e.target.value);
         this.notificarMudanca();
-        this.renderizar();
       });
-      box.querySelector('#rmMapaTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmMapaEscala').addEventListener('input', e => { b.escala = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmMapaNorte').addEventListener('change', e => { b.orientacao_norte = e.target.checked; this.notificarMudanca(); });
       box.querySelector('#rmMapaLegenda').addEventListener('input', e => { b.legenda_cartografica = e.target.value; this.notificarMudanca(); });
@@ -1560,17 +1592,15 @@ export class PainelPropriedades {
             ${svgIcone('quadro', 12)} Personalizar...
           </button>
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <label style="flex:1;">Identificação / Título
-            <input type="text" id="rmTabTitulo" value="${escapeHtml(b.titulo || '')}" placeholder="Ex: ${rotuloTab} 1 — Título da tabela">
-          </label>
-          <button type="button" class="glx-btn glx-btn-xs glx-btn-secondary" id="rmBtnTabAtualizarNum" style="height:32px; margin-top:14px; margin-left:6px; font-weight:700;" title="Prefixar numeração automática">
-            + ${rotuloTab} #
-          </button>
-        </div>
-        <label class="rm-chk" style="font-size:11.5px; margin-top:2px; margin-bottom:6px;">
-          <input type="checkbox" id="rmTabNumAuto" ${b.numeracao_automatica !== false ? 'checked' : ''}>
-          Manter numeração automática no nome (${rotuloTab} #${b.numero_sequencial || 1})
+        <!-- Identificação / Título com Prefixo Estático Intrínseco -->
+        <label>Identificação / Título
+          <div style="display:flex; align-items:center; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:8px; overflow:hidden; background:#fff; margin-top:3px;">
+            <span style="background:#EEF4FA; color:var(--ath-primary, #314F79); font:800 11.5px var(--glx-font); padding:6px 10px; border-right:1px solid #CBD5E1; user-select:none; white-space:nowrap;">
+              ${rotuloTab} ${b.numero_sequencial || 1} —
+            </span>
+            <input type="text" id="rmTabTitulo" value="${escapeHtml(obterTextoPuroTitulo(b))}" placeholder="Descrição da ${isQuadro ? 'estrutura' : 'tabela'}" style="border:none; padding:6px 10px; flex:1; outline:none; font-size:12px; margin:0;">
+          </div>
+          <span style="font-size:10px; color:var(--ath-muted, #64748B); display:block; margin-top:3px;">Numeração automática intrínseca à posição.</span>
         </label>
         <div class="rm-linha2">
           <label>Colunas
@@ -1599,22 +1629,10 @@ export class PainelPropriedades {
           }
         });
       });
-      box.querySelector('#rmBtnTabAtualizarNum').addEventListener('click', () => {
-        b.numeracao_automatica = true;
-        aplicarNumeracaoNoTitulo(b, this.doc);
-        box.querySelector('#rmTabTitulo').value = b.titulo;
-        this.notificarMudanca();
-        this.renderizar();
-      });
-      box.querySelector('#rmTabNumAuto').addEventListener('change', e => {
-        b.numeracao_automatica = e.target.checked;
-        if (b.numeracao_automatica) {
-          aplicarNumeracaoNoTitulo(b, this.doc);
-          box.querySelector('#rmTabTitulo').value = b.titulo;
-        }
+      box.querySelector('#rmTabTitulo').addEventListener('input', e => {
+        b.titulo = removerPrefixoNumeracaoTitulo(e.target.value);
         this.notificarMudanca();
       });
-      box.querySelector('#rmTabTitulo').addEventListener('input', e => { b.titulo = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmTabCols')?.addEventListener('change', e => {
         const nCols = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 2));
         if (!Array.isArray(b.colunas)) b.colunas = ['Coluna 1', 'Coluna 2'];
@@ -1957,12 +1975,15 @@ export class PainelPropriedades {
         </label>
       </div>
 
-      <div style="display:flex; gap:16px; align-items:center;">
+      <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
         <label class="rm-chk" style="font-size:12px;">
           <input type="checkbox" id="athEstiloItalico" ${rasc.italico ? 'checked' : ''}> Itálico
         </label>
         <label class="rm-chk" style="font-size:12px;">
           <input type="checkbox" id="athEstiloCaixaAlta" ${rasc.caixa_alta ? 'checked' : ''}> Caixa Alta
+        </label>
+        <label class="rm-chk" style="font-size:12px;" title="Ativa quebra silábica de palavras com hífen (exem-plo)">
+          <input type="checkbox" id="athEstiloHifenizacao" ${rasc.hifenizacao ? 'checked' : ''}> Hifenização (exem-plo)
         </label>
       </div>
 
@@ -2039,6 +2060,11 @@ export class PainelPropriedades {
 
     inputCor.addEventListener('input', e => {
       rasc.cor = e.target.value;
+      atualizarPrevia();
+    });
+
+    box.querySelector('#athEstiloHifenizacao')?.addEventListener('change', e => {
+      rasc.hifenizacao = e.target.checked;
       atualizarPrevia();
     });
 

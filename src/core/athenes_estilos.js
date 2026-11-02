@@ -534,7 +534,9 @@ export function estiloParaCss(estilo, fontesDisponiveis = FONTES_SISTEMA) {
 
   // Hifenização
   if (estilo.hifenizacao) {
-    props.push('hyphens: auto; -webkit-hyphens: auto;');
+    props.push('hyphens: auto; -webkit-hyphens: auto; -ms-hyphens: auto; hyphenate-limit-chars: 6 3 3; -webkit-hyphenate-limit-before: 3; -webkit-hyphenate-limit-after: 3; overflow-wrap: break-word;');
+  } else if (estilo.hifenizacao === false) {
+    props.push('hyphens: manual; -webkit-hyphens: manual; -ms-hyphens: manual;');
   }
 
   // Regra editorial para não quebrar títulos no fim de página

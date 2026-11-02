@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ath_primary">#314F79</color>
+    <color name="ath_primary_dark">#233B5C</color>
+    <color name="ath_bg">#F8FAFC</color>
+    <color name="ath_surface">#FFFFFF</color>
+</resources>

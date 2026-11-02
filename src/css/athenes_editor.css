@@ -695,8 +695,98 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 }
 
 .ath-bloco-folha.sel .ath-bloco-cracha {
-  display: inline-block;
+  display: none; /* A barra rápida substitui o crachá quando o bloco é selecionado */
 }
+
+/* Barra flutuante de seleção rápida de estilos e tipos no bloco da página */
+.ath-bloco-barra-rapida {
+  position: absolute;
+  top: -14px;
+  left: 6px;
+  display: none;
+  align-items: center;
+  gap: 4px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 2px 6px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  z-index: 40;
+  font-family: var(--glx-font, Nunito), system-ui, sans-serif;
+  user-select: none;
+}
+
+.ath-bloco-folha.sel .ath-bloco-barra-rapida {
+  display: inline-flex;
+}
+
+.ath-bloco-barra-rapida .ath-sel-rapido {
+  height: 22px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1E293B;
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+}
+
+.ath-bloco-barra-rapida .ath-sel-rapido:hover,
+.ath-bloco-barra-rapida .ath-sel-rapido:focus {
+  border-color: #314F79;
+  background: #FFFFFF;
+}
+
+.ath-bloco-barra-rapida .ath-btn-rapido {
+  height: 22px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  background: #F8FAFC;
+  color: #334155;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transition: all 0.15s ease;
+}
+
+.ath-bloco-barra-rapida .ath-btn-rapido:hover {
+  background: #EFF6FF;
+  border-color: #314F79;
+  color: #314F79;
+}
+
+.ath-bloco-barra-rapida .ath-btn-rapido.ativo {
+  background: #314F79;
+  border-color: #314F79;
+  color: #FFFFFF;
+}
+
+/* Card e Avatar do Perfil Google na Barra Superior / Popover */
+.ath-google-user-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+}
+
+.ath-google-user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #CBD5E1;
+}
+
 
 /* =========================================================================
    Blocos Compostos: Figura, Mapa, Tabela, Quadro, Fórmula

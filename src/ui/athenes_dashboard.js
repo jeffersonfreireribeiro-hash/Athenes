@@ -195,6 +195,7 @@ export class DashboardView {
             <h1>Estúdio de Artigos, Leitura de PDF & Fichamento Zotero</h1>
             <p>Leia os PDFs direto do seu Google Drive em Tela Cheia, risque à mão livre estilo Samsung Notes, marque citações e sincronize notas com o Zotero.</p>
           </div>
+          <div id="athHeaderAcoesZotero" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"></div>
         </header>
         <div id="athContainerEstudoArtigos"></div>
       </section>

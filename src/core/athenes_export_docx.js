@@ -7,7 +7,7 @@
 import { ZipBuilder } from './zip_builder.js';
 import { MM_PARA_DXA } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
-import { gerarSumarioDinamico, modeloDaPagina } from './athenes_documento.js';
+import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao } from './athenes_documento.js';
 
 function escaparXml(texto) {
   if (texto === undefined || texto === null) return '';
@@ -458,8 +458,9 @@ export async function exportarParaDocx(documento) {
           tblRowsXml += `<w:tr>${cels}</w:tr>`;
         }
 
-        if (b.titulo) {
-          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(b.titulo)}</w:t></w:r></w:p>`);
+        const titQuadro = obterTituloCompletoComNumeracao(b);
+        if (titQuadro) {
+          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titQuadro)}</w:t></w:r></w:p>`);
         }
 
         bodyXmlParts.push(`<w:tbl>
@@ -483,8 +484,9 @@ export async function exportarParaDocx(documento) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(b.fonte)}</w:t></w:r></w:p>`);
         }
       } else if (b.tipo === 'figura') {
-        if (b.titulo) {
-          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(b.titulo)}</w:t></w:r></w:p>`);
+        const titFig = obterTituloCompletoComNumeracao(b);
+        if (titFig) {
+          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titFig)}</w:t></w:r></w:p>`);
         }
         bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="64748B"/></w:rPr><w:t>[Ilustração / Grid de Imagens - Layout ${escaparXml(b.layout || '1')}]</w:t></w:r></w:p>`);
         if (b.legenda_geral) {
@@ -494,8 +496,9 @@ export async function exportarParaDocx(documento) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(b.fonte)}</w:t></w:r></w:p>`);
         }
       } else if (b.tipo === 'mapa') {
-        if (b.titulo) {
-          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(b.titulo)}</w:t></w:r></w:p>`);
+        const titMapa = obterTituloCompletoComNumeracao(b);
+        if (titMapa) {
+          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titMapa)}</w:t></w:r></w:p>`);
         }
         bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="64748B"/></w:rPr><w:t>[Mapa Territorial - Escala: ${escaparXml(b.escala || '1:10.000')}${b.orientacao_norte ? ' | Norte Verdadeiro' : ''}]</w:t></w:r></w:p>`);
         if (b.legenda_cartografica) {
@@ -520,8 +523,9 @@ export async function exportarParaDocx(documento) {
           tblRowsXml += `<w:tr>${cels}</w:tr>`;
         }
 
-        if (b.titulo) {
-          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(b.titulo)}</w:t></w:r></w:p>`);
+        const titQuadro = obterTituloCompletoComNumeracao(b);
+        if (titQuadro) {
+          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titQuadro)}</w:t></w:r></w:p>`);
         }
 
         bodyXmlParts.push(`<w:tbl>

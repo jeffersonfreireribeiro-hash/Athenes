@@ -543,6 +543,8 @@ export class EstudoArtigosView {
     this.container.innerHTML = '';
 
     if (this.artigoAberto) {
+      const headerAcoes = document.getElementById('athHeaderAcoesZotero');
+      if (headerAcoes) headerAcoes.innerHTML = '';
       this.alternarModoDashboardFull(true);
       this.renderizarEstudioPdfFullScreen(this.artigoAberto, scrollSalvo);
     } else {
@@ -563,33 +565,40 @@ export class EstudoArtigosView {
       ? `Zotero Conectado (${this.zoteroClient.userId ? '#' + this.zoteroClient.userId : 'API Ativa'})`
       : 'Configurar Chave Zotero (API Key)';
 
+    const htmlBotoesAcao = `
+      <button type="button" class="ath-btn ${conectado ? 'ath-btn-zotero-ok' : ''}" id="athBtnConfigurarChaveZotero" title="Inserir sua API Key e User ID do Zotero">
+        <span class="ath-dot-conexao ${conectado ? 'on' : ''}"></span>
+        ${svgIcone('zotero', 14)}
+        <span>${escapeHtml(labelZotero)}</span>
+      </button>
+
+      <button type="button" class="ath-btn" id="athBtnSincronizarZoteroHub" title="Buscar e sincronizar artigos da sua biblioteca Zotero">
+        ${svgIcone('zotero', 15)} <span>Sincronizar Biblioteca</span>
+      </button>
+
+      <label class="ath-btn" style="cursor:pointer;" title="Importar referências de arquivo .bib do Zotero">
+        ${svgIcone('documento', 14)} <span>Importar .bib</span>
+        <input type="file" accept=".bib,.txt" id="athInputImportarBibEstudo" style="display:none;">
+      </label>
+
+      <button type="button" class="ath-btn ath-btn-primary" id="athBtnNovoArtigoDrive">
+        ${svgIcone('mais', 14)} <span>Vincular Artigo & PDF</span>
+      </button>
+    `;
+
+    const containerHeaderAcoes = document.getElementById('athHeaderAcoesZotero');
+    if (containerHeaderAcoes) {
+      containerHeaderAcoes.innerHTML = htmlBotoesAcao;
+    }
+
     wrap.innerHTML = `
       <div class="ath-estudo-barra-topo">
-        <div class="ath-busca-box" style="flex:1; max-width:420px;">
+        <div class="ath-busca-box" style="flex:1; max-width:540px;">
           ${svgIcone('busca', 16)}
           <input type="text" class="ath-input" id="athEstudoBuscaInput" value="${escapeHtml(this.filtroBusca)}" placeholder="Buscar artigo por título, autor, tag Zotero ou citação marcada...">
         </div>
 
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <button type="button" class="ath-btn ${conectado ? 'ath-btn-zotero-ok' : ''}" id="athBtnConfigurarChaveZotero" title="Inserir sua API Key e User ID do Zotero">
-            <span class="ath-dot-conexao ${conectado ? 'on' : ''}"></span>
-            ${svgIcone('zotero', 14)}
-            <span>${escapeHtml(labelZotero)}</span>
-          </button>
-
-          <button type="button" class="ath-btn" id="athBtnSincronizarZoteroHub" title="Buscar e sincronizar artigos da sua biblioteca Zotero">
-            ${svgIcone('zotero', 15)} <span>Sincronizar Biblioteca</span>
-          </button>
-
-          <label class="ath-btn" style="cursor:pointer;" title="Importar referências de arquivo .bib do Zotero">
-            ${svgIcone('documento', 14)} <span>Importar .bib</span>
-            <input type="file" accept=".bib,.txt" id="athInputImportarBibEstudo" style="display:none;">
-          </label>
-
-          <button type="button" class="ath-btn ath-btn-primary" id="athBtnNovoArtigoDrive">
-            ${svgIcone('mais', 14)} <span>Vincular Artigo & PDF</span>
-          </button>
-        </div>
+        ${!containerHeaderAcoes ? `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${htmlBotoesAcao}</div>` : ''}
       </div>
 
       <div class="ath-artigos-zotero-grid" id="athArtigosZoteroGrid"></div>
@@ -598,20 +607,22 @@ export class EstudoArtigosView {
     this.container.appendChild(wrap);
 
     const inputBusca = wrap.querySelector('#athEstudoBuscaInput');
-    inputBusca.addEventListener('input', () => {
+    inputBusca?.addEventListener('input', () => {
       this.filtroBusca = inputBusca.value.trim().toLowerCase();
       this.atualizarGridCatalogo();
     });
 
-    wrap.querySelector('#athBtnConfigurarChaveZotero').addEventListener('click', () => {
+    const escopoBotoes = containerHeaderAcoes || wrap;
+
+    escopoBotoes.querySelector('#athBtnConfigurarChaveZotero')?.addEventListener('click', () => {
       this.abrirModalCredenciaisZotero();
     });
 
-    wrap.querySelector('#athBtnSincronizarZoteroHub').addEventListener('click', () => {
+    escopoBotoes.querySelector('#athBtnSincronizarZoteroHub')?.addEventListener('click', () => {
       this.sincronizarComZoteroApi();
     });
 
-    wrap.querySelector('#athInputImportarBibEstudo').addEventListener('change', e => {
+    escopoBotoes.querySelector('#athInputImportarBibEstudo')?.addEventListener('change', e => {
       const arq = e.target.files?.[0];
       if (!arq) return;
       const reader = new FileReader();
@@ -630,7 +641,7 @@ export class EstudoArtigosView {
       reader.readAsText(arq);
     });
 
-    wrap.querySelector('#athBtnNovoArtigoDrive').addEventListener('click', () => {
+    escopoBotoes.querySelector('#athBtnNovoArtigoDrive')?.addEventListener('click', () => {
       this.abrirModalVincularArtigo();
     });
 

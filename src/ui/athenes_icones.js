@@ -100,7 +100,9 @@ export const ICONES = Object.freeze({
   drive: '<polygon points="12 2 19 14 15.5 20 8.5 8 12 2"/><polygon points="2 14 8.5 2 12 8 5.5 20 2 14"/><polygon points="5.5 20 19 20 22 14 8.5 14 5.5 20"/>',
   sugestao: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M9 10h6M9 14h4"/>',
   usuarios: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-  cadeado: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
+  cadeado: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  google: '<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm3.9 10.8h-3.9v-2.2h6.1a5.6 5.6 0 0 1 .1 1 5.9 5.9 0 0 1-6.2 6 5.8 5.8 0 1 1 0-11.6 5.5 5.5 0 0 1 3.9 1.5l-1.6 1.6a3.5 3.5 0 0 0-2.3-.9 3.6 3.6 0 1 0 0 7.2 3.4 3.4 0 0 0 3.5-2.6h-3.5v-2z"/>',
+  pasta: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'
 });
 
 export function svgIcone(nome, tamanho = 16, classe = '') {

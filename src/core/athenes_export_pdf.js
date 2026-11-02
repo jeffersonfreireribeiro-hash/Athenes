@@ -8,7 +8,7 @@
 import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
-import { gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento } from './athenes_documento.js';
+import { gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento, obterTituloCompletoComNumeracao } from './athenes_documento.js';
 
 export function escaparHtml(texto) {
   if (texto === undefined || texto === null) return '';
@@ -113,9 +113,13 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
     case 'figura': {
       const estLegenda = estilosMap.legenda || estilosMap.corpo;
       const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
-      const itens = Array.isArray(bloco.itens) ? bloco.itens : [{ url: bloco.src || '' }];
       const layout = bloco.layout || '1';
+      const qtdSlots = (layout === '2_lado' || layout === '2_empilhado') ? 2
+        : (layout === '3_linha' || layout === '3_misto') ? 3
+        : (layout === '4_grade') ? 4
+        : (layout === '6_grade') ? 6 : 1;
       const gridCols = layout === '2_lado' || layout === '4_grade' ? 2 : (layout === '3_linha' || layout === '6_grade' ? 3 : 1);
+      const itens = (Array.isArray(bloco.itens) ? bloco.itens : [{ url: bloco.src || '' }]).slice(0, qtdSlots);
       
       const itensHtml = itens.map((it, idx) => {
         const sub = it.legenda_sub ? '<figcaption style="font-size:9pt; color:#64748B; font-style:italic;">' + escaparHtml(it.legenda_sub) + '</figcaption>' : '';
@@ -125,8 +129,10 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
         '</div>';
       }).join('\n');
 
+      const titFig = obterTituloCompletoComNumeracao(bloco);
+
       return '<figure class="ath-bloco ath-figura-composta" style="margin:12px 0; break-inside:avoid;" data-id="' + bloco.id + '">' +
-        (bloco.titulo ? '<div class="ath-legenda" style="' + estiloParaCss(estLegenda) + ' font-weight:800; margin-bottom:6px;">' + bloco.titulo + '</div>' : '') +
+        (titFig ? '<div class="ath-legenda" style="' + estiloParaCss(estLegenda) + ' font-weight:800; margin-bottom:6px;">' + titFig + '</div>' : '') +
         '<div style="display:grid; grid-template-columns:repeat(' + gridCols + ', 1fr); gap:8px; padding:6px; background:#F8FAFC; border-radius:6px;">' +
           itensHtml +
         '</div>' +
@@ -138,8 +144,9 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
     case 'mapa': {
       const estLegenda = estilosMap.legenda || estilosMap.corpo;
       const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
+      const titMapa = obterTituloCompletoComNumeracao(bloco);
       return '<figure class="ath-bloco ath-mapa-wrap" style="margin:12px 0; break-inside:avoid;" data-id="' + bloco.id + '">' +
-        (bloco.titulo ? '<div class="ath-legenda" style="' + estiloParaCss(estLegenda) + ' font-weight:800; margin-bottom:6px;">' + bloco.titulo + '</div>' : '') +
+        (titMapa ? '<div class="ath-legenda" style="' + estiloParaCss(estLegenda) + ' font-weight:800; margin-bottom:6px;">' + titMapa + '</div>' : '') +
         '<div style="position:relative; width:100%; height:80mm; background:#F1F5F9; border:1px solid #CBD5E1; border-radius:6px; display:grid; place-items:center;">' +
           '<span style="font-weight:700; color:#475569;">Área do Mapa Territorial</span>' +
           (bloco.orientacao_norte ? '<div style="position:absolute; top:8px; right:10px; font-weight:900; color:#314F79;">N ↑</div>' : '') +
@@ -163,7 +170,7 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       }).join('\n');
 
       return `<div class="ath-bloco ath-tabela-wrap" style="margin:12px 0; break-inside:avoid;" data-id="${bloco.id}">
-        ${bloco.titulo ? `<div class="ath-legenda" style="${estiloParaCss(estLegenda)} text-align:left; margin-bottom:4px;">${bloco.titulo}</div>` : ''}
+        ${obterTituloCompletoComNumeracao(bloco) ? `<div class="ath-legenda" style="${estiloParaCss(estLegenda)} text-align:left; margin-bottom:4px;">${obterTituloCompletoComNumeracao(bloco)}</div>` : ''}
         <table class="ath-tabela">
           ${bloco.com_cabecalho !== false ? `<thead><tr>${cabHtml}</tr></thead>` : ''}
           <tbody>${linhasHtml}</tbody>

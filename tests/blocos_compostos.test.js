@@ -10,8 +10,12 @@ import {
   gerarListaMapas,
   gerarListaTabelas,
   gerarListaQuadros,
-  resolverReferenciasCruzadas
+  resolverReferenciasCruzadas,
+  removerPrefixoNumeracaoTitulo,
+  obterTextoPuroTitulo,
+  obterTituloCompletoComNumeracao
 } from '../src/core/athenes_documento.js';
+import { classificarTipoRef } from '../src/ui/athenes_painel_zotero.js';
 
 describe('Athenes — Blocos Compostos, Numeração Separada e Referências Cruzadas', () => {
   it('cria blocos compostos próprios para figura, mapa, tabela e quadro', () => {
@@ -103,5 +107,41 @@ describe('Athenes — Blocos Compostos, Numeração Separada e Referências Cruz
     assert.match(textoResolvido, /Tabela \d+/);
     assert.match(textoResolvido, /Quadro 1/);
     assert.doesNotMatch(textoResolvido, /\[ref:/);
+  });
+
+  it('impede duplicações de numeração e trata o prefixo como intrínseco à posição', () => {
+    // Casos reais de digitação ou concatenação acidental
+    const textoRepetido1 = 'Figura 1 — Figura 1asdasdasd';
+    const textoRepetido2 = 'Figura 1 — Figura 1 — Descrição da Fachada';
+    const textoRepetido3 = 'Tabela 2: Tabela 2 — Resultados';
+    
+    assert.equal(removerPrefixoNumeracaoTitulo(textoRepetido1), 'asdasdasd');
+    assert.equal(removerPrefixoNumeracaoTitulo(textoRepetido2), 'Descrição da Fachada');
+    assert.equal(removerPrefixoNumeracaoTitulo(textoRepetido3), 'Resultados');
+
+    const blocoFig = {
+      tipo: 'figura',
+      subtipo: 'figura',
+      numero_sequencial: 3,
+      titulo: 'Figura 3 — Detalhe da esquadria'
+    };
+    assert.equal(obterTextoPuroTitulo(blocoFig), 'Detalhe da esquadria');
+    assert.equal(obterTituloCompletoComNumeracao(blocoFig), 'Figura 3 — Detalhe da esquadria');
+
+    // Ao mudar o subtipo para gráfico, atualiza o prefixo preservando o texto puro
+    blocoFig.subtipo = 'grafico';
+    assert.equal(obterTituloCompletoComNumeracao(blocoFig), 'Gráfico 3 — Detalhe da esquadria');
+  });
+
+  it('classifica corretamente os tipos de referência para os filtros de citação', () => {
+    const art = { itemTypeZotero: 'journalArticle', titulo: 'Acústica Arquitetônica', ano: 2024 };
+    const livro = { itemTypeZotero: 'book', titulo: 'Manual de Conforto Térmico', ano: 2021 };
+    const tese = { itemTypeZotero: 'thesis', titulo: 'Eficiência Energética em Edifícios', ano: 2023 };
+    const conf = { itemTypeZotero: 'conferencePaper', titulo: 'Anais do Encontro de Tecnologia', ano: 2025 };
+
+    assert.equal(classificarTipoRef(art).id, 'artigo');
+    assert.equal(classificarTipoRef(livro).id, 'livro');
+    assert.equal(classificarTipoRef(tese).id, 'tese');
+    assert.equal(classificarTipoRef(conf).id, 'conferencia');
   });
 });

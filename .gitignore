@@ -5,3 +5,13 @@ Thumbs.db
 *.log
 tests/amostra_artigo_athenes.docx
 tests/amostra_artigo_athenes.html
+
+# Android build artifacts
+android/.gradle/
+android/build/
+android/*/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/*/*.iml
+

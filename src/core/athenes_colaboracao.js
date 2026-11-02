@@ -785,6 +785,122 @@ export async function baixarArquivoDoGoogleDrive(fileId, accessToken, fetchImpl 
   return await resp.json();
 }
 
+/**
+ * Consulta informacoes do perfil do usuario autenticado no Google (Gmail, Nome, Foto)
+ */
+export async function obterInfoUsuarioGoogle(accessToken, fetchImpl = globalThis.fetch) {
+  if (!accessToken) throw new Error('Token de acesso obrigatorio.');
+  const resp = await fetchImpl('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { 'Authorization': `Bearer ${accessToken}` }
+  });
+  if (!resp.ok) {
+    throw new Error(`Erro ao consultar perfil Google (${resp.status}).`);
+  }
+  return await resp.json();
+}
+
+/**
+ * Localiza ou cria a pasta raiz 'Athenes' e subpastas ('Documentos', 'Zotero_Notas', 'Relatorios_PDF')
+ * no Google Drive do usuario para sincronizacao entre Web e App.
+ */
+export async function obterOuCriarEstruturaPastasAthenes(accessToken, pastaRaizId = null, fetchImpl = globalThis.fetch) {
+  if (!accessToken) throw new Error('Token de acesso obrigatorio.');
+
+  const headers = {
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  };
+
+  const buscarPasta = async (nome, parentId = null) => {
+    let q = `trashed = false and mimeType = 'application/vnd.google-apps.folder' and name = '${nome}'`;
+    if (parentId) q += ` and '${parentId}' in parents`;
+    const resp = await fetchImpl(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`, { headers });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.files?.[0]?.id || null;
+  };
+
+  const criarPasta = async (nome, parentId = null) => {
+    const body = {
+      name: nome,
+      mimeType: 'application/vnd.google-apps.folder',
+      ...(parentId ? { parents: [parentId] } : {})
+    };
+    const resp = await fetchImpl('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) throw new Error(`Falha ao criar pasta ${nome} no Drive`);
+    const data = await resp.json();
+    return data.id;
+  };
+
+  let raizId = pastaRaizId;
+  if (!raizId) {
+    raizId = await buscarPasta('Athenes') || await criarPasta('Athenes');
+  }
+
+  const documentosId = await buscarPasta('Documentos', raizId) || await criarPasta('Documentos', raizId);
+  const zoteroId = await buscarPasta('Zotero_Notas', raizId) || await criarPasta('Zotero_Notas', raizId);
+  const relatoriosId = await buscarPasta('Relatorios_PDF', raizId) || await criarPasta('Relatorios_PDF', raizId);
+
+  const estrutura = {
+    pastaRaizId: raizId,
+    pastaDocumentosId: documentosId,
+    pastaZoteroId: zoteroId,
+    pastaRelatoriosId: relatoriosId
+  };
+
+  const cfgAtual = obterConfigGoogleDrive();
+  salvarConfigGoogleDrive({ ...cfgAtual, ...estrutura, pastaId: documentosId });
+
+  return estrutura;
+}
+
+/**
+ * Salva notas de fichamento e sinteses do Zotero na pasta dedicada do Google Drive.
+ */
+export async function salvarNotaZoteroNoGoogleDrive({
+  chaveOuId,
+  titulo,
+  conteudo,
+  accessToken,
+  pastaZoteroId = null
+}, fetchImpl = globalThis.fetch) {
+  const cfg = obterConfigGoogleDrive();
+  const destino = pastaZoteroId || cfg.pastaZoteroId || cfg.pastaId;
+  const nome = `Zotero_${(titulo || chaveOuId || 'Nota').replace(/[^\w\d_-]+/g, '_')}.json`;
+  return await salvarArquivoNoGoogleDrive({
+    nomeArquivo: nome,
+    conteudoBlobOuTexto: typeof conteudo === 'object' ? JSON.stringify(conteudo, null, 2) : String(conteudo),
+    mimeType: 'application/json',
+    accessToken,
+    pastaId: destino
+  }, fetchImpl);
+}
+
+/**
+ * Salva relatorios exportados em PDF na pasta 'Relatorios_PDF' do Google Drive.
+ */
+export async function salvarRelatorioPdfNoGoogleDrive({
+  nomeArquivo,
+  blobPdf,
+  accessToken,
+  pastaRelatoriosId = null
+}, fetchImpl = globalThis.fetch) {
+  const cfg = obterConfigGoogleDrive();
+  const destino = pastaRelatoriosId || cfg.pastaRelatoriosId || cfg.pastaId;
+  const nome = (nomeArquivo || 'Relatorio_Athenes.pdf').replace(/[^\w\d_.-]+/g, '_');
+  return await salvarArquivoNoGoogleDrive({
+    nomeArquivo: nome,
+    conteudoBlobOuTexto: blobPdf,
+    mimeType: 'application/pdf',
+    accessToken,
+    pastaId: destino
+  }, fetchImpl);
+}
+
 function carregarScriptExterno(src) {
   return new Promise((resolve, reject) => {
     const existente = document.querySelector(`script[src="${src}"]`);
