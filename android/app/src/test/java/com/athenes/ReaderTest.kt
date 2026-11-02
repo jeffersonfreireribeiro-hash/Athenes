@@ -55,18 +55,18 @@ class ReaderTest {
 
     @Test
     fun testAlternarPaineisIndependentemente() {
-        assertTrue(viewModel.painelEsquerdoAberto.value)
-        assertTrue(viewModel.painelDireitoAberto.value)
+        assertFalse(viewModel.painelEsquerdoAberto.value)
+        assertFalse(viewModel.painelDireitoAberto.value)
 
         viewModel.alternarPainelEsquerdo()
-        assertFalse("Painel esquerdo deve fechar", viewModel.painelEsquerdoAberto.value)
-        assertTrue("Painel direito deve continuar aberto", viewModel.painelDireitoAberto.value)
+        assertTrue("Painel esquerdo deve abrir", viewModel.painelEsquerdoAberto.value)
+        assertFalse("Painel direito deve continuar fechado", viewModel.painelDireitoAberto.value)
 
         viewModel.alternarPainelDireito()
-        assertFalse("Ambos fechados", viewModel.painelDireitoAberto.value)
+        assertTrue("Ambos abertos", viewModel.painelDireitoAberto.value)
 
         viewModel.alternarPainelEsquerdo()
-        assertTrue("Painel esquerdo reaberto", viewModel.painelEsquerdoAberto.value)
+        assertFalse("Painel esquerdo fechado", viewModel.painelEsquerdoAberto.value)
     }
 
     @Test
