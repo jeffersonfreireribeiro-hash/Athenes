@@ -93,4 +93,28 @@ test('Athenes — Sistema de Login, Sessão e Continuidade Conectada', async (t)
     assert.equal(res.sucesso, false);
     assert.equal(res.pastaRaizId, null);
   });
+
+  await t.test('7. Encerrar sessão limpa autenticadoGoogle, fotos, email e accessToken do Drive', () => {
+    salvarPerfilColaborador({
+      nome: 'Pesquisador Teste',
+      email: 'teste@exemplo.com',
+      foto: 'https://lh3.googleusercontent.com/foto.png',
+      autenticadoGoogle: true,
+      conectado: true,
+      continuarConectado: true
+    });
+    mockStorage.local.set('athenes_gdrive_config', JSON.stringify({ clientId: 'id123', accessToken: 'token123' }));
+
+    encerrarSessao();
+
+    const p = obterPerfilColaborador();
+    assert.equal(p.autenticadoGoogle, false);
+    assert.equal(p.conectado, false);
+    assert.equal(p.continuarConectado, false);
+    assert.equal(p.foto, undefined);
+    assert.equal(p.email, undefined);
+
+    const driveCfg = JSON.parse(mockStorage.local.get('athenes_gdrive_config') || '{}');
+    assert.equal(driveCfg.accessToken, '');
+  });
 });

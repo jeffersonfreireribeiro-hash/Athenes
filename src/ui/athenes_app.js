@@ -86,6 +86,7 @@ export class AthenesApp {
   }
 
   navegarParaLogin(docIdLink = null) {
+    document.querySelectorAll('.ath-modal-backdrop').forEach(m => m.remove());
     this.tela = 'login';
     this.container.innerHTML = '<div id="athAppLogin"></div>';
     const loginBox = this.container.querySelector('#athAppLogin');
@@ -103,6 +104,17 @@ export class AthenesApp {
 
   fazerLogout() {
     encerrarSessao();
+    document.querySelectorAll('.ath-modal-backdrop').forEach(m => m.remove());
+    try {
+      if (window.history && window.history.replaceState) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('tela');
+        url.searchParams.delete('editor');
+        url.searchParams.delete('doc');
+        url.searchParams.delete('login');
+        window.history.replaceState(null, '', url.pathname);
+      }
+    } catch (_) {}
     this.navegarParaLogin();
   }
 

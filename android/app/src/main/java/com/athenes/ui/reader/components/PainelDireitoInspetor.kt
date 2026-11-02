@@ -130,10 +130,10 @@ private fun ItemAbaInspetor(
         onClick = onClick,
         color = if (selecionada) AthenesPrimary else Color.Transparent,
         shape = RoundedCornerShape(6.dp),
-        modifier = modifier.padding(horizontal = 2.dp)
+        modifier = modifier.padding(horizontal = 1.5.dp)
     ) {
         Row(
-            modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+            modifier = Modifier.padding(vertical = 7.dp, horizontal = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
@@ -141,17 +141,18 @@ private fun ItemAbaInspetor(
                 imageVector = icone,
                 contentDescription = null,
                 tint = if (selecionada) Color.White else AthenesTextDark,
-                modifier = Modifier.size(15.dp)
+                modifier = Modifier.size(13.dp)
             )
-            Spacer(modifier = Modifier.width(5.dp))
+            Spacer(modifier = Modifier.width(3.dp))
             Text(
                 text = titulo,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = if (selecionada) FontWeight.Bold else FontWeight.SemiBold,
                     color = if (selecionada) Color.White else AthenesTextDark,
-                    fontSize = 11.5.sp
+                    fontSize = 10.sp
                 ),
                 maxLines = 1,
+                softWrap = false,
                 overflow = TextOverflow.Ellipsis
             )
         }
@@ -572,6 +573,40 @@ private fun ConteudoAbaZoteroDrive(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
+                    // Botão: Vincular a uma Referência já existente do Zotero (Fiel ao Web)
+                    Button(
+                        onClick = {
+                            Toast.makeText(context, "Abrindo catálogo de referências do Zotero...", Toast.LENGTH_SHORT).show()
+                        },
+                        shape = RoundedCornerShape(6.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AthenesPrimary,
+                            contentColor = Color.White
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.MenuBook,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Vincular a uma Referência do Zotero",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     CampoFormulario(
                         rotulo = "Sua Zotero API Key",
                         valor = apiKey,
@@ -640,30 +675,51 @@ private fun ConteudoAbaZoteroDrive(
                         onClick = {
                             Toast.makeText(context, "Seletor de PDF ativado", Toast.LENGTH_SHORT).show()
                         },
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(6.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AthenesPrimary,
                             contentColor = Color.White
                         ),
-                        modifier = Modifier.fillMaxWidth().height(36.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(36.dp)
                     ) {
                         Icon(imageVector = Icons.Rounded.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "Selecionar Arquivo PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Selecionar Arquivo PDF (Drive / Local)",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Status Drive OK
+                    // Botão Buscar no Drive + Status Drive OK
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Rounded.CloudDone, contentDescription = null, tint = AthenesPrimary, modifier = Modifier.size(16.dp))
+                        OutlinedButton(
+                            onClick = {
+                                Toast.makeText(context, "Buscando arquivo no Google Drive...", Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(6.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = AthenesPrimary
+                            )
+                        ) {
+                            Icon(imageVector = Icons.Rounded.CloudDone, contentDescription = null, tint = AthenesPrimary, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "Google Drive", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AthenesTextDark)
+                            Text(text = "Buscar PDF no Drive", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
                         }
 
                         Surface(
@@ -730,8 +786,11 @@ private fun ConteudoAbaZoteroDrive(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Sincronizar Agora (Zotero + Drive + Supabase)",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

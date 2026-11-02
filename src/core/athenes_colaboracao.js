@@ -106,7 +106,13 @@ export function encerrarSessao() {
     const p = obterPerfilColaborador();
     p.conectado = false;
     p.continuarConectado = false;
+    p.autenticadoGoogle = false;
+    delete p.foto;
+    delete p.email;
     salvarPerfilColaborador(p);
+
+    const cfg = obterConfigGoogleDrive();
+    salvarConfigGoogleDrive({ ...cfg, accessToken: '' });
   } catch (_) {}
 }
 

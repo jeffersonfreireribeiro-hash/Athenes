@@ -150,6 +150,9 @@ export class DashboardView {
             </span>
             <span class="ath-dash-user-edit">${svgIcone('lapis', 12)}</span>
           </button>
+          <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="athBtnLogoutDash" title="Encerrar sessão e mudar de conta" style="height:32px; padding:0 10px; font-size:11.5px; font-weight:750; color:#DC2626; display:inline-flex; align-items:center; gap:4px; border:1px solid #FECACA; background:#FEF2F2;">
+            Sair
+          </button>
         </div>
       </div>
 
@@ -214,8 +217,13 @@ export class DashboardView {
       });
     });
 
-    root.querySelector('#athBtnPerfilLoginDash').addEventListener('click', () => {
+    root.querySelector('#athBtnPerfilLoginDash')?.addEventListener('click', () => {
       this.abrirModalIdentificacaoLogin();
+    });
+
+    root.querySelector('#athBtnLogoutDash')?.addEventListener('click', () => {
+      encerrarSessao();
+      this.onLogout();
     });
 
     root.querySelector('#athBtnNovoDocModal').addEventListener('click', () => this.abrirModalNovoDoc());
@@ -291,7 +299,7 @@ export class DashboardView {
                   <span style="font-size:11px; color:#15803D;">${p.email} · Conta Google Conectada</span>
                 </div>
               </div>
-              <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnModalDesconectarGoogle" style="font-size:11px; padding:2px 8px;">Desconectar</button>
+              <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnModalDesconectarGoogle" style="font-size:11px; padding:3px 10px; color:#DC2626; font-weight:750; border:1px solid #FCA5A5; background:#FFF1F2; cursor:pointer;" title="Desconectar e voltar ao login">Desconectar / Sair</button>
             </div>
           ` : `
             <button type="button" class="glx-btn glx-btn-primary" id="athBtnModalLoginGoogle" style="width:100%; height:38px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:700; margin-bottom:14px; background:#FFFFFF; color:#1F2937; border:1px solid #CBD5E1; box-shadow:0 1px 3px rgba(0,0,0,0.08); font-size:12.5px; border-radius:8px; cursor:pointer;">
@@ -363,9 +371,14 @@ export class DashboardView {
             </button>
           </div>
         </div>
-        <div class="ath-modal-foot">
-          <button type="button" class="ath-btn" id="athBtnCancelarLogin">Cancelar</button>
-          <button type="button" class="ath-btn ath-btn-primary" id="athBtnSalvarLogin">Salvar Identificação & Chaves</button>
+        <div class="ath-modal-foot" style="display:flex; justify-content:space-between; align-items:center;">
+          <button type="button" class="glx-btn glx-btn-soft" id="athBtnModalSairConta" style="color:#DC2626; font-weight:750; font-size:12px; height:34px; padding:0 12px; display:inline-flex; align-items:center; gap:6px; border:1px solid #FCA5A5; background:#FEF2F2; cursor:pointer;" title="Encerrar sessão e trocar de conta">
+            ⏻ Sair da Conta / Mudar Usuário
+          </button>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="ath-btn" id="athBtnCancelarLogin">Cancelar</button>
+            <button type="button" class="ath-btn ath-btn-primary" id="athBtnSalvarLogin">Salvar Identificação & Chaves</button>
+          </div>
         </div>
       </div>
     `;
@@ -422,12 +435,15 @@ export class DashboardView {
     });
 
     modal.querySelector('#athBtnModalDesconectarGoogle')?.addEventListener('click', () => {
-      p.autenticadoGoogle = false;
-      delete p.foto;
-      salvarPerfilColaborador(p);
       fechar();
-      this.abrirModalLogin();
-      this.renderizar();
+      encerrarSessao();
+      this.onLogout();
+    });
+
+    modal.querySelector('#athBtnModalSairConta')?.addEventListener('click', () => {
+      fechar();
+      encerrarSessao();
+      this.onLogout();
     });
 
     modal.querySelector('#athBtnModalSincronizarHub')?.addEventListener('click', async () => {
