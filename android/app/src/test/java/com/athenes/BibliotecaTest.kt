@@ -25,19 +25,19 @@ class BibliotecaTest {
         assertEquals(3, docs.size)
 
         val doc1 = docs[0]
-        assertTrue(doc1.titulo.contains("Acoustic Performance-Based Design"))
-        assertEquals(TipoDocumento.DOCUMENTO, doc1.tipo)
-        assertEquals(SituacaoDocumento.RASCUNHO, doc1.situacao)
-        assertEquals(EstadoNuvem.NUVEM_SUPABASE, doc1.estadoNuvem)
+        assertTrue(doc1.titulo.contains("Análise Espacial e Diretrizes"))
+        assertEquals(TipoDocumento.ARTIGO, doc1.tipo)
+        assertEquals(SituacaoDocumento.EM_REVISAO, doc1.situacao)
+        assertEquals(EstadoNuvem.LOCAL, doc1.estadoNuvem)
 
         val doc2 = docs[1]
-        assertTrue(doc2.titulo.contains("Análise Espacial e Diretrizes"))
-        assertEquals(TipoDocumento.ARTIGO, doc2.tipo)
-        assertEquals(SituacaoDocumento.EM_REVISAO, doc2.situacao)
+        assertTrue(doc2.titulo.contains("Relatório Técnico"))
+        assertEquals(TipoDocumento.RELATORIO, doc2.tipo)
 
         val doc3 = docs[2]
-        assertTrue(doc3.titulo.contains("Relatório Técnico"))
-        assertEquals(TipoDocumento.RELATORIO, doc3.tipo)
+        assertTrue(doc3.titulo.contains("Monografia"))
+        assertEquals(TipoDocumento.MONOGRAFIA, doc3.tipo)
+        assertEquals(EstadoNuvem.NUVEM_SUPABASE, doc3.estadoNuvem)
     }
 
     @Test

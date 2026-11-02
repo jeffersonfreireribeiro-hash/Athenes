@@ -33,7 +33,7 @@ fun EditorPainelCitacao(
     onFechar: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val artigos = remember { ArtigoEstudoRepository.obterArtigosIniciais() }
+    val artigos by ArtigoEstudoRepository.compartilhado.artigos.collectAsState()
     var busca by remember { mutableStateOf("") }
     val filtrados = remember(busca, artigos) {
         if (busca.isBlank()) artigos

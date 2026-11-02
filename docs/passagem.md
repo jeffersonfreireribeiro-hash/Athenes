@@ -1,4 +1,14 @@
 
+## 02/11/2026 (noite) — HUDs do tablet, figuras com imagem, exportação e acervo compartilhado no Android
+
+- **HUDs sobrepostas (tablet):** no leitor as duas gavetas abriam juntas e a barra flutuante de ferramentas ficava cortada atrás delas; agora as gavetas são mutuamente exclusivas e a barra some enquanto há gaveta aberta. No editor, gavetas e scrim começam abaixo da barra de título (voltar/estrutura/inspetor continuam clicáveis).
+- **Figuras com imagem real:** seletor de fotos do sistema, cópia reduzida para `filesDir/imagens`, exibição decodificada reduzida; persiste no JSON do documento.
+- **Acervo compartilhado:** `ArtigoEstudoRepository.compartilhado` (Home, Leitura e Citar usavam 3 instâncias).
+- **Exportação no app:** `core/export/ExportadorDocumento.kt` (DOCX OOXML com figuras embutidas e HTML paginado `@page` A4); menu ⋮ do editor: Word (seletor de arquivos) e PDF (impressão do sistema). Bug corrigido na validação: `PrintManager` exige `Activity` (crash real, achado no emulador).
+- **Testes Android:** 22 verdes (novo `ExportadorTest`; `BibliotecaTest` e `ReaderTest` atualizados ao comportamento atual).
+- **Avaliação de desempenho:** o `athenes.apk` distribuído é build debug; release exigiria outro `applicationId` e quebraria o updater. Decisão pendente (ver nota 16).
+- **Fora do escopo:** o pacote de estilo web (`athenes_pacote_estilo.js`) não foi tocado; DOCX/PDF do app usam geometria ABNT fixa.
+
 ## 02/11/2026 — Auditoria Web x APK e Redesenho do Editor Android
 
 - **Auditoria:** o editor do APK era uma casca — título, resumo e bloco de figura fixos no código, "Salvar" só ligava uma flag (nada gravado), estrutura estática, tabela/fórmula/legenda não editáveis, botões duplicados na barra (mapa/espaçamento/quebra de página abriam "divisor"), cabeçalho de ~130 dp (logo, subtítulo, seletor de tipo, pílula de modo, status) e folha inteira num único item de rolagem.

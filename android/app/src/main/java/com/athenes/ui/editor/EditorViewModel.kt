@@ -2,6 +2,10 @@ package com.athenes.ui.editor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.athenes.core.export.AlinhamentoExport
+import com.athenes.core.export.BlocoExport
+import com.athenes.core.export.DocumentoExport
+import com.athenes.core.export.TipoBlocoExport
 import com.athenes.core.model.ArtigoEstudoDetalhado
 import com.athenes.core.model.Documento
 import com.athenes.core.model.TipoDocumento
@@ -51,6 +55,7 @@ data class BlocoEditor(
     val legenda: String = "",
     val fonte: String = "",
     val formulaLatex: String = "",
+    val imagem: String = "", // nome do arquivo em filesDir/imagens (figuras)
     val colunas: Int = 12,
     val alinhamento: AlinhamentoTexto = AlinhamentoTexto.JUSTIFICADO,
     val estiloId: String = "texto",
@@ -207,6 +212,11 @@ class EditorViewModel : ViewModel() {
     fun atualizarFonteBloco(id: String, novo: String) = atualizarBloco(id) { it.copy(fonte = novo) }
     fun atualizarFormulaBloco(id: String, novo: String) = atualizarBloco(id) { it.copy(formulaLatex = novo) }
 
+    fun definirImagemBloco(id: String, nomeArquivo: String) {
+        salvarNoHistorico()
+        atualizarBloco(id) { it.copy(imagem = nomeArquivo) }
+    }
+
     fun atualizarCelulaTabela(id: String, linha: Int, coluna: Int, novo: String) = atualizarBloco(id) { b ->
         b.copy(tabelaLinhas = b.tabelaLinhas.mapIndexed { i, l ->
             if (i == linha) l.mapIndexed { j, c -> if (j == coluna) novo else c } else l
@@ -324,6 +334,30 @@ class EditorViewModel : ViewModel() {
         indiceHistorico = historico.size - 1
     }
 
+    /** Instantâneo neutro (sem Android) do documento atual para os exportadores. */
+    fun paraExportacao(): DocumentoExport = DocumentoExport(
+        titulo = _titulo.value,
+        subtitulo = _subtitulo.value,
+        autores = _autores.value,
+        resumo = _resumo.value,
+        blocos = _blocos.value.map { b ->
+            BlocoExport(
+                tipo = TipoBlocoExport.valueOf(b.tipo.name),
+                titulo = b.titulo, texto = b.texto, legenda = b.legenda, fonte = b.fonte,
+                formula = b.formulaLatex, imagem = b.imagem,
+                alinhamento = AlinhamentoExport.valueOf(b.alinhamento.name),
+                tabela = b.tabelaLinhas
+            )
+        }
+    )
+
+    /** Nome de arquivo seguro a partir do título, sem acentos ("Análise" -> "analise"). */
+    fun nomeBaseArquivo(): String =
+        java.text.Normalizer.normalize(_titulo.value.lowercase(), java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{M}+"), "")
+            .replace(Regex("[^a-z0-9]+"), "_").trim('_').take(48).trim('_')
+            .ifEmpty { "documento" }
+
     // ------------------------------------------------------------------
     // Persistência: um arquivo JSON por documento em filesDir
     // ------------------------------------------------------------------
@@ -377,7 +411,7 @@ class EditorViewModel : ViewModel() {
         _blocos.value.forEach { b ->
             arr.put(JSONObject().apply {
                 put("id", b.id); put("tipo", b.tipo.name); put("titulo", b.titulo); put("texto", b.texto)
-                put("legenda", b.legenda); put("fonte", b.fonte); put("formulaLatex", b.formulaLatex)
+                put("legenda", b.legenda); put("fonte", b.fonte); put("formulaLatex", b.formulaLatex); put("imagem", b.imagem)
                 put("colunas", b.colunas); put("alinhamento", b.alinhamento.name); put("estiloId", b.estiloId)
                 put("tabela", JSONArray(b.tabelaLinhas.map { JSONArray(it) }))
             })
@@ -403,7 +437,7 @@ class EditorViewModel : ViewModel() {
                     tipo = runCatching { TipoBlocoEditor.valueOf(o.optString("tipo")) }.getOrDefault(TipoBlocoEditor.PARAGRAFO),
                     titulo = o.optString("titulo"), texto = o.optString("texto"),
                     legenda = o.optString("legenda"), fonte = o.optString("fonte"),
-                    formulaLatex = o.optString("formulaLatex"), colunas = o.optInt("colunas", 12),
+                    formulaLatex = o.optString("formulaLatex"), imagem = o.optString("imagem"), colunas = o.optInt("colunas", 12),
                     alinhamento = runCatching { AlinhamentoTexto.valueOf(o.optString("alinhamento")) }.getOrDefault(AlinhamentoTexto.JUSTIFICADO),
                     estiloId = o.optString("estiloId", "texto"),
                     tabelaLinhas = if (tab == null) emptyList() else (0 until tab.length()).map { r ->

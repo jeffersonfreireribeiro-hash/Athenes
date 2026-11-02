@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 
 class BibliotecaViewModel(
     private val repository: DocumentoRepository,
-    private val artigoRepository: ArtigoEstudoRepository = ArtigoEstudoRepository()
+    private val artigoRepository: ArtigoEstudoRepository = ArtigoEstudoRepository.compartilhado
 ) : ViewModel() {
 
     // Tab 1: Escrita & Documentos

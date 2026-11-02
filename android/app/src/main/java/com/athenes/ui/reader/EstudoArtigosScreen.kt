@@ -117,13 +117,17 @@ fun EstudoArtigosScreen(
 
             // BARRA DE PÍLULA FLUTUANTE (.rm-barra-blocos)
             // Fiel ao web Athenes: [ ← ] [ 💾 ] | [ ↶ ] [ 🗑 ] | [ ☰ ] [ ✏ ] [ 🖊 ] [ ⚬—⚬ ] [ ▱ ] [ 📝 ] [ ❝ ] | ● ● ● ● ● ●
-            Box(
+            // Some enquanto uma gaveta está aberta, para não ficar cortada atrás dela.
+            AnimatedVisibility(
+                visible = !painelEsquerdoAberto && !painelDireitoAberto,
+                enter = fadeIn(),
+                exit = fadeOut(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .padding(top = 10.dp),
-                contentAlignment = Alignment.Center
+                    .padding(top = 10.dp)
             ) {
+              Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 ReaderSubBar(
                     ferramentaAtiva = ferramentaAtiva,
                     modoLinhaReta = modoLinhaReta,
@@ -139,6 +143,7 @@ fun EstudoArtigosScreen(
                     onAlternarModoLinhaReta = { viewModel.alternarModoLinhaReta() },
                     onSelecionarCor = { viewModel.definirCor(it) }
                 )
+              }
             }
 
             // Scrim Translúcido de Fundo quando qualquer aba lateral estiver aberta sobre o canvas

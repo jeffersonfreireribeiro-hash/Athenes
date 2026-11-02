@@ -37,6 +37,8 @@ fun EditorTopBar(
     onTipoAlterado: (TipoDocumento) -> Unit,
     onModoRevisaoAlterado: (String) -> Unit,
     onSalvar: () -> Unit,
+    onExportarDocx: () -> Unit,
+    onExportarPdf: () -> Unit,
     onVoltar: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -108,6 +110,10 @@ fun EditorTopBar(
                             onTipoAlterado(tipo); menuAberto = false
                         }
                     }
+                    HorizontalDivider()
+                    CabecalhoMenu("Exportar")
+                    ItemMenu("Word (.docx)", Icons.Rounded.Description, false) { onExportarDocx(); menuAberto = false }
+                    ItemMenu("PDF (imprimir)", Icons.Rounded.PictureAsPdf, false) { onExportarPdf(); menuAberto = false }
                     HorizontalDivider()
                     ItemMenu("Salvar agora", Icons.Rounded.Save, false) { onSalvar(); menuAberto = false }
                 }

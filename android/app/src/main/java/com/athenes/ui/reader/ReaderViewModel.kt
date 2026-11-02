@@ -16,7 +16,7 @@ data class TextoSelecionadoPopup(
 )
 
 class ReaderViewModel(
-    private val repository: ArtigoEstudoRepository = ArtigoEstudoRepository()
+    private val repository: ArtigoEstudoRepository = ArtigoEstudoRepository.compartilhado
 ) : ViewModel() {
 
     val artigos = repository.artigos
@@ -131,12 +131,15 @@ class ReaderViewModel(
         _corAtiva.value = corHex
     }
 
+    // As gavetas são mutuamente exclusivas: abrir uma fecha a outra (evita HUDs empilhadas).
     fun alternarPainelEsquerdo() {
         _painelEsquerdoAberto.value = !_painelEsquerdoAberto.value
+        if (_painelEsquerdoAberto.value) _painelDireitoAberto.value = false
     }
 
     fun alternarPainelDireito() {
         _painelDireitoAberto.value = !_painelDireitoAberto.value
+        if (_painelDireitoAberto.value) _painelEsquerdoAberto.value = false
     }
 
     fun selecionarAbaDireita(aba: AbaInspetorDireito) {

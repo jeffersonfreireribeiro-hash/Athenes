@@ -119,6 +119,9 @@ class ArtigoEstudoRepository {
     }
 
     companion object {
+        /** Instância única do processo: Home, Leitura e Citar do editor enxergam o mesmo acervo e as mesmas anotações. */
+        val compartilhado: ArtigoEstudoRepository by lazy { ArtigoEstudoRepository() }
+
         fun obterArtigosIniciais(): List<ArtigoEstudoDetalhado> {
             val paginasArtigo1 = (1..33).map { num ->
                 PaginaPdfInfo(

@@ -1,6 +1,9 @@
 package com.athenes.ui.editor
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -47,7 +50,15 @@ import com.athenes.ui.editor.components.EditorPainelCitacao
 import com.athenes.ui.editor.components.EditorTopBar
 import com.athenes.ui.theme.AthenesPrimary
 import com.athenes.ui.theme.AthenesTextMuted
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import android.widget.Toast
+import com.athenes.core.data.ImagemRepositorio
+import com.athenes.core.export.ExportadorDocumento
+import com.athenes.core.export.ResolvedorImagem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val PalcoCor = Color(0xFFEEF2F6)
 private val TextoCor = Color(0xFF1E293B)
@@ -81,6 +92,58 @@ fun EditorDocumentoScreen(
     val abaEsquerdaAtiva by viewModel.abaEsquerdaAtiva.collectAsState()
     val painelInspetorAberto by viewModel.painelInspetorAberto.collectAsState()
     val painelCitacaoAberto by viewModel.painelCitacaoAberto.collectAsState()
+
+    // Seletor de fotos do sistema (sem permissão de armazenamento); a imagem é copiada e reduzida.
+    var alvoImagem by remember { mutableStateOf<String?>(null) }
+    val seletorImagem = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val alvo = alvoImagem
+        alvoImagem = null
+        if (uri != null && alvo != null) {
+            scope.launch {
+                val nome = withContext(Dispatchers.IO) { ImagemRepositorio.importar(context, uri) }
+                if (nome != null) viewModel.definirImagemBloco(alvo, nome)
+            }
+        }
+    }
+    val escolherImagem: (String) -> Unit = { id ->
+        alvoImagem = id
+        seletorImagem.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+
+    // Exportação: DOCX pelo seletor de arquivos do sistema; PDF pela impressão do sistema.
+    val resolvedorImagem = remember { ResolvedorImagem { nome -> ImagemRepositorio.paraExportacao(context, nome) } }
+    val criarDocx = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val bytes = ExportadorDocumento.gerarDocx(viewModel.paraExportacao(), resolvedorImagem)
+                        context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: error("sem saída")
+                    }.isSuccess
+                }
+                val msg = if (ok) "Documento Word exportado." else "Não foi possível exportar o Word."
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    val exportarDocx: () -> Unit = {
+        viewModel.salvarDocumento()
+        criarDocx.launch(viewModel.nomeBaseArquivo() + ".docx")
+    }
+    val exportarPdf: () -> Unit = {
+        viewModel.salvarDocumento()
+        scope.launch {
+            val html = withContext(Dispatchers.IO) { ExportadorDocumento.gerarHtml(viewModel.paraExportacao(), resolvedorImagem) }
+            val activity = ExportarPdf.activityDe(context)
+            if (activity != null) {
+                ExportarPdf.imprimir(activity, html, viewModel.nomeBaseArquivo())
+            } else {
+                Toast.makeText(context, "Não foi possível abrir a impressão.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     val editavel = modoRevisao != "leitura"
     val blocoSelecionado = remember(blocos, blocoSelecionadoId) { blocos.find { it.id == blocoSelecionadoId } }
@@ -124,6 +187,8 @@ fun EditorDocumentoScreen(
         val compacto = maxWidth < LARGURA_COMPACTA_DP.dp
         val larguraFolha = if (compacto) maxWidth - 8.dp else minOf(820.dp, maxWidth - 32.dp)
         val margemFolha = if (compacto) 16.dp else 34.dp
+        // Gavetas e scrim começam abaixo da barra de título: voltar/estrutura/inspetor seguem acessíveis.
+        val topoHud = 52.dp + WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
         // ============================ FOLHA ============================
         LazyColumn(
@@ -159,6 +224,7 @@ fun EditorDocumentoScreen(
                     editavel = editavel,
                     compacto = compacto,
                     numeroFormula = numeroFormula,
+                    onEscolherImagem = escolherImagem,
                     vm = viewModel
                 )
             }
@@ -184,6 +250,8 @@ fun EditorDocumentoScreen(
                     onTipoAlterado = viewModel::definirTipoDocumento,
                     onModoRevisaoAlterado = viewModel::definirModoRevisao,
                     onSalvar = viewModel::salvarDocumento,
+                    onExportarDocx = exportarDocx,
+                    onExportarPdf = exportarPdf,
                     onVoltar = ::sair
                 )
                 // Barra de inserção de blocos logo abaixo do título (preferência do usuário: no topo)
@@ -206,6 +274,7 @@ fun EditorDocumentoScreen(
         if (algumPainelAberto) {
             Box(
                 modifier = Modifier
+                    .padding(top = topoHud)
                     .fillMaxSize()
                     .background(Color(0x55000000))
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
@@ -219,7 +288,7 @@ fun EditorDocumentoScreen(
             visible = painelEstruturaAberto,
             enter = slideInHorizontally { -it } + fadeIn(),
             exit = slideOutHorizontally { -it } + fadeOut(),
-            modifier = Modifier.align(Alignment.CenterStart)
+            modifier = Modifier.align(Alignment.CenterStart).padding(top = topoHud)
         ) {
             EditorPainelEsquerdo(
                 abaAtiva = abaEsquerdaAtiva,
@@ -239,7 +308,7 @@ fun EditorDocumentoScreen(
             visible = painelInspetorAberto,
             enter = slideInHorizontally { it } + fadeIn(),
             exit = slideOutHorizontally { it } + fadeOut(),
-            modifier = Modifier.align(Alignment.CenterEnd)
+            modifier = Modifier.align(Alignment.CenterEnd).padding(top = topoHud)
         ) {
             EditorPainelInspetor(
                 bloco = blocoSelecionado,
@@ -381,6 +450,7 @@ private fun ItemBlocoFolha(
     editavel: Boolean,
     compacto: Boolean,
     numeroFormula: Int,
+    onEscolherImagem: (String) -> Unit,
     vm: EditorViewModel
 ) {
     val borda = RoundedCornerShape(6.dp)
@@ -430,15 +500,19 @@ private fun ItemBlocoFolha(
             TipoBlocoEditor.FIGURA -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 CampoLegenda(bloco.legenda, "Legenda da figura", editavel, selecionar) { vm.atualizarLegendaBloco(bloco.id, it) }
                 Spacer(Modifier.height(6.dp))
-                Surface(
-                    color = Color(0xFFF1F5F9),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
-                    modifier = Modifier.fillMaxWidth().height(120.dp)
-                ) {
-                    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Rounded.Image, contentDescription = null, tint = AthenesTextMuted, modifier = Modifier.size(32.dp))
-                        Text("Área da figura", style = TextStyle(fontSize = 11.sp, color = AthenesTextMuted))
+                ImagemFigura(
+                    nomeArquivo = bloco.imagem,
+                    editavel = editavel,
+                    onEscolher = { selecionar(); onEscolherImagem(bloco.id) }
+                )
+                if (selecionado && editavel && bloco.imagem.isNotEmpty()) {
+                    TextButton(
+                        onClick = { onEscolherImagem(bloco.id) },
+                        modifier = Modifier.heightIn(min = 44.dp)
+                    ) {
+                        Icon(Icons.Rounded.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Trocar imagem", fontSize = 13.sp)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -519,4 +593,40 @@ private fun CampoFonte(valor: String, editavel: Boolean, onFocused: () -> Unit, 
         value = valor, onValueChange = onChange, editavel = editavel, placeholder = "Fonte: …", onFocused = onFocused,
         style = TextStyle(fontStyle = FontStyle.Italic, fontSize = 11.sp, lineHeight = 15.sp, color = AthenesTextMuted, textAlign = TextAlign.Center)
     )
+}
+
+/** Imagem da figura (decodificada reduzida, fora da thread principal) ou área de toque para escolher. */
+@Composable
+private fun ImagemFigura(nomeArquivo: String, editavel: Boolean, onEscolher: () -> Unit) {
+    val context = LocalContext.current
+    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, nomeArquivo) {
+        value = if (nomeArquivo.isEmpty()) null
+        else withContext(Dispatchers.IO) { ImagemRepositorio.carregar(context, nomeArquivo) }
+    }
+    val img = bitmap
+    if (img != null) {
+        Image(
+            bitmap = img,
+            contentDescription = "Figura",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)
+        )
+    } else {
+        Surface(
+            onClick = onEscolher,
+            enabled = editavel,
+            color = Color(0xFFF1F5F9),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+            modifier = Modifier.fillMaxWidth().height(120.dp)
+        ) {
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Rounded.Image, contentDescription = null, tint = AthenesTextMuted, modifier = Modifier.size(32.dp))
+                Text(
+                    if (editavel) "Toque para escolher a imagem" else "Sem imagem",
+                    style = TextStyle(fontSize = 12.sp, color = AthenesTextMuted)
+                )
+            }
+        }
+    }
 }
