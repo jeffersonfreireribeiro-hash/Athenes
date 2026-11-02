@@ -121,6 +121,14 @@ export class TelaLoginView {
           </button>
         </form>
 
+        
+        <div style="margin-top:16px; padding-top:14px; border-top:1px dashed #E2E8F0; display:flex; justify-content:center;">
+          <a href="/athenes.apk" download="athenes.apk" id="athBtnBaixarAppAndroidLogin" class="ath-btn ath-btn-sm" style="display:inline-flex; align-items:center; gap:8px; padding:6px 16px; border-radius:999px; background:#ECFDF5; border:1px solid #A7F3D0; color:#047857; text-decoration:none; font-weight:700; font-size:12px;" title="Baixar instalador oficial para tablets e celulares Android">
+            ${svgIcone('android', 16)}
+            <span>Baixar App Athenes para Android (.apk)</span>
+          </a>
+        </div>
+
         <!-- Rodapé de Privacidade e Segurança Local -->
         <div class="ath-login-rodape">
           <div class="ath-login-seguranca">

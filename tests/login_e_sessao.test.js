@@ -117,4 +117,11 @@ test('Athenes — Sistema de Login, Sessão e Continuidade Conectada', async (t)
     const driveCfg = JSON.parse(mockStorage.local.get('athenes_gdrive_config') || '{}');
     assert.equal(driveCfg.accessToken, '');
   });
+
+  await t.test('8. Ícone e rota de download do App Android (.apk) disponíveis', async () => {
+    const { svgIcone } = await import('../src/ui/athenes_icones.js');
+    const icone = svgIcone('android', 16);
+    assert.ok(icone.includes('<svg'));
+    assert.ok(icone.includes('ath-icon'));
+  });
 });

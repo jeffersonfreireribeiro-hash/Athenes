@@ -26,7 +26,8 @@ const MIME_TYPES = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  '.pdf': 'application/pdf'
+  '.pdf': 'application/pdf',
+  '.apk': 'application/vnd.android.package-archive'
 };
 
 const server = http.createServer((req, res) => {
@@ -52,11 +53,17 @@ const server = http.createServer((req, res) => {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-    res.writeHead(200, {
+    const headers = {
       'Content-Type': contentType,
       'Access-Control-Allow-Origin': '*',
       'Cache-Control': 'no-cache'
-    });
+    };
+
+    if (ext === '.apk') {
+      headers['Content-Disposition'] = 'attachment; filename="athenes.apk"';
+    }
+
+    res.writeHead(200, headers);
 
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
