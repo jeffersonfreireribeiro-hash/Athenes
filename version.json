@@ -1,0 +1,11 @@
+{
+  "disponivel": true,
+  "versao": "1.0.1",
+  "nome": "athenes.apk",
+  "tamanhoBytes": 20652795,
+  "tamanhoFormatado": "19.7 MB",
+  "atualizadoEm": "2026-11-02T12:12:00Z",
+  "downloadUrl": "/athenes.apk",
+  "downloadUrlFallback": "https://raw.githubusercontent.com/jeffersonfreireribeiro-hash/Athenes/main/athenes.apk",
+  "notas": "Atualização automática in-app padrão Glaux GIS, detecção silenciosa de caneta S-Pen e rejeição de palma alocada nas Configurações, barra superior compacta com ícones SVG expressivos e layout de leitura limpo."
+}

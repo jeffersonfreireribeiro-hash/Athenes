@@ -32,6 +32,49 @@ const MIME_TYPES = {
 
 const server = http.createServer((req, res) => {
   let reqPath = decodeURIComponent(req.url.split('?')[0]);
+
+  // Rotas de API para atualização automática do aplicativo Android (padrão Glaux GIS)
+  if (reqPath === '/api/v1/app/info') {
+    const versionFilePath = path.join(__dirname, 'version.json');
+    const apkFilePath = path.join(__dirname, 'athenes.apk');
+    let info = {
+      disponivel: true,
+      versao: '1.0.1',
+      nome: 'athenes.apk',
+      tamanhoBytes: 10959328,
+      tamanhoFormatado: '10.5 MB',
+      atualizadoEm: new Date().toISOString(),
+      downloadUrl: '/athenes.apk',
+      downloadUrlFallback: 'https://raw.githubusercontent.com/jeffersonfreireribeiro-hash/Athenes/main/athenes.apk',
+      notas: 'Detecção de caneta S-Pen e rejeição de palma alocada nas Configurações, barra superior compacta com ícones SVG expressivos e layout de leitura limpo.'
+    };
+
+    if (fs.existsSync(versionFilePath)) {
+      try {
+        info = JSON.parse(fs.readFileSync(versionFilePath, 'utf8'));
+      } catch (_) {}
+    }
+
+    if (fs.existsSync(apkFilePath)) {
+      const stats = fs.statSync(apkFilePath);
+      info.tamanhoBytes = stats.size;
+      info.tamanhoFormatado = `${(stats.size / (1024 * 1024)).toFixed(1)} MB`;
+      info.atualizadoEm = stats.mtime.toISOString();
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-cache'
+    });
+    res.end(JSON.stringify(info));
+    return;
+  }
+
+  if (reqPath === '/api/v1/app/download' || reqPath === '/baixar-app') {
+    reqPath = '/athenes.apk';
+  }
+
   if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
 
   const filePath = path.join(__dirname, reqPath);

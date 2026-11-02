@@ -21,11 +21,15 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import com.athenes.core.model.AbaInspetorDireito
+import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.reader.components.*
 
 @Composable
 fun EstudoArtigosScreen(
     onVoltarBiblioteca: () -> Unit,
+    updateInfo: AppUpdateInfo? = null,
+    onOpenUpdateDialog: () -> Unit = {},
+    onCheckUpdateManual: () -> Unit = {},
     viewModel: ReaderViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
@@ -214,7 +218,10 @@ fun EstudoArtigosScreen(
                         abaAtiva = abaDireitaAtiva,
                         modoSomenteStylus = modoSomenteStylus,
                         stylusDetectada = stylusDetectada,
+                        updateInfo = updateInfo,
                         onAlternarModoStylus = { viewModel.alternarModoSomenteStylus() },
+                        onOpenUpdateDialog = onOpenUpdateDialog,
+                        onCheckUpdateManual = onCheckUpdateManual,
                         onSelecionarAba = { viewModel.selecionarAbaDireita(it) },
                         onNovaCitacaoClick = { viewModel.abrirCriacaoCitacao() },
                         onRemoverCitacao = { viewModel.removerCitacao(it) },

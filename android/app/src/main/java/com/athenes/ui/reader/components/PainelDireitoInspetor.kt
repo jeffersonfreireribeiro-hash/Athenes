@@ -25,7 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.athenes.BuildConfig
 import com.athenes.core.model.*
+import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.theme.*
 
 @Composable
@@ -34,7 +36,10 @@ fun PainelDireitoInspetor(
     abaAtiva: AbaInspetorDireito,
     modoSomenteStylus: Boolean = false,
     stylusDetectada: Boolean = false,
+    updateInfo: AppUpdateInfo? = null,
     onAlternarModoStylus: () -> Unit = {},
+    onOpenUpdateDialog: () -> Unit = {},
+    onCheckUpdateManual: () -> Unit = {},
     onSelecionarAba: (AbaInspetorDireito) -> Unit,
     onNovaCitacaoClick: () -> Unit,
     onRemoverCitacao: (String) -> Unit,
@@ -116,7 +121,10 @@ fun PainelDireitoInspetor(
                         config = artigo.zoteroConfig,
                         modoSomenteStylus = modoSomenteStylus,
                         stylusDetectada = stylusDetectada,
+                        updateInfo = updateInfo,
                         onAlternarModoStylus = onAlternarModoStylus,
+                        onOpenUpdateDialog = onOpenUpdateDialog,
+                        onCheckUpdateManual = onCheckUpdateManual,
                         onSalvarConfig = onSalvarConfigZoteroDrive,
                         context = context
                     )
@@ -539,7 +547,10 @@ private fun ConteudoAbaZoteroDrive(
     config: ZoteroVinculoConfig,
     modoSomenteStylus: Boolean,
     stylusDetectada: Boolean,
+    updateInfo: AppUpdateInfo?,
     onAlternarModoStylus: () -> Unit,
+    onOpenUpdateDialog: () -> Unit,
+    onCheckUpdateManual: () -> Unit,
     onSalvarConfig: (ZoteroVinculoConfig) -> Unit,
     context: Context
 ) {
@@ -652,6 +663,126 @@ private fun ConteudoAbaZoteroDrive(
                                     color = if (stylusDetectada) Color(0xFF047857) else Color(0xFF64748B)
                                 )
                             )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Bloco 0.5: ATUALIZAÇÕES DO APLICATIVO (APK)
+        item {
+            Surface(
+                color = Color.White,
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.SystemUpdate,
+                                contentDescription = null,
+                                tint = AthenesPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "ATUALIZAÇÃO DO APP",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 11.sp,
+                                    letterSpacing = 0.5.sp,
+                                    color = AthenesTextDark
+                                )
+                            )
+                        }
+
+                        Surface(
+                            color = Color(0xFFEFF6FF),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "v${BuildConfig.VERSION_NAME}",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AthenesPrimary
+                                ),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (updateInfo?.temNovaVersao == true) {
+                        Surface(
+                            color = Color(0xFFEFF6FF),
+                            shape = RoundedCornerShape(6.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFBFDBFE)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = "Nova versão disponível: v${updateInfo.versao}",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = AthenesPrimary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Tamanho: ${updateInfo.tamanhoFormatado}",
+                                    fontSize = 10.5.sp,
+                                    color = AthenesTextMuted
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = onOpenUpdateDialog,
+                                    shape = RoundedCornerShape(6.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = AthenesPrimary,
+                                        contentColor = Color.White
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.fillMaxWidth().height(34.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Atualizar Agora", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Você está na versão mais recente.",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 10.5.sp,
+                                    color = Color(0xFF64748B)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            OutlinedButton(
+                                onClick = onCheckUpdateManual,
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.height(30.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AthenesPrimary)
+                            ) {
+                                Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(12.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Verificar", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

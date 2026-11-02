@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.core.model.Documento
+import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.components.AthenesCard
 import com.athenes.ui.components.AthenesSearchBar
 import com.athenes.ui.components.AthenesTopBar
@@ -38,15 +40,19 @@ import com.athenes.ui.components.DialogRenomear
 import com.athenes.ui.theme.AthenesBg
 import com.athenes.ui.theme.AthenesText
 import com.athenes.ui.theme.AthenesTextMuted
+import com.athenes.ui.updater.UpdateBanner
 
 @Composable
 fun BibliotecaScreen(
     viewModel: BibliotecaViewModel,
     onAbrirDocumento: (Documento) -> Unit,
     onAbrirLeitorPdf: (String) -> Unit = {},
+    updateInfo: AppUpdateInfo? = null,
+    onOpenUpdateDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var modoAtivo by remember { mutableIntStateOf(0) } // 0 = Escrita & Documentos, 1 = Leitura & Zotero
+    var updateBannerDismissed by remember { mutableStateOf(false) }
 
     val textoBusca by viewModel.textoBusca.collectAsState()
     val tipoFiltro by viewModel.tipoFiltro.collectAsState()
@@ -103,6 +109,16 @@ fun BibliotecaScreen(
             )
 
             Spacer(modifier = Modifier.height(14.dp))
+
+            // Banner de Notificação de Atualização Disponível (Padrão Glaux GIS)
+            if (updateInfo != null && updateInfo.temNovaVersao && !updateBannerDismissed) {
+                UpdateBanner(
+                    updateInfo = updateInfo,
+                    onOpenDialog = onOpenUpdateDialog,
+                    onDismiss = { updateBannerDismissed = true }
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+            }
 
             // Barra de Pesquisa + Filtros de Tipo + Botão Novo Documento
             AthenesSearchBar(
