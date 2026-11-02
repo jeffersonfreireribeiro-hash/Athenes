@@ -5,6 +5,7 @@
 
 import { DashboardView } from './athenes_dashboard.js';
 import { criarDocumento } from '../core/athenes_documento.js';
+import { carregarDocumentoDoSupabase } from '../core/athenes_colaboracao.js';
 import { sanitizarDocumentoImportado } from '../core/athenes_seguranca.js';
 import { EditorView } from './athenes_editor.js';
 import { PainelPropriedades } from './athenes_painel_propriedades.js';
@@ -31,6 +32,20 @@ export class AthenesApp {
 
   iniciar() {
     const params = new URLSearchParams(window.location.search);
+    const docIdLink = params.get('doc');
+    if (docIdLink) {
+      this.container.innerHTML = '<p style="padding:32px; font:600 14px Nunito, sans-serif; color:#314F79;">Abrindo documento compartilhado...</p>';
+      carregarDocumentoDoSupabase(docIdLink).then(remoto => {
+        if (!remoto) throw new Error('Documento não encontrado na nuvem.');
+        this.documentoAtivo = sanitizarDocumentoImportado(remoto);
+        this.autoSalvar();
+        this.navegarParaEditor();
+      }).catch(err => {
+        alert(`Não foi possível abrir o link: ${err.message}`);
+        this.navegarParaDashboard();
+      });
+      return;
+    }
     if (params.get('tela') === 'editor' || params.get('editor') === '1') {
       try {
         const salvo = localStorage.getItem('athenes_docs_indice');

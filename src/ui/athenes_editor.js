@@ -963,6 +963,9 @@ export class EditorView {
               ${svgIcone('documento', 13)} Abrir da Nuvem
             </button>
           </div>
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnCopiarLinkColab" title="Salva na nuvem e copia o link para o professor entrar neste texto em tempo real" style="height:30px; display:flex; align-items:center; justify-content:center; gap:5px; font-weight:700; background:#fff;">
+            ${svgIcone('usuarios', 13)} Copiar link para colaborar
+          </button>
           <div id="athListaArquivosSupabase" hidden style="max-height:130px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; margin-top:4px;"></div>
         </div>
 
@@ -1053,6 +1056,23 @@ export class EditorView {
           if (badge) { badge.textContent = 'Erro ao salvar'; badge.style.background = '#FEE2E2'; badge.style.color = '#991B1B'; }
           alert(err.message);
         }
+      });
+
+      popNuvem.querySelector('#athBtnCopiarLinkColab')?.addEventListener('click', async (ev) => {
+        const btn = ev.currentTarget;
+        const rotuloOriginal = btn.innerHTML;
+        try {
+          btn.textContent = 'Salvando na nuvem...';
+          await salvarDocumentoNoSupabase(this.doc, this.perfilColaborador);
+          this.sessaoRealtime?.transmitirDocumento(this.doc);
+          const link = `${window.location.origin}${window.location.pathname}?doc=${encodeURIComponent(this.doc.id)}`;
+          try { await navigator.clipboard.writeText(link); } catch (_) { window.prompt('Copie o link:', link); }
+          btn.textContent = 'Link copiado ✓';
+        } catch (err) {
+          btn.textContent = 'Erro ao gerar link';
+          alert(err.message);
+        }
+        setTimeout(() => { btn.innerHTML = rotuloOriginal; }, 2200);
       });
 
       popNuvem.querySelector('#athBtnAbrirSupabase')?.addEventListener('click', async () => {
