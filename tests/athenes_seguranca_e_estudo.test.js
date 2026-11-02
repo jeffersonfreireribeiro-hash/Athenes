@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   escapeHtml,
   sanitizarHtmlEditorial,
@@ -262,4 +263,25 @@ test('Estúdio de Artigos suporta isolamento por pasta, método filtrarPorPasta 
   assert.equal(codigoEstudo.includes('athNovoArtPasta'), true);
   assert.equal(codigoEstudo.includes('coletarPastasBib'), true);
   assert.equal(codigoEstudo.includes('novoArt.pastaId ='), true);
+});
+
+test('Todos os módulos frontend (UI e Core) importam sem SyntaxError ou referências inválidas', async () => {
+  const modulos = [
+    'src/core/athenes_documento.js',
+    'src/core/athenes_estilos.js',
+    'src/core/athenes_colaboracao.js',
+    'src/core/athenes_seguranca.js',
+    'src/core/athenes_zotero.js',
+    'src/ui/athenes_icones.js',
+    'src/ui/athenes_login_view.js',
+    'src/ui/athenes_estudo_artigos.js',
+    'src/ui/athenes_editor.js',
+    'src/ui/athenes_dashboard.js',
+    'src/ui/athenes_app.js'
+  ];
+
+  for (const m of modulos) {
+    const mod = await import(pathToFileURL(path.resolve(m)).href);
+    assert.ok(mod, `Módulo ${m} deve ser carregado com sucesso.`);
+  }
 });

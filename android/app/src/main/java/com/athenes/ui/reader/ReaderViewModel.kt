@@ -89,9 +89,6 @@ class ReaderViewModel(
     private val _stylusDetectada = MutableStateFlow(false)
     val stylusDetectada: StateFlow<Boolean> = _stylusDetectada.asStateFlow()
 
-    private val _mensagemStatusStylus = MutableStateFlow<String?>(null)
-    val mensagemStatusStylus: StateFlow<String?> = _mensagemStatusStylus.asStateFlow()
-
     fun obterArtigoAtivo(): ArtigoEstudoDetalhado {
         return repository.artigos.value.find { it.id == _artigoAtivoId.value }
             ?: repository.artigos.value.first()
@@ -285,13 +282,7 @@ class ReaderViewModel(
     }
 
     fun alternarModoSomenteStylus() {
-        val novoEstado = !_modoSomenteStylus.value
-        _modoSomenteStylus.value = novoEstado
-        _mensagemStatusStylus.value = if (novoEstado) {
-            "✏ Modo S-Pen Exclusivo Ativado · Rejeição de Palma Ligada"
-        } else {
-            "👆 Modo Dedo + Caneta Ativado · Toque na tela habilitado"
-        }
+        _modoSomenteStylus.value = !_modoSomenteStylus.value
     }
 
     fun definirModoSomenteStylus(ativo: Boolean) {
@@ -302,11 +293,6 @@ class ReaderViewModel(
         if (!_stylusDetectada.value) {
             _stylusDetectada.value = true
             _modoSomenteStylus.value = true
-            _mensagemStatusStylus.value = "✏ S-Pen / Caneta Detectada · Rejeição de palma ativada automaticamente!"
         }
-    }
-
-    fun limparMensagemStatusStylus() {
-        _mensagemStatusStylus.value = null
     }
 }

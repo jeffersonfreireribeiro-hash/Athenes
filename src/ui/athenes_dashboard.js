@@ -893,17 +893,6 @@ export class DashboardView {
     const pastaPreselecionada = (this.pastaAtivaId !== 'todas' && opcoesMae.some(o => o.id === this.pastaAtivaId))
       ? this.pastaAtivaId
       : opcoesMae[0].id;
-    function coletarPastas(lista, prefixo = '') {
-      for (const p of lista) {
-        opcoesMae.push({ id: p.id, nome: `${prefixo}${p.nome}`, tipo: p.tipo });
-        if (p.subpastas && p.subpastas.length > 0) {
-          coletarPastas(p.subpastas, `${prefixo}  ↳ `);
-        }
-      }
-    }
-    coletarPastas(this.pastasDrive);
-
-    const pastaPreselecionada = (this.pastaAtivaId !== 'todas' ? this.pastaAtivaId : 'pasta_rel_raiz');
 
     modal.innerHTML = `
       <div class="ath-modal" style="max-width:440px;">

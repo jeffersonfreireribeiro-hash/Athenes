@@ -47,18 +47,9 @@ fun EstudoArtigosScreen(
 
     val modoSomenteStylus by viewModel.modoSomenteStylus.collectAsState()
     val stylusDetectada by viewModel.stylusDetectada.collectAsState()
-    val mensagemStatusStylus by viewModel.mensagemStatusStylus.collectAsState()
 
     val mostrarDialogCitacao by viewModel.mostrarDialogNovaCitacao.collectAsState()
     val mostrarDialogNota by viewModel.mostrarDialogNovaNota.collectAsState()
-
-    // Auto-dismiss do banner flutuante de status da caneta após 3.5 segundos
-    LaunchedEffect(mensagemStatusStylus) {
-        if (mensagemStatusStylus != null) {
-            delay(3500)
-            viewModel.limparMensagemStatusStylus()
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -66,11 +57,8 @@ fun EstudoArtigosScreen(
                 artigo = artigoAtivo,
                 painelEsquerdoAberto = painelEsquerdoAberto,
                 painelDireitoAberto = painelDireitoAberto,
-                modoSomenteStylus = modoSomenteStylus,
-                stylusDetectada = stylusDetectada,
                 onAlternarEsquerdo = { viewModel.alternarPainelEsquerdo() },
                 onAlternarDireito = { viewModel.alternarPainelDireito() },
-                onAlternarModoStylus = { viewModel.alternarModoSomenteStylus() },
                 onAbrirPdfClick = {
                     Toast.makeText(context, "Abrindo ${artigoAtivo.zoteroConfig.driveFileName}...", Toast.LENGTH_SHORT).show()
                 },
@@ -140,44 +128,6 @@ fun EstudoArtigosScreen(
                     onAlternarModoLinhaReta = { viewModel.alternarModoLinhaReta() },
                     onSelecionarCor = { viewModel.definirCor(it) }
                 )
-            }
-
-            // Notificação Flutuante de Detecção de Caneta / Rejeição de Palma (Samsung Notes Style)
-            AnimatedVisibility(
-                visible = mensagemStatusStylus != null,
-                enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
-                exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 64.dp)
-            ) {
-                Surface(
-                    color = Color(0xFF1E293B),
-                    shape = RoundedCornerShape(24.dp),
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Draw,
-                            contentDescription = null,
-                            tint = Color(0xFF60A5FA),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = mensagemStatusStylus ?: "",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp
-                            )
-                        )
-                    }
-                }
             }
 
             // Scrim Translúcido de Fundo quando qualquer aba lateral estiver aberta sobre o canvas
@@ -262,6 +212,9 @@ fun EstudoArtigosScreen(
                     PainelDireitoInspetor(
                         artigo = artigoAtivo,
                         abaAtiva = abaDireitaAtiva,
+                        modoSomenteStylus = modoSomenteStylus,
+                        stylusDetectada = stylusDetectada,
+                        onAlternarModoStylus = { viewModel.alternarModoSomenteStylus() },
                         onSelecionarAba = { viewModel.selecionarAbaDireita(it) },
                         onNovaCitacaoClick = { viewModel.abrirCriacaoCitacao() },
                         onRemoverCitacao = { viewModel.removerCitacao(it) },

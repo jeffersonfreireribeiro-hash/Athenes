@@ -32,6 +32,9 @@ import com.athenes.ui.theme.*
 fun PainelDireitoInspetor(
     artigo: ArtigoEstudoDetalhado,
     abaAtiva: AbaInspetorDireito,
+    modoSomenteStylus: Boolean = false,
+    stylusDetectada: Boolean = false,
+    onAlternarModoStylus: () -> Unit = {},
     onSelecionarAba: (AbaInspetorDireito) -> Unit,
     onNovaCitacaoClick: () -> Unit,
     onRemoverCitacao: (String) -> Unit,
@@ -79,8 +82,8 @@ fun PainelDireitoInspetor(
                     )
 
                     ItemAbaInspetor(
-                        titulo = "Zotero & Drive",
-                        icone = Icons.Rounded.CloudSync,
+                        titulo = "Configurações",
+                        icone = Icons.Rounded.Settings,
                         selecionada = abaAtiva == AbaInspetorDireito.ZOTERO_DRIVE,
                         onClick = { onSelecionarAba(AbaInspetorDireito.ZOTERO_DRIVE) },
                         modifier = Modifier.weight(1f)
@@ -111,6 +114,9 @@ fun PainelDireitoInspetor(
                     )
                     AbaInspetorDireito.ZOTERO_DRIVE -> ConteudoAbaZoteroDrive(
                         config = artigo.zoteroConfig,
+                        modoSomenteStylus = modoSomenteStylus,
+                        stylusDetectada = stylusDetectada,
+                        onAlternarModoStylus = onAlternarModoStylus,
                         onSalvarConfig = onSalvarConfigZoteroDrive,
                         context = context
                     )
@@ -531,6 +537,9 @@ private fun CardCitacaoItem(
 @Composable
 private fun ConteudoAbaZoteroDrive(
     config: ZoteroVinculoConfig,
+    modoSomenteStylus: Boolean,
+    stylusDetectada: Boolean,
+    onAlternarModoStylus: () -> Unit,
     onSalvarConfig: (ZoteroVinculoConfig) -> Unit,
     context: Context
 ) {
@@ -545,6 +554,110 @@ private fun ConteudoAbaZoteroDrive(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // Bloco 0: ENTRADA & CANETA (S-PEN / STYLUS)
+        item {
+            Surface(
+                color = Color.White,
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Draw,
+                            contentDescription = null,
+                            tint = AthenesPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "CANETA & REJEIÇÃO DE PALMA",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 11.sp,
+                                letterSpacing = 0.5.sp,
+                                color = AthenesTextDark
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        ) {
+                            Text(
+                                text = "Modo Somente Caneta (S-Pen)",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.5.sp,
+                                    color = AthenesTextDark
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = "Rejeição de palma da mão ativa: o toque dos dedos e da mão apenas rola a página, permitindo apoiar a mão livremente na tela sem riscar acidentalmente.",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 10.5.sp,
+                                    color = Color(0xFF64748B),
+                                    lineHeight = 14.sp
+                                )
+                            )
+                        }
+
+                        Switch(
+                            checked = modoSomenteStylus,
+                            onCheckedChange = { onAlternarModoStylus() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = AthenesPrimary,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = Color(0xFFCBD5E1)
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Indicador Discreto de Sensor de Hardware
+                    Surface(
+                        color = if (stylusDetectada) Color(0xFFECFDF5) else Color(0xFFF1F5F9),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (stylusDetectada) Icons.Rounded.CheckCircle else Icons.Rounded.TouchApp,
+                                contentDescription = null,
+                                tint = if (stylusDetectada) Color(0xFF059669) else Color(0xFF64748B),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (stylusDetectada) "Sensor S-Pen / Stylus reconhecido no dispositivo" else "Sensor aguardando caneta física (ou toque livre)",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (stylusDetectada) Color(0xFF047857) else Color(0xFF64748B)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Bloco 1: VÍNCULO DE METADADOS COM O ZOTERO
         item {
             Surface(

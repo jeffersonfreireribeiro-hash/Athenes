@@ -152,25 +152,19 @@ class ReaderTest {
         // Estado Inicial: Palm Rejection desligado e stylus ainda não detectada
         assertFalse(viewModel.modoSomenteStylus.value)
         assertFalse(viewModel.stylusDetectada.value)
-        assertNull(viewModel.mensagemStatusStylus.value)
 
-        // Alternar manualmente para Modo Somente Caneta / Rejeição de Palma
+        // Alternar manualmente nas Configurações para Modo Somente Caneta / Rejeição de Palma
         viewModel.alternarModoSomenteStylus()
-        assertTrue("Modo Stylus exclusivo deve estar ativo", viewModel.modoSomenteStylus.value)
-        assertTrue(viewModel.mensagemStatusStylus.value?.contains("Rejeição de Palma") == true)
+        assertTrue("Modo Stylus exclusivo deve estar ativo nas configurações", viewModel.modoSomenteStylus.value)
 
         // Alternar de volta para Dedo + Caneta
         viewModel.alternarModoSomenteStylus()
         assertFalse("Modo Stylus exclusivo deve estar desligado", viewModel.modoSomenteStylus.value)
 
-        // Detecção Automática de Stylus / S-Pen ao encostar na tela (Estilo Samsung Notes)
+        // Detecção Automática e Silenciosa de Stylus / S-Pen ao encostar na tela (Estilo Samsung Notes - sem poluir a visão)
         viewModel.registrarStylusDetectada()
         assertTrue("Stylus detectada deve ser verdadeira", viewModel.stylusDetectada.value)
-        assertTrue("Modo somente stylus deve ativar automaticamente", viewModel.modoSomenteStylus.value)
-        assertTrue(viewModel.mensagemStatusStylus.value?.contains("S-Pen") == true)
-
-        viewModel.limparMensagemStatusStylus()
-        assertNull(viewModel.mensagemStatusStylus.value)
+        assertTrue("Modo somente stylus deve ativar automaticamente de forma 100% silenciosa", viewModel.modoSomenteStylus.value)
     }
 
     @Test
