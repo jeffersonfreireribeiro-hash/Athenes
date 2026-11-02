@@ -9,8 +9,10 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.athenes.core.data.DocumentoRepository
+import com.athenes.core.model.Documento
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.core.updater.AppUpdater
+import com.athenes.ui.editor.EditorDocumentoScreen
 import com.athenes.ui.library.BibliotecaScreen
 import com.athenes.ui.library.BibliotecaViewModel
 import com.athenes.ui.reader.EstudoArtigosScreen
@@ -22,6 +24,7 @@ import kotlinx.coroutines.withContext
 
 enum class AppTela {
     BIBLIOTECA,
+    EDITOR_DOCUMENTO,
     LEITURA_ESTUDO
 }
 
@@ -43,6 +46,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             AthenesTheme {
                 var telaAtual by remember { mutableStateOf(AppTela.BIBLIOTECA) }
+                var documentoSelecionado by remember { mutableStateOf<Documento?>(null) }
+                var artigoSelecionadoId by remember { mutableStateOf("art_radino_2020") }
                 var appUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
                 var showUpdateDialog by remember { mutableStateOf(false) }
                 val scope = rememberCoroutineScope()
@@ -86,25 +91,30 @@ class MainActivity : ComponentActivity() {
                             updateInfo = appUpdateInfo,
                             onOpenUpdateDialog = { showUpdateDialog = true },
                             onAbrirDocumento = { doc ->
-                                if (doc.titulo.contains("Fichamento", ignoreCase = true) ||
-                                    doc.titulo.contains("Acoustic", ignoreCase = true)
-                                ) {
-                                    telaAtual = AppTela.LEITURA_ESTUDO
-                                } else {
-                                    Toast.makeText(
-                                        this,
-                                        "Abrindo documento: ${doc.titulo}",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
+                                documentoSelecionado = doc
+                                telaAtual = AppTela.EDITOR_DOCUMENTO
                             },
-                            onAbrirLeitorPdf = { _ ->
+                            onAbrirLeitorPdf = { artId ->
+                                if (artId.isNotBlank()) {
+                                    artigoSelecionadoId = artId
+                                }
                                 telaAtual = AppTela.LEITURA_ESTUDO
                             }
                         )
                     }
+
+                    AppTela.EDITOR_DOCUMENTO -> {
+                        EditorDocumentoScreen(
+                            documentoInicial = documentoSelecionado,
+                            onVoltarBiblioteca = {
+                                telaAtual = AppTela.BIBLIOTECA
+                            }
+                        )
+                    }
+
                     AppTela.LEITURA_ESTUDO -> {
                         EstudoArtigosScreen(
+                            artigoIdInicial = artigoSelecionadoId,
                             updateInfo = appUpdateInfo,
                             onOpenUpdateDialog = { showUpdateDialog = true },
                             onCheckUpdateManual = { scope.launch { checkAppUpdate(forced = true) } },

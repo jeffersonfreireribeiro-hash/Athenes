@@ -26,6 +26,7 @@ import com.athenes.ui.reader.components.*
 
 @Composable
 fun EstudoArtigosScreen(
+    artigoIdInicial: String? = null,
     onVoltarBiblioteca: () -> Unit,
     updateInfo: AppUpdateInfo? = null,
     onOpenUpdateDialog: () -> Unit = {},
@@ -34,6 +35,12 @@ fun EstudoArtigosScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+
+    LaunchedEffect(artigoIdInicial) {
+        if (!artigoIdInicial.isNullOrBlank()) {
+            viewModel.selecionarArtigo(artigoIdInicial)
+        }
+    }
     val artigos by viewModel.artigos.collectAsState()
     val artigoAtivoId by viewModel.artigoAtivoId.collectAsState()
     val artigoAtivo = remember(artigos, artigoAtivoId) {

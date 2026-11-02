@@ -136,24 +136,13 @@ class DocumentoRepository(private val context: Context? = null) {
         fun obterDocumentosPadraoIniciais(): List<Documento> {
             return listOf(
                 Documento(
-                    id = "doc_fichamento_acoustic",
-                    titulo = "[Fichamento PDF] Acoustic Performance-Based Design: A Brief Overview of the Opportunities and Limits in Current Practice",
-                    subtitulo = "Estudo de performance acústica integrada e parametrização morfológica",
-                    tipo = TipoDocumento.DOCUMENTO,
-                    situacao = SituacaoDocumento.RASCUNHO,
-                    estadoNuvem = EstadoNuvem.NUVEM_SUPABASE,
-                    autor = "Autor Principal",
-                    ano = 2026,
-                    modificadoEm = "01/11/2026"
-                ),
-                Documento(
                     id = "doc_reurb_sustentavel",
                     titulo = "Análise Espacial e Diretrizes de Reurbanização Sustentável",
-                    subtitulo = "Estudo de escopo e proposições metodológicas para comunidades consolidadas",
+                    subtitulo = "Estudo de caso e proposições metodológicas para comunidades consolidadas",
                     tipo = TipoDocumento.ARTIGO,
                     situacao = SituacaoDocumento.EM_REVISAO,
                     estadoNuvem = EstadoNuvem.LOCAL,
-                    autor = "Autor Principal",
+                    autor = "Jefferson F. Ribeiro",
                     ano = 2026,
                     modificadoEm = "01/11/2026"
                 ),
@@ -164,7 +153,18 @@ class DocumentoRepository(private val context: Context? = null) {
                     tipo = TipoDocumento.RELATORIO,
                     situacao = SituacaoDocumento.RASCUNHO,
                     estadoNuvem = EstadoNuvem.LOCAL,
-                    autor = "Autor Principal",
+                    autor = "Jefferson F. Ribeiro",
+                    ano = 2026,
+                    modificadoEm = "01/11/2026"
+                ),
+                Documento(
+                    id = "doc_monografia_reurb",
+                    titulo = "Monografia de Políticas Urbanas e Regularização Fundiária",
+                    subtitulo = "Instrumentos jurídicos e urbanísticos da Lei Federal 13.465/2017",
+                    tipo = TipoDocumento.MONOGRAFIA,
+                    situacao = SituacaoDocumento.RASCUNHO,
+                    estadoNuvem = EstadoNuvem.NUVEM_SUPABASE,
+                    autor = "Jefferson F. Ribeiro",
                     ano = 2026,
                     modificadoEm = "01/11/2026"
                 )

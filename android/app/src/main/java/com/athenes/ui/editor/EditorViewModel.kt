@@ -1,10 +1,22 @@
 package com.athenes.ui.editor
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.athenes.core.model.ArtigoEstudoDetalhado
+import com.athenes.core.model.Documento
 import com.athenes.core.model.TipoDocumento
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.util.UUID
 
 enum class EstiloTexto(val rotulo: String, val tamanhoPt: Int, val ehNegrito: Boolean = false, val ehItalico: Boolean = false) {
     TEXTO_NORMAL("Texto normal", 12),
@@ -21,6 +33,30 @@ enum class AlinhamentoTexto {
     ESQUERDA, CENTRO, DIREITA, JUSTIFICADO
 }
 
+enum class TipoBlocoEditor(val rotulo: String, val desc: String) {
+    TITULO("Título", "Título de seção numerada"),
+    PARAGRAFO("Texto", "Parágrafo com recuo ABNT"),
+    CITACAO("Citação", "Citação direta longa recuada"),
+    FIGURA("Figura", "Ilustração numerada com legenda e fonte"),
+    TABELA("Tabela", "Tabela de dados norma IBGE"),
+    FORMULA("Fórmula", "Expressão matemática numerada"),
+    DIVISOR("Divisor", "Linha divisória ou espaçamento")
+}
+
+data class BlocoEditor(
+    val id: String = UUID.randomUUID().toString(),
+    val tipo: TipoBlocoEditor,
+    val titulo: String = "",
+    val texto: String = "",
+    val legenda: String = "",
+    val fonte: String = "",
+    val formulaLatex: String = "",
+    val colunas: Int = 12,
+    val alinhamento: AlinhamentoTexto = AlinhamentoTexto.JUSTIFICADO,
+    val estiloId: String = "texto",
+    val tabelaLinhas: List<List<String>> = emptyList()
+)
+
 data class SecaoEstrutura(
     val id: String,
     val numero: String,
@@ -29,153 +65,421 @@ data class SecaoEstrutura(
     val subsecoes: List<SecaoEstrutura> = emptyList()
 )
 
-data class NotaEditor(
-    val id: String,
-    val texto: String,
-    val corHex: String
-)
-
 class EditorViewModel : ViewModel() {
 
-    private val _titulo = MutableStateFlow("Revisão da Literatura sobre Tecnologias Educacionais")
+    private val _documento = MutableStateFlow<Documento?>(null)
+    val documento: StateFlow<Documento?> = _documento.asStateFlow()
+
+    private val _titulo = MutableStateFlow("")
     val titulo: StateFlow<String> = _titulo.asStateFlow()
 
-    private val _subtitulo = MutableStateFlow("Uma análise das principais abordagens e perspectivas atuais")
+    private val _subtitulo = MutableStateFlow("")
     val subtitulo: StateFlow<String> = _subtitulo.asStateFlow()
 
-    private val _autores = MutableStateFlow("Maria Silva Santos¹, João Pereira Lima², Ana Souza Oliveira³")
+    private val _autores = MutableStateFlow("")
     val autores: StateFlow<String> = _autores.asStateFlow()
+
+    private val _resumo = MutableStateFlow("")
+    val resumo: StateFlow<String> = _resumo.asStateFlow()
 
     private val _tipoDocumento = MutableStateFlow(TipoDocumento.ARTIGO)
     val tipoDocumento: StateFlow<TipoDocumento> = _tipoDocumento.asStateFlow()
 
-    private val _estiloAtivo = MutableStateFlow(EstiloTexto.TEXTO_NORMAL)
-    val estiloAtivo: StateFlow<EstiloTexto> = _estiloAtivo.asStateFlow()
+    private val _modoRevisao = MutableStateFlow("edicao") // "edicao" | "sugestao" | "leitura"
+    val modoRevisao: StateFlow<String> = _modoRevisao.asStateFlow()
 
-    private val _fonteAtiva = MutableStateFlow("Arial")
-    val fonteAtiva: StateFlow<String> = _fonteAtiva.asStateFlow()
+    // true = tudo gravado em disco; false = alteração pendente de autosave
+    private val _salvo = MutableStateFlow(true)
+    val salvo: StateFlow<Boolean> = _salvo.asStateFlow()
 
-    private val _tamanhoFonte = MutableStateFlow(12)
-    val tamanhoFonte: StateFlow<Int> = _tamanhoFonte.asStateFlow()
-
-    private val _negrito = MutableStateFlow(false)
-    val negrito: StateFlow<Boolean> = _negrito.asStateFlow()
-
-    private val _italico = MutableStateFlow(false)
-    val italico: StateFlow<Boolean> = _italico.asStateFlow()
-
-    private val _sublinhado = MutableStateFlow(false)
-    val sublinhado: StateFlow<Boolean> = _sublinhado.asStateFlow()
-
-    private val _tachado = MutableStateFlow(false)
-    val tachado: StateFlow<Boolean> = _tachado.asStateFlow()
-
-    private val _alinhamento = MutableStateFlow(AlinhamentoTexto.ESQUERDA)
-    val alinhamento: StateFlow<AlinhamentoTexto> = _alinhamento.asStateFlow()
-
-    private val _paginaAtual = MutableStateFlow(1)
-    val paginaAtual: StateFlow<Int> = _paginaAtual.asStateFlow()
-
-    val totalPaginas: Int = 12
-
-    private val _zoom = MutableStateFlow(100)
-    val zoom: StateFlow<Int> = _zoom.asStateFlow()
-
-    // Painéis Laterais: Em tablets verticais, iniciam recolhidos (overlay)
+    // Painéis Laterais: Em tablets, operam como sobreposição (overlay)
     private val _painelEstruturaAberto = MutableStateFlow(false)
     val painelEstruturaAberto: StateFlow<Boolean> = _painelEstruturaAberto.asStateFlow()
+
+    private val _abaEsquerdaAtiva = MutableStateFlow(0) // 0 = Seções, 1 = Margens ABNT, 2 = Estilos
+    val abaEsquerdaAtiva: StateFlow<Int> = _abaEsquerdaAtiva.asStateFlow()
 
     private val _painelInspetorAberto = MutableStateFlow(false)
     val painelInspetorAberto: StateFlow<Boolean> = _painelInspetorAberto.asStateFlow()
 
-    private val _secaoSelecionadaId = MutableStateFlow("intro")
-    val secaoSelecionadaId: StateFlow<String> = _secaoSelecionadaId.asStateFlow()
+    private val _painelCitacaoAberto = MutableStateFlow(false)
+    val painelCitacaoAberto: StateFlow<Boolean> = _painelCitacaoAberto.asStateFlow()
 
-    // Tags acadêmicas
-    val tags = listOf("Educação", "Tecnologia", "Revisão")
+    // Bloco Selecionado Atualmente no Palco
+    private val _blocoSelecionadoId = MutableStateFlow<String?>(null)
+    val blocoSelecionadoId: StateFlow<String?> = _blocoSelecionadoId.asStateFlow()
 
-    // Notas de produção do usuário
-    val notas = listOf(
-        NotaEditor("1", "Ponto importante sobre a personalização.", "#FDE047"),
-        NotaEditor("2", "Verificar referências deste trecho.", "#D8B4FE")
-    )
+    // Lista de Blocos na Folha
+    private val _blocos = MutableStateFlow<List<BlocoEditor>>(listOf(blocoParagrafoVazio()))
+    val blocos: StateFlow<List<BlocoEditor>> = _blocos.asStateFlow()
 
-    // Árvore de Estrutura do Artigo Científico
-    val estrutura = listOf(
-        SecaoEstrutura("intro", "1.", "Introdução", 1),
-        SecaoEstrutura(
-            "fund", "2.", "Fundamentação Teórica", 1,
-            subsecoes = listOf(
-                SecaoEstrutura("fund_1", "2.1.", "Conceitos Básicos", 2),
-                SecaoEstrutura("fund_2", "2.2.", "Trabalhos Relacionados", 2)
-            )
-        ),
-        SecaoEstrutura("met", "3.", "Metodologia", 1),
-        SecaoEstrutura("res", "4.", "Resultados", 1),
-        SecaoEstrutura("disc", "5.", "Discussão", 1),
-        SecaoEstrutura("conc", "6.", "Conclusão", 1)
-    )
+    // Pilhas de Desfazer / Refazer
+    private val historico = mutableListOf<List<BlocoEditor>>()
+    private var indiceHistorico = -1
+
+    private var pastaArmazenamento: File? = null
+    private var jobAutosave: Job? = null
+    private var documentoCarregadoId: String? = null
+
+    init {
+        salvarNoHistorico()
+    }
+
+    /**
+     * Carrega o conteúdo gravado do documento (ou um esqueleto limpo) e zera histórico/painéis.
+     * Idempotente por id: recomposições e rotações não descartam edições em andamento.
+     */
+    fun carregarDocumento(doc: Documento, pasta: File?) {
+        if (documentoCarregadoId == doc.id) return
+        documentoCarregadoId = doc.id
+        pastaArmazenamento = pasta
+
+        _documento.value = doc
+        _titulo.value = doc.titulo
+        _subtitulo.value = doc.subtitulo
+        _autores.value = doc.autor
+        _resumo.value = doc.resumo
+        _tipoDocumento.value = doc.tipo
+        _painelEstruturaAberto.value = false
+        _painelInspetorAberto.value = false
+        _painelCitacaoAberto.value = false
+
+        val lido = lerDoDisco(doc.id)
+        if (lido != null) {
+            _titulo.value = lido.titulo
+            _subtitulo.value = lido.subtitulo
+            _autores.value = lido.autores
+            _resumo.value = lido.resumo
+            _blocos.value = lido.blocos.ifEmpty { listOf(blocoParagrafoVazio()) }
+        } else {
+            _blocos.value = if (doc.id == ID_DOCUMENTO_EXEMPLO) obterBlocosIniciais() else listOf(blocoParagrafoVazio())
+            if (doc.id == ID_DOCUMENTO_EXEMPLO && _resumo.value.isBlank()) _resumo.value = RESUMO_EXEMPLO
+        }
+        _blocoSelecionadoId.value = null
+        historico.clear()
+        indiceHistorico = -1
+        salvarNoHistorico()
+        _salvo.value = true
+    }
+
+    fun definirTitulo(novo: String) { _titulo.value = novo; marcarAlterado() }
+    fun definirSubtitulo(novo: String) { _subtitulo.value = novo; marcarAlterado() }
+    fun definirResumo(novo: String) { _resumo.value = novo; marcarAlterado() }
+    fun definirTipoDocumento(tipo: TipoDocumento) { _tipoDocumento.value = tipo; marcarAlterado() }
+    fun definirModoRevisao(modo: String) { _modoRevisao.value = modo }
 
     fun alternarPainelEstrutura() {
         _painelEstruturaAberto.value = !_painelEstruturaAberto.value
+        if (_painelEstruturaAberto.value) _painelInspetorAberto.value = false
     }
+
+    fun fecharPainelEstrutura() { _painelEstruturaAberto.value = false }
+    fun definirAbaEsquerda(aba: Int) { _abaEsquerdaAtiva.value = aba }
 
     fun alternarPainelInspetor() {
         _painelInspetorAberto.value = !_painelInspetorAberto.value
+        if (_painelInspetorAberto.value) _painelEstruturaAberto.value = false
     }
 
-    fun definirEstilo(estilo: EstiloTexto) {
-        _estiloAtivo.value = estilo
-        _tamanhoFonte.value = estilo.tamanhoPt
-        _negrito.value = estilo.ehNegrito
-        _italico.value = estilo.ehItalico
+    fun fecharPainelInspetor() { _painelInspetorAberto.value = false }
+    fun abrirPainelCitacao() { _painelCitacaoAberto.value = true }
+    fun fecharPainelCitacao() { _painelCitacaoAberto.value = false }
+
+    fun selecionarBloco(id: String) { _blocoSelecionadoId.value = id }
+
+    /** Seções numeradas derivadas dos blocos de título (fonte única: o próprio documento). */
+    fun montarEstrutura(blocos: List<BlocoEditor>): List<SecaoEstrutura> {
+        var n = 0
+        return blocos.filter { it.tipo == TipoBlocoEditor.TITULO }.map { b ->
+            n++
+            SecaoEstrutura(id = b.id, numero = "$n.", titulo = b.titulo.ifBlank { "Seção sem título" })
+        }
     }
 
-    fun definirFonte(fonte: String) {
-        _fonteAtiva.value = fonte
+    private fun atualizarBloco(id: String, transforma: (BlocoEditor) -> BlocoEditor) {
+        _blocos.value = _blocos.value.map { if (it.id == id) transforma(it) else it }
+        marcarAlterado()
     }
 
-    fun definirTamanho(tam: Int) {
-        _tamanhoFonte.value = tam
+    fun atualizarTextoBloco(id: String, novo: String) = atualizarBloco(id) { it.copy(texto = novo) }
+    fun atualizarTituloBloco(id: String, novo: String) = atualizarBloco(id) { it.copy(titulo = novo) }
+    fun atualizarLegendaBloco(id: String, novo: String) = atualizarBloco(id) { it.copy(legenda = novo) }
+    fun atualizarFonteBloco(id: String, novo: String) = atualizarBloco(id) { it.copy(fonte = novo) }
+    fun atualizarFormulaBloco(id: String, novo: String) = atualizarBloco(id) { it.copy(formulaLatex = novo) }
+
+    fun atualizarCelulaTabela(id: String, linha: Int, coluna: Int, novo: String) = atualizarBloco(id) { b ->
+        b.copy(tabelaLinhas = b.tabelaLinhas.mapIndexed { i, l ->
+            if (i == linha) l.mapIndexed { j, c -> if (j == coluna) novo else c } else l
+        })
     }
 
-    fun alternarNegrito() {
-        _negrito.value = !_negrito.value
+    fun adicionarLinhaTabela(id: String) {
+        salvarNoHistorico()
+        atualizarBloco(id) { b ->
+            val colunas = b.tabelaLinhas.firstOrNull()?.size ?: 2
+            b.copy(tabelaLinhas = b.tabelaLinhas + listOf(List(colunas) { "" }))
+        }
     }
 
-    fun alternarItalico() {
-        _italico.value = !_italico.value
+    fun definirAlinhamentoBloco(id: String, alinhamento: AlinhamentoTexto) {
+        salvarNoHistorico()
+        atualizarBloco(id) { it.copy(alinhamento = alinhamento) }
     }
 
-    fun alternarSublinhado() {
-        _sublinhado.value = !_sublinhado.value
+    fun definirColunasBloco(id: String, colunas: Int) {
+        salvarNoHistorico()
+        atualizarBloco(id) { it.copy(colunas = colunas.coerceIn(1, 12)) }
     }
 
-    fun alternarTachado() {
-        _tachado.value = !_tachado.value
+    fun adicionarBloco(tipo: TipoBlocoEditor) {
+        salvarNoHistorico()
+        val novo = when (tipo) {
+            TipoBlocoEditor.TITULO -> BlocoEditor(tipo = tipo, alinhamento = AlinhamentoTexto.ESQUERDA)
+            TipoBlocoEditor.PARAGRAFO -> blocoParagrafoVazio()
+            TipoBlocoEditor.CITACAO -> BlocoEditor(tipo = tipo)
+            TipoBlocoEditor.FIGURA -> BlocoEditor(
+                tipo = tipo,
+                legenda = "Figura — legenda",
+                fonte = "Fonte: elaborado pelos autores (${java.time.Year.now().value})",
+                alinhamento = AlinhamentoTexto.CENTRO
+            )
+            TipoBlocoEditor.TABELA -> BlocoEditor(
+                tipo = tipo,
+                legenda = "Tabela — legenda",
+                fonte = "Fonte: elaborado pelos autores (${java.time.Year.now().value})",
+                alinhamento = AlinhamentoTexto.CENTRO,
+                tabelaLinhas = listOf(listOf("Coluna 1", "Coluna 2", "Coluna 3"), listOf("", "", ""))
+            )
+            TipoBlocoEditor.FORMULA -> BlocoEditor(tipo = tipo, formulaLatex = "x = y", alinhamento = AlinhamentoTexto.CENTRO)
+            TipoBlocoEditor.DIVISOR -> BlocoEditor(tipo = tipo)
+        }
+        inserirAposSelecionado(novo)
     }
 
-    fun definirAlinhamento(al: AlinhamentoTexto) {
-        _alinhamento.value = al
+    /** Insere a citação ABNT (SOBRENOME, ano) no bloco de texto selecionado (ou cria um parágrafo). */
+    fun inserirCitacao(artigo: ArtigoEstudoDetalhado) {
+        // ABNT: autores separados por ponto e vírgula; o campo de origem pode trazer "A & B, 2025"
+        val sobrenome = artigo.autores.substringBefore(",").replace(" & ", "; ").replace(" e ", "; ").trim()
+            .ifBlank { artigo.autores.substringBefore(" ").trim() }
+        val marca = "(${sobrenome.uppercase()}, ${artigo.ano})"
+        val alvo = _blocos.value.find { it.id == _blocoSelecionadoId.value }
+        salvarNoHistorico()
+        if (alvo != null && (alvo.tipo == TipoBlocoEditor.PARAGRAFO || alvo.tipo == TipoBlocoEditor.CITACAO)) {
+            val sep = if (alvo.texto.isBlank() || alvo.texto.endsWith(" ")) "" else " "
+            atualizarBloco(alvo.id) { it.copy(texto = it.texto + sep + marca) }
+        } else {
+            inserirAposSelecionado(BlocoEditor(tipo = TipoBlocoEditor.PARAGRAFO, texto = marca))
+        }
+        _painelCitacaoAberto.value = false
     }
 
-    fun selecionarSecao(id: String) {
-        _secaoSelecionadaId.value = id
+    private fun inserirAposSelecionado(novo: BlocoEditor) {
+        val lista = _blocos.value.toMutableList()
+        val idx = lista.indexOfFirst { it.id == _blocoSelecionadoId.value }
+        if (idx >= 0) lista.add(idx + 1, novo) else lista.add(novo)
+        _blocos.value = lista
+        _blocoSelecionadoId.value = novo.id
+        marcarAlterado()
     }
 
-    fun proximaPagina() {
-        if (_paginaAtual.value < totalPaginas) _paginaAtual.value += 1
+    fun removerBloco(id: String) {
+        salvarNoHistorico()
+        _blocos.value = _blocos.value.filterNot { it.id == id }.ifEmpty { listOf(blocoParagrafoVazio()) }
+        if (_blocoSelecionadoId.value == id) _blocoSelecionadoId.value = _blocos.value.firstOrNull()?.id
+        marcarAlterado()
     }
 
-    fun paginaAnterior() {
-        if (_paginaAtual.value > 1) _paginaAtual.value -= 1
+    fun duplicarBloco(id: String) {
+        salvarNoHistorico()
+        val original = _blocos.value.find { it.id == id } ?: return
+        val copia = original.copy(id = UUID.randomUUID().toString())
+        val lista = _blocos.value.toMutableList()
+        val idx = lista.indexOfFirst { it.id == id }
+        if (idx >= 0) lista.add(idx + 1, copia) else lista.add(copia)
+        _blocos.value = lista
+        _blocoSelecionadoId.value = copia.id
+        marcarAlterado()
     }
 
-    fun zoomIn() {
-        if (_zoom.value < 200) _zoom.value += 10
+    fun desfazer() {
+        if (indiceHistorico > 0) {
+            indiceHistorico--
+            _blocos.value = historico[indiceHistorico]
+            marcarAlterado()
+        }
     }
 
-    fun zoomOut() {
-        if (_zoom.value > 50) _zoom.value -= 10
+    fun refazer() {
+        if (indiceHistorico < historico.size - 1) {
+            indiceHistorico++
+            _blocos.value = historico[indiceHistorico]
+            marcarAlterado()
+        }
+    }
+
+    private fun salvarNoHistorico() {
+        while (historico.size > indiceHistorico + 1) historico.removeAt(historico.size - 1)
+        historico.add(_blocos.value)
+        if (historico.size > LIMITE_HISTORICO) historico.removeAt(0)
+        indiceHistorico = historico.size - 1
+    }
+
+    // ------------------------------------------------------------------
+    // Persistência: um arquivo JSON por documento em filesDir
+    // ------------------------------------------------------------------
+
+    private fun marcarAlterado() {
+        _salvo.value = false
+        jobAutosave?.cancel()
+        jobAutosave = viewModelScope.launch {
+            delay(AUTOSAVE_MS)
+            gravarNoDisco()
+        }
+    }
+
+    /** Salvamento imediato (botão Salvar e saída da tela). */
+    fun salvarDocumento() {
+        jobAutosave?.cancel()
+        viewModelScope.launch { gravarNoDisco() }
+    }
+
+    private suspend fun gravarNoDisco() {
+        val doc = _documento.value ?: return
+        val arquivo = arquivoDe(doc.id) ?: run { _salvo.value = true; return }
+        val json = serializar()
+        withContext(Dispatchers.IO) {
+            try {
+                arquivo.writeText(json)
+            } catch (_: Exception) {
+            }
+        }
+        _salvo.value = true
+    }
+
+    override fun onCleared() {
+        // Última gravação síncrona: o escopo do ViewModel já foi cancelado neste ponto.
+        val doc = _documento.value
+        if (doc != null && !_salvo.value) {
+            try { arquivoDe(doc.id)?.writeText(serializar()) } catch (_: Exception) {}
+        }
+        super.onCleared()
+    }
+
+    private fun arquivoDe(id: String): File? = pastaArmazenamento?.let { File(it, "editor_$id.json") }
+
+    private fun serializar(): String {
+        val raiz = JSONObject()
+        raiz.put("titulo", _titulo.value)
+        raiz.put("subtitulo", _subtitulo.value)
+        raiz.put("autores", _autores.value)
+        raiz.put("resumo", _resumo.value)
+        val arr = JSONArray()
+        _blocos.value.forEach { b ->
+            arr.put(JSONObject().apply {
+                put("id", b.id); put("tipo", b.tipo.name); put("titulo", b.titulo); put("texto", b.texto)
+                put("legenda", b.legenda); put("fonte", b.fonte); put("formulaLatex", b.formulaLatex)
+                put("colunas", b.colunas); put("alinhamento", b.alinhamento.name); put("estiloId", b.estiloId)
+                put("tabela", JSONArray(b.tabelaLinhas.map { JSONArray(it) }))
+            })
+        }
+        raiz.put("blocos", arr)
+        return raiz.toString()
+    }
+
+    private class ConteudoLido(
+        val titulo: String, val subtitulo: String, val autores: String, val resumo: String, val blocos: List<BlocoEditor>
+    )
+
+    private fun lerDoDisco(id: String): ConteudoLido? {
+        val arquivo = arquivoDe(id)?.takeIf { it.exists() } ?: return null
+        return try {
+            val raiz = JSONObject(arquivo.readText())
+            val arr = raiz.getJSONArray("blocos")
+            val blocos = (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                val tab = o.optJSONArray("tabela")
+                BlocoEditor(
+                    id = o.optString("id", UUID.randomUUID().toString()),
+                    tipo = runCatching { TipoBlocoEditor.valueOf(o.optString("tipo")) }.getOrDefault(TipoBlocoEditor.PARAGRAFO),
+                    titulo = o.optString("titulo"), texto = o.optString("texto"),
+                    legenda = o.optString("legenda"), fonte = o.optString("fonte"),
+                    formulaLatex = o.optString("formulaLatex"), colunas = o.optInt("colunas", 12),
+                    alinhamento = runCatching { AlinhamentoTexto.valueOf(o.optString("alinhamento")) }.getOrDefault(AlinhamentoTexto.JUSTIFICADO),
+                    estiloId = o.optString("estiloId", "texto"),
+                    tabelaLinhas = if (tab == null) emptyList() else (0 until tab.length()).map { r ->
+                        val l = tab.getJSONArray(r)
+                        (0 until l.length()).map { c -> l.getString(c) }
+                    }
+                )
+            }
+            ConteudoLido(
+                raiz.optString("titulo"), raiz.optString("subtitulo"),
+                raiz.optString("autores"), raiz.optString("resumo"), blocos
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    companion object {
+        const val ID_DOCUMENTO_EXEMPLO = "doc_reurb_sustentavel"
+        private const val AUTOSAVE_MS = 900L
+        private const val LIMITE_HISTORICO = 60
+        private const val RESUMO_EXEMPLO =
+            "Este artigo apresenta metodologia integrada para modelagem e diagramação acadêmica de peças técnicas e artigos com rigor ABNT e APA."
+
+        fun blocoParagrafoVazio() = BlocoEditor(tipo = TipoBlocoEditor.PARAGRAFO)
+
+        fun obterBlocosIniciais(): List<BlocoEditor> {
+            return listOf(
+                BlocoEditor(
+                    id = "bloco_sec_1",
+                    tipo = TipoBlocoEditor.TITULO,
+                    titulo = "INTRODUÇÃO E DELIMITAÇÃO DO TEMA",
+                    alinhamento = AlinhamentoTexto.ESQUERDA
+                ),
+                BlocoEditor(
+                    id = "bloco_par_1",
+                    tipo = TipoBlocoEditor.PARAGRAFO,
+                    texto = "A elaboração de relatórios técnicos e artigos científicos com conformidade normativa requer rigor metodológico na estruturação de seções, parágrafos e citações bibliográficas. No modelo editorial em blocos do Athenes, cada componente preserva suas propriedades geométricas e tipográficas em milímetros e pontos, garantindo diagramação contínua de alta precisão."
+                ),
+                BlocoEditor(
+                    id = "bloco_par_2",
+                    tipo = TipoBlocoEditor.PARAGRAFO,
+                    texto = "Historicamente, a dissociação entre editores de texto convencionais e gerenciadores de referências bibliográficas acarretou retrabalho na atualização de citações e na formatação de notas de rodapé. A integração adotada nesta plataforma possibilita a inserção imediata de dados sincronizados do acervo Zotero."
+                ),
+                BlocoEditor(
+                    id = "bloco_cit_1",
+                    tipo = TipoBlocoEditor.CITACAO,
+                    texto = "A segurança jurídica da posse depende diretamente da precisão geométrica e da rastreabilidade social do cadastro territorial, constituindo o elo permanente entre o levantamento técnico e a titulação no registro de imóveis (SANTOS; RIBEIRO, 2025, p. 114)."
+                ),
+                BlocoEditor(
+                    id = "bloco_fig_1",
+                    tipo = TipoBlocoEditor.FIGURA,
+                    legenda = "Figura 1 — Esquema metodológico de integração territorial e diagramação paramétrica",
+                    fonte = "Fonte: Elaborado pelos autores (2026)",
+                    alinhamento = AlinhamentoTexto.CENTRO
+                ),
+                BlocoEditor(
+                    id = "bloco_tab_1",
+                    tipo = TipoBlocoEditor.TABELA,
+                    legenda = "Tabela 1 — Indicadores quantitativos de consolidação urbana",
+                    fonte = "Fonte: Banco territorial SIRGAS 2000 (2026)",
+                    alinhamento = AlinhamentoTexto.CENTRO,
+                    tabelaLinhas = listOf(
+                        listOf("Núcleo Urbano", "Lotes", "Área Total (m²)", "Status"),
+                        listOf("Núcleo Central", "142", "45.820,00", "Validado"),
+                        listOf("Comunidade Esperança", "86", "28.340,50", "Conforme"),
+                        listOf("Setor Bela Vista", "119", "39.110,20", "Validado")
+                    )
+                ),
+                BlocoEditor(
+                    id = "bloco_form_1",
+                    tipo = TipoBlocoEditor.FORMULA,
+                    formulaLatex = "Iv = (Σ Lv / Agleba) × 100",
+                    alinhamento = AlinhamentoTexto.CENTRO
+                )
+            )
+        }
     }
 }

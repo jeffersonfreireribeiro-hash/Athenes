@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,7 +55,8 @@ fun AthenesTopBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
         ) {
             // Linha Superior: Logo Athenes + Menu + Avatar
             Row(
@@ -67,9 +70,9 @@ fun AthenesTopBar(
                         painter = painterResource(id = R.drawable.ic_athenes_owl_logo),
                         contentDescription = "Logo Athenes",
                         tint = AthenesPrimary,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(30.dp)
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
                             text = "ATHENES",
@@ -79,13 +82,6 @@ fun AthenesTopBar(
                                 color = AthenesPrimary
                             )
                         )
-                        Text(
-                            text = "Plataforma Acadêmica Colaborativa",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 11.sp,
-                                color = AthenesTextMuted
-                            )
-                        )
                     }
                 }
 
@@ -93,7 +89,7 @@ fun AthenesTopBar(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = onMenuClick,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Menu,
@@ -121,7 +117,7 @@ fun AthenesTopBar(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Seletor de Modo Pílula: 1. Escrita & Documentos | 2. Leitura de Artigos, PDF & Zotero
             Box(
@@ -139,7 +135,7 @@ fun AthenesTopBar(
                             .clip(RoundedCornerShape(999.dp))
                             .background(if (modoAtivo == 0) AthenesPrimary else Color.Transparent)
                             .clickable { onModoAlterado(0) }
-                            .padding(vertical = 7.dp),
+                            .heightIn(min = 44.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -151,7 +147,7 @@ fun AthenesTopBar(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "1. Escrita & Documentos",
+                                text = "Escrita",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
@@ -168,7 +164,7 @@ fun AthenesTopBar(
                             .clip(RoundedCornerShape(999.dp))
                             .background(if (modoAtivo == 1) AthenesPrimary else Color.Transparent)
                             .clickable { onModoAlterado(1) }
-                            .padding(vertical = 7.dp),
+                            .heightIn(min = 44.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -180,7 +176,7 @@ fun AthenesTopBar(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "2. Leitura de Artigos, PDF & Zotero",
+                                text = "Leitura e Zotero",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,

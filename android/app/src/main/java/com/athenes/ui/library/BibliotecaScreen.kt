@@ -1,45 +1,28 @@
 package com.athenes.ui.library
 
+import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.core.model.Documento
 import com.athenes.core.updater.AppUpdateInfo
-import com.athenes.ui.components.AthenesCard
-import com.athenes.ui.components.AthenesSearchBar
-import com.athenes.ui.components.AthenesTopBar
-import com.athenes.ui.components.DialogConfirmarExclusao
-import com.athenes.ui.components.DialogNovoDocumento
-import com.athenes.ui.components.DialogRenomear
-import com.athenes.ui.theme.AthenesBg
-import com.athenes.ui.theme.AthenesText
-import com.athenes.ui.theme.AthenesTextMuted
+import com.athenes.ui.components.*
+import com.athenes.ui.theme.*
 import com.athenes.ui.updater.UpdateBanner
 
 @Composable
@@ -51,12 +34,18 @@ fun BibliotecaScreen(
     onOpenUpdateDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var modoAtivo by remember { mutableIntStateOf(0) } // 0 = Escrita & Documentos, 1 = Leitura & Zotero
+    val context = LocalContext.current
+    var modoAtivo by remember { mutableIntStateOf(0) } // 0 = Escrita & Documentos, 1 = Leitura de Artigos & Zotero
     var updateBannerDismissed by remember { mutableStateOf(false) }
 
+    // Estados da Aba 1 (Escrita)
     val textoBusca by viewModel.textoBusca.collectAsState()
     val tipoFiltro by viewModel.tipoFiltro.collectAsState()
     val documentos by viewModel.documentosFiltrados.collectAsState()
+
+    // Estados da Aba 2 (Artigos / Zotero)
+    val textoBuscaArtigos by viewModel.textoBuscaArtigos.collectAsState()
+    val artigos by viewModel.artigosFiltrados.collectAsState()
 
     val dialogNovoAberto by viewModel.dialogNovoAberto.collectAsState()
     val docParaExcluir by viewModel.docParaExcluir.collectAsState()
@@ -68,11 +57,8 @@ fun BibliotecaScreen(
                 modoAtivo = modoAtivo,
                 onModoAlterado = { novoModo ->
                     modoAtivo = novoModo
-                    if (novoModo == 1) {
-                        onAbrirLeitorPdf("")
-                    }
                 },
-                onMenuClick = { /* Abertura de gaveta futura */ }
+                onMenuClick = { /* Abertura de gaveta lateral */ }
             )
         },
         containerColor = AthenesBg,
@@ -84,98 +70,228 @@ fun BibliotecaScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp)
         ) {
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Cabeçalho da Seção (Idêntico ao Web e ao Mockup)
-            Text(
-                text = if (modoAtivo == 0) "Meus Documentos e Artigos" else "Biblioteca de Leitura, PDF & Zotero",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 21.sp,
-                    color = AthenesText
-                )
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = if (modoAtivo == 0) {
-                    "Ambiente de escrita e diagramação acadêmica em blocos com revisão Google Docs em tempo real"
-                } else {
-                    "Fichamento de artigos científicos, leitura de PDFs com caneta e sincronização com o Zotero"
-                },
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 12.sp,
-                    color = AthenesTextMuted
-                )
-            )
+            // ========================================================
+            // CABEÇALHO DA SEÇÃO (IDÊNTICO AO WEB ATHENES)
+            // ========================================================
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (modoAtivo == 0) "Meus documentos" else "Biblioteca e fichamentos",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 19.sp,
+                            color = AthenesText
+                        )
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(14.dp))
+                // Botões de Ação Específicos para a Aba de Artigos / Zotero (Idênticos ao Web)
+                if (modoAtivo == 1) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                Toast.makeText(context, "Sincronizando biblioteca do Zotero...", Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.height(44.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AthenesPrimary)
+                        ) {
+                            Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = "Sincronizar Zotero", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
 
-            // Banner de Notificação de Atualização Disponível (Padrão Glaux GIS)
+                        Button(
+                            onClick = {
+                                Toast.makeText(context, "Selecione o arquivo PDF para vincular ao novo artigo.", Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.height(44.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AthenesPrimary,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(text = "Novo Artigo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Banner de Notificação de Atualização Disponível
             if (updateInfo != null && updateInfo.temNovaVersao && !updateBannerDismissed) {
                 UpdateBanner(
                     updateInfo = updateInfo,
                     onOpenDialog = onOpenUpdateDialog,
                     onDismiss = { updateBannerDismissed = true }
                 )
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Barra de Pesquisa + Filtros de Tipo + Botão Novo Documento
-            AthenesSearchBar(
-                textoBusca = textoBusca,
-                onBuscaAlterada = viewModel::setTextoBusca,
-                tipoFiltro = tipoFiltro,
-                onTipoFiltroAlterado = viewModel::setTipoFiltro,
-                onNovoDocumentoClick = viewModel::abrirDialogNovo
-            )
+            // ========================================================
+            // CONTEÚDO DA ABA SELECIONADA
+            // ========================================================
+            if (modoAtivo == 0) {
+                // ABA 1: ESCRITA & DOCUMENTOS
+                AthenesSearchBar(
+                    textoBusca = textoBusca,
+                    onBuscaAlterada = viewModel::setTextoBusca,
+                    tipoFiltro = tipoFiltro,
+                    onTipoFiltroAlterado = viewModel::setTipoFiltro,
+                    onNovoDocumentoClick = viewModel::abrirDialogNovo
+                )
 
-            Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // Grade Adaptativa Responsiva: 2 a 3 colunas em Tablets; 1 coluna em Celulares
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val larguraDisponivel = maxWidth
-                val colunas = if (larguraDisponivel >= 900.dp) {
-                    GridCells.Fixed(3)
-                } else if (larguraDisponivel >= 600.dp) {
-                    GridCells.Fixed(2)
-                } else {
-                    GridCells.Fixed(1)
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val colunas = if (maxWidth >= 900.dp) GridCells.Fixed(3) else if (maxWidth >= 600.dp) GridCells.Fixed(2) else GridCells.Fixed(1)
+
+                    if (documentos.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = 40.dp),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            Text(
+                                text = if (textoBusca.isNotBlank()) "Nenhum documento encontrado para \"$textoBusca\"" else "Nenhum documento cadastrado.",
+                                style = MaterialTheme.typography.bodyMedium.copy(color = AthenesTextMuted)
+                            )
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = colunas,
+                            contentPadding = PaddingValues(bottom = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(documentos, key = { it.id }) { doc ->
+                                AthenesCard(
+                                    documento = doc,
+                                    onAbrirClick = { onAbrirDocumento(doc) },
+                                    onDuplicarClick = { viewModel.duplicarDocumento(doc.id) },
+                                    onRenomearClick = { viewModel.solicitarRenomear(doc) },
+                                    onExcluirClick = { viewModel.solicitarExclusao(doc) }
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                // ABA 2: LEITURA DE ARTIGOS, PDF & ZOTERO (CATÁLOGO DE ARTIGOS)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = textoBuscaArtigos,
+                        onValueChange = viewModel::setTextoBuscaArtigos,
+                        placeholder = {
+                            Text(
+                                text = "Pesquisar por título, autor, chave Zotero ou DOI...",
+                                fontSize = 12.sp,
+                                color = AthenesTextMuted
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Search,
+                                contentDescription = null,
+                                tint = AthenesTextMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            focusedBorderColor = AthenesPrimary,
+                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                        ),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Badge de Status Conexão Zotero
+                    Surface(
+                        color = Color(0xFFECFDF5),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFA7F3D0)),
+                        modifier = Modifier.height(48.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(Color(0xFF10B981), androidx.compose.foundation.shape.CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Zotero Conectado (#18806479)",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF047857)
+                                )
+                            )
+                        }
+                    }
                 }
 
-                if (documentos.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 40.dp),
-                        contentAlignment = Alignment.TopCenter
-                    ) {
-                        Text(
-                            text = if (textoBusca.isNotBlank()) "Nenhum documento encontrado para \"$textoBusca\"" else "Nenhum documento cadastrado.",
-                            style = MaterialTheme.typography.bodyMedium.copy(color = AthenesTextMuted)
-                        )
-                    }
-                } else {
-                    LazyVerticalGrid(
-                        columns = colunas,
-                        contentPadding = PaddingValues(bottom = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(documentos, key = { it.id }) { doc ->
-                            AthenesCard(
-                                documento = doc,
-                                onAbrirClick = {
-                                    if (modoAtivo == 1) {
-                                        onAbrirLeitorPdf(doc.id)
-                                    } else {
-                                        onAbrirDocumento(doc)
-                                    }
-                                },
-                                onDuplicarClick = { viewModel.duplicarDocumento(doc.id) },
-                                onRenomearClick = { viewModel.solicitarRenomear(doc) },
-                                onExcluirClick = { viewModel.solicitarExclusao(doc) }
+                Spacer(modifier = Modifier.height(14.dp))
+
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val colunas = if (maxWidth >= 900.dp) GridCells.Fixed(3) else if (maxWidth >= 600.dp) GridCells.Fixed(2) else GridCells.Fixed(1)
+
+                    if (artigos.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = 40.dp),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            Text(
+                                text = if (textoBuscaArtigos.isNotBlank()) "Nenhum artigo encontrado para \"$textoBuscaArtigos\"" else "Nenhum artigo cadastrado.",
+                                style = MaterialTheme.typography.bodyMedium.copy(color = AthenesTextMuted)
                             )
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = colunas,
+                            contentPadding = PaddingValues(bottom = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(artigos, key = { it.id }) { art ->
+                                ArtigoEstudoCard(
+                                    artigo = art,
+                                    onAbrirTelaCheiaClick = {
+                                        onAbrirLeitorPdf(art.id)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -187,7 +303,10 @@ fun BibliotecaScreen(
     if (dialogNovoAberto) {
         DialogNovoDocumento(
             onDismiss = viewModel::fecharDialogNovo,
-            onConfirmar = viewModel::criarNovoDocumento
+            onConfirmar = { titulo, subtitulo, tipo, autor ->
+                val novo = viewModel.criarNovoDocumento(titulo, subtitulo, tipo, autor)
+                onAbrirDocumento(novo)
+            }
         )
     }
 

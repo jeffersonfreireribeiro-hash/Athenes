@@ -21,6 +21,7 @@ Abra a pasta `docs/` como cofre no **Obsidian**: estas notas ficam em `docs/brai
 - [[13 - Tipografia e Perfis Academicos]] — controle tipográfico (Affinity/InDesign), fontes offline, ABNT, APA, IEEE, Vancouver.
 - [[14 - Zotero, Fichamento e Grafo]] — Zotero Web API v3, importação BibTeX, biblioteca de leitura, notas de fichamento e grafo de conexões.
 - [[15 - Exportacao PDF e DOCX]] — W3C Paged Media (@page), Office Open XML (ECMA-376) para Word/Google Docs e relatório pré-voo.
+- [[16 - App Android]] — app Compose (Home, editor em blocos com modo foco, citação da biblioteca, leitura de artigos).
 - [[90 - Fluxos de Trabalho]] — ciclo de vida do artigo: criação, estruturação, citação, revisão e publicação.
 
 ---

@@ -63,16 +63,16 @@ fun ReaderSubBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // 1. Botão Voltar (←)
+            // 1. Botão Voltar (chevron v deitado <)
             BotaoCircularBarra(
                 onClick = onVoltar,
                 contentDescription = "Voltar para Biblioteca"
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    imageVector = Icons.Rounded.ChevronLeft,
                     contentDescription = null,
                     tint = Color(0xFF64748B),
-                    modifier = Modifier.size(17.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
 

@@ -1,4 +1,13 @@
 
+## 02/11/2026 — Auditoria Web x APK e Redesenho do Editor Android
+
+- **Auditoria:** o editor do APK era uma casca — título, resumo e bloco de figura fixos no código, "Salvar" só ligava uma flag (nada gravado), estrutura estática, tabela/fórmula/legenda não editáveis, botões duplicados na barra (mapa/espaçamento/quebra de página abriam "divisor"), cabeçalho de ~130 dp (logo, subtítulo, seletor de tipo, pílula de modo, status) e folha inteira num único item de rolagem.
+- **Editor refeito:** barra de título de uma linha + barra de blocos no topo (preferência do usuário), ambas recolhíveis ao rolar (modo foco); folha virtualizada com `BasicTextField`; largura total no celular; alvos de 44 dp; estrutura derivada dos títulos com navegação; botão **Citar** com painel da biblioteca; persistência real por documento com autosave.
+- **Home:** barra superior compacta (sem tagline, abas "Escrita" / "Leitura e Zotero" de 44 dp), cabeçalho de seção reduzido a um título.
+- **Arquivos:** `EditorDocumentoScreen.kt`, `EditorViewModel.kt`, `EditorTopBar.kt`, `EditorBarraBlocos.kt`, `EditorPainelCitacao.kt` (novo), `EditorPainelEsquerdo.kt`, `AthenesTopBar.kt`, `BibliotecaScreen.kt`. Nota: [[16 - App Android]].
+- **Validação:** emulador (Home, editor, modo foco, inserção, persistência, citação). `npm test` verde (146). `athenes.apk` atualizado. O pacote de estilo (`athenes_pacote_estilo.js`) não foi tocado: nenhuma propriedade visual de documento web mudou.
+- **Pendências conhecidas:** imagem real em figuras, fórmula renderizada, mestras/páginas e exportação no app, Zotero real na aba de leitura. ANR transitório na abertura a frio no emulador (ver nota 16).
+
 ## Identidade Visual Azul (#314F79), Controles Completos de Formatação e Editor de Páginas Mestras (01/11/2026 - Tarde)
 
 - **Identidade Visual Athenes em Azul:**
