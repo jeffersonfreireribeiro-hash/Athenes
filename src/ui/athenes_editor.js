@@ -2357,9 +2357,9 @@ export class EditorView {
       const subtipos = [
         { id: 'figura', nome: 'Figura' },
         { id: 'grafico', nome: 'Gráfico' },
-        { id: 'fotografia', nome: 'Fotografia' },
+        { id: 'fotografia', nome: 'Foto' },
         { id: 'diagrama', nome: 'Diagrama' },
-        { id: 'fluxograma', nome: 'Fluxograma' },
+        { id: 'fluxograma', nome: 'Fluxo' },
         { id: 'esquema', nome: 'Esquema' },
         { id: 'croqui', nome: 'Croqui' },
         { id: 'desenho', nome: 'Desenho' },
@@ -2383,8 +2383,8 @@ export class EditorView {
         { id: '2_lado', nome: '2 Lado a Lado' },
         { id: '2_empilhado', nome: '2 Empilhado' },
         { id: '3_linha', nome: '3 em Linha' },
-        { id: '4_grade', nome: '4 em Grade (2×2)' },
-        { id: '6_grade', nome: '6 em Grade (2×3)' }
+        { id: '4_grade', nome: 'Grade 2×2' },
+        { id: '6_grade', nome: 'Grade 2×3' }
       ];
       selLay.innerHTML = layouts.map(l => `<option value="${l.id}" ${(b.layout || '1') === l.id ? 'selected' : ''}>${l.nome}</option>`).join('');
       selLay.addEventListener('change', e => {
@@ -2432,20 +2432,6 @@ export class EditorView {
         barra.appendChild(selMod);
       }
 
-      // 3. Dropdown de Subgrade / Legenda
-      const selSubgrade = document.createElement('select');
-      selSubgrade.className = 'ath-sel-rapido';
-      selSubgrade.title = 'Estrutura da legenda';
-      selSubgrade.innerHTML = `
-        <option value="1" ${(!b.subgrade_colunas || b.subgrade_colunas === 1) ? 'selected' : ''}>Vertical</option>
-        <option value="2" ${b.subgrade_colunas === 2 ? 'selected' : ''}>Legenda ao Lado</option>
-      `;
-      selSubgrade.addEventListener('change', e => {
-        b.subgrade_colunas = parseInt(e.target.value, 10);
-        this.notificarMudanca();
-        this.renderizar();
-      });
-      barra.appendChild(selSubgrade);
 
       // 4. Botão de edição avançada (Abre ModalLayoutBloco)
       const btnEdit = document.createElement('button');
