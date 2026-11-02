@@ -146,4 +146,55 @@ class ReaderTest {
         assertEquals("998877", artAtualizado.zoteroConfig.userId)
         assertEquals("ITEM_NOVO_123", artAtualizado.zoteroConfig.itemKey)
     }
+
+    @Test
+    fun testStylusDetectionAndPalmRejectionToggle() {
+        // Estado Inicial: Palm Rejection desligado e stylus ainda não detectada
+        assertFalse(viewModel.modoSomenteStylus.value)
+        assertFalse(viewModel.stylusDetectada.value)
+        assertNull(viewModel.mensagemStatusStylus.value)
+
+        // Alternar manualmente para Modo Somente Caneta / Rejeição de Palma
+        viewModel.alternarModoSomenteStylus()
+        assertTrue("Modo Stylus exclusivo deve estar ativo", viewModel.modoSomenteStylus.value)
+        assertTrue(viewModel.mensagemStatusStylus.value?.contains("Rejeição de Palma") == true)
+
+        // Alternar de volta para Dedo + Caneta
+        viewModel.alternarModoSomenteStylus()
+        assertFalse("Modo Stylus exclusivo deve estar desligado", viewModel.modoSomenteStylus.value)
+
+        // Detecção Automática de Stylus / S-Pen ao encostar na tela (Estilo Samsung Notes)
+        viewModel.registrarStylusDetectada()
+        assertTrue("Stylus detectada deve ser verdadeira", viewModel.stylusDetectada.value)
+        assertTrue("Modo somente stylus deve ativar automaticamente", viewModel.modoSomenteStylus.value)
+        assertTrue(viewModel.mensagemStatusStylus.value?.contains("S-Pen") == true)
+
+        viewModel.limparMensagemStatusStylus()
+        assertNull(viewModel.mensagemStatusStylus.value)
+    }
+
+    @Test
+    fun testApagarTracosProximosComBorracha() {
+        viewModel.navegarParaPagina(4)
+        val artId = viewModel.obterArtigoAtivo().id
+
+        // Traço 1 próximo a (100, 100)
+        viewModel.adicionarTracoLivre(
+            listOf(PontoTraco(100f, 100f), PontoTraco(110f, 110f))
+        )
+        // Traço 2 longe em (500, 500)
+        viewModel.adicionarTracoLivre(
+            listOf(PontoTraco(500f, 500f), PontoTraco(510f, 510f))
+        )
+
+        var tracosP4 = viewModel.obterArtigoAtivo().tracos.filter { it.pagina == 4 }
+        assertEquals("Devem existir 2 traços na página 4", 2, tracosP4.size)
+
+        // Passar a borracha em (105, 105) com raio 25f
+        viewModel.apagarTracosProximos(105f, 105f, raio = 25f)
+
+        tracosP4 = viewModel.obterArtigoAtivo().tracos.filter { it.pagina == 4 }
+        assertEquals("Deve restar apenas 1 traço (o que está distante)", 1, tracosP4.size)
+        assertEquals(500f, tracosP4.first().pontos.first().x, 0.1f)
+    }
 }

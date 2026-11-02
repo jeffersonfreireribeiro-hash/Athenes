@@ -8,6 +8,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,6 +31,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -46,13 +49,16 @@ fun PdfContinuousCanvas(
     paginaAtual: Int,
     ferramentaAtiva: FerramentaLeitura,
     corAtiva: String,
+    modoSomenteStylus: Boolean = false,
     textoSelecionado: TextoSelecionadoPopup?,
     onTextoSelecionado: (String, Int, Float, Float) -> Unit,
     onFecharPopupSelecao: () -> Unit,
     onGrifarTexto: () -> Unit,
     onCriarCitacao: () -> Unit,
     onCriarNota: () -> Unit,
-    onAdicionarTraco: (List<PontoTraco>) -> Unit,
+    onAdicionarTraco: (Int, List<PontoTraco>) -> Unit,
+    onApagarTracoProximo: (Int, Float, Float) -> Unit = { _, _, _ -> },
+    onStylusDetectada: () -> Unit = {},
     onPaginaAnterior: () -> Unit = {},
     onProximaPagina: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -86,12 +92,15 @@ fun PdfContinuousCanvas(
                     pagina = pagina,
                     ferramentaAtiva = ferramentaAtiva,
                     corAtiva = corAtiva,
+                    modoSomenteStylus = modoSomenteStylus,
                     tracosPagina = artigo.tracos.filter { it.pagina == pagina.numero },
                     notasPagina = artigo.notas.filter { it.pagina == pagina.numero },
                     onTextoSelecionado = { texto ->
                         onTextoSelecionado(texto, pagina.numero, 0f, 0f)
                     },
-                    onAdicionarTraco = onAdicionarTraco
+                    onAdicionarTraco = onAdicionarTraco,
+                    onApagarTracoProximo = onApagarTracoProximo,
+                    onStylusDetectada = onStylusDetectada
                 )
             }
         }
@@ -286,10 +295,13 @@ private fun FolhaPdfRenderizada(
     pagina: PaginaPdfInfo,
     ferramentaAtiva: FerramentaLeitura,
     corAtiva: String,
+    modoSomenteStylus: Boolean,
     tracosPagina: List<TracoDesenho>,
     notasPagina: List<NotaAdesiva>,
     onTextoSelecionado: (String) -> Unit,
-    onAdicionarTraco: (List<PontoTraco>) -> Unit
+    onAdicionarTraco: (Int, List<PontoTraco>) -> Unit,
+    onApagarTracoProximo: (Int, Float, Float) -> Unit,
+    onStylusDetectada: () -> Unit
 ) {
     var pontosAtuais = remember { mutableStateListOf<PontoTraco>() }
 
@@ -332,29 +344,6 @@ private fun FolhaPdfRenderizada(
                 .shadow(elevation = 3.dp, shape = RoundedCornerShape(2.dp))
                 .background(Color.White)
                 .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(2.dp))
-                .pointerInput(ferramentaAtiva, corAtiva) {
-                    if (ferramentaAtiva == FerramentaLeitura.CANETA || ferramentaAtiva == FerramentaLeitura.MARCADOR) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                pontosAtuais.clear()
-                                pontosAtuais.add(PontoTraco(offset.x, offset.y))
-                            },
-                            onDrag = { change, _ ->
-                                change.consume()
-                                pontosAtuais.add(PontoTraco(change.position.x, change.position.y))
-                            },
-                            onDragEnd = {
-                                if (pontosAtuais.isNotEmpty()) {
-                                    onAdicionarTraco(pontosAtuais.toList())
-                                    pontosAtuais.clear()
-                                }
-                            },
-                            onDragCancel = {
-                                pontosAtuais.clear()
-                            }
-                        )
-                    }
-                }
         ) {
             // Camada de Texto Acadêmico
             Column(
@@ -434,51 +423,128 @@ private fun FolhaPdfRenderizada(
                 }
             }
 
-            // Camada de Risco / Anotações Caneta e Marca-Texto (Canvas sobre a folha)
-            Canvas(modifier = Modifier.matchParentSize()) {
-                // Desenhar traços já persistidos
-                tracosPagina.forEach { traco ->
-                    val cor = parseHexColor(traco.corHex).copy(
-                        alpha = if (traco.ehMarcaTexto) 0.38f else 1.0f
-                    )
-                    if (traco.pontos.size > 1) {
-                        val path = Path().apply {
-                            moveTo(traco.pontos.first().x, traco.pontos.first().y)
-                            for (p in traco.pontos.drop(1)) {
-                                lineTo(p.x, p.y)
-                            }
-                        }
-                        drawPath(
-                            path = path,
-                            color = cor,
-                            style = Stroke(
-                                width = traco.espessura,
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round
-                            )
-                        )
-                    }
-                }
+            // Camada de Risco / Anotações Caneta, Marca-Texto e Borracha (Overlay físico transparente sobre o papel)
+            val ehModoDesenho = (ferramentaAtiva == FerramentaLeitura.CANETA ||
+                                 ferramentaAtiva == FerramentaLeitura.MARCADOR ||
+                                 ferramentaAtiva == FerramentaLeitura.BORRACHA)
 
-                // Desenhar traço em tempo real sendo desenhado pelo usuário
-                if (pontosAtuais.size > 1) {
-                    val ehMarca = (ferramentaAtiva == FerramentaLeitura.MARCADOR)
-                    val corAtual = parseHexColor(corAtiva).copy(alpha = if (ehMarca) 0.38f else 1.0f)
-                    val pathAtual = Path().apply {
-                        moveTo(pontosAtuais.first().x, pontosAtuais.first().y)
-                        for (p in pontosAtuais.drop(1)) {
-                            lineTo(p.x, p.y)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .then(
+                        if (ehModoDesenho) {
+                            Modifier.pointerInput(ferramentaAtiva, corAtiva, modoSomenteStylus) {
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                                    val tipo = down.type
+
+                                    // Se stylus ativa ou borracha do stylus for detectada
+                                    if (tipo == PointerType.Stylus || tipo == PointerType.Eraser) {
+                                        onStylusDetectada()
+                                    }
+
+                                    // REJEIÇÃO DE PALMA DA MÃO (PALM REJECTION INTELIGENTE):
+                                    // Quando modoSomenteStylus está ativo e o toque vem de dedo ou palma (Touch),
+                                    // NÃO consumimos down e saímos imediatamente.
+                                    // Isso permite que a mão descanse na tela sem riscar e que dedos rolem o PDF livremente!
+                                    if (modoSomenteStylus && tipo == PointerType.Touch) {
+                                        return@awaitEachGesture
+                                    }
+
+                                    val ehAcaoBorracha = (ferramentaAtiva == FerramentaLeitura.BORRACHA) || (tipo == PointerType.Eraser)
+                                    if (ehAcaoBorracha) {
+                                        down.consume()
+                                        onApagarTracoProximo(pagina.numero, down.position.x, down.position.y)
+                                        while (true) {
+                                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                            if (!change.pressed) break
+                                            change.consume()
+                                            onApagarTracoProximo(pagina.numero, change.position.x, change.position.y)
+                                        }
+                                    } else {
+                                        down.consume()
+                                        pontosAtuais.clear()
+                                        pontosAtuais.add(PontoTraco(down.position.x, down.position.y))
+
+                                        while (true) {
+                                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                            if (!change.pressed) break
+                                            change.consume()
+                                            pontosAtuais.add(PontoTraco(change.position.x, change.position.y))
+                                        }
+
+                                        if (pontosAtuais.isNotEmpty()) {
+                                            onAdicionarTraco(pagina.numero, pontosAtuais.toList())
+                                            pontosAtuais.clear()
+                                        }
+                                    }
+                                }
+                            }
+                        } else Modifier
+                    )
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    // Desenhar traços já persistidos
+                    tracosPagina.forEach { traco ->
+                        val cor = parseHexColor(traco.corHex).copy(
+                            alpha = if (traco.ehMarcaTexto) 0.38f else 1.0f
+                        )
+                        if (traco.pontos.size > 1) {
+                            val path = Path().apply {
+                                moveTo(traco.pontos.first().x, traco.pontos.first().y)
+                                for (p in traco.pontos.drop(1)) {
+                                    lineTo(p.x, p.y)
+                                }
+                            }
+                            drawPath(
+                                path = path,
+                                color = cor,
+                                style = Stroke(
+                                    width = traco.espessura,
+                                    cap = StrokeCap.Round,
+                                    join = StrokeJoin.Round
+                                )
+                            )
+                        } else if (traco.pontos.size == 1) {
+                            drawCircle(
+                                color = cor,
+                                radius = traco.espessura / 2,
+                                center = Offset(traco.pontos.first().x, traco.pontos.first().y)
+                            )
                         }
                     }
-                    drawPath(
-                        path = pathAtual,
-                        color = corAtual,
-                        style = Stroke(
-                            width = if (ehMarca) 18f else 3f,
-                            cap = StrokeCap.Round,
-                            join = StrokeJoin.Round
-                        )
-                    )
+
+                    // Desenhar traço em tempo real sendo desenhado pelo usuário
+                    if (pontosAtuais.isNotEmpty()) {
+                        val ehMarca = (ferramentaAtiva == FerramentaLeitura.MARCADOR)
+                        val corAtual = parseHexColor(corAtiva).copy(alpha = if (ehMarca) 0.38f else 1.0f)
+                        val espessura = if (ehMarca) 18f else 3f
+                        if (pontosAtuais.size > 1) {
+                            val pathAtual = Path().apply {
+                                moveTo(pontosAtuais.first().x, pontosAtuais.first().y)
+                                for (p in pontosAtuais.drop(1)) {
+                                    lineTo(p.x, p.y)
+                                }
+                            }
+                            drawPath(
+                                path = pathAtual,
+                                color = corAtual,
+                                style = Stroke(
+                                    width = espessura,
+                                    cap = StrokeCap.Round,
+                                    join = StrokeJoin.Round
+                                )
+                            )
+                        } else {
+                            drawCircle(
+                                color = corAtual,
+                                radius = espessura / 2,
+                                center = Offset(pontosAtuais.first().x, pontosAtuais.first().y)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -498,7 +564,7 @@ private fun FolhaPdfRenderizada(
                     Column(modifier = Modifier.padding(6.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Rounded.StickyNote2,
+                                imageVector = Icons.AutoMirrored.Rounded.StickyNote2,
                                 contentDescription = null,
                                 tint = corNota,
                                 modifier = Modifier.size(12.dp)

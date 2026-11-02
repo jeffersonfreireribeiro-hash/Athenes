@@ -82,6 +82,16 @@ class ReaderViewModel(
     private val _mostrarDialogZoteroDrive = MutableStateFlow(false)
     val mostrarDialogZoteroDrive: StateFlow<Boolean> = _mostrarDialogZoteroDrive.asStateFlow()
 
+    // Modo Stylus Exclusivo / Rejeição de Palma da Mão (Estilo Samsung Notes / S-Pen)
+    private val _modoSomenteStylus = MutableStateFlow(false)
+    val modoSomenteStylus: StateFlow<Boolean> = _modoSomenteStylus.asStateFlow()
+
+    private val _stylusDetectada = MutableStateFlow(false)
+    val stylusDetectada: StateFlow<Boolean> = _stylusDetectada.asStateFlow()
+
+    private val _mensagemStatusStylus = MutableStateFlow<String?>(null)
+    val mensagemStatusStylus: StateFlow<String?> = _mensagemStatusStylus.asStateFlow()
+
     fun obterArtigoAtivo(): ArtigoEstudoDetalhado {
         return repository.artigos.value.find { it.id == _artigoAtivoId.value }
             ?: repository.artigos.value.first()
@@ -115,6 +125,9 @@ class ReaderViewModel(
 
     fun definirFerramenta(ferramenta: FerramentaLeitura) {
         _ferramentaAtiva.value = ferramenta
+        if (ferramenta != FerramentaLeitura.SELECAO) {
+            _textoSelecionado.value = null
+        }
     }
 
     fun definirCor(corHex: String) {
@@ -244,11 +257,11 @@ class ReaderViewModel(
         repository.limparTracosPagina(art.id, _paginaAtiva.value)
     }
 
-    fun adicionarTracoLivre(pontos: List<PontoTraco>) {
+    fun adicionarTracoLivre(pontos: List<PontoTraco>, pagina: Int = _paginaAtiva.value) {
         val art = obterArtigoAtivo()
         val ehReta = _modoLinhaReta.value || (_ferramentaAtiva.value == FerramentaLeitura.LINHA_RETA)
         val traco = TracoDesenho(
-            pagina = _paginaAtiva.value,
+            pagina = pagina,
             corHex = _corAtiva.value,
             espessura = if (_ferramentaAtiva.value == FerramentaLeitura.MARCADOR) 18f else 3f,
             pontos = if (ehReta && pontos.size > 1) listOf(pontos.first(), pontos.last()) else pontos,
@@ -256,5 +269,44 @@ class ReaderViewModel(
             ehMarcaTexto = (_ferramentaAtiva.value == FerramentaLeitura.MARCADOR)
         )
         repository.adicionarTraco(art.id, traco)
+    }
+
+    fun adicionarTracoLivre(pagina: Int, pontos: List<PontoTraco>) {
+        adicionarTracoLivre(pontos, pagina)
+    }
+
+    fun apagarTracosProximos(x: Float, y: Float, pagina: Int = _paginaAtiva.value, raio: Float = 28f) {
+        val art = obterArtigoAtivo()
+        repository.apagarTracosProximos(art.id, pagina, x, y, raio)
+    }
+
+    fun apagarTracosProximos(pagina: Int, x: Float, y: Float, raio: Float = 28f) {
+        apagarTracosProximos(x, y, pagina, raio)
+    }
+
+    fun alternarModoSomenteStylus() {
+        val novoEstado = !_modoSomenteStylus.value
+        _modoSomenteStylus.value = novoEstado
+        _mensagemStatusStylus.value = if (novoEstado) {
+            "✏ Modo S-Pen Exclusivo Ativado · Rejeição de Palma Ligada"
+        } else {
+            "👆 Modo Dedo + Caneta Ativado · Toque na tela habilitado"
+        }
+    }
+
+    fun definirModoSomenteStylus(ativo: Boolean) {
+        _modoSomenteStylus.value = ativo
+    }
+
+    fun registrarStylusDetectada() {
+        if (!_stylusDetectada.value) {
+            _stylusDetectada.value = true
+            _modoSomenteStylus.value = true
+            _mensagemStatusStylus.value = "✏ S-Pen / Caneta Detectada · Rejeição de palma ativada automaticamente!"
+        }
+    }
+
+    fun limparMensagemStatusStylus() {
+        _mensagemStatusStylus.value = null
     }
 }

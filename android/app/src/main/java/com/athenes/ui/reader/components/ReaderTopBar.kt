@@ -30,8 +30,11 @@ fun ReaderTopBar(
     artigo: ArtigoEstudoDetalhado,
     painelEsquerdoAberto: Boolean,
     painelDireitoAberto: Boolean,
+    modoSomenteStylus: Boolean = false,
+    stylusDetectada: Boolean = false,
     onAlternarEsquerdo: () -> Unit,
     onAlternarDireito: () -> Unit,
+    onAlternarModoStylus: () -> Unit = {},
     onAbrirPdfClick: () -> Unit,
     onSalvarDriveZoteroClick: () -> Unit,
     onVoltarBiblioteca: () -> Unit,
@@ -178,7 +181,42 @@ fun ReaderTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // 1. Status Conexão Zotero (Ícone Acadêmico + Ponto Verde + Tag Compacta)
+                // 1. Modo Stylus Exclusivo / Rejeição de Palma da Mão (Samsung Notes Style)
+                Surface(
+                    color = if (modoSomenteStylus) Color(0xFFEFF6FF) else Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(20.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (modoSomenteStylus) Color(0xFF93C5FD) else Color(0xFFCBD5E1)
+                    ),
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onAlternarModoStylus() }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (modoSomenteStylus) Icons.Rounded.Draw else Icons.Rounded.TouchApp,
+                            contentDescription = if (modoSomenteStylus) "S-Pen Exclusiva (Rejeição de Palma Ativa)" else "Modo Dedo + Caneta",
+                            tint = if (modoSomenteStylus) AthenesPrimary else Color(0xFF64748B),
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (modoSomenteStylus) "✏ S-Pen" else "👆 Toque Livre",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (modoSomenteStylus) AthenesPrimary else Color(0xFF64748B)
+                            )
+                        )
+                    }
+                }
+
+                // 2. Status Conexão Zotero (Ícone Acadêmico + Ponto Verde + Tag Compacta)
                 Surface(
                     color = Color(0xFFECFDF5),
                     shape = RoundedCornerShape(20.dp),

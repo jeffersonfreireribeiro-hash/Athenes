@@ -84,6 +84,24 @@ class ArtigoEstudoRepository {
         }
     }
 
+    fun apagarTracosProximos(artigoId: String, pagina: Int, x: Float, y: Float, raio: Float = 28f) {
+        _artigos.value = _artigos.value.map { art ->
+            if (art.id == artigoId) {
+                val tracosFiltrados = art.tracos.filterNot { traco ->
+                    if (traco.pagina != pagina) false
+                    else {
+                        traco.pontos.any { p ->
+                            val dx = p.x - x
+                            val dy = p.y - y
+                            (dx * dx + dy * dy) <= (raio * raio)
+                        }
+                    }
+                }
+                art.copy(tracos = tracosFiltrados)
+            } else art
+        }
+    }
+
     fun atualizarResumos(artigoId: String, meuResumo: String, analiseMetodologica: String) {
         _artigos.value = _artigos.value.map { art ->
             if (art.id == artigoId) {

@@ -7,14 +7,19 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import com.athenes.core.model.AbaInspetorDireito
 import com.athenes.ui.reader.components.*
 
@@ -26,7 +31,10 @@ fun EstudoArtigosScreen(
 ) {
     val context = LocalContext.current
     val artigos by viewModel.artigos.collectAsState()
-    val artigoAtivo = viewModel.obterArtigoAtivo()
+    val artigoAtivoId by viewModel.artigoAtivoId.collectAsState()
+    val artigoAtivo = remember(artigos, artigoAtivoId) {
+        artigos.find { it.id == artigoAtivoId } ?: artigos.first()
+    }
     val paginaAtiva by viewModel.paginaAtiva.collectAsState()
     val ferramentaAtiva by viewModel.ferramentaAtiva.collectAsState()
     val modoLinhaReta by viewModel.modoLinhaReta.collectAsState()
@@ -37,8 +45,20 @@ fun EstudoArtigosScreen(
     val textoSelecionado by viewModel.textoSelecionado.collectAsState()
     val filtroArtigos by viewModel.filtroArtigos.collectAsState()
 
+    val modoSomenteStylus by viewModel.modoSomenteStylus.collectAsState()
+    val stylusDetectada by viewModel.stylusDetectada.collectAsState()
+    val mensagemStatusStylus by viewModel.mensagemStatusStylus.collectAsState()
+
     val mostrarDialogCitacao by viewModel.mostrarDialogNovaCitacao.collectAsState()
     val mostrarDialogNota by viewModel.mostrarDialogNovaNota.collectAsState()
+
+    // Auto-dismiss do banner flutuante de status da caneta após 3.5 segundos
+    LaunchedEffect(mensagemStatusStylus) {
+        if (mensagemStatusStylus != null) {
+            delay(3500)
+            viewModel.limparMensagemStatusStylus()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -46,8 +66,11 @@ fun EstudoArtigosScreen(
                 artigo = artigoAtivo,
                 painelEsquerdoAberto = painelEsquerdoAberto,
                 painelDireitoAberto = painelDireitoAberto,
+                modoSomenteStylus = modoSomenteStylus,
+                stylusDetectada = stylusDetectada,
                 onAlternarEsquerdo = { viewModel.alternarPainelEsquerdo() },
                 onAlternarDireito = { viewModel.alternarPainelDireito() },
+                onAlternarModoStylus = { viewModel.alternarModoSomenteStylus() },
                 onAbrirPdfClick = {
                     Toast.makeText(context, "Abrindo ${artigoAtivo.zoteroConfig.driveFileName}...", Toast.LENGTH_SHORT).show()
                 },
@@ -76,6 +99,7 @@ fun EstudoArtigosScreen(
                 paginaAtual = paginaAtiva,
                 ferramentaAtiva = ferramentaAtiva,
                 corAtiva = corAtiva,
+                modoSomenteStylus = modoSomenteStylus,
                 textoSelecionado = textoSelecionado,
                 onTextoSelecionado = { txt, pag, x, y ->
                     viewModel.selecionarTexto(txt, pag, x, y)
@@ -84,7 +108,9 @@ fun EstudoArtigosScreen(
                 onGrifarTexto = { viewModel.grifarTextoSelecionado() },
                 onCriarCitacao = { viewModel.abrirCriacaoCitacao() },
                 onCriarNota = { viewModel.abrirCriacaoNota() },
-                onAdicionarTraco = { pontos -> viewModel.adicionarTracoLivre(pontos) },
+                onAdicionarTraco = { pag, pontos -> viewModel.adicionarTracoLivre(pag, pontos) },
+                onApagarTracoProximo = { pag, x, y -> viewModel.apagarTracosProximos(pag, x, y) },
+                onStylusDetectada = { viewModel.registrarStylusDetectada() },
                 onPaginaAnterior = { viewModel.paginaAnterior() },
                 onProximaPagina = { viewModel.proximaPagina() },
                 modifier = Modifier.fillMaxSize()
@@ -114,6 +140,44 @@ fun EstudoArtigosScreen(
                     onAlternarModoLinhaReta = { viewModel.alternarModoLinhaReta() },
                     onSelecionarCor = { viewModel.definirCor(it) }
                 )
+            }
+
+            // Notificação Flutuante de Detecção de Caneta / Rejeição de Palma (Samsung Notes Style)
+            AnimatedVisibility(
+                visible = mensagemStatusStylus != null,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
+                exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 64.dp)
+            ) {
+                Surface(
+                    color = Color(0xFF1E293B),
+                    shape = RoundedCornerShape(24.dp),
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Draw,
+                            contentDescription = null,
+                            tint = Color(0xFF60A5FA),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = mensagemStatusStylus ?: "",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp
+                            )
+                        )
+                    }
+                }
             }
 
             // Scrim Translúcido de Fundo quando qualquer aba lateral estiver aberta sobre o canvas
