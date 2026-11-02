@@ -20,6 +20,9 @@ import {
   rotuloDaFigura
 } from '../core/athenes_documento.js';
 import { criarSeletorSimbolosMatematica } from './athenes_simbolos_matematica.js';
+import { construirGradeFiguraDom, montarPainelFiguraVisual, montarPainelTipografiaBloco, papeisTipografiaFigura } from './athenes_figura_ui.js';
+import { estiloParaCssComAlinhamento, localizarEstilo } from '../core/athenes_estilos.js';
+import { ajustarItensAoLayout } from '../core/athenes_figura_layout.js';
 import { construirTabelaDom, instalarSelecaoCelulas, montarBarraFormatacaoTabela, montarSecoesEstiloTabela } from './athenes_tabela_ui.js';
 
 export class ModalLayoutBloco {
@@ -171,6 +174,7 @@ export class ModalLayoutBloco {
           </div>
 
           ${this.ehTabelaOuQuadro() ? '<div id="athSecEstiloTabela" style="background:#fff; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:12px; padding:12px;"></div>' : ''}
+          ${this.ehTabelaOuQuadro() ? '<div style="background:#fff; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:12px; padding:12px;"><span class="rm-rot" style="margin:0 0 8px; display:block;">Tipografia do Título e da Fonte</span><div id="athSecTipografiaTabela"></div></div>' : ''}
 
           <!-- Subgrade e Variáveis do Bloco (Estilo Glaux Desk) -->
           <div style="background:#fff; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;" id="athSecVariaveis"></div>
@@ -224,11 +228,26 @@ export class ModalLayoutBloco {
       bloco: this.rascunho,
       obterTabela: () => this.backdrop.querySelector('#athPreviaFolhaSlot table'),
       obterSelecao: () => this._selTabela,
+      aoReconstruir: () => this.atualizarPrevia(), // dados novos: refaz a tabela da prévia
       aoAlterar: () => {}, // a prévia é atualizada no próprio DOM; o bloco só é gravado em "Salvar e Aplicar"
       estado: { escopo: 'selecao' }
     };
     this._barraTabela = montarBarraFormatacaoTabela(barra, this._ctxTabela);
     montarSecoesEstiloTabela(secoes, this._ctxTabela);
+    const tip = this.backdrop.querySelector('#athSecTipografiaTabela');
+    if (tip) {
+      montarPainelTipografiaBloco(tip, {
+        bloco: this.rascunho,
+        estilos: this.doc.estilos || [],
+        papeis: [
+          { chave: 'titulo', rotulo: this.rascunho.tipo === 'quadro' ? 'Título do quadro' : 'Título da tabela' },
+          { chave: 'numeracao', rotulo: this.rascunho.tipo === 'quadro' ? 'Numeração ("Quadro 1 —")' : 'Numeração ("Tabela 1 —")', alinhamento: false },
+          { chave: 'dados', rotulo: this.rascunho.tipo === 'quadro' ? 'Dados do quadro (células)' : 'Dados da tabela (células)', alinhamento: false },
+          { chave: 'fonte', rotulo: 'Fonte / atribuição' }
+        ],
+        aoAlterar: () => this.atualizarPrevia()
+      });
+    }
   }
 
   renderizarPresets() {
@@ -548,118 +567,29 @@ export class ModalLayoutBloco {
       const estilos = this.doc.estilos || [];
 
       figBox.innerHTML = `
-        <div style="font-size:11px; font-weight:800; color:#314F79; text-transform:uppercase;">Enquadramento e Dimensões da Imagem</div>
-        <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-          <label style="font-size:11.5px; font-weight:700; color:#475569;">Altura da Imagem
-            <select id="athModalImgAltura" class="glx-select" style="height:30px; font-size:11.5px;">
-              <option value="auto" ${(!this.rascunho.altura_modo || this.rascunho.altura_modo === 'auto') ? 'selected' : ''}>Auto (Proporcional)</option>
-              <option value="160px" ${this.rascunho.altura_modo === '160px' ? 'selected' : ''}>160 px (Compacta)</option>
-              <option value="220px" ${this.rascunho.altura_modo === '220px' ? 'selected' : ''}>220 px (Média)</option>
-              <option value="280px" ${this.rascunho.altura_modo === '280px' ? 'selected' : ''}>280 px (Padrão)</option>
-              <option value="360px" ${this.rascunho.altura_modo === '360px' ? 'selected' : ''}>360 px (Grande)</option>
-              <option value="450px" ${this.rascunho.altura_modo === '450px' ? 'selected' : ''}>450 px (Ampla)</option>
-              <option value="100%" ${this.rascunho.altura_modo === '100%' ? 'selected' : ''}>100% (Ocupar Altura)</option>
-            </select>
-          </label>
-          <label style="font-size:11.5px; font-weight:700; color:#475569;">Proporção (Aspect Ratio)
-            <select id="athModalImgProporcao" class="glx-select" style="height:30px; font-size:11.5px;">
-              <option value="livre" ${(!this.rascunho.proporcao_imagem || this.rascunho.proporcao_imagem === 'livre') ? 'selected' : ''}>Livre (Natural)</option>
-              <option value="16/9" ${this.rascunho.proporcao_imagem === '16/9' ? 'selected' : ''}>16:9 (Widescreen)</option>
-              <option value="4/3" ${this.rascunho.proporcao_imagem === '4/3' ? 'selected' : ''}>4:3 (Clássica)</option>
-              <option value="1/1" ${this.rascunho.proporcao_imagem === '1/1' ? 'selected' : ''}>1:1 (Quadrada)</option>
-              <option value="3/4" ${this.rascunho.proporcao_imagem === '3/4' ? 'selected' : ''}>3:4 (Retrato)</option>
-              <option value="9/16" ${this.rascunho.proporcao_imagem === '9/16' ? 'selected' : ''}>9:16 (Vertical)</option>
-            </select>
-          </label>
-        </div>
-        <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-          <label style="font-size:11.5px; font-weight:700; color:#475569;">Recorte / Enquadramento
-            <select id="athModalImgAjuste" class="glx-select" style="height:30px; font-size:11.5px;">
-              <option value="contain" ${(!this.rascunho.ajuste_enquadramento || this.rascunho.ajuste_enquadramento === 'contain') ? 'selected' : ''}>Conter sem cortar (Contain)</option>
-              <option value="cover" ${this.rascunho.ajuste_enquadramento === 'cover' ? 'selected' : ''}>Cobrir cortando bordas (Cover)</option>
-              <option value="scale-down" ${this.rascunho.ajuste_enquadramento === 'scale-down' ? 'selected' : ''}>Reduzir se necessário</option>
-              <option value="fill" ${this.rascunho.ajuste_enquadramento === 'fill' ? 'selected' : ''}>Esticar (Fill)</option>
-            </select>
-          </label>
-          <label style="font-size:11.5px; font-weight:700; color:#475569;">Alinhamento da Imagem
-            <select id="athModalImgAlinhamento" class="glx-select" style="height:30px; font-size:11.5px;">
-              <option value="center" ${(!this.rascunho.alinhamento_imagem || this.rascunho.alinhamento_imagem === 'center') ? 'selected' : ''}>Centralizado</option>
-              <option value="left" ${this.rascunho.alinhamento_imagem === 'left' ? 'selected' : ''}>À Esquerda</option>
-              <option value="right" ${this.rascunho.alinhamento_imagem === 'right' ? 'selected' : ''}>À Direita</option>
-            </select>
-          </label>
-        </div>
+        <div style="font-size:11px; font-weight:800; color:#314F79; text-transform:uppercase;">Diagramação da Figura</div>
+        <div id="athModalFigPainel"></div>
 
-        <div style="font-size:11px; font-weight:800; color:#314F79; text-transform:uppercase; margin-top:4px;">Tipografia e Alinhamento de Legenda e Título</div>
-        <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-          <label style="font-size:11.5px; font-weight:700; color:#475569;">Estilo da Legenda
-            <select id="athModalLegEstilo" class="glx-select" style="height:30px; font-size:11.5px;">
-              <option value="">Padrão do Bloco</option>
-              ${estilos.map(e => `<option value="${e.id}" ${this.rascunho.legenda_estilo_id === e.id ? 'selected' : ''}>${e.nome}</option>`).join('')}
-            </select>
-          </label>
-          <label style="font-size:11.5px; font-weight:700; color:#475569;">Alinhamento da Legenda
-            <select id="athModalLegAlin" class="glx-select" style="height:30px; font-size:11.5px;">
-              <option value="estilo" ${(!this.rascunho.legenda_alinhamento || this.rascunho.legenda_alinhamento === 'estilo') ? 'selected' : ''}>Do estilo de texto</option>
-              <option value="center" ${this.rascunho.legenda_alinhamento === 'center' ? 'selected' : ''}>Centralizado</option>
-              <option value="left" ${this.rascunho.legenda_alinhamento === 'left' ? 'selected' : ''}>À Esquerda</option>
-              <option value="right" ${this.rascunho.legenda_alinhamento === 'right' ? 'selected' : ''}>À Direita</option>
-              <option value="justify" ${this.rascunho.legenda_alinhamento === 'justify' ? 'selected' : ''}>Justificado</option>
-            </select>
-          </label>
-        </div>
-        <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-          <label style="font-size:11.5px; font-weight:700; color:#475569;">Estilo do Título
-            <select id="athModalTitEstilo" class="glx-select" style="height:30px; font-size:11.5px;">
-              <option value="">Padrão do Bloco</option>
-              ${estilos.map(e => `<option value="${e.id}" ${this.rascunho.titulo_estilo_id === e.id ? 'selected' : ''}>${e.nome}</option>`).join('')}
-            </select>
-          </label>
-          <label style="font-size:11.5px; font-weight:700; color:#475569;">Alinhamento do Título
-            <select id="athModalTitAlin" class="glx-select" style="height:30px; font-size:11.5px;">
-              <option value="estilo" ${(!this.rascunho.titulo_alinhamento || this.rascunho.titulo_alinhamento === 'estilo') ? 'selected' : ''}>Do estilo de texto</option>
-              <option value="center" ${this.rascunho.titulo_alinhamento === 'center' ? 'selected' : ''}>Centralizado</option>
-              <option value="left" ${this.rascunho.titulo_alinhamento === 'left' ? 'selected' : ''}>À Esquerda</option>
-              <option value="right" ${this.rascunho.titulo_alinhamento === 'right' ? 'selected' : ''}>À Direita</option>
-            </select>
-          </label>
-        </div>
+        <div style="font-size:11px; font-weight:800; color:#314F79; text-transform:uppercase; margin-top:4px;">Tipografia dos Textos da Figura</div>
+        <div id="athModalFigTipografia"></div>
       `;
 
       sec.appendChild(figBox);
 
-      figBox.querySelector('#athModalImgAltura')?.addEventListener('change', e => {
-        this.rascunho.altura_modo = e.target.value;
-        this.atualizarPrevia();
+      ajustarItensAoLayout(this.rascunho);
+      montarPainelFiguraVisual(figBox.querySelector('#athModalFigPainel'), {
+        bloco: this.rascunho,
+        aoAlterar: () => this.atualizarPrevia()
       });
-      figBox.querySelector('#athModalImgProporcao')?.addEventListener('change', e => {
-        this.rascunho.proporcao_imagem = e.target.value;
-        this.atualizarPrevia();
+      const montarTipografia = () => montarPainelTipografiaBloco(figBox.querySelector('#athModalFigTipografia'), {
+        bloco: this.rascunho,
+        estilos: this.doc.estilos || [],
+        papeis: papeisTipografiaFigura(this.rascunho),
+        aoAlterar: () => this.atualizarPrevia()
       });
-      figBox.querySelector('#athModalImgAjuste')?.addEventListener('change', e => {
-        this.rascunho.ajuste_enquadramento = e.target.value;
-        this.atualizarPrevia();
-      });
-      figBox.querySelector('#athModalImgAlinhamento')?.addEventListener('change', e => {
-        this.rascunho.alinhamento_imagem = e.target.value;
-        this.atualizarPrevia();
-      });
-      figBox.querySelector('#athModalLegEstilo')?.addEventListener('change', e => {
-        this.rascunho.legenda_estilo_id = e.target.value;
-        this.atualizarPrevia();
-      });
-      figBox.querySelector('#athModalLegAlin')?.addEventListener('change', e => {
-        this.rascunho.legenda_alinhamento = e.target.value;
-        this.atualizarPrevia();
-      });
-      figBox.querySelector('#athModalTitEstilo')?.addEventListener('change', e => {
-        this.rascunho.titulo_estilo_id = e.target.value;
-        this.atualizarPrevia();
-      });
-      figBox.querySelector('#athModalTitAlin')?.addEventListener('change', e => {
-        this.rascunho.titulo_alinhamento = e.target.value;
-        this.atualizarPrevia();
-      });
+      montarTipografia();
+      // os papéis de tipografia mudam com o nº de imagens e o tipo de rótulo
+      figBox.querySelector('#athModalFigPainel').addEventListener('click', () => setTimeout(montarTipografia, 0));
     }
 
     sec.querySelector('#athSubgradeCols')?.addEventListener('change', e => {
@@ -770,26 +700,14 @@ export class ModalLayoutBloco {
       const posTit = this.rascunho.posicao_titulo || 'topo';
 
       const rotulo = rotuloDaFigura(this.rascunho);
-      const estTit = (this.doc.estilos || []).find(e => e.id === this.rascunho.titulo_estilo_id);
-      const estLeg = (this.doc.estilos || []).find(e => e.id === this.rascunho.legenda_estilo_id);
+      const cssTit = estiloParaCssComAlinhamento(localizarEstilo(this.doc.estilos, this.rascunho.titulo_estilo_id), this.rascunho.titulo_alinhamento);
+      const cssLeg = estiloParaCssComAlinhamento(localizarEstilo(this.doc.estilos, this.rascunho.legenda_estilo_id), this.rascunho.legenda_alinhamento);
+      const cssFon = estiloParaCssComAlinhamento(localizarEstilo(this.doc.estilos, this.rascunho.fonte_estilo_id), this.rascunho.fonte_alinhamento);
 
-      const titAlin = (this.rascunho.titulo_alinhamento && this.rascunho.titulo_alinhamento !== 'estilo') ? this.rascunho.titulo_alinhamento : (estTit?.alinhamento || 'left');
-      const legAlin = (this.rascunho.legenda_alinhamento && this.rascunho.legenda_alinhamento !== 'estilo') ? this.rascunho.legenda_alinhamento : (estLeg?.alinhamento || 'left');
-
-      const hVal = this.rascunho.altura_modo && this.rascunho.altura_modo !== 'auto' ? (this.rascunho.altura_modo === '100%' ? '100%' : this.rascunho.altura_modo) : '90px';
-      const aspRatio = this.rascunho.proporcao_imagem && this.rascunho.proporcao_imagem !== 'livre' ? `aspect-ratio: ${this.rascunho.proporcao_imagem};` : '';
-      const objFit = this.rascunho.ajuste_enquadramento || 'contain';
-      const imgAlin = this.rascunho.alinhamento_imagem || 'center';
-
-      const titHtml = `<strong style="display:block; font-size:12px; font-weight:800; color:#1F2733; margin-bottom:4px; text-align:${titAlin};">${this.rascunho.titulo || `${rotulo} 1 — Ilustração Técnica`}</strong>`;
-      const imgHtml = `
-        <div style="background:#F1F5F9; border-radius:4px; height:${hVal}; ${aspRatio} display:grid; place-items:center; color:#64748B; object-fit:${objFit}; margin:${imgAlin === 'center' ? '0 auto' : imgAlin === 'right' ? '0 0 0 auto' : '0 auto 0 0'};">
-          ${svgIcone('imagem', 28)}
-          <span style="font-size:10px; font-weight:700;">Área da Ilustração / Imagem</span>
-        </div>
-      `;
-      const legHtml = `<p style="margin:4px 0 0 0; font-size:11px; color:#475569; text-align:${legAlin};">${this.rascunho.legenda_geral || this.rascunho.legenda || 'Legenda descritiva dos elementos.'}</p>`;
-      const fonteHtml = `<small style="font-size:10px; color:#64748B; margin-top:2px; display:block; text-align:${legAlin};">${this.rascunho.fonte || 'Fonte: Autores (2026).'}</small>`;
+      const titHtml = `<strong style="display:block; font-size:12px; font-weight:800; color:#1F2733; margin-bottom:4px; ${cssTit}">${this.rascunho.titulo || `${rotulo} 1 — Ilustração Técnica`}</strong>`;
+      const imgHtml = '<div data-mount-figura></div>';
+      const legHtml = `<p style="margin:4px 0 0 0; font-size:11px; color:#475569; ${cssLeg}">${this.rascunho.legenda_geral || this.rascunho.legenda || 'Legenda descritiva dos elementos.'}</p>`;
+      const fonteHtml = `<small style="font-size:10px; color:#64748B; margin-top:2px; display:block; ${cssFon}">${this.rascunho.fonte || 'Fonte: Autores (2026).'}</small>`;
 
       if (isSubgrade2Col) {
         box.innerHTML += `
@@ -813,9 +731,11 @@ export class ModalLayoutBloco {
       const isQuadro = this.rascunho.tipo === 'quadro';
       const rotuloTab = isQuadro ? 'Quadro' : 'Tabela';
       const posTit = this.rascunho.posicao_titulo || 'topo';
-      const titHtml = `<strong style="display:block; font-size:12px; font-weight:800; color:#1F2733; margin-bottom:4px;">${this.rascunho.titulo || `${rotuloTab} 1 — Dados Apresentados`}</strong>`;
+      const cssTitTab = estiloParaCssComAlinhamento(localizarEstilo(this.doc.estilos, this.rascunho.titulo_estilo_id), this.rascunho.titulo_alinhamento);
+      const cssFonTab = estiloParaCssComAlinhamento(localizarEstilo(this.doc.estilos, this.rascunho.fonte_estilo_id), this.rascunho.fonte_alinhamento);
+      const titHtml = `<strong style="display:block; font-size:12px; font-weight:800; color:#1F2733; margin-bottom:4px; ${cssTitTab}">${this.rascunho.titulo || `${rotuloTab} 1 — Dados Apresentados`}</strong>`;
       const tabHtml = '<div data-mount-tabela></div>';
-      const fonteHtml = `<small style="font-size:10px; color:#64748B; margin-top:4px; display:block;">${this.rascunho.fonte || 'Fonte: IBGE / Autores.'}</small>`;
+      const fonteHtml = `<small style="font-size:10px; color:#64748B; margin-top:4px; display:block; ${cssFonTab}">${this.rascunho.fonte || 'Fonte: IBGE / Autores.'}</small>`;
 
       if (posTit === 'topo') {
         box.innerHTML += `<div>${titHtml}${tabHtml}${fonteHtml}</div>`;
@@ -826,11 +746,15 @@ export class ModalLayoutBloco {
 
     slot.appendChild(box);
 
+    // Figura real do rascunho: mesma grade do canvas e do PDF
+    const montFig = box.querySelector('[data-mount-figura]');
+    if (montFig) montFig.replaceWith(construirGradeFiguraDom(this.rascunho, { estilos: this.doc.estilos }).grid);
+
     // Tabela/quadro real do rascunho (editável e selecionável), preservando a seleção entre reconstruções
     const mount = box.querySelector('[data-mount-tabela]');
     if (mount) {
       const rectAnterior = this._selTabela ? this._selTabela.obterRetangulo() : null;
-      const tabela = construirTabelaDom(this.rascunho, this.rascunho.tipo === 'quadro' ? 'ath-quadro-abnt' : 'ath-tabela-abnt', null);
+      const tabela = construirTabelaDom(this.rascunho, this.rascunho.tipo === 'quadro' ? 'ath-quadro-abnt' : 'ath-tabela-abnt', null, this.doc.estilos);
       mount.replaceWith(tabela);
       this._selTabela = instalarSelecaoCelulas(tabela, () => this._barraTabela?.atualizar());
       if (rectAnterior) this._selTabela.selecionar(rectAnterior);

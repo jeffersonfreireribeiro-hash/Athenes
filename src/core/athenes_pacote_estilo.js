@@ -10,6 +10,9 @@
 
 import { criarEstilosPadrao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { criarModelosPaginaPadrao, MODOS_APLICACAO_MESTRA } from './athenes_documento.js';
+import { sanitizarNumeracao } from './athenes_paginacao.js';
+import { obterConfigNotas } from './athenes_notas_rodape.js';
+import { extrairEstiloFigura, sanitizarEstiloFigura, aplicarEstiloFiguraAoBloco, extrairTipografiaTituloFonte } from './athenes_figura_layout.js';
 import { extrairEstiloGlobalTabela, sanitizarEstiloTabela, garantirEstiloTabela } from './athenes_tabela_estilo.js';
 
 export const VERSAO_SCHEMA_TEMA = 'athenes-tema-v1';
@@ -54,7 +57,10 @@ export function exportarPacoteEstilo(documento, opcoes = {}) {
       perfil: documento.perfil || 'abnt',
       tipoDoc: documento.tipoDoc || 'artigo',
       espacoDepoisBlocoPadraoPt: 8,
-      espacoParagrafoPadraoPt: 6
+      espacoParagrafoPadraoPt: 6,
+      // paginação padrão do documento (a mestra pode ter a sua em `numeracao_pagina`) e estilo das notas de rodapé
+      ...(documento.paginacao ? { paginacao: sanitizarNumeracao(documento.paginacao) } : {}),
+      notas_rodape: obterConfigNotas(documento)
     },
     estilos: estilos,
     mestras: mestras,
@@ -127,11 +133,18 @@ export function extrairConfiguracaoMoldurasDoDocumento(doc) {
     }
   }
 
+  // Diagramação de figuras/subgrid (layout, gap, rótulos, moldura, sombra, enquadramento, largura, fluxo)
+  const figuraRef = todosBlocos.find(b => (b.tipo === 'figura' || b.tipo === 'imagem') && b.moldura_tipo);
+  padroes.figura.estilo_figura = extrairEstiloFigura(figuraRef || {});
+
   // Estilo declarativo de células (bordas, zebra, cabeçalho...): sempre exportado, mesmo no padrão
   const tabelaRef = todosBlocos.find(b => b.tipo === 'tabela' && b.estilo_tabela);
   const quadroRef = todosBlocos.find(b => b.tipo === 'quadro' && b.estilo_tabela);
   padroes.tabela.estilo_tabela = extrairEstiloGlobalTabela(tabelaRef || { tipo: 'tabela' });
   padroes.quadro.estilo_tabela = extrairEstiloGlobalTabela(quadroRef || { tipo: 'quadro' });
+  // Estilos de texto do título e da fonte (ids dos estilos do próprio tema + alinhamento)
+  Object.assign(padroes.tabela, extrairTipografiaTituloFonte(todosBlocos.find(b => b.tipo === 'tabela') || {}));
+  Object.assign(padroes.quadro, extrairTipografiaTituloFonte(todosBlocos.find(b => b.tipo === 'quadro') || {}));
 
   for (const b of todosBlocos) {
     if (b.tipo === 'formula' && b.moldura_tipo) {
@@ -202,7 +215,11 @@ export function validarPacoteEstilo(conteudo) {
     },
     configuracaoGlobal: {
       perfil: obj.configuracaoGlobal?.perfil || 'abnt',
-      tipoDoc: obj.configuracaoGlobal?.tipoDoc || 'artigo'
+      tipoDoc: obj.configuracaoGlobal?.tipoDoc || 'artigo',
+      ...(obj.configuracaoGlobal?.paginacao && typeof obj.configuracaoGlobal.paginacao === 'object'
+        ? { paginacao: sanitizarNumeracao(obj.configuracaoGlobal.paginacao) } : {}),
+      ...(obj.configuracaoGlobal?.notas_rodape && typeof obj.configuracaoGlobal.notas_rodape === 'object'
+        ? { notas_rodape: obterConfigNotas({ notas_config: obj.configuracaoGlobal.notas_rodape }) } : {})
     },
     estilos: obj.estilos,
     mestras: Array.isArray(obj.mestras) && obj.mestras.length > 0 ? obj.mestras : criarModelosPaginaPadrao('abnt'),
@@ -211,11 +228,16 @@ export function validarPacoteEstilo(conteudo) {
   };
 
   // Sanitiza o estilo declarativo de tabelas/quadros (cores hex, larguras, enums) vindo de JSON externo/IA
+  const confFig = pacoteNormalizado.layout_padrao_figuras.figura;
+  if (confFig && typeof confFig === 'object' && confFig.estilo_figura) {
+    confFig.estilo_figura = sanitizarEstiloFigura(confFig.estilo_figura);
+  }
   for (const tipo of ['tabela', 'quadro']) {
     const conf = pacoteNormalizado.layout_padrao_figuras[tipo];
     if (conf && typeof conf === 'object' && conf.estilo_tabela) {
       conf.estilo_tabela = sanitizarEstiloTabela(conf.estilo_tabela, tipo);
     }
+    if (conf && typeof conf === 'object') Object.assign(conf, extrairTipografiaTituloFonte(conf));
   }
 
   return { valido: true, pacote: pacoteNormalizado };
@@ -268,6 +290,8 @@ export function aplicarPacoteEstilo(documento, pacote, opcoes = {}) {
   if (p.configuracaoGlobal?.perfil) {
     documento.perfil = p.configuracaoGlobal.perfil;
   }
+  if (p.configuracaoGlobal?.paginacao) documento.paginacao = JSON.parse(JSON.stringify(p.configuracaoGlobal.paginacao));
+  if (p.configuracaoGlobal?.notas_rodape) documento.notas_config = JSON.parse(JSON.stringify(p.configuracaoGlobal.notas_rodape));
 
   // 5. Se solicitado, propaga estilos padrão de moldura para figuras, tabelas e fórmulas existentes
   let blocosAtualizados = 0;
@@ -281,17 +305,20 @@ export function aplicarPacoteEstilo(documento, pacote, opcoes = {}) {
         if (conf.linha_cor) b.linha_cor = conf.linha_cor;
         if (conf.padding_pt !== undefined) b.padding_pt = conf.padding_pt;
         if (conf.subgrade_colunas) b.subgrade_colunas = conf.subgrade_colunas;
+        if (conf.estilo_figura) aplicarEstiloFiguraAoBloco(b, conf.estilo_figura); // preserva imagens e nº de slots
         blocosAtualizados++;
       } else if (b.tipo === 'tabela' && p.layout_padrao_figuras.tabela) {
         const conf = p.layout_padrao_figuras.tabela;
         if (conf.moldura_tipo) b.moldura_tipo = conf.moldura_tipo;
         if (conf.linha_estilo) b.linha_estilo = conf.linha_estilo;
         aplicarEstiloTabelaDoTema(b, conf.estilo_tabela);
+        Object.assign(b, extrairTipografiaTituloFonte(conf));
         blocosAtualizados++;
       } else if (b.tipo === 'quadro' && p.layout_padrao_figuras.quadro) {
         const conf = p.layout_padrao_figuras.quadro;
         if (conf.moldura_tipo) b.moldura_tipo = conf.moldura_tipo;
         aplicarEstiloTabelaDoTema(b, conf.estilo_tabela);
+        Object.assign(b, extrairTipografiaTituloFonte(conf));
         blocosAtualizados++;
       } else if (b.tipo === 'formula' && p.layout_padrao_figuras.formula) {
         const conf = p.layout_padrao_figuras.formula;
@@ -342,21 +369,40 @@ INSTRUÇÕES DE ANÁLISE:
    - Formato de papel ("a4") e orientação ("retrato" ou "paisagem").
    - Margens exatas em milímetros { "t": 30, "r": 20, "b": 20, "l": 30 } (ABNT: Superior 30mm, Esquerda 30mm, Inferior 20mm, Direita 20mm).
    - Grade de colunas (1 coluna ampla para ABNT/monografia, ou 2 colunas com gap_mm: 5 para formato IEEE/Artigo internacional).
-   - Cabeçalho (ativo, texto recorrente, alinhamento, linha divisória).
-   - Rodapé (ativo, paginação/numeração ativada e posição: "superior_direita", "inferior_direita", "inferior_centro", etc.).
+   - Cabeçalho e rodapé ("cabecalho" / "rodape"): "ativo"; "zonas" { "esquerda", "centro", "direita" } com texto livre e variáveis
+     {documento.titulo}, {documento.autor_principal}, {documento.instituicao}, {documento.ano}, {secao}, {pagina}, {total}, {data};
+     "pares_impares_diferentes" (true = páginas pares usam "zonas_par", ou espelham esquerda↔direita se vazio); "ocultar_primeira_pagina";
+     tipografia: "fonte" (id: nunito, times, arial, georgia, garamond, cambria, calibri, consolas), "tamanho_pt" (6-24), "peso" (300-800), "cor" (#RRGGBB), "entrelinha" (1-2.5);
+     "linha_divisoria", "linha_espessura_pt", "linha_cor"; "distancia_borda_mm" (da borda da folha) e "respiro_mm" (até o corpo do texto).
+   - Paginação da mestra ("numeracao_pagina", ou "configuracaoGlobal.paginacao" para o padrão do documento): "ativo"; "local" ("cabecalho" | "rodape");
+     "horizontal" ("esquerda" | "centro" | "direita" | "alternado" = lado externo, para frente e verso); "formato" ("apenas_numero" | "n_de_total" | "n_barra_total" |
+     "n_of_total" | "pagina_n" | "pagina_n_de_total" | "pagina_barra_total" | "hifen" | "personalizado" com "mascara" usando {p} e {t}); "prefixo"; "sufixo";
+     "estilo" ("arabico" | "romano_mai" | "romano_min" | "alfa_mai" | "alfa_min"); "iniciar_em"; "continuar" (false = reinicia a contagem na 1ª folha da seção); "ocultar_primeira".
+   - Notas de rodapé ("configuracaoGlobal.notas_rodape"): "marcador" ("numerico" | "alfabetico" | "simbolos"); "reiniciar" ("documento" | "secao" | "pagina");
+     "separador" { "comprimento_pct", "espessura_pt", "cor" }; "fonte"; "tamanho_pt" (ex.: 10); "entrelinha" (ex.: 1.15); "cor".
 
 3. MOLDURAS DE ILUSTRAÇÕES, TABELAS E FÓRMULAS:
    - moldura_tipo: "limpo" (sem borda), "linha_lateral" (tarja lateral elegante), "cartao" (fundo suave), "borda_completa" (caixa fechada técnica), ou "esquadro".
    - linha_estilo: "solida" (linha reta), "quadriculada_reta" (cantos retos 0px), "pontilhada", "tracejada", "dupla" (técnica) ou "ponto_destaque".
    - linha_cor: cor hexadecimal da linha decorativa (ex: "#314F79").
 
-4. ESTILO DE CÉLULAS DE TABELAS E QUADROS ("estilo_tabela" dentro de layout_padrao_figuras.tabela e .quadro):
+4. DIAGRAMAÇÃO DE FIGURAS E SUBGRID ("estilo_figura" dentro de layout_padrao_figuras.figura):
+   - layout: "1" | "2_lado" (1×2) | "3_linha" (1×3) | "4_linha" (1×4) | "2_empilhado" (2×1) | "4_grade" (2×2) | "6_grade" (2×3) | "6_grade_3x2" (3×2) | "3_misto" (1 grande à esquerda + 2 empilhadas) | "3_panoramica" (1 panorâmica no topo + 2 na base).
+   - gap_modo: "nenhum" | "compacto" | "normal" | "amplo" (só com 2+ imagens).
+   - Rótulos das subfiguras (só com 2+ imagens): subrotulo_tipo: "nenhum" | "letra_minuscula" (a, b, c) | "letra_maiuscula" (A, B, C) | "numero" (1, 2, 3); subrotulo_formato: "parenteses" ((a)) | "fecha" (a)) | "ponto" (a.) | "simples" (a); subrotulo_posicao: "interna" (sobre a imagem) | "externa" (na legenda).
+   - Estilos de texto (ids de itens de "estilos", "" = padrão do bloco): titulo_estilo_id, numeracao_estilo_id (prefixo "Figura 1 —"), legenda_estilo_id, fonte_estilo_id, sublegenda_estilo_id (legenda de cada subimagem), subrotulo_texto_estilo_id (rótulo a/b/c); alinhamentos titulo_alinhamento, legenda_alinhamento, fonte_alinhamento, sublegenda_alinhamento: "estilo" | "left" | "center" | "right" | "justify".
+   - img_moldura: "nenhuma" | "fina" | "dupla" | "passe_partout"; img_borda_largura_pt (0.25-6), img_borda_estilo ("solida"|"tracejada"), img_borda_cor (#RRGGBB); img_raio: "reto" | "discreto" | "arredondado" | "pilula"; img_sombra: "nenhuma" | "suave" | "media" | "elevada".
+   - ajuste_enquadramento: "contain" | "cover" | "fill"; foco_x/foco_y (0-100, ponto focal); proporcao_imagem: "livre" | "16/9" | "4/3" | "1/1" | "3/4" | "9/16".
+   - largura_modo: "corpo" | "estendida" | "pagina" | "pct" (com largura_pct 20-100); alinhamento_bloco: "esquerda" | "centro" | "direita"; fluxo: "em_linha" | "contornar_esq" | "contornar_dir".
+
+5. ESTILO DE CÉLULAS DE TABELAS E QUADROS ("estilo_tabela" dentro de layout_padrao_figuras.tabela e .quadro):
    - bordas.externas {t,r,b,l} e bordas.internas {h,v}: cada aresta é null (sem borda) ou { "largura_pt": 0.25-6, "estilo": "solida"|"tracejada"|"pontilhada"|"dupla", "cor": "#RRGGBB" }.
      Tabela ABNT/IBGE: apenas topo e base externas e divisórias horizontais finas internas; Quadro: todas as bordas.
    - cabecalho { ativo, fundo, cor_texto, negrito, borda_superior, borda_inferior } e rodape { ativo, fundo, negrito, borda_superior, borda_inferior }: contorno independente das células comuns (omita a chave para herdar).
    - coluna_cabecalho { ativo, fundo, negrito, borda_direita }: primeira coluna destacada.
    - zebra { ativo, cor_impar, cor_par }: preenchimento alternado das linhas de dados.
    - padding: "compacto" (2pt) | "normal" (4pt) | "expandido" (8pt); quebra: "normal" | "forcada".
+   - titulo_estilo_id / fonte_estilo_id / numeracao_estilo_id (prefixo "Tabela 1 —" / "Quadro 1 —") / dados_estilo_id (tipografia das células) são ids de itens de "estilos" (ou ""); titulo_alinhamento / fonte_alinhamento: "estilo" | "left" | "center" | "right" | "justify". Ficam ao lado de "estilo_tabela" em layout_padrao_figuras.tabela e .quadro.
    - camadas.tabela { fundo, h: "esquerda"|"centro"|"direita"|"justificado", v: "topo"|"centro"|"base", fonte (id: "nunito"|"times"|"arial"|"georgia"|"garamond"|"cambria"|"calibri"|"consolas"), tamanho_pt (6-72), negrito, italico, riscado (booleanos), cor_texto (#RRGGBB), wrap: "quebrar"|"nao_quebrar", rotacao: "horizontal"|"cima"|"baixo" }: fundo, alinhamento e tipografia padrão das células.
 
 FORMATO EXATO DE RESPOSTA:
@@ -377,7 +423,16 @@ Responda EXCLUSIVAMENTE com o bloco JSON válido abaixo, sem texto antes ou depo
     "perfil": "abnt",
     "tipoDoc": "artigo",
     "espacoDepoisBlocoPadraoPt": 8,
-    "espacoParagrafoPadraoPt": 6
+    "espacoParagrafoPadraoPt": 6,
+    "notas_rodape": {
+      "marcador": "numerico",
+      "reiniciar": "documento",
+      "separador": { "comprimento_pct": 33, "espessura_pt": 0.75, "cor": "#64748B" },
+      "fonte": "nunito",
+      "tamanho_pt": 10,
+      "entrelinha": 1.15,
+      "cor": "#334155"
+    }
   },
   "estilos": [
     {
@@ -569,17 +624,36 @@ Responda EXCLUSIVAMENTE com o bloco JSON válido abaixo, sem texto antes ou depo
       "grade": { "colunas": 1, "gap_mm": 0 },
       "cabecalho": {
         "ativo": true,
-        "texto": "{documento.titulo}",
-        "logo": "",
-        "alinhamento": "direita",
-        "linha_divisoria": true
+        "zonas": { "esquerda": "{documento.autor_principal}", "centro": "", "direita": "{documento.titulo}" },
+        "pares_impares_diferentes": false,
+        "ocultar_primeira_pagina": false,
+        "fonte": "nunito",
+        "tamanho_pt": 9,
+        "peso": 400,
+        "cor": "#64748B",
+        "entrelinha": 1.2,
+        "linha_divisoria": true,
+        "linha_espessura_pt": 0.75,
+        "linha_cor": "#CBD5E1",
+        "distancia_borda_mm": 10,
+        "respiro_mm": 4
       },
       "rodape": {
         "ativo": true,
-        "texto": "{documento.autor_principal}",
-        "numeracao": true,
-        "posicao_numero": "superior_direita",
-        "linha_divisoria": false
+        "zonas": { "esquerda": "{secao}", "centro": "", "direita": "" },
+        "linha_divisoria": false,
+        "distancia_borda_mm": 10,
+        "respiro_mm": 4
+      },
+      "numeracao_pagina": {
+        "ativo": true,
+        "local": "rodape",
+        "horizontal": "direita",
+        "formato": "n_de_total",
+        "estilo": "arabico",
+        "iniciar_em": 1,
+        "continuar": true,
+        "ocultar_primeira": false
       },
       "posicionamento_livre": false,
       "elementos_recorrentes": []
@@ -595,7 +669,37 @@ Responda EXCLUSIVAMENTE com o bloco JSON válido abaixo, sem texto antes ou depo
       "posicao_titulo": "topo",
       "posicao_fonte": "base",
       "subgrade_colunas": 1,
-      "subgrade_linhas": 3
+      "subgrade_linhas": 3,
+      "estilo_figura": {
+        "layout": "1",
+        "gap_modo": "normal",
+        "subrotulo_tipo": "letra_minuscula",
+        "subrotulo_formato": "parenteses",
+        "subrotulo_posicao": "externa",
+        "titulo_estilo_id": "",
+        "legenda_estilo_id": "",
+        "fonte_estilo_id": "",
+        "sublegenda_estilo_id": "",
+        "subrotulo_texto_estilo_id": "",
+        "titulo_alinhamento": "estilo",
+        "legenda_alinhamento": "estilo",
+        "fonte_alinhamento": "estilo",
+        "sublegenda_alinhamento": "estilo",
+        "img_moldura": "nenhuma",
+        "img_borda_largura_pt": 0.75,
+        "img_borda_estilo": "solida",
+        "img_borda_cor": "#94A3B8",
+        "img_raio": "discreto",
+        "img_sombra": "nenhuma",
+        "ajuste_enquadramento": "contain",
+        "foco_x": 50,
+        "foco_y": 50,
+        "proporcao_imagem": "livre",
+        "largura_modo": "corpo",
+        "largura_pct": 100,
+        "alinhamento_bloco": "centro",
+        "fluxo": "em_linha"
+      }
     },
     "tabela": {
       "moldura_tipo": "limpo",

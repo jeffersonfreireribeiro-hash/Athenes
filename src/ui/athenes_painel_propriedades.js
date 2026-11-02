@@ -18,6 +18,8 @@ import {
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
+import { montarPainelFiguraVisual, montarPainelTipografiaBloco, papeisTipografiaFigura } from './athenes_figura_ui.js';
+import { qtdSlotsDoLayout, ajustarItensAoLayout } from '../core/athenes_figura_layout.js';
 import { criarSeletorSimbolosMatematica } from './athenes_simbolos_matematica.js';
 import { escapeHtml, registrarListenerSelecaoSegura, obterOuRestaurarSelecaoDoBloco } from '../core/athenes_seguranca.js';
 
@@ -1176,24 +1178,8 @@ export class PainelPropriedades {
       const textoPuro = obterTextoPuroTitulo(b);
 
       // Garante lista de itens de imagem
-      if (!Array.isArray(b.itens) || b.itens.length === 0) {
-        b.itens = [{ url: b.src || '', legenda_sub: 'Visão Geral' }];
-      }
-      const qtdSlots = (b.layout === '2_lado' || b.layout === '2_empilhado') ? 2
-        : (b.layout === '3_linha' || b.layout === '3_misto') ? 3
-        : (b.layout === '4_grade') ? 4
-        : (b.layout === '6_grade') ? 6 : 1;
-
-      if (b.itens.length > qtdSlots) {
-        b.itens = b.itens.slice(0, qtdSlots);
-      } else {
-        while (b.itens.length < qtdSlots) {
-          b.itens.push({ url: '', legenda_sub: `Item ${String.fromCharCode(97 + b.itens.length).toUpperCase()}` });
-        }
-      }
-      if (qtdSlots === 1 && b.itens[0]) {
-        b.src = b.itens[0].url || b.src || '';
-      }
+      ajustarItensAoLayout(b);
+      const qtdSlots = qtdSlotsDoLayout(b.layout);
 
       const estilosTexto = this.doc.estilos || [];
 
@@ -1239,18 +1225,11 @@ export class PainelPropriedades {
           <span style="font-size:10px; color:var(--ath-muted, #64748B); display:block; margin-top:3px;">A numeração é sequencial e automática. Escreva apenas o nome descritivo.</span>
         </label>
 
-        <!-- Configuração de Disposição (Layout de Grade) -->
-        <label style="margin-top:6px;">Disposição das Imagens (Layout)
-          <select id="rmFigLayout" class="glx-select">
-            <option value="1" ${b.layout === '1' ? 'selected' : ''}>1 Imagem individual</option>
-            <option value="2_lado" ${b.layout === '2_lado' ? 'selected' : ''}>2 Imagens lado a lado (50% / 50%)</option>
-            <option value="2_empilhado" ${b.layout === '2_empilhado' ? 'selected' : ''}>2 Imagens empilhadas</option>
-            <option value="3_linha" ${b.layout === '3_linha' ? 'selected' : ''}>3 Imagens em linha (33% cada)</option>
-            <option value="3_misto" ${b.layout === '3_misto' ? 'selected' : ''}>3 Imagens (1 destaque + 2 menores)</option>
-            <option value="4_grade" ${b.layout === '4_grade' ? 'selected' : ''}>4 Imagens em grade (2 × 2)</option>
-            <option value="6_grade" ${b.layout === '6_grade' ? 'selected' : ''}>6 Imagens em grade (2 × 3)</option>
-          </select>
-        </label>
+        <!-- Disposição, moldura, sombra, enquadramento e posição no documento (seletores gráficos) -->
+        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:8px; background:#fff;">
+          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; margin-bottom:8px;">Diagramação da Figura</div>
+          <div id="athFigPainelVisual"></div>
+        </div>
 
         <!-- Seleção de Arquivos / Imagens por Campo / Slot -->
         <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:8px; background:#fff;">
@@ -1286,105 +1265,22 @@ export class PainelPropriedades {
           </div>
         </div>
 
-        <!-- Dimensões, Proporção e Enquadramento da Imagem -->
-        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:8px; background:#fff;">
-          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; margin-bottom:8px;">
-            Altura, Proporção e Recorte
-          </div>
-          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end;">
-            <label style="font-size:11px; font-weight:700; min-width:0;">
-              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Altura da Imagem</span>
-              <select id="athImgAlturaModo" class="glx-select" style="height:32px; font-size:11.5px; padding:0 22px 0 8px;">
-                <option value="auto" ${(!b.altura_modo || b.altura_modo === 'auto') ? 'selected' : ''}>Automática</option>
-                <option value="160px" ${b.altura_modo === '160px' ? 'selected' : ''}>160 px (Compacta)</option>
-                <option value="220px" ${b.altura_modo === '220px' ? 'selected' : ''}>220 px (Normal)</option>
-                <option value="280px" ${b.altura_modo === '280px' ? 'selected' : ''}>280 px (Padrão)</option>
-                <option value="360px" ${b.altura_modo === '360px' ? 'selected' : ''}>360 px (Alta)</option>
-                <option value="450px" ${b.altura_modo === '450px' ? 'selected' : ''}>450 px (Destaque)</option>
-                <option value="100%" ${b.altura_modo === '100%' ? 'selected' : ''}>100% (Total)</option>
-              </select>
-            </label>
-            <label style="font-size:11px; font-weight:700; min-width:0;">
-              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Proporção</span>
-              <select id="athImgProporcao" class="glx-select" style="height:32px; font-size:11.5px; padding:0 22px 0 8px;">
-                <option value="livre" ${(!b.proporcao_imagem || b.proporcao_imagem === 'livre') ? 'selected' : ''}>Livre / Original</option>
-                <option value="16/9" ${b.proporcao_imagem === '16/9' ? 'selected' : ''}>16:9 (Paisagem)</option>
-                <option value="4/3" ${b.proporcao_imagem === '4/3' ? 'selected' : ''}>4:3 (Padrão)</option>
-                <option value="1/1" ${b.proporcao_imagem === '1/1' ? 'selected' : ''}>1:1 (Quadrada)</option>
-                <option value="3/4" ${b.proporcao_imagem === '3/4' ? 'selected' : ''}>3:4 (Retrato)</option>
-                <option value="9/16" ${b.proporcao_imagem === '9/16' ? 'selected' : ''}>9:16 (Vertical)</option>
-              </select>
-            </label>
-          </div>
-          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; align-items:end;">
-            <label style="font-size:11px; font-weight:700; min-width:0;">
-              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Enquadramento</span>
-              <select id="athImgAjuste" class="glx-select" style="height:32px; font-size:11.5px; padding:0 22px 0 8px;">
-                <option value="contain" ${(!b.ajuste_enquadramento || b.ajuste_enquadramento === 'contain') ? 'selected' : ''}>Sem corte (Contain)</option>
-                <option value="cover" ${b.ajuste_enquadramento === 'cover' ? 'selected' : ''}>Preencher (Cover)</option>
-                <option value="scale-down" ${b.ajuste_enquadramento === 'scale-down' ? 'selected' : ''}>Reduzir (Scale)</option>
-                <option value="fill" ${b.ajuste_enquadramento === 'fill' ? 'selected' : ''}>Esticar (Fill)</option>
-              </select>
-            </label>
-            <label style="font-size:11px; font-weight:700; min-width:0;">
-              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Alinhamento</span>
-              <select id="athImgAlinhamento" class="glx-select" style="height:32px; font-size:11.5px; padding:0 22px 0 8px;">
-                <option value="centro" ${(!b.alinhamento_imagem || b.alinhamento_imagem === 'centro') ? 'selected' : ''}>Centralizado</option>
-                <option value="esquerda" ${b.alinhamento_imagem === 'esquerda' ? 'selected' : ''}>À Esquerda</option>
-                <option value="direita" ${b.alinhamento_imagem === 'direita' ? 'selected' : ''}>À Direita</option>
-              </select>
-            </label>
-          </div>
-        </div>
-
-        <!-- Textos: Legenda Geral e Fonte com Estilos de Texto e Alinhamento -->
+        <!-- Textos da figura e tipografia (estilos de texto completos) -->
         <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px; margin-top:8px; background:#fff;">
           <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; margin-bottom:8px;">
-            Legenda, Fonte e Tipografia
+            Legenda e Fonte
           </div>
-
-          <!-- Legenda Geral -->
           <label style="font-weight:700;">Legenda Geral
             <textarea id="rmFigLegenda" rows="2">${b.legenda_geral || b.legenda || ''}</textarea>
           </label>
-          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px; margin-bottom:8px;">
-            <label style="font-size:10.5px;">Estilo da Legenda
-              <select id="athFigLegEstilo" class="glx-select" style="height:28px; font-size:11px;">
-                <option value="">Padrão (Legenda)</option>
-                ${estilosTexto.map(est => `<option value="${est.id}" ${b.legenda_estilo_id === est.id ? 'selected' : ''}>${est.nome}</option>`).join('')}
-              </select>
-            </label>
-            <label style="font-size:10.5px;">Alinhamento da Legenda
-              <select id="athFigLegAlinhamento" class="glx-select" style="height:28px; font-size:11px;">
-                <option value="estilo" ${(!b.legenda_alinhamento || b.legenda_alinhamento === 'estilo') ? 'selected' : ''}>Do Estilo de Texto</option>
-                <option value="esquerda" ${b.legenda_alinhamento === 'esquerda' ? 'selected' : ''}>Esquerda</option>
-                <option value="centro" ${b.legenda_alinhamento === 'centro' ? 'selected' : ''}>Centralizado</option>
-                <option value="direita" ${b.legenda_alinhamento === 'direita' ? 'selected' : ''}>Direita</option>
-                <option value="justificado_esquerda" ${b.legenda_alinhamento === 'justificado_esquerda' ? 'selected' : ''}>Justificado</option>
-              </select>
-            </label>
-          </div>
-
-          <!-- Fonte / Atribuição -->
-          <label style="font-weight:700;">Fonte / Atribuição
+          <label style="font-weight:700; margin-top:6px;">Fonte / Atribuição
             <input type="text" id="rmFigFonte" value="${b.fonte || 'Fonte: Autores (2026).'}">
           </label>
-          <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:4px;">
-            <label style="font-size:10.5px;">Estilo da Fonte
-              <select id="athFigFonteEstilo" class="glx-select" style="height:28px; font-size:11px;">
-                <option value="">Padrão (Notas/Fonte)</option>
-                ${estilosTexto.map(est => `<option value="${est.id}" ${b.fonte_estilo_id === est.id ? 'selected' : ''}>${est.nome}</option>`).join('')}
-              </select>
-            </label>
-            <label style="font-size:10.5px;">Alinhamento da Fonte
-              <select id="athFigFonteAlinhamento" class="glx-select" style="height:28px; font-size:11px;">
-                <option value="estilo" ${(!b.fonte_alinhamento || b.fonte_alinhamento === 'estilo') ? 'selected' : ''}>Do Estilo de Texto</option>
-                <option value="esquerda" ${b.fonte_alinhamento === 'esquerda' ? 'selected' : ''}>Esquerda</option>
-                <option value="centro" ${b.fonte_alinhamento === 'centro' ? 'selected' : ''}>Centralizado</option>
-                <option value="direita" ${b.fonte_alinhamento === 'direita' ? 'selected' : ''}>Direita</option>
-              </select>
-            </label>
-          </div>
+        </div>
+
+        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:8px; background:#fff;">
+          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; margin-bottom:8px;">Tipografia do Texto</div>
+          <div id="athFigTipografia"></div>
         </div>
       `;
 
@@ -1415,26 +1311,17 @@ export class PainelPropriedades {
         this.notificarMudanca();
       });
 
-      box.querySelector('#rmFigLayout').addEventListener('change', e => {
-        b.layout = e.target.value;
-        const q = (b.layout === '2_lado' || b.layout === '2_empilhado') ? 2
-          : (b.layout === '3_linha' || b.layout === '3_misto') ? 3
-          : (b.layout === '4_grade') ? 4
-          : (b.layout === '6_grade') ? 6 : 1;
-        
-        // Se reduziu a quantidade de slots, trunca o array eliminando as imagens excedentes
-        if (b.itens.length > q) {
-          b.itens = b.itens.slice(0, q);
-        } else {
-          while (b.itens.length < q) {
-            b.itens.push({ url: '', legenda_sub: `Item ${String.fromCharCode(97 + b.itens.length).toUpperCase()}` });
+      montarPainelFiguraVisual(box.querySelector('#athFigPainelVisual'), {
+        bloco: b,
+        aoAlterar: (chave) => {
+          if (chave === 'layout' || chave === 'subrotulo_tipo') {
+            // nº de slots ou tipo de rótulo mudou: refaz campos de imagem e papéis de tipografia do inspetor
+            this.notificarMudanca();
+            this.renderizar();
+          } else {
+            this.notificarMudanca();
           }
         }
-        if (q === 1 && b.itens[0]) {
-          b.src = b.itens[0].url || '';
-        }
-        this.notificarMudanca();
-        this.renderizar();
       });
 
       // Uploads e URLs de Imagem por Slot
@@ -1481,49 +1368,20 @@ export class PainelPropriedades {
         });
       });
 
-      // Dimensões, Proporção e Enquadramento
-      box.querySelector('#athImgAlturaModo')?.addEventListener('change', e => {
-        b.altura_modo = e.target.value;
-        this.notificarMudanca();
-      });
-      box.querySelector('#athImgProporcao')?.addEventListener('change', e => {
-        b.proporcao_imagem = e.target.value;
-        this.notificarMudanca();
-      });
-      box.querySelector('#athImgAjuste')?.addEventListener('change', e => {
-        b.ajuste_enquadramento = e.target.value;
-        this.notificarMudanca();
-      });
-      box.querySelector('#athImgAlinhamento')?.addEventListener('change', e => {
-        b.alinhamento_imagem = e.target.value;
-        this.notificarMudanca();
-      });
-
       // Legenda e Fonte
       box.querySelector('#rmFigLegenda')?.addEventListener('input', e => {
         b.legenda_geral = e.target.value;
         this.notificarMudanca();
       });
-      box.querySelector('#athFigLegEstilo')?.addEventListener('change', e => {
-        b.legenda_estilo_id = e.target.value;
-        this.notificarMudanca();
-      });
-      box.querySelector('#athFigLegAlinhamento')?.addEventListener('change', e => {
-        b.legenda_alinhamento = e.target.value;
-        this.notificarMudanca();
-      });
-
       box.querySelector('#rmFigFonte')?.addEventListener('input', e => {
         b.fonte = e.target.value;
         this.notificarMudanca();
       });
-      box.querySelector('#athFigFonteEstilo')?.addEventListener('change', e => {
-        b.fonte_estilo_id = e.target.value;
-        this.notificarMudanca();
-      });
-      box.querySelector('#athFigFonteAlinhamento')?.addEventListener('change', e => {
-        b.fonte_alinhamento = e.target.value;
-        this.notificarMudanca();
+      montarPainelTipografiaBloco(box.querySelector('#athFigTipografia'), {
+        bloco: b,
+        estilos: this.doc.estilos || [],
+        papeis: papeisTipografiaFigura(b),
+        aoAlterar: () => this.notificarMudanca()
       });
     }
 

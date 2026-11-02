@@ -461,6 +461,59 @@ export function criarEstilosPadrao(perfilId = 'abnt') {
 /**
  * Converte um estilo de texto em propriedades CSS para exibição inline na folha
  */
+/**
+ * Somente a TIPOGRAFIA de um estilo de texto (fonte, tamanho, peso, cor, itálico, caixa alta, entrelinha,
+ * espaçamento de letras/palavras). Serve a conteúdos que têm layout próprio, como as células de uma tabela:
+ * alinhamento, margens, recuos e fundo do estilo não se aplicam.
+ */
+export function estiloParaCssTipografia(estilo) {
+  if (!estilo) return '';
+  const f = FONTES_SISTEMA[estilo.fonte] || FONTES_SISTEMA.nunito;
+  const p = [
+    `font-family: ${f.familia}`,
+    `font-size: ${estilo.tamanho_pt || 11}pt`,
+    `font-weight: ${estilo.peso || 400}`,
+    `color: ${estilo.cor || '#1F2733'}`,
+    `line-height: ${estilo.entrelinha || 1.5}`
+  ];
+  if (estilo.italico) p.push('font-style: italic');
+  if (estilo.caixa_alta) p.push('text-transform: uppercase');
+  if (estilo.espacamento_letras_em) p.push(`letter-spacing: ${estilo.espacamento_letras_em}em`);
+  if (estilo.espacamento_palavras_em) p.push(`word-spacing: ${estilo.espacamento_palavras_em}em`);
+  return p.join('; ') + ';';
+}
+
+/** Estilo do prefixo de numeração ("Tabela 1 —"): tipografia do estilo, sem layout de bloco. */
+export function estiloParaCssNumeracao(estilo) {
+  return estilo ? `${estiloParaCssTipografia(estilo)} display: inline; margin: 0; padding: 0; text-indent: 0;` : '';
+}
+
+/** Localiza um estilo de texto por id (null se `id` vazio ou inexistente). */
+export function localizarEstilo(estilos, id) {
+  if (!id || !Array.isArray(estilos)) return null;
+  return estilos.find(e => e.id === id) || null;
+}
+
+const ALINHAMENTO_BLOCO_CSS = {
+  esquerda: 'left', left: 'left', centro: 'center', center: 'center', direita: 'right', right: 'right',
+  justificado: 'justify', justificado_esquerda: 'justify', justify: 'justify'
+};
+
+/**
+ * CSS COMPLETO de um estilo de texto (fonte, tamanho, peso, cor, itálico, caixa alta, entrelinha, recuos,
+ * espaçamentos, fundo, hifenização…) mais o alinhamento explícito do bloco, que vence o do estilo.
+ * `alinhamento`: 'estilo' | vazio (usa o do estilo) | left | center | right | justify (aceita também pt-BR).
+ * Sem estilo, devolve apenas o alinhamento explícito (se houver).
+ */
+export function estiloParaCssComAlinhamento(estilo, alinhamento) {
+  let css = estilo ? estiloParaCss(estilo) : '';
+  const norm = ALINHAMENTO_BLOCO_CSS[alinhamento];
+  if (norm) {
+    css += norm === 'justify' ? ' text-align: justify; text-align-last: auto;' : ` text-align: ${norm}; text-align-last: ${norm};`;
+  }
+  return css.trim();
+}
+
 export function estiloParaCss(estilo, fontesDisponiveis = FONTES_SISTEMA) {
   if (!estilo) return '';
 

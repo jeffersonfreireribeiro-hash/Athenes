@@ -147,8 +147,9 @@ describe('Athenes — Sistema de Páginas Mestras e Fluxo Contínuo', () => {
     const secCorpo = doc.secoes.find(s => s.mestraId === 'corpo');
     secCorpo.blocos = [];
 
-    // Preenche a página 1 até perto do limite inferior (~560 pt de 638 pt)
-    for (let i = 0; i < 12; i++) {
+    // Preenche a página 1 até perto do limite inferior (~600 pt de 700 pt: cabeçalho e rodapé ficam na margem,
+    // então o corpo útil é 297 − 30 − 20 mm). O título cabe (646 pt), mas não com o próximo bloco (+60 pt).
+    for (let i = 0; i < 13; i++) {
       secCorpo.blocos.push(criarNovoBloco('paragrafo', {
         texto: 'Texto de preenchimento substancial da folha para atingir o limite útil da margem inferior e demonstrar a repaginação automática.'
       }));

@@ -8,6 +8,10 @@ import { ZipBuilder } from './zip_builder.js';
 import { MM_PARA_DXA } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
 import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao } from './athenes_documento.js';
+import { documentoComSugestoesResolvidas } from './athenes_diff.js';
+import { resolverAreasPagina, normalizarNumeracao, normalizarArea, estiloEfetivoNumeracao } from './athenes_paginacao.js';
+import { obterConfigNotas, obterNota, sanitizarHtmlNota, idsNotasDoBloco } from './athenes_notas_rodape.js';
+import { nomeFonteDocx } from './athenes_tabela_estilo.js';
 import { obterEstiloTabela, dimensoesTabela, resolverCelula, celulaParaDocx, PADDINGS_CELULA } from './athenes_tabela_estilo.js';
 
 /** Tabela/quadro OOXML com bordas por célula, sombreamento, alinhamento e zebra do estilo declarativo. */
@@ -70,9 +74,19 @@ function limparHtmlParaTexto(html) {
 /**
  * Converte HTML simples em runs OpenXML <w:r>
  */
+// Contexto da exportação em curso: notas de rodapé do Word (id sequencial por ordem de referência) e cabeçalho/rodapé
+let ctxDocx = null;
+
+function idFootnoteWord(idNota) {
+  if (!ctxDocx) return null;
+  if (!ctxDocx.notas.has(idNota)) ctxDocx.notas.set(idNota, ctxDocx.notas.size + 1);
+  return ctxDocx.notas.get(idNota);
+}
+
 function htmlParaRunsDocx(htmlTexto, estiloPadrao = {}) {
   const runs = [];
   if (!htmlTexto) return runs;
+  let pulandoMarcador = false;
 
   const paragrafos = String(htmlTexto).split(/\r?\n|<br\s*[\/]?>/gi);
 
@@ -82,7 +96,7 @@ function htmlParaRunsDocx(htmlTexto, estiloPadrao = {}) {
       runs.push('<w:r><w:br/></w:r>');
     }
 
-    const tokens = trecho.split(/(<\/?(?:strong|b|em|i|u|span|small)[^>]*>)/gi);
+    const tokens = trecho.split(/(<\/?(?:strong|b|em|i|u|span|small|sup)[^>]*>)/gi);
     let negrito = Boolean(estiloPadrao.negrito);
     let italico = Boolean(estiloPadrao.italico);
     let sublinhado = Boolean(estiloPadrao.sublinhado);
@@ -90,7 +104,17 @@ function htmlParaRunsDocx(htmlTexto, estiloPadrao = {}) {
     for (const token of tokens) {
       if (!token) continue;
       const lower = token.toLowerCase();
-      if (lower.startsWith('<strong') || lower.startsWith('<b')) {
+      if (lower.startsWith('<sup') && lower.includes('ath-nota-ref')) {
+        // marcador de nota de rodapé → referência nativa do Word (o Word numera e posiciona a nota na página)
+        const idNota = /data-nota="([\w-]+)"/.exec(token)?.[1];
+        const idWord = idNota ? idFootnoteWord(idNota) : null;
+        if (idWord) runs.push(`<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="${idWord}"/></w:r>`);
+        pulandoMarcador = true;
+      } else if (lower.startsWith('</sup')) {
+        pulandoMarcador = false;
+      } else if (pulandoMarcador) {
+        // texto visível do marcador (substituído pelo número nativo do Word)
+      } else if (lower.startsWith('<strong') || lower.startsWith('<b')) {
         negrito = true;
       } else if (lower.startsWith('</strong') || lower.startsWith('</b')) {
         negrito = false;
@@ -144,7 +168,12 @@ function dataUrlParaBytes(dataUrl) {
 /**
  * Monta as propriedades de seção OpenXML (<w:sectPr>) para uma mestra
  */
-function gerarSectPrXml(mestra, ehUltima = false) {
+const FMT_PGNUM = { arabico: 'decimal', romano_mai: 'upperRoman', romano_min: 'lowerRoman', alfa_mai: 'upperLetter', alfa_min: 'lowerLetter' };
+const FMT_NOTA = { numerico: 'decimal', alfabetico: 'lowerLetter', simbolos: 'chicago' };
+const REINICIO_NOTA = { documento: 'continuous', secao: 'eachSect', pagina: 'eachPage' };
+const NS_R = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+
+function gerarSectPrXml(mestra, ehUltima = false, sIdx = 0) {
   const m = mestra.margens_mm || mestra.margens || { t: 30, r: 20, b: 20, l: 30 };
   const topDxa = Math.round((m.t || 30) * MM_PARA_DXA);
   const rightDxa = Math.round((m.r || 20) * MM_PARA_DXA);
@@ -156,30 +185,111 @@ function gerarSectPrXml(mestra, ehUltima = false) {
   const heightDxa = paisagem ? 11906 : 16838;
   const orient = paisagem ? 'landscape' : 'portrait';
   const cols = Math.max(1, mestra.colunas || (mestra.grade?.colunas || 1));
+  const doc = ctxDocx?.documento;
+  const hf = ctxDocx?.hf;
 
-  const headerRef = mestra.cabecalho?.ativo
-    ? '<w:headerReference w:type="default" r:id="rIdHeader1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>'
-    : '';
-  const footerRef = mestra.rodape?.ativo
-    ? '<w:footerReference w:type="default" r:id="rIdFooter1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>'
-    : '';
+  const refs = [];
+  if (mestra.cabecalho?.ativo) {
+    refs.push(`<w:headerReference w:type="default" r:id="rIdHeader1" ${NS_R}/>`);
+    if (hf?.evenAndOdd) refs.push(`<w:headerReference w:type="even" r:id="rIdHeader2" ${NS_R}/>`);
+    if (hf?.titlePg) refs.push(`<w:headerReference w:type="first" r:id="rIdHeader3" ${NS_R}/>`);
+  }
+  if (mestra.rodape?.ativo) {
+    refs.push(`<w:footerReference w:type="default" r:id="rIdFooter1" ${NS_R}/>`);
+    if (hf?.evenAndOdd) refs.push(`<w:footerReference w:type="even" r:id="rIdFooter2" ${NS_R}/>`);
+    if (hf?.titlePg) refs.push(`<w:footerReference w:type="first" r:id="rIdFooter3" ${NS_R}/>`);
+  }
 
-  const titlePg = (!mestra.cabecalho?.ativo && !mestra.rodape?.ativo) ? '<w:titlePg/>' : '';
+  // Notas: marcador e reinício (a numeração em si é feita pelo Word)
+  const cfgNotas = obterConfigNotas(doc || {});
+  const footnotePr = `<w:footnotePr><w:numFmt w:val="${FMT_NOTA[cfgNotas.marcador]}"/><w:numRestart w:val="${REINICIO_NOTA[cfgNotas.reiniciar]}"/></w:footnotePr>`;
+
+  // Numeração de páginas: estilo (romano/letras) e reinício na seção
+  const num = normalizarNumeracao(doc || {}, mestra);
+  const fmt = FMT_PGNUM[estiloEfetivoNumeracao(num)] || 'decimal';
+  const reinicia = num.legado ? (sIdx === 0 && num.iniciar_em > 1) : (sIdx === 0 ? num.iniciar_em !== 1 : num.continuar === false);
+  const pgNumType = `<w:pgNumType w:fmt="${fmt}"${reinicia ? ` w:start="${num.iniciar_em}"` : ''}/>`;
+
+  // Distâncias do cabeçalho/rodapé à borda da folha
+  const cab = normalizarArea(mestra.cabecalho);
+  const rod = normalizarArea(mestra.rodape);
+  const hdrDxa = Math.round(cab.distancia_borda_mm * MM_PARA_DXA);
+  const ftrDxa = Math.round(rod.distancia_borda_mm * MM_PARA_DXA);
 
   return `<w:sectPr>
-    ${headerRef}
-    ${footerRef}
-    ${titlePg}
+    ${refs.join('\n    ')}
+    ${footnotePr}
     <w:pgSz w:w="${widthDxa}" w:h="${heightDxa}" w:orient="${orient}"/>
-    <w:pgMar w:top="${topDxa}" w:right="${rightDxa}" w:bottom="${bottomDxa}" w:left="${leftDxa}" w:header="720" w:footer="720"/>
+    <w:pgMar w:top="${topDxa}" w:right="${rightDxa}" w:bottom="${bottomDxa}" w:left="${leftDxa}" w:header="${hdrDxa}" w:footer="${ftrDxa}"/>
+    ${pgNumType}
     <w:cols w:num="${cols}" w:space="720"/>
+    ${hf?.titlePg ? '<w:titlePg/>' : ''}
   </w:sectPr>`;
+}
+
+/**
+ * Cabeçalho/rodapé do Word a partir da mestra de corpo (um conjunto para o documento): 3 zonas por tabulação,
+ * campos PAGE/NUMPAGES com formato (romano/letras), linha divisória e variantes de primeira página e pares.
+ */
+function construirCabecalhoRodapeDocx(documento, mestrasMap) {
+  const lista = [...mestrasMap.values()];
+  const mestra = mestrasMap.get('corpo') || lista.find(m => m.cabecalho?.ativo || m.rodape?.ativo) || lista[0];
+  const vazio = { header: { default: '', even: '', first: '' }, footer: { default: '', even: '', first: '' }, titlePg: false, evenAndOdd: false };
+  if (!mestra) return vazio;
+
+  const m = mestra.margens_mm || { l: 30, r: 20 };
+  const larguraDxa = Math.round(((mestra.orientacao === 'paisagem' ? 297 : 210) - (m.l || 0) - (m.r || 0)) * MM_PARA_DXA);
+  const secaoId = (documento.secoes || [])[0]?.id;
+  const numeracao = normalizarNumeracao(documento, mestra);
+  const estilo = estiloEfetivoNumeracao(numeracao);
+  const sw = { arabico: '', romano_mai: ' \\* ROMAN', romano_min: ' \\* roman', alfa_mai: ' \\* ALPHABETIC', alfa_min: ' \\* alphabetic' }[estilo] || '';
+  const PAG = '§§PAG§§';
+  const TOT = '§§TOT§§';
+
+  const runTexto = (txt, rPr) => (txt ? `<w:r>${rPr}<w:t xml:space="preserve">${escaparXml(txt)}</w:t></w:r>` : '');
+  const zonaXml = (txt, rPr) => txt.split(/(§§PAG§§|§§TOT§§)/).map(parte => {
+    if (parte === PAG) return `<w:fldSimple w:instr="PAGE${sw}"><w:r>${rPr}<w:t>1</w:t></w:r></w:fldSimple>`;
+    if (parte === TOT) return `<w:fldSimple w:instr="NUMPAGES"><w:r>${rPr}<w:t>1</w:t></w:r></w:fldSimple>`;
+    return runTexto(parte, rPr);
+  }).join('');
+
+  const paragrafo = (area, tipo) => {
+    if (!area) return '<w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>';
+    const fonte = nomeFonteDocx(normalizarArea(mestra[tipo]).fonte);
+    const a = normalizarArea(mestra[tipo]);
+    const rPr = `<w:rPr>${fonte ? `<w:rFonts w:ascii="${fonte}" w:hAnsi="${fonte}" w:cs="${fonte}"/>` : ''}${a.peso >= 600 ? '<w:b/>' : ''}<w:color w:val="${a.cor.replace('#', '').toUpperCase().padEnd(6, '0').slice(0, 6)}"/><w:sz w:val="${Math.round(a.tamanho_pt * 2)}"/></w:rPr>`;
+    const borda = area.linha
+      ? `<w:pBdr><w:${tipo === 'cabecalho' ? 'bottom' : 'top'} w:val="single" w:sz="${Math.max(2, Math.round(area.linha.espessura_pt * 8))}" w:space="1" w:color="${area.linha.cor.replace('#', '').toUpperCase().padEnd(6, '0').slice(0, 6)}"/></w:pBdr>`
+      : '';
+    return `<w:p><w:pPr><w:pStyle w:val="${tipo === 'cabecalho' ? 'Header' : 'Footer'}"/>${borda}<w:tabs><w:tab w:val="clear" w:pos="4513"/><w:tab w:val="clear" w:pos="9026"/><w:tab w:val="center" w:pos="${Math.round(larguraDxa / 2)}"/><w:tab w:val="right" w:pos="${larguraDxa}"/></w:tabs><w:spacing w:after="0" w:line="${Math.round(a.entrelinha * 240)}" w:lineRule="auto"/></w:pPr>${zonaXml(area.zonas.esquerda, rPr)}<w:r><w:tab/></w:r>${zonaXml(area.zonas.centro, rPr)}<w:r><w:tab/></w:r>${zonaXml(area.zonas.direita, rPr)}</w:p>`;
+  };
+
+  const montar = (numero, naSecao) => {
+    const pag = { numero, numeroNaSecao: naSecao, secaoId };
+    const r = resolverAreasPagina(documento, mestra, pag, numero, 1, { marcadores: { p: PAG, t: TOT } });
+    return { cabecalho: paragrafo(r.cabecalho, 'cabecalho'), rodape: paragrafo(r.rodape, 'rodape') };
+  };
+  const padrao = montar(3, 2);   // página ímpar comum
+  const par = montar(2, 2);      // página par comum
+  const primeira = montar(1, 1); // primeira página da seção
+
+  const hf = {
+    header: { default: padrao.cabecalho, even: par.cabecalho, first: primeira.cabecalho },
+    footer: { default: padrao.rodape, even: par.rodape, first: primeira.rodape },
+    titlePg: primeira.cabecalho !== padrao.cabecalho || primeira.rodape !== padrao.rodape,
+    evenAndOdd: par.cabecalho !== padrao.cabecalho || par.rodape !== padrao.rodape
+  };
+  return hf;
 }
 
 /**
  * Gera um pacote .docx binário completo pronto para download e edição
  */
 export async function exportarParaDocx(documento) {
+  // Sugestões pendentes saem como "proposta aceita", sem marcações <ins>/<del> cruas no Word
+  documento = documentoComSugestoesResolvidas(documento, 'aceitar');
+  const mestrasMapDoc = new Map((documento.mestras || documento.modelosPagina || []).map(m => [m.id, m]));
+  ctxDocx = { documento, notas: new Map(), hf: construirCabecalhoRodapeDocx(documento, mestrasMapDoc) };
   const zip = new ZipBuilder();
   const imagens = [];
   let contadorImagens = 0;
@@ -196,7 +306,11 @@ export async function exportarParaDocx(documento) {
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
   <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
   <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/header3.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
   <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
+  <Override PartName="/word/footer2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
+  <Override PartName="/word/footer3.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
   <Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>
   <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
 </Types>`;
@@ -213,6 +327,7 @@ export async function exportarParaDocx(documento) {
   const settingsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:defaultTabStop w:val="720"/>
+  ${ctxDocx.hf.evenAndOdd ? '<w:evenAndOddHeaders/>' : ''}
   <w:characterSpacingControl w:val="doNotCompress"/>
   <w:compat>
     <w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/>
@@ -357,52 +472,12 @@ export async function exportarParaDocx(documento) {
 </w:numbering>`;
   zip.add('word/numbering.xml', numberingXml);
 
-  // 6. word/header1.xml
-  const headerXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:p>
-    <w:pPr>
-      <w:pStyle w:val="Header"/>
-      <w:jc w:val="right"/>
-      <w:spacing w:after="0"/>
-    </w:pPr>
-    <w:r>
-      <w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr>
-      <w:t>${escaparXml(documento.titulo || 'Athenes — Artigo Científico')}</w:t>
-    </w:r>
-  </w:p>
-</w:hdr>`;
-  zip.add('word/header1.xml', headerXml);
-
-  // 7. word/footer1.xml
-  const footerXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:p>
-    <w:pPr>
-      <w:pStyle w:val="Footer"/>
-      <w:jc w:val="right"/>
-      <w:spacing w:after="0"/>
-    </w:pPr>
-    <w:r>
-      <w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr>
-      <w:t xml:space="preserve">Página </w:t>
-    </w:r>
-    <w:fldSimple w:instr="PAGE"/>
-  </w:p>
-</w:ftr>`;
-  zip.add('word/footer1.xml', footerXml);
-
-  // 8. word/footnotes.xml
-  const footnotesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:footnote w:type="separator" w:id="-1">
-    <w:p><w:r><w:separator/></w:r></w:p>
-  </w:footnote>
-  <w:footnote w:type="continuationSeparator" w:id="0">
-    <w:p><w:r><w:continuationSeparator/></w:r></w:p>
-  </w:footnote>
-</w:footnotes>`;
-  zip.add('word/footnotes.xml', footnotesXml);
+  // 6/7. word/header{1,2,3}.xml e footer{1,2,3}.xml (padrão, pares e primeira página)
+  const NS_W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  ['default', 'even', 'first'].forEach((tipo, i) => {
+    zip.add(`word/header${i + 1}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:hdr ${NS_W}>${ctxDocx.hf.header[tipo] || '<w:p/>'}</w:hdr>`);
+    zip.add(`word/footer${i + 1}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:ftr ${NS_W}>${ctxDocx.hf.footer[tipo] || '<w:p/>'}</w:ftr>`);
+  });
 
   // 9. word/document.xml - Geração estruturada por seções
   const bodyXmlParts = [];
@@ -491,16 +566,17 @@ export async function exportarParaDocx(documento) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(b.fonte)}</w:t></w:r></w:p>`);
         }
       } else if (b.tipo === 'figura') {
+        const jcFig = ({ esquerda: 'left', direita: 'right' })[b.alinhamento_bloco] || 'center';
         const titFig = obterTituloCompletoComNumeracao(b);
         if (titFig) {
-          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titFig)}</w:t></w:r></w:p>`);
+          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titFig)}</w:t></w:r></w:p>`);
         }
-        bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="64748B"/></w:rPr><w:t>[Ilustração / Grid de Imagens - Layout ${escaparXml(b.layout || '1')}]</w:t></w:r></w:p>`);
+        bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="64748B"/></w:rPr><w:t>[Ilustração / Grid de Imagens - Layout ${escaparXml(b.layout || '1')}]</w:t></w:r></w:p>`);
         if (b.legenda_geral) {
-          bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(b.legenda_geral)}</w:t></w:r></w:p>`);
+          bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(b.legenda_geral)}</w:t></w:r></w:p>`);
         }
         if (b.fonte) {
-          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(b.fonte)}</w:t></w:r></w:p>`);
+          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(b.fonte)}</w:t></w:r></w:p>`);
         }
       } else if (b.tipo === 'mapa') {
         const titMapa = obterTituloCompletoComNumeracao(b);
@@ -612,12 +688,26 @@ export async function exportarParaDocx(documento) {
 
     // Se não for a última seção, insere a quebra de seção nativa do Word (<w:sectPr>) no parágrafo final
     if (!ehUltimaSecao) {
-      bodyXmlParts.push(`<w:p><w:pPr>${gerarSectPrXml(mestra, false)}</w:pPr></w:p>`);
+      bodyXmlParts.push(`<w:p><w:pPr>${gerarSectPrXml(mestra, false, sIdx)}</w:pPr></w:p>`);
     } else {
       // Última seção: sectPr no nível raiz do body
-      bodyXmlParts.push(gerarSectPrXml(mestra, true));
+      bodyXmlParts.push(gerarSectPrXml(mestra, true, sIdx));
     }
   }
+
+  // 8. word/footnotes.xml — notas nativas do Word, na ordem em que foram referenciadas no corpo
+  const cfgNotasDoc = obterConfigNotas(documento);
+  const notasXml = [...ctxDocx.notas.entries()].map(([idNota, idWord]) => {
+    const nota = obterNota(documento, idNota);
+    const runs = htmlParaRunsDocx(sanitizarHtmlNota(nota?.html || ''), { tamanhoPt: cfgNotasDoc.tamanho_pt, cor: cfgNotasDoc.cor });
+    return `<w:footnote w:id="${idWord}"><w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> </w:t></w:r>${runs.join('')}</w:p></w:footnote>`;
+  }).join('\n');
+  zip.add('word/footnotes.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>
+  <w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>
+  ${notasXml}
+</w:footnotes>`);
 
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -636,7 +726,11 @@ export async function exportarParaDocx(documento) {
   <Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rIdNumbering" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
   <Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+  <Relationship Id="rIdHeader2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/>
+  <Relationship Id="rIdHeader3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header3.xml"/>
   <Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
+  <Relationship Id="rIdFooter2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer2.xml"/>
+  <Relationship Id="rIdFooter3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer3.xml"/>
   <Relationship Id="rIdFootnotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>
   <Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>`;
 
@@ -650,5 +744,7 @@ export async function exportarParaDocx(documento) {
 </Relationships>`;
   zip.add('word/_rels/document.xml.rels', documentRelsXml);
 
-  return zip.build();
+  const bytes = zip.build();
+  ctxDocx = null;
+  return bytes;
 }

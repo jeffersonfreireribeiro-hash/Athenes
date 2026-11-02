@@ -14,15 +14,18 @@ import {
   ajustarCasasDecimais, formatarNumeroPtBr, TAMANHO_MIN_PT, TAMANHO_MAX_PT,
   PADDINGS_CELULA, PRESETS_BORDA, corValida
 } from '../core/athenes_tabela_estilo.js';
-import { FONTES_SISTEMA } from '../core/athenes_estilos.js';
+import { FONTES_SISTEMA, estiloParaCssTipografia, localizarEstilo } from '../core/athenes_estilos.js';
+import { csvParaTabela, aplicarCsvAoBloco, decodificarCsv, SEPARADORES } from '../core/athenes_csv.js';
 
 // ───────────────────────────── DOM ─────────────────────────────
 
 /** Reaplica o estilo declarativo do bloco a uma <table> existente (um único passe). */
-export function aplicarEstiloTabelaDom(table, bloco) {
+export function aplicarEstiloTabelaDom(table, bloco, estilos = table._estilos) {
   const estilo = obterEstiloTabela(bloco);
   const dim = dimensoesTabela(bloco);
-  table.style.cssText = tabelaParaCss();
+  // tipografia dos DADOS: estilo de texto escolhido no bloco aplicado à tabela (as células herdam;
+  // ajustes por célula, como tamanho/negrito da barra de formatação, continuam valendo por cima)
+  table.style.cssText = tabelaParaCss() + ';' + estiloParaCssTipografia(localizarEstilo(estilos, bloco.dados_estilo_id));
   const linhas = table.rows;
   for (let r = 0; r < linhas.length; r++) {
     const cels = linhas[r].cells;
@@ -36,8 +39,9 @@ export function aplicarEstiloTabelaDom(table, bloco) {
  * Constrói a <table> editável de um bloco tabela/quadro com colgroup proporcional e
  * sincronização do texto das células de volta ao bloco (delegação: 1 listener por tabela).
  */
-export function construirTabelaDom(b, classe, aoAlterarConteudo) {
+export function construirTabelaDom(b, classe, aoAlterarConteudo, estilos = []) {
   const table = document.createElement('table');
+  table._estilos = estilos;
   table.className = classe;
   table.dataset.blocoId = b.id;
 
@@ -448,6 +452,20 @@ export function montarSecoesEstiloTabela(el, ctx) {
     </div>
 
     <div class="sec">
+      <h4>Dados</h4>
+      <div class="lin">
+        <button type="button" class="bt" id="tpImportCsv" style="padding:0 12px;width:auto" title="Importar tabela de um arquivo CSV (Excel, Google Planilhas)">Importar CSV…</button>
+        <input type="file" id="tpArqCsv" accept=".csv,.tsv,.txt,text/csv,text/plain" hidden>
+        <label><input type="checkbox" id="tpCsvCab" checked> 1ª linha é cabeçalho</label>
+      </div>
+      <div class="lin">
+        <label>Separador <select id="tpCsvSep"><option value="auto">Automático</option><option value="${SEPARADORES.ponto_virgula}">Ponto e vírgula ( ; )</option><option value="${SEPARADORES.virgula}">Vírgula ( , )</option><option value="${SEPARADORES.tab}">Tabulação</option><option value="${SEPARADORES.barra}">Barra ( | )</option></select></label>
+        <label>Modo <select id="tpCsvModo"><option value="substituir">Substituir dados</option><option value="anexar">Anexar linhas</option></select></label>
+      </div>
+      <div id="tpCsvMsg" role="status" style="font-size:11px;color:#64748B;min-height:14px"></div>
+    </div>
+
+    <div class="sec">
       <h4>Espaçamento e quebra</h4>
       <div class="lin">
         <label>Padding <select id="tpPadding">${opcoesPad}</select></label>
@@ -513,6 +531,32 @@ export function montarSecoesEstiloTabela(el, ctx) {
   };
   ['#tpColAtivo', '#tpColFundo', '#tpColDiv'].forEach(id => $(id).addEventListener('input', colChave));
 
+  // Importação de CSV
+  const msg = (t, erro = false) => { const m = $('#tpCsvMsg'); m.textContent = t; m.style.color = erro ? '#B42318' : '#15803D'; };
+  $('#tpImportCsv').addEventListener('click', () => $('#tpArqCsv').click());
+  $('#tpArqCsv').addEventListener('change', async (ev) => {
+    const arq = ev.target.files?.[0];
+    ev.target.value = '';
+    if (!arq) return;
+    try {
+      const { texto, codificacao } = decodificarCsv(await arq.arrayBuffer());
+      const res = csvParaTabela(texto, { separador: $('#tpCsvSep').value, cabecalho: $('#tpCsvCab').checked });
+      if (!res.colunas.length || (!res.linhas.length && $('#tpCsvModo').value === 'anexar')) {
+        msg('Nenhum dado encontrado no arquivo.', true);
+        return;
+      }
+      garantirEstiloTabela(ctx.bloco);
+      const total = aplicarCsvAoBloco(ctx.bloco, res, { modo: $('#tpCsvModo').value });
+      const sepNome = res.separador === '	' ? 'tabulação' : `"${res.separador}"`;
+      const aviso = res.truncado.linhas || res.truncado.colunas ? ' (arquivo grande: excedente ignorado)' : '';
+      msg(`Importado: ${res.linhas.length} linha(s) × ${res.colunas.length} coluna(s) · separador ${sepNome} · ${codificacao}${aviso}. Total: ${total.linhas} × ${total.colunas}.`);
+      if (ctx.aoReconstruir) ctx.aoReconstruir(); else reaplicar(ctx);
+      ctx.aoAlterar?.();
+    } catch (err) {
+      msg('Não foi possível ler o arquivo: ' + err.message, true);
+    }
+  });
+
   $('#tpPadding').addEventListener('change', ev => { e().padding = ev.target.value; reaplicar(ctx); });
   $('#tpQuebra').addEventListener('change', ev => { e().quebra = ev.target.value; reaplicar(ctx); });
 }
@@ -534,7 +578,7 @@ function fecharForaHandler(e) {
 }
 
 /** Popover rápido (barra do bloco): mesmas seções do modal, com a barra de formatação no topo. */
-export function abrirPopoverEstiloTabela({ bloco, ancora, obterTabela, obterSelecao, aoAlterar }) {
+export function abrirPopoverEstiloTabela({ bloco, ancora, obterTabela, obterSelecao, aoAlterar, aoReconstruir }) {
   fecharPopoverEstiloTabela();
   garantirCss();
 
@@ -548,7 +592,7 @@ export function abrirPopoverEstiloTabela({ bloco, ancora, obterTabela, obterSele
   popoverAtivo = pop;
   tabelaDoPopover = obterTabela;
 
-  const ctx = { bloco, obterTabela, obterSelecao, aoAlterar, estado: { escopo: 'selecao' } };
+  const ctx = { bloco, obterTabela, obterSelecao, aoAlterar, aoReconstruir, estado: { escopo: 'selecao' } };
   montarBarraFormatacaoTabela(pop.querySelector('#popBarra'), ctx, { linhaUnica: false });
   montarSecoesEstiloTabela(pop.querySelector('#popSecoes'), ctx);
 

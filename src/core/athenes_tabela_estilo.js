@@ -278,6 +278,7 @@ export function resolverCelula(estilo, dim, r, c) {
     // negrito/cor do cabeçalho são padrões; a formatação explícita da seleção tem precedência
     negrito: texto.negrito !== undefined ? texto.negrito
       : ehCab ? !!estilo.cabecalho.negrito : ehRod ? !!estilo.rodape.negrito : ehColChave ? !!estilo.coluna_cabecalho.negrito : false,
+    negritoExplicito: texto.negrito !== undefined,
     italico: !!texto.italico,
     riscado: !!texto.riscado,
     cor_texto: texto.cor_texto || (ehCab ? estilo.cabecalho.cor_texto || null : null),
@@ -501,7 +502,10 @@ export function celulaParaCss(res, estilo) {
     `border-right:${bordaParaCss(res.bordas.r)}`
   ];
   if (res.fundo) decl.push(`background-color:${res.fundo}`);
-  decl.push(`font-weight:${res.negrito ? 800 : 400}`);
+  // peso: cabeçalho sempre explícito (o navegador deixa <th> em negrito); dados só quando negrito ou ajuste explícito,
+  // para não anular o peso do estilo de texto escolhido para os dados da tabela
+  if (res.negrito) decl.push('font-weight:800');
+  else if (res.tipo === 'cabecalho' || res.negritoExplicito) decl.push('font-weight:400');
   if (res.italico) decl.push('font-style:italic');
   if (res.riscado) decl.push('text-decoration:line-through');
   if (res.cor_texto) decl.push(`color:${res.cor_texto}`);

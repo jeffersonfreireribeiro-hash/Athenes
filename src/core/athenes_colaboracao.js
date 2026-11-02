@@ -14,8 +14,14 @@ export const SUPABASE_CONFIG_PADRAO = Object.freeze({
 export const MODOS_TRABALHO = Object.freeze({
   EDICAO: 'edicao',         // Edita diretamente o documento
   SUGESTAO: 'sugestao',     // Registra adições em verde e exclusões tachadas em vermelho com Aceitar/Rejeitar
-  VISUALIZACAO: 'leitura'   // Somente leitura (readonly)
+  COMPARAR: 'comparar',     // Original × proposta lado a lado, com diff e rolagem sincronizada (somente leitura)
+  VISUALIZACAO: 'leitura'   // Leitura fiel: réplica exata da exportação/impressão (somente leitura estrita)
 });
+
+/** Modos em que o documento não pode ser editado (leitura fiel e comparação). */
+export function modoSomenteLeitura(modo) {
+  return modo === MODOS_TRABALHO.VISUALIZACAO || modo === MODOS_TRABALHO.COMPARAR;
+}
 
 export const CORES_COLABORADORES = Object.freeze([
   '#314F79', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#EF4444'
@@ -140,6 +146,7 @@ export function registrarSugestao(doc, {
   textoOriginal = '',
   textoNovo = '',
   autor = 'Prof. Revisor',
+  autorId = '',
   corAutor = '#10B981',
   comentario = ''
 } = {}) {
@@ -152,6 +159,7 @@ export function registrarSugestao(doc, {
     textoOriginal: String(textoOriginal || ''),
     textoNovo: String(textoNovo || ''),
     autor: String(autor || 'Revisor'),
+    autorId: String(autorId || ''),
     corAutor: corAutor || '#10B981',
     comentario: String(comentario || ''),
     status: 'pendente', // 'pendente' | 'aceita' | 'rejeitada'
@@ -168,21 +176,52 @@ export function registrarSugestao(doc, {
  */
 export function gerarHtmlMarcacaoSugestao(sugestao) {
   if (!sugestao) return '';
-  const id = sugestao.id;
+  const id = escaparAtributo(sugestao.id);
   const autor = escaparAtributo(sugestao.autor || 'Revisor');
+  const autorId = escaparAtributo(sugestao.autorId || '');
+  const quando = escaparAtributo(sugestao.criadoEm || '');
+  const cor = /^#[0-9a-f]{3,8}$/i.test(sugestao.corAutor || '') ? sugestao.corAutor : '#10B981';
+  const attrs = `data-sugestao-id="${id}" data-autor="${autor}" data-autor-id="${autorId}" data-criado="${quando}" style="--ath-sug-cor:${cor}"`;
   const Partes = [];
 
+  // O conteúdo é texto puro (vem de seleção/digitação): escapa para não injetar HTML
   if (sugestao.textoOriginal) {
     Partes.push(
-      `<del class="ath-sug-mark ath-sug-del" data-sugestao-id="${id}" data-autor="${autor}" title="Exclusão sugerida por ${autor}">${sugestao.textoOriginal}</del>`
+      `<del class="ath-sug-mark ath-sug-del" ${attrs} title="Exclusão sugerida por ${autor}">${escaparTexto(sugestao.textoOriginal)}</del>`
     );
   }
   if (sugestao.textoNovo) {
     Partes.push(
-      `<ins class="ath-sug-mark ath-sug-ins" data-sugestao-id="${id}" data-autor="${autor}" title="Adição sugerida por ${autor}">${sugestao.textoNovo}</ins>`
+      `<ins class="ath-sug-mark ath-sug-ins" ${attrs} title="Adição sugerida por ${autor}">${escaparTexto(sugestao.textoNovo)}</ins>`
     );
   }
-  return Partes.join(' ');
+  return Partes.join('');
+}
+
+function escaparTexto(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * Serializa as sugestões no formato de intercâmbio `{ id, author_id, author_name, timestamp, type, content }`.
+ * `type` é 'insertion' ou 'deletion'; uma substituição vira duas entradas (deletion + insertion) ligadas por
+ * `group_id` (a decisão de aceitar/rejeitar continua atômica: ambas compartilham o mesmo `id` de origem).
+ */
+export function serializarSugestoesPadrao(lista) {
+  const out = [];
+  for (const s of Array.isArray(lista) ? lista : []) {
+    const base = {
+      author_id: s.autorId || '',
+      author_name: s.autor || '',
+      timestamp: s.criadoEm || '',
+      block_id: s.blocoId || null,
+      status: s.status || 'pendente',
+      group_id: s.id
+    };
+    if (s.textoOriginal) out.push({ id: s.id + (s.textoNovo ? ':del' : ''), type: 'deletion', content: s.textoOriginal, ...base });
+    if (s.textoNovo) out.push({ id: s.id + (s.textoOriginal ? ':ins' : ''), type: 'insertion', content: s.textoNovo, ...base });
+  }
+  return out;
 }
 
 function escaparAtributo(str) {

@@ -5,6 +5,11 @@
  */
 
 import { criarEstilosPadrao, PERFIS_FORMATACAO } from './athenes_estilos.js';
+import { obterLayoutFigura, CHAVES_ESTILO_FIGURA } from './athenes_figura_layout.js';
+import { geometriaCorpoMm, calcularNumerosExibidos } from './athenes_paginacao.js';
+import {
+  obterConfigNotas, idsNotasDoBloco, alturaSegmentoPt, alturaSeparadorPt, ajustarNotasAoEspaco, rotularNotas, PT_POR_MM
+} from './athenes_notas_rodape.js';
 
 let contadorId = 0;
 export const gerarId = prefixo => `${prefixo || 'b'}_${Date.now().toString(36)}_${(contadorId++).toString(36)}`;
@@ -242,6 +247,19 @@ export function criarSecao(nome, mestraId, blocos = [], id = null) {
 }
 
 /**
+ * Copia para o bloco o estilo de texto (id + alinhamento) do título e da fonte de tabela/quadro.
+ * Só aceita ids simples e alinhamentos conhecidos (dados podem vir de JSON externo).
+ */
+function copiarTipografiaBloco(b, dados) {
+  for (const papel of ['titulo', 'fonte', 'numeracao', 'dados']) {
+    const id = dados[`${papel}_estilo_id`];
+    if (typeof id === 'string' && /^[\w-]{1,64}$/.test(id)) b[`${papel}_estilo_id`] = id;
+    const al = dados[`${papel}_alinhamento`];
+    if (['estilo', 'left', 'center', 'right', 'justify'].includes(al)) b[`${papel}_alinhamento`] = al;
+  }
+}
+
+/**
  * Cria um novo bloco de conteúdo para o documento
  */
 export function criarNovoBloco(tipo, dados = {}) {
@@ -318,6 +336,11 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.posicao_titulo = dados.posicao_titulo || 'topo';
       b.subgrade_colunas = dados.subgrade_colunas || 1;
       b.padding_pt = dados.padding_pt !== undefined ? dados.padding_pt : 4;
+      // diagramação do subgrid (gap, rótulos, moldura da imagem, sombra, enquadramento, largura, fluxo...)
+      for (const k of CHAVES_ESTILO_FIGURA) {
+        if (dados[k] !== undefined && k !== 'layout' && k !== 'largura_pct') b[k] = dados[k];
+      }
+      if (dados.largura_pct !== undefined) b.largura_pct = dados.largura_pct;
       break;
 
     case 'mapa':
@@ -346,6 +369,7 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.com_cabecalho = dados.com_cabecalho !== undefined ? dados.com_cabecalho : true;
       b.bordas_abertas = true; // Estilo ABNT/IBGE (laterais verticais abertas)
       if (dados.estilo_tabela) b.estilo_tabela = JSON.parse(JSON.stringify(dados.estilo_tabela)); // bordas/zebra/alinhamento das células
+      copiarTipografiaBloco(b, dados);
       b.numero_sequencial = dados.numero_sequencial || 1;
       b.moldura_tipo = dados.moldura_tipo || 'limpo';
       b.linha_estilo = dados.linha_estilo || 'solida';
@@ -369,6 +393,7 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.com_cabecalho = dados.com_cabecalho !== undefined ? dados.com_cabecalho : true;
       b.bordas_fechadas = true; // Estilo Quadro ABNT (caixa com todas as bordas fechadas)
       if (dados.estilo_tabela) b.estilo_tabela = JSON.parse(JSON.stringify(dados.estilo_tabela));
+      copiarTipografiaBloco(b, dados);
       b.numero_sequencial = dados.numero_sequencial || 1;
       b.moldura_tipo = dados.moldura_tipo || 'caixa_borda';
       b.linha_estilo = dados.linha_estilo || 'solida';
@@ -507,6 +532,8 @@ export function estimarAlturaBlocoPt(bloco) {
       let mult = 1;
       if (layout === '2_empilhado' || layout === '6_grade') mult = 1.6;
       else if (layout === '4_grade') mult = 1.4;
+      else if (obterLayoutFigura(layout).rows.length > 2) mult = 2.1; // 3×2 e demais com 3 linhas
+      else if (layout === '3_panoramica') mult = 1.4;
       return 180 * mult + 36; // imagem/grid + título, legenda geral e fonte
     }
 
@@ -585,132 +612,116 @@ export function repaginarDocumento(doc) {
   const paginasCalculadas = [];
   let contadorPaginaGlobal = 1;
 
+  // Notas de rodapé: o espaço delas é reservado ANTES de decidir onde o texto principal quebra
+  const cfgNotas = obterConfigNotas(doc);
+  const registroNotas = new Map((doc.notasRodape || []).map(n => [n.id, n]));
+  const segmentoDe = (id) => ({ id, html: registroNotas.get(id)?.html || '' });
+  const idsDaLinha = (blocos, inicio) => {
+    const primeiro = blocos[inicio];
+    const ids = [...idsNotasDoBloco(primeiro)];
+    if (primeiro.grupo) {
+      for (let i = inicio + 1; i < blocos.length && blocos[i].grupo === primeiro.grupo; i++) ids.push(...idsNotasDoBloco(blocos[i]));
+    }
+    return ids.filter(id => registroNotas.has(id));
+  };
+
   for (let sIdx = 0; sIdx < doc.secoes.length; sIdx++) {
     const sec = doc.secoes[sIdx];
     const mestra = doc.mestras.find(m => m.id === sec.mestraId) || doc.mestras[0];
     const blocosDaSecao = Array.isArray(sec.blocos) ? sec.blocos : [];
 
-    // Altura útil da folha A4 em pontos tipográficos
+    // Corpo útil: cabeçalho/rodapé ficam na margem; se não couberem, a margem cresce (nunca sobrepõem o texto)
     const paisagem = mestra.orientacao === 'paisagem';
-    const alturaFolhaMm = paisagem ? 210 : 297;
-    const margens = mestra.margens_mm || mestra.margens || { t: 30, b: 20, l: 30, r: 20 };
-    const espacoCabecalhoMm = mestra.cabecalho?.ativo ? 12 : 0;
-    const espacoRodapeMm = mestra.rodape?.ativo ? 10 : 0;
-    const alturaUtilMm = Math.max(100, alturaFolhaMm - (margens.t + margens.b + espacoCabecalhoMm + espacoRodapeMm));
-    const alturaUtilPt = alturaUtilMm * 2.83465;
+    const geo = geometriaCorpoMm(mestra);
+    const alturaUtilPt = geo.alturaCorpoMm * PT_POR_MM;
+    const larguraPt = ((paisagem ? 297 : 210) - geo.margemEsq - geo.margemDir) * PT_POR_MM;
 
-    if (mestra.modo_aplicacao === MODOS_APLICACAO_MESTRA.FIXA) {
-      // PÁGINA FIXA: gera exatamente 1 página (ou respeita quebra_pagina explícita)
-      let blocosPagAtual = [];
-      let numNaSecao = 1;
+    let blocosPag = [];
+    let alturaAcumuladaPt = 0;
+    let notasPag = [];           // segmentos de nota da página em montagem (inclui continuações da anterior)
+    let numNaSecao = 1;
 
-      for (let bIdx = 0; bIdx < blocosDaSecao.length; bIdx++) {
-        const b = blocosDaSecao[bIdx];
-        if (b.tipo === 'quebra_pagina' && blocosPagAtual.length > 0) {
-          paginasCalculadas.push({
-            id: gerarId('pg'),
-            secaoId: sec.id,
-            mestraId: mestra.id,
-            modeloId: mestra.id,
-            numero: contadorPaginaGlobal++,
-            numeroNaSecao: numNaSecao++,
-            origemFluxo: 'fixa',
-            blocos: blocosPagAtual
-          });
-          blocosPagAtual = [];
-        } else if (b.tipo !== 'quebra_pagina') {
-          blocosPagAtual.push(b);
-        }
-      }
+    const alturaNotasPag = () => (notasPag.length
+      ? alturaSeparadorPt(cfgNotas) + notasPag.reduce((t, x) => t + alturaSegmentoPt(x.html, cfgNotas, larguraPt), 0)
+      : 0);
 
+    const fecharPagina = (fixa = false) => {
+      let visiveis = notasPag;
+      let resto = [];
+      if (!fixa) ({ visiveis, resto } = ajustarNotasAoEspaco(notasPag, alturaUtilPt - alturaAcumuladaPt, cfgNotas, larguraPt));
+      const numero = numNaSecao++;
       paginasCalculadas.push({
         id: gerarId('pg'),
         secaoId: sec.id,
         mestraId: mestra.id,
         modeloId: mestra.id,
         numero: contadorPaginaGlobal++,
-        numeroNaSecao: numNaSecao,
-        origemFluxo: 'fixa',
-        blocos: blocosPagAtual
+        numeroNaSecao: numero,
+        origemFluxo: fixa ? 'fixa' : (numero === 1 ? 'progressiva_raiz' : 'fluxo_automatico'),
+        blocos: blocosPag,
+        notas: visiveis
       });
+      blocosPag = [];
+      alturaAcumuladaPt = 0;
+      notasPag = resto; // o que não coube continua no topo da página seguinte
+    };
 
-    } else {
-      // PÁGINA PROGRESSIVA: Repagina e flui blocos automaticamente
-      let alturaAcumuladaPt = 0;
-      let blocosPagAtual = [];
-      let numNaSecao = 1;
+    const eFixa = mestra.modo_aplicacao === MODOS_APLICACAO_MESTRA.FIXA;
 
-      for (let bIdx = 0; bIdx < blocosDaSecao.length; bIdx++) {
-        const b = blocosDaSecao[bIdx];
+    for (let bIdx = 0; bIdx < blocosDaSecao.length; bIdx++) {
+      const b = blocosDaSecao[bIdx];
 
-        if (b.tipo === 'quebra_pagina') {
-          if (blocosPagAtual.length > 0) {
-            paginasCalculadas.push({
-              id: gerarId('pg'),
-              secaoId: sec.id,
-              mestraId: mestra.id,
-              modeloId: mestra.id,
-              numero: contadorPaginaGlobal++,
-              numeroNaSecao: numNaSecao++,
-              origemFluxo: numNaSecao === 2 ? 'progressiva_raiz' : 'fluxo_automatico',
-              blocos: blocosPagAtual
-            });
-            blocosPagAtual = [];
-            alturaAcumuladaPt = 0;
-          }
-          continue;
-        }
-
-        // Blocos da mesma linha (grupo) ficam juntos: só o primeiro decide a quebra
-        const anterior = bIdx > 0 ? blocosDaSecao[bIdx - 1] : null;
-        if (b.grupo && anterior && anterior.grupo === b.grupo && blocosPagAtual[blocosPagAtual.length - 1] === anterior) {
-          blocosPagAtual.push(b);
-          continue;
-        }
-        const altPt = alturaDaLinha(blocosDaSecao, bIdx);
-
-        // Regra manterComProximo: título não pode ficar no fim da folha sem espaço para o próximo bloco
-        let exigeNovaPagina = false;
-        if (b.manterComProximo && (alturaAcumuladaPt + altPt + 60 > alturaUtilPt) && blocosPagAtual.length > 0) {
-          exigeNovaPagina = true;
-        } else if (alturaAcumuladaPt + altPt > alturaUtilPt && blocosPagAtual.length > 0) {
-          exigeNovaPagina = true;
-        }
-
-        if (exigeNovaPagina) {
-          paginasCalculadas.push({
-            id: gerarId('pg'),
-            secaoId: sec.id,
-            mestraId: mestra.id,
-            modeloId: mestra.id,
-            numero: contadorPaginaGlobal++,
-            numeroNaSecao: numNaSecao++,
-            origemFluxo: numNaSecao === 2 ? 'progressiva_raiz' : 'fluxo_automatico',
-            blocos: blocosPagAtual
-          });
-          blocosPagAtual = [b];
-          alturaAcumuladaPt = altPt;
-        } else {
-          blocosPagAtual.push(b);
-          alturaAcumuladaPt += altPt;
-        }
+      if (b.tipo === 'quebra_pagina') {
+        if (blocosPag.length > 0 || (!eFixa && notasPag.length > 0)) fecharPagina(eFixa);
+        continue;
       }
 
-      // Última página da seção progressiva
-      paginasCalculadas.push({
-        id: gerarId('pg'),
-        secaoId: sec.id,
-        mestraId: mestra.id,
-        modeloId: mestra.id,
-        numero: contadorPaginaGlobal++,
-        numeroNaSecao: numNaSecao,
-        origemFluxo: numNaSecao === 1 ? 'progressiva_raiz' : 'fluxo_automatico',
-        blocos: blocosPagAtual
-      });
+      if (eFixa) {
+        // PÁGINA FIXA: 1 página (ou as quebras explícitas); as notas dos blocos acompanham a página
+        blocosPag.push(b);
+        notasPag.push(...idsNotasDoBloco(b).filter(id => registroNotas.has(id)).map(segmentoDe));
+        continue;
+      }
+
+      // PÁGINA PROGRESSIVA: flui blocos automaticamente
+      // Blocos da mesma linha (grupo) ficam juntos: só o primeiro decide a quebra
+      const anterior = bIdx > 0 ? blocosDaSecao[bIdx - 1] : null;
+      if (b.grupo && anterior && anterior.grupo === b.grupo && blocosPag[blocosPag.length - 1] === anterior) {
+        blocosPag.push(b);
+        continue;
+      }
+      const altPt = alturaDaLinha(blocosDaSecao, bIdx);
+      const novas = idsDaLinha(blocosDaSecao, bIdx).filter(id => !notasPag.some(x => x.id === id)).map(segmentoDe);
+      const alturaNovasPt = novas.reduce((t, x) => t + alturaSegmentoPt(x.html, cfgNotas, larguraPt), 0)
+        + (notasPag.length === 0 && novas.length ? alturaSeparadorPt(cfgNotas) : 0);
+      const totalPt = alturaAcumuladaPt + altPt + alturaNotasPag() + alturaNovasPt;
+
+      // manterComProximo: título não fica no fim da folha sem espaço para o próximo bloco
+      const exigeNovaPagina = blocosPag.length > 0
+        && ((b.manterComProximo && totalPt + 60 > alturaUtilPt) || totalPt > alturaUtilPt);
+
+      if (exigeNovaPagina) {
+        fecharPagina();
+        blocosPag = [b];
+        alturaAcumuladaPt = altPt;
+        notasPag = [...notasPag, ...novas];
+      } else {
+        blocosPag.push(b);
+        alturaAcumuladaPt += altPt;
+        notasPag.push(...novas);
+      }
     }
+
+    // Última página da seção e, se sobrou continuação de nota, páginas adicionais só com as notas
+    fecharPagina(eFixa);
+    let guarda = 0;
+    while (notasPag.length && guarda++ < 50) fecharPagina();
   }
 
+  rotularNotas(doc, paginasCalculadas);
   doc.paginas = paginasCalculadas;
+  const exibidos = calcularNumerosExibidos(doc);
+  paginasCalculadas.forEach((pg, i) => { pg.numeroExibido = exibidos[i]; });
   return paginasCalculadas;
 }
 

@@ -10,7 +10,7 @@
  */
 
 import { dimensoesPapelMm } from '../core/athenes_grid.js';
-import { estiloParaCss, FONTES_SISTEMA, PESOS_FONTE, criarEstilosPadrao } from '../core/athenes_estilos.js';
+import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssNumeracao, localizarEstilo, FONTES_SISTEMA, PESOS_FONTE, criarEstilosPadrao } from '../core/athenes_estilos.js';
 import {
   criarNovoBloco,
   modeloDaPagina,
@@ -51,10 +51,19 @@ import { ModalEditorMestra } from './athenes_editor_mestra.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 import { construirTabelaDom, instalarSelecaoCelulas, abrirPopoverEstiloTabela } from './athenes_tabela_ui.js';
 import { instalarZoomCanvas } from './athenes_zoom_canvas.js';
+import { montarLeituraFiel, montarComparacao } from './athenes_visoes_revisao.js';
+import { instalarSugestaoInline, abrirCardSugestao, fecharCardSugestao, SEL_MARCA } from './athenes_sugestoes_ui.js';
+import { geometriaCorpoMm, resolverAreasPagina } from '../core/athenes_paginacao.js';
+import { criarNotaRodape, htmlMarcadorNota, aplicarRotulosNotasHtml, sanitizarHtmlNota, obterNota, removerNota, podarNotasOrfas } from '../core/athenes_notas_rodape.js';
+import { construirAreaPaginaDom, construirNotasDom, abrirEditorNota, fecharEditorNota } from './athenes_pagina_ui.js';
+import { ModalConfigPagina } from './athenes_config_pagina_modal.js';
+import { construirGradeFiguraDom, criarBarraItemFigura, criarBotaoLayoutFigura } from './athenes_figura_ui.js';
+import { descreverFigura } from '../core/athenes_figura_layout.js';
 import { ModalEditorEstilo } from './athenes_editor_estilo_modal.js';
 import { ModalCentralEstilos } from './athenes_central_estilos_modal.js';
 import {
   MODOS_TRABALHO,
+  modoSomenteLeitura,
   obterPerfilColaborador,
   salvarPerfilColaborador,
   garantirEstruturaSugestoes,
@@ -136,6 +145,8 @@ export class EditorView {
     this._tSnap = null;
     this._selTabelas = new Map();
     this.zoomCanvas = 1;
+    this._itemFigura = null; // { id, idx }: imagem selecionada no canvas
+    this._visaoRevisao = null; // leitura fiel / comparação ativa (somente leitura)
 
     this.opcoes = opcoes;
     this.onAlterado = opcoes.onAlterado || (() => {});
@@ -249,6 +260,7 @@ export class EditorView {
   }
 
   salvarSnapshot() {
+    podarNotasOrfas(this.doc);
     const snap = JSON.stringify(this.doc);
     if (this.historicoIndice >= 0 && this.historico[this.historicoIndice] === snap) return;
 
@@ -259,6 +271,7 @@ export class EditorView {
   }
 
   desfazer() {
+    if (modoSomenteLeitura(this.modoTrabalho)) return;
     if (this.historicoIndice > 0) {
       this.historicoIndice--;
       this.doc = JSON.parse(this.historico[this.historicoIndice]);
@@ -271,6 +284,7 @@ export class EditorView {
   }
 
   refazer() {
+    if (modoSomenteLeitura(this.modoTrabalho)) return;
     if (this.historicoIndice < this.historico.length - 1) {
       this.historicoIndice++;
       this.doc = JSON.parse(this.historico[this.historicoIndice]);
@@ -298,6 +312,10 @@ export class EditorView {
       palco: this.container.querySelector('#rmPrevPalco')?.scrollTop || 0,
       esq: this.container.querySelector('#rmColEsq')?.scrollTop || 0
     };
+    this._visaoRevisao?.destruir();
+    this._visaoRevisao = null;
+    fecharCardSugestao();
+    fecharEditorNota();
     this.container.innerHTML = '';
 
     const root = document.createElement('div');
@@ -319,7 +337,7 @@ export class EditorView {
         <!-- Presença em Tempo Real (Avatares Online) -->
         <div class="ath-presenca-avatares" id="athAvataresPresenca" title="Colaboradores online neste documento"></div>
 
-        <!-- Seletor dos 3 Modos de Trabalho estilo Google Docs (Edição / Sugestão / Visualização) -->
+        <!-- Seletor dos 4 modos: Edição / Sugestão / Comparar lado a lado / Leitura fiel (impressão) -->
         <div class="ath-seletor-modo-trabalho" id="athSeletorModoTrabalho" role="group" aria-label="Modo de Trabalho">
           <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.EDICAO ? 'on' : ''}" data-modo="edicao" title="Modo Edição: edita o documento diretamente">
             ${svgIcone('lapis', 13)} <span>Edição</span>
@@ -328,7 +346,10 @@ export class EditorView {
             ${svgIcone('sugestao', 13)} <span>Sugestão</span>
             ${(this.doc.sugestoes?.length > 0) ? `<span style="background:#FFFFFF; color:#059669; border-radius:999px; padding:0 5px; font-size:10px; font-weight:800;">${this.doc.sugestoes.length}</span>` : ''}
           </button>
-          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.VISUALIZACAO ? 'on' : ''}" data-modo="leitura" title="Modo Visualização: trava o documento somente para leitura">
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.COMPARAR ? 'on' : ''}" data-modo="comparar" title="Comparar lado a lado: original × proposta, com diff e rolagem sincronizada">
+            ${svgIcone('grade', 13)} <span>Comparar</span>
+          </button>
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.VISUALIZACAO ? 'on' : ''}" data-modo="leitura" title="Leitura fiel: réplica exata da exportação/impressão, somente leitura">
             ${svgIcone('olho', 13)} <span>Leitura</span>
           </button>
         </div>
@@ -348,7 +369,7 @@ export class EditorView {
 
     // 2. Editor Principal Glaux (Grade de 3 Colunas: 310px | 1fr | 330px)
     const editorEl = document.createElement('div');
-    editorEl.className = 'rm-editor rm-main';
+    editorEl.className = 'rm-editor rm-main' + (modoSomenteLeitura(this.modoTrabalho) ? ' ath-modo-revisao' : '');
     editorEl.innerHTML = `
       <div class="rm-ed-grade">
         <!-- COLUNA ESQUERDA: Configuração, Margens, Seções, Cabeçalho/Rodapé, Estilos e Blocos -->
@@ -455,6 +476,7 @@ export class EditorView {
             </div>
             <button type="button" class="rm-ic-bt" id="rmAddMapa" data-tip="Mapa" title="Inserir Mapa Territorial">${svgIcone('mapa', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddFormula" data-tip="Fórmula" title="Inserir Fórmula Matemática">${svgIcone('formula', 16)}</button>
+            <button type="button" class="rm-ic-bt" id="rmAddNota" data-tip="Nota" title="Inserir nota de rodapé (Ctrl+Alt+F)">${svgIcone('nota', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddDivisor" data-tip="Divisor" title="Inserir Divisor">${svgIcone('divisor', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddEspaco" data-tip="Espaço" title="Inserir Espaçamento">${svgIcone('espacamento', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddQuebra" data-tip="Quebra" title="Inserir Quebra de Página">${svgIcone('quebra_pagina', 16)}</button>
@@ -538,7 +560,27 @@ export class EditorView {
     root.querySelector('#athBtnAbaConexoes').addEventListener('click', () => this.onAbrirConexoes());
     root.querySelector('#athBtnExportarModal').addEventListener('click', () => this.onAbrirExportar());
 
-    // Seletor de Modos de Trabalho estilo Google Docs (Edição / Sugestão / Visualização)
+    // Card de decisão: clique em uma marca de sugestão (ou cursor posicionado sobre ela) abre Aceitar/Rejeitar
+    const abrirCardDaMarca = (marca) => abrirCardSugestao({
+      doc: this.doc,
+      sugestaoId: marca.dataset.sugestaoId,
+      ancora: marca,
+      aoResolver: () => { this.notificarMudanca(); this.renderizar(); }
+    });
+    root.addEventListener('click', (ev) => {
+      if (modoSomenteLeitura(this.modoTrabalho)) return;
+      const marca = ev.target.closest?.(SEL_MARCA);
+      if (marca) abrirCardDaMarca(marca);
+    }, true); // captura: os blocos da folha interrompem a propagação do clique
+    root.addEventListener('keyup', (ev) => {
+      if (modoSomenteLeitura(this.modoTrabalho)) return;
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(ev.key)) return;
+      const no = window.getSelection()?.anchorNode;
+      const marca = (no?.nodeType === 1 ? no : no?.parentElement)?.closest?.(SEL_MARCA);
+      if (marca && root.contains(marca)) abrirCardDaMarca(marca);
+    }, true);
+
+    // Seletor de Modos de Trabalho (Edição / Sugestão / Comparar / Leitura fiel)
     root.querySelectorAll('.ath-btn-modo-trab').forEach(btn => {
       btn.addEventListener('click', () => {
         const novoModo = btn.dataset.modo;
@@ -550,8 +592,8 @@ export class EditorView {
 
     // Botões de inserção de blocos
     const adicionar = (tipo, dados = {}) => {
-      if (this.modoTrabalho === MODOS_TRABALHO.VISUALIZACAO) {
-        alert('O documento está em Modo Visualização (Somente Leitura). Mude para Edição ou Sugestão no topo para inserir blocos.');
+      if (modoSomenteLeitura(this.modoTrabalho)) {
+        alert('O documento está em um modo somente leitura (Leitura ou Comparar). Mude para Edição ou Sugestão no topo para inserir blocos.');
         return;
       }
       const sec = this.obterSecaoAtiva();
@@ -582,6 +624,26 @@ export class EditorView {
     root.querySelector('#rmAddTabela').addEventListener('click', () => adicionar('tabela', { titulo: 'Tabela — Dados quantitativos' }));
     root.querySelector('#rmAddMapa').addEventListener('click', () => adicionar('mapa', { titulo: 'Mapa — Delimitação territorial' }));
     root.querySelector('#rmAddFormula').addEventListener('click', () => adicionar('formula', { latex: 'E = m \\cdot c^2' }));
+    const btnNota = root.querySelector('#rmAddNota');
+    btnNota.addEventListener('mousedown', (e) => e.preventDefault()); // mantém o cursor no texto
+    btnNota.addEventListener('click', () => this.inserirNotaRodapeNoCursor());
+    root.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.altKey && !e.shiftKey && (e.code === 'KeyF' || e.key.toLowerCase() === 'f')) {
+        e.preventDefault();
+        this.inserirNotaRodapeNoCursor();
+      }
+    }, true);
+    // clique no marcador abre o editor da nota inteira (também para notas divididas entre páginas)
+    root.addEventListener('click', (ev) => {
+      const ref = ev.target.closest?.('sup.ath-nota-ref');
+      if (!ref || !root.contains(ref)) return;
+      ev.stopPropagation();
+      abrirEditorNota({
+        doc: this.doc, id: ref.dataset.nota, ancora: ref,
+        aoSalvar: (id, html) => this.salvarNotaRodape(id, html),
+        aoExcluir: (id) => this.excluirNotaRodape(id)
+      });
+    }, true);
     root.querySelector('#rmAddDivisor').addEventListener('click', () => adicionar('divisor', {}));
     root.querySelector('#rmAddEspaco').addEventListener('click', () => adicionar('espaco', { altura_pt: 24 }));
     root.querySelector('#rmAddQuebra').addEventListener('click', () => adicionar('quebra_pagina', {}));
@@ -788,6 +850,10 @@ export class EditorView {
         <strong>Cabeçalho e Rodapé</strong>
         <button type="button" class="rm-ic" data-fechar-popover title="Fechar">${svgIcone('fechar', 13)}</button>
       </div>
+      <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="rmAbrirConfigPagina" style="width:100%; margin-bottom:8px;" title="Zonas, tipografia, paginação, regras de seção e notas de rodapé, com prévia ao vivo">
+        ${svgIcone('grade', 14)} Configuração de Página…
+      </button>
+      <span id="rmAvisoConfigPagina" style="display:none; font-size:11px; color:#64748B; margin-bottom:6px;">Cabeçalho e rodapé desta mestra são gerenciados em <b>Configuração de Página</b>.</span>
       <label class="rm-chk"><input type="checkbox" id="rmCabAtivo" ${mestra.cabecalho?.ativo ? 'checked' : ''}> Mostrar cabeçalho</label>
       <span class="rm-rot">Logo da empresa</span>
       <label class="rm-arquivo glx-btn glx-btn-soft glx-btn-sm" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
@@ -812,6 +878,22 @@ export class EditorView {
       </label>
       <label class="rm-chk"><input type="checkbox" id="rmRodNum" ${mestra.rodape?.numeracao ? 'checked' : ''}> Numerar páginas ("Página 1 de 3")</label>
     `;
+
+    popCabRod.querySelector('#rmAbrirConfigPagina').addEventListener('click', () => {
+      popCabRod.hidden = true;
+      new ModalConfigPagina(this.doc, mestra, {
+        onSalvar: () => {
+          this.menuTopoAberto = null; // o popover não deve reabrir depois de salvar
+          this.notificarMudanca();
+          this.renderizar();
+        }
+      });
+    });
+    // com zonas definidas, os campos de texto/alinhamento antigos deixam de valer: evita duas fontes de verdade
+    if (mestra.cabecalho?.zonas || mestra.rodape?.zonas) {
+      popCabRod.querySelector('#rmAvisoConfigPagina').style.display = 'block';
+      ['#rmCabLinhas', '#rmCabAlinha', '#rmRodTexto'].forEach(q => { const n = popCabRod.querySelector(q); if (n) n.disabled = true; });
+    }
 
     popCabRod.querySelector('#rmCabAtivo').addEventListener('change', e => {
       mestra.cabecalho = mestra.cabecalho || {};
@@ -1936,7 +2018,141 @@ export class EditorView {
     });
   }
 
+  /**
+   * Aplica o estilo de texto COMPLETO escolhido para o `papel` (titulo, legenda, fonte…) do bloco:
+   * fonte, tamanho, peso, cor, itálico, caixa alta, entrelinha, recuos, espaçamentos, fundo e alinhamento
+   * (o alinhamento explícito do bloco vence o do estilo). Sem estilo escolhido, mantém o visual padrão.
+   * `prefixoEl` (ex.: "Figura 1 —") passa a herdar peso e cor do estilo.
+   */
+  aplicarTipografiaBloco(el, b, papel, prefixoEl = null) {
+    const est = localizarEstilo(this.doc.estilos, b[`${papel}_estilo_id`]);
+    const css = estiloParaCssComAlinhamento(est, b[`${papel}_alinhamento`]);
+    if (css) el.style.cssText += ';' + css;
+    if (est && prefixoEl) {
+      prefixoEl.style.fontWeight = 'inherit';
+      prefixoEl.style.color = 'inherit';
+    }
+    // numeração ("Tabela 1 —", "Figura 2 —"): estilo próprio, independente do título
+    const estNum = papel === 'titulo' ? localizarEstilo(this.doc.estilos, b.numeracao_estilo_id) : null;
+    if (estNum && prefixoEl) prefixoEl.style.cssText += ';' + estiloParaCssNumeracao(estNum) + ';margin-right:4px;';
+  }
+
+  /** Insere um marcador de nota de rodapé na posição do cursor e foca o texto da nova nota na base da página. */
+  inserirNotaRodapeNoCursor() {
+    if (modoSomenteLeitura(this.modoTrabalho)) return;
+    const sel = window.getSelection();
+    const no = sel?.anchorNode;
+    const alvo = (no?.nodeType === 1 ? no : no?.parentElement)?.closest?.('.ath-texto-editable, .ath-titulo-editable');
+    const folha = alvo?.closest('.ath-bloco-folha');
+    const b = folha ? this.buscarBlocoPorId(folha.dataset.blocoId) : null;
+    if (!alvo || !b) {
+      alert('Posicione o cursor no texto onde a nota de rodapé deve aparecer.');
+      return;
+    }
+    const nota = criarNotaRodape(this.doc, '');
+    document.execCommand('insertHTML', false, htmlMarcadorNota(nota.id));
+    b.texto = removerHifensCondicionais(alvo.innerHTML);
+    this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
+    this.notificarMudanca();
+    this.renderizarFolhasPaginas();
+    requestAnimationFrame(() => {
+      const campo = this.container?.querySelector(`.ath-nota[data-nota-id="${nota.id}"] .ath-nota-txt`);
+      if (campo) { campo.scrollIntoView({ block: 'nearest' }); campo.focus(); }
+    });
+  }
+
+  /** Grava o conteúdo (já sanitizado) de uma nota e repagina, pois a altura pode ter mudado. */
+  salvarNotaRodape(id, html) {
+    const nota = obterNota(this.doc, id);
+    if (!nota || nota.html === html) return;
+    nota.html = html;
+    this.notificarMudanca();
+    this.renderizarFolhasPaginas();
+  }
+
+  excluirNotaRodape(id) {
+    removerNota(this.doc, id);
+    this.notificarMudanca();
+    this.renderizar();
+  }
+
+  /** Liga a captura de edição sob sugestão a um elemento editável de texto (parágrafo/título). */
+  instalarSugestaoNoBloco(elemento, b) {
+    instalarSugestaoInline(elemento, {
+      bloco: b,
+      doc: this.doc,
+      perfil: () => this.perfilColaborador,
+      ativo: () => this.modoTrabalho === MODOS_TRABALHO.SUGESTAO,
+      aoAlterar: () => {
+        b.texto = removerHifensCondicionais(elemento.innerHTML);
+        this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
+        this.notificarMudancaRapida();
+      }
+    });
+  }
+
+  /** Seleciona uma imagem individual do subgrid: destaca com contorno e mostra a barra do item. */
+  selecionarItemFigura(b, pag, idx) {
+    this._itemFigura = { id: b.id, idx };
+    this.selecionarBloco(b, pag);
+    this.marcarItemFigura();
+  }
+
+  /** Reflete `_itemFigura` no DOM: contorno ativo + barra flutuante (ou limpa se não houver seleção). */
+  marcarItemFigura() {
+    if (!this.container) return;
+    this.container.querySelectorAll('.ath-fig-item.sel').forEach(n => n.classList.remove('sel'));
+    this.container.querySelectorAll('.ath-fig-barra-item').forEach(n => n.remove());
+    const sel = this._itemFigura;
+    if (!sel) return;
+    const bloco = this.buscarBlocoPorId(sel.id);
+    const cel = this.container.querySelector(`.ath-bloco-folha[data-bloco-id="${sel.id}"] .ath-fig-item[data-idx="${sel.idx}"]`);
+    if (!bloco || !cel) return;
+    cel.classList.add('sel');
+    cel.appendChild(criarBarraItemFigura({
+      b: bloco,
+      idx: sel.idx,
+      aoAlterar: () => { this.notificarMudancaRapida(); this.reconstruirFigura(bloco.id); },
+      aoTrocarImagem: (i) => this.escolherImagemItemFigura(bloco, i),
+      aoLimpar: (i) => {
+        bloco.itens[i].url = '';
+        bloco.src = bloco.itens[0]?.url || '';
+        this.notificarMudanca();
+        this.reconstruirFigura(bloco.id);
+      }
+    }));
+  }
+
+  reconstruirFigura(blocoId) {
+    this.container?.querySelector(`.ath-bloco-folha[data-bloco-id="${blocoId}"]`)?._reconstruirFigura?.();
+  }
+
+  /** Abre o seletor de arquivo e grava a imagem (data URL, offline) no slot `idx`. */
+  escolherImagemItemFigura(b, idx) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.addEventListener('change', () => {
+      const arq = input.files?.[0];
+      if (!arq) return;
+      const leitor = new FileReader();
+      leitor.onload = (e) => {
+        if (!Array.isArray(b.itens)) b.itens = [];
+        (b.itens[idx] ||= { url: '', legenda_sub: '' }).url = e.target.result;
+        b.src = b.itens[0]?.url || '';
+        this.notificarMudanca();
+        this.reconstruirFigura(b.id);
+      };
+      leitor.readAsDataURL(arq);
+    });
+    input.click();
+  }
+
   selecionarBloco(b, pag = null, opcoes = {}) {
+    if (this._itemFigura && this._itemFigura.id !== b?.id) {
+      this._itemFigura = null;
+      this.marcarItemFigura();
+    }
     this.blocoSelecionado = b;
     let mudouSecao = false;
     if (b) {
@@ -2043,9 +2259,23 @@ export class EditorView {
     });
   }
 
+  /** Leitura fiel e Comparar: o palco passa a exibir réplicas da exportação em iframes (sem nenhum elemento editável). */
+  renderizarVisaoRevisao(palco) {
+    this._visaoRevisao?.destruir();
+    palco.innerHTML = '';
+    palco.classList.add('ath-palco-revisao');
+    this._visaoRevisao = this.modoTrabalho === MODOS_TRABALHO.COMPARAR
+      ? montarComparacao(palco, this.doc)
+      : montarLeituraFiel(palco, this.doc);
+    const info = this.container.querySelector('#rmPrevInfo');
+    if (info) info.textContent = this.modoTrabalho === MODOS_TRABALHO.COMPARAR ? 'comparação original × proposta' : 'leitura fiel (réplica da exportação)';
+  }
+
   renderizarFolhasPaginas() {
     const palco = this.container.querySelector('#rmPrevPalco');
     if (!palco) return;
+    if (modoSomenteLeitura(this.modoTrabalho)) { this.renderizarVisaoRevisao(palco); return; }
+    palco.classList.remove('ath-palco-revisao');
     palco.innerHTML = '';
 
     repaginarDocumento(this.doc);
@@ -2071,10 +2301,12 @@ export class EditorView {
 
       // Margem interna proporcional (conversão mm para px a ~3.78 px/mm)
       const pxPorMm = 3.7795;
-      const padTop = margens.t * pxPorMm;
+      const geo = geometriaCorpoMm(mestraPag);
+      const padTop = geo.topoMm * pxPorMm;
       const padRight = margens.r * pxPorMm;
-      const padBottom = margens.b * pxPorMm;
+      const padBottom = geo.baseMm * pxPorMm;
       const padLeft = margens.l * pxPorMm;
+      const areasPag = resolverAreasPagina(this.doc, mestraPag, pag, pag.numeroExibido ?? pag.numero, paginas.length);
 
       folha.style.padding = `${padTop}px ${padRight}px ${padBottom}px ${padLeft}px`;
 
@@ -2234,16 +2466,13 @@ export class EditorView {
       const areaUtil = document.createElement('div');
       areaUtil.className = 'ath-folha-area-util';
 
-      // Cabeçalho da Página
-      if (mestraPag?.cabecalho?.ativo) {
-        const cab = document.createElement('div');
-        cab.className = 'ath-folha-cabecalho';
-        const txtCab = (mestraPag.cabecalho.texto || '')
-          .replace(/\{\{?\s*documento\.titulo\s*\}?\}/g, this.doc.titulo || '')
-          .replace(/\{\{?\s*documento\.instituicao\s*\}?\}/g, this.doc.metadados?.instituicao || '')
-          .replace(/\n/g, ' · ');
-        cab.innerHTML = `<span>${txtCab}</span><span>${this.doc.tipoDoc?.toUpperCase() || 'ARTIGO'}</span>`;
-        areaUtil.appendChild(cab);
+      // Cabeçalho em 3 zonas, posicionado na margem superior (distância da borda configurável)
+      if (areasPag.cabecalho) {
+        const cab = construirAreaPaginaDom(areasPag.cabecalho);
+        cab.style.top = `${areasPag.cabecalho.distancia_borda_mm * pxPorMm}px`;
+        cab.style.left = `${padLeft}px`;
+        cab.style.right = `${padRight}px`;
+        folha.appendChild(cab);
       }
 
       // Container dos Blocos na folha (Grid de 12 Colunas)
@@ -2260,42 +2489,20 @@ export class EditorView {
 
       areaUtil.appendChild(gradeBlocos);
 
-      // Rodapé da Página com Numeração Completa e Alternada
-      if (mestraPag?.rodape?.ativo) {
-        const rod = document.createElement('div');
-        rod.className = 'ath-folha-rodape';
-        const txtRod = mestraPag.rodape.texto || 'Athenes · Editor de Documentos';
-        
-        let numTxt = '';
-        if (mestraPag.rodape.numeracao !== false) {
-          numTxt = formatarNumeroPagina(pag.numero, paginas.length, mestraPag.rodape);
-        }
+      // Notas de rodapé desta página (na base do corpo, acima do rodapé)
+      const notasEl = construirNotasDom(pag, this.doc, {
+        editavel: !modoSomenteLeitura(this.modoTrabalho),
+        aoSalvar: (id, html) => this.salvarNotaRodape(id, html)
+      });
+      if (notasEl) areaUtil.appendChild(notasEl);
 
-        const pos = mestraPag.rodape.posicao_numero || 'direita';
-        const ehPar = pag.numero % 2 === 0;
-
-        if (pos === 'alternado') {
-          // Espelhado: par = número à esquerda, ímpar = número à direita
-          if (ehPar) {
-            rod.style.flexDirection = 'row-reverse';
-            rod.innerHTML = `<span>${txtRod}</span><span><strong>${numTxt}</strong></span>`;
-          } else {
-            rod.style.flexDirection = 'row';
-            rod.innerHTML = `<span>${txtRod}</span><span><strong>${numTxt}</strong></span>`;
-          }
-        } else if (pos === 'centro') {
-          rod.style.justifyContent = 'center';
-          rod.style.gap = '20px';
-          rod.innerHTML = `<span>${txtRod}</span><span><strong>${numTxt}</strong></span>`;
-        } else if (pos === 'esquerda') {
-          rod.style.flexDirection = 'row-reverse';
-          rod.innerHTML = `<span>${txtRod}</span><span><strong>${numTxt}</strong></span>`;
-        } else {
-          rod.style.flexDirection = 'row';
-          rod.innerHTML = `<span>${txtRod}</span><span><strong>${numTxt}</strong></span>`;
-        }
-
-        areaUtil.appendChild(rod);
+      // Rodapé em 3 zonas na margem inferior (distância da borda configurável)
+      if (areasPag.rodape) {
+        const rod = construirAreaPaginaDom(areasPag.rodape);
+        rod.style.bottom = `${areasPag.rodape.distancia_borda_mm * pxPorMm}px`;
+        rod.style.left = `${padLeft}px`;
+        rod.style.right = `${padRight}px`;
+        folha.appendChild(rod);
       }
 
       folha.appendChild(areaUtil);
@@ -2392,43 +2599,11 @@ export class EditorView {
       barra.appendChild(selSub);
 
       // 2. Dropdown de Layout de Imagens
-      const selLay = document.createElement('select');
-      selLay.className = 'ath-sel-rapido';
-      selLay.title = 'Layout de slots de imagens';
-      const layouts = [
-        { id: '1', nome: '1 Imagem' },
-        { id: '2_lado', nome: '2 Lado a Lado' },
-        { id: '2_empilhado', nome: '2 Empilhado' },
-        { id: '3_linha', nome: '3 em Linha' },
-        { id: '4_grade', nome: 'Grade 2×2' },
-        { id: '6_grade', nome: 'Grade 2×3' }
-      ];
-      selLay.innerHTML = layouts.map(l => `<option value="${l.id}" ${(b.layout || '1') === l.id ? 'selected' : ''}>${l.nome}</option>`).join('');
-      selLay.addEventListener('change', e => {
-        b.layout = e.target.value;
-        const q = (b.layout === '2_lado' || b.layout === '2_empilhado') ? 2
-          : (b.layout === '3_linha' || b.layout === '3_misto') ? 3
-          : (b.layout === '4_grade') ? 4
-          : (b.layout === '6_grade') ? 6 : 1;
-
-        if (!Array.isArray(b.itens)) {
-          b.itens = [{ url: b.src || '', legenda_sub: 'Item A' }];
-        }
-        if (b.itens.length > q) {
-          // Quando muda para menos imagens, remove e limpa os slots excedentes
-          b.itens = b.itens.slice(0, q);
-        } else {
-          while (b.itens.length < q) {
-            b.itens.push({ url: '', legenda_sub: `Item ${String.fromCharCode(97 + b.itens.length).toUpperCase()}` });
-          }
-        }
-        if (q === 1 && b.itens[0]) {
-          b.src = b.itens[0].url || '';
-        }
+      // Disposição das imagens: botão com o ícone do layout atual + grade de layouts
+      barra.appendChild(criarBotaoLayoutFigura(b, () => {
         this.notificarMudanca();
         this.renderizar();
-      });
-      barra.appendChild(selLay);
+      }));
 
       // 3. Dropdown de Modelos de Apresentação
       const modelosFig = obterModelosLayoutBloco(b.tipo, this.doc);
@@ -2508,7 +2683,8 @@ export class EditorView {
             ancora: btnEstilo,
             obterTabela: () => this.container.querySelector(`table[data-bloco-id="${b.id}"]`),
             obterSelecao: () => this._selTabelas.get(b.id) || null,
-            aoAlterar: () => this.notificarMudancaRapida()
+            aoAlterar: () => this.notificarMudancaRapida(),
+            aoReconstruir: () => { this.notificarMudanca(); this.renderizar(); }
           });
         });
         barra.appendChild(btnEstilo);
@@ -2617,13 +2793,14 @@ export class EditorView {
       heading.setAttribute('lang', 'pt-BR');
       const hifAtivoTit = Boolean(estiloMesclado.hifenizacao);
       heading.style.cssText = `${cssEstilo}; margin:0; outline:none;`;
-      heading.innerHTML = hifAtivoTit ? hifenizarHtml(b.texto || 'Título da Seção') : removerHifensCondicionais(b.texto || 'Título da Seção');
+      heading.innerHTML = aplicarRotulosNotasHtml(hifAtivoTit ? hifenizarHtml(b.texto || 'Título da Seção') : removerHifensCondicionais(b.texto || 'Título da Seção'), pag?.rotulosNotas);
 
       heading.addEventListener('input', () => {
         b.texto = removerHifensCondicionais(heading.innerHTML);
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida();
       });
+      this.instalarSugestaoNoBloco(heading, b);
       el.appendChild(heading);
     }
 
@@ -2645,55 +2822,11 @@ export class EditorView {
         }
       }
 
-      p.innerHTML = resolverReferenciasCruzadas(hifAtivoP ? hifenizarHtml(conteudoHtml) : removerHifensCondicionais(conteudoHtml), this.doc);
+      p.innerHTML = aplicarRotulosNotasHtml(resolverReferenciasCruzadas(hifAtivoP ? hifenizarHtml(conteudoHtml) : removerHifensCondicionais(conteudoHtml), this.doc), pag?.rotulosNotas);
       this.aplicarConfigListaNoBloco(p, b);
 
-      // Modo Sugestão (estilo Google Docs): intercepta deleção/digitação quando modoTrabalho === 'sugestao'
-      p.addEventListener('beforeinput', e => {
-        if (this.modoTrabalho !== MODOS_TRABALHO.SUGESTAO) return;
-        const tipoIn = e.inputType;
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0) return;
-        const range = sel.getRangeAt(0);
-        const textoSelecionado = range.toString();
-
-        // Se o professor apaga um trecho selecionado, marca com <del class="ath-sug-del"> (tachado vermelho) sem apagar de verdade
-        if ((tipoIn === 'deleteContentBackward' || tipoIn === 'deleteContentForward' || tipoIn === 'deleteByCut') && textoSelecionado.trim()) {
-          e.preventDefault();
-          const sug = registrarSugestao(this.doc, {
-            blocoId: b.id,
-            tipo: 'exclusao',
-            textoOriginal: textoSelecionado,
-            textoNovo: '',
-            autor: this.perfilColaborador.nome,
-            corAutor: this.perfilColaborador.cor
-          });
-          const htmlDel = gerarHtmlMarcacaoSugestao(sug);
-          document.execCommand('insertHTML', false, htmlDel);
-          b.texto = removerHifensCondicionais(p.innerHTML);
-          this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
-          this.notificarMudancaRapida();
-          return;
-        }
-
-        // Se o professor digita substituindo uma seleção, cria sugestão de substituição (<del> + <ins>)
-        if (tipoIn === 'insertText' && e.data && textoSelecionado.trim()) {
-          e.preventDefault();
-          const sug = registrarSugestao(this.doc, {
-            blocoId: b.id,
-            tipo: 'substituicao',
-            textoOriginal: textoSelecionado,
-            textoNovo: e.data,
-            autor: this.perfilColaborador.nome,
-            corAutor: this.perfilColaborador.cor
-          });
-          const htmlSub = gerarHtmlMarcacaoSugestao(sug);
-          document.execCommand('insertHTML', false, htmlSub);
-          b.texto = p.innerHTML;
-          this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
-          this.notificarMudancaRapida();
-        }
-      });
+      // Modo Sugestão (estilo Google Docs): digitar/colar vira inserção, apagar vira exclusão tachada (sem alterar a base)
+      this.instalarSugestaoNoBloco(p, b);
 
       p.addEventListener('input', () => {
         b.texto = p.innerHTML;
@@ -2762,11 +2895,6 @@ export class EditorView {
       figBox.className = 'ath-composto-figura';
       Object.assign(figBox.style, gerarCssMolduraBloco(b));
 
-      // Estilos tipográficos aplicados
-      const estTit = (this.doc.estilos || []).find(e => e.id === b.titulo_estilo_id);
-      const estLeg = (this.doc.estilos || []).find(e => e.id === b.legenda_estilo_id);
-      const estFonte = (this.doc.estilos || []).find(e => e.id === b.fonte_estilo_id);
-
       // Título da Figura com Prefixo Intrínseco não-editável
       const tit = document.createElement('div');
       tit.className = 'ath-fig-titulo';
@@ -2778,71 +2906,47 @@ export class EditorView {
       tit.innerHTML = `
         <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoStr}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuro}</span>
       `;
-      if (estTit) {
-        tit.style.fontFamily = FONTES_SISTEMA[estTit.fonte]?.familia || 'inherit';
-        tit.style.fontSize = `${estTit.tamanho_pt || 12}pt`;
-        tit.style.fontWeight = estTit.peso || '700';
-        if (estTit.cor) tit.style.color = estTit.cor;
-      }
-      if (b.titulo_alinhamento && b.titulo_alinhamento !== 'estilo') {
-        tit.style.textAlign = b.titulo_alinhamento;
-      }
+      this.aplicarTipografiaBloco(tit, b, 'titulo', tit.querySelector('.ath-num-prefixo-fixo'));
       const spanEditavel = tit.querySelector('.ath-titulo-texto-editavel');
       spanEditavel.addEventListener('blur', () => {
         b.titulo = removerPrefixoNumeracaoTitulo(spanEditavel.innerText.trim());
         this.notificarMudancaRapida();
       });
 
-      // Grid de Imagens (limitado estritamente à quantidade de slots do layout ativo)
-      const grid = document.createElement('div');
-      grid.className = 'ath-fig-grid';
-      grid.dataset.layout = b.layout || '1';
-
-      // Dimensionamento, proporção e recorte da imagem
-      const imgStyleArr = [];
-      if (b.altura_modo && b.altura_modo !== 'auto') {
-        imgStyleArr.push(`height:${b.altura_modo}; max-height:none;`);
-      } else if (b.altura_imagem_px) {
-        imgStyleArr.push(`height:${b.altura_imagem_px}px; max-height:none;`);
-      }
-      if (b.proporcao_imagem && b.proporcao_imagem !== 'livre') {
-        imgStyleArr.push(`aspect-ratio:${b.proporcao_imagem};`);
-      }
-      if (b.ajuste_enquadramento) {
-        imgStyleArr.push(`object-fit:${b.ajuste_enquadramento};`);
-      }
-      const inlineImgStyle = imgStyleArr.join(' ');
-
-      const qtdSlots = (b.layout === '2_lado' || b.layout === '2_empilhado') ? 2
-        : (b.layout === '3_linha' || b.layout === '3_misto') ? 3
-        : (b.layout === '4_grade') ? 4
-        : (b.layout === '6_grade') ? 6 : 1;
-
-      // Se o bloco tiver itens excedentes em relação ao layout ativo, limpa imediatamente
-      if (Array.isArray(b.itens) && b.itens.length > qtdSlots) {
-        b.itens = b.itens.slice(0, qtdSlots);
-      }
-      const itens = (Array.isArray(b.itens) ? b.itens : [{ url: b.src || '', legenda_sub: 'Visão Geral' }]).slice(0, qtdSlots);
-      itens.forEach((it, idx) => {
-        const itEl = document.createElement('div');
-        itEl.className = 'ath-fig-item';
-
-        const alinImg = b.alinhamento_imagem || 'centro';
-        if (alinImg === 'esquerda') itEl.style.alignItems = 'flex-start';
-        else if (alinImg === 'direita') itEl.style.alignItems = 'flex-end';
-        else itEl.style.alignItems = 'center';
-
-        const imgUrl = it.url || b.src || 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80';
-        const subLegHtml = (qtdSlots > 1 && it.legenda_sub) 
-          ? `<span class="ath-fig-sublegenda">${rotuloDaFigura(b)} ${b.numero_sequencial || 1}${String.fromCharCode(97 + idx)} — ${it.legenda_sub}</span>`
-          : '';
-
-        itEl.innerHTML = `
-          <img src="${imgUrl}" alt="Ilustração" ${inlineImgStyle ? `style="${inlineImgStyle}"` : ''}>
-          ${subLegHtml}
-        `;
-        grid.appendChild(itEl);
+      // Grade de imagens (subgrid): estilo vindo de `descreverFigura`, o mesmo usado na exportação PDF
+      const margensFig = modeloDaPagina(this.doc, pag)?.margens_mm || { l: 25, r: 20 };
+      const aplicarBlocoFig = () => {
+        ['width', 'marginLeft', 'marginRight', 'float', 'clear', 'marginBottom'].forEach(k => { figBox.style[k] = ''; });
+        Object.assign(figBox.style, descreverFigura(b, { margens_mm: margensFig }).bloco);
+      };
+      const montarGrade = () => construirGradeFiguraDom(b, {
+        margens_mm: margensFig,
+        estilos: this.doc.estilos,
+        interativo: true,
+        selecionadoIdx: this._itemFigura?.id === b.id ? this._itemFigura.idx : null,
+        // clique único na imagem: seleciona a figura individual (barra flutuante + painel do bloco)
+        aoClicarItem: (idx, ev) => { ev.stopPropagation(); this.selecionarItemFigura(b, pag, idx); },
+        // duplo clique: troca a imagem do slot
+        aoDuploClique: (idx, ev) => { ev.stopPropagation(); this.escolherImagemItemFigura(b, idx); }
+      }).grid;
+      let grid = montarGrade();
+      aplicarBlocoFig();
+      // reconstrói só a grade (sem re-renderizar a folha) quando propriedades da imagem mudam
+      el._reconstruirFigura = () => {
+        const novo = montarGrade();
+        grid.replaceWith(novo);
+        grid = novo;
+        aplicarBlocoFig();
+        this.marcarItemFigura();
+      };
+      // clique no contêiner/moldura (fora das imagens): seleciona o bloco agregador
+      figBox.addEventListener('click', (ev) => {
+        if (!ev.target.closest('.ath-fig-item') && this._itemFigura?.id === b.id) {
+          this._itemFigura = null;
+          this.marcarItemFigura();
+        }
       });
+      if (this._itemFigura?.id === b.id) queueMicrotask(() => this.marcarItemFigura());
 
       // Legenda Geral
       let leg = null;
@@ -2851,15 +2955,7 @@ export class EditorView {
         leg.contentEditable = 'true';
         leg.className = 'ath-fig-legenda-geral';
         leg.innerHTML = b.legenda_geral || b.legenda || 'Legenda explicativa dos elementos representados.';
-        if (estLeg) {
-          leg.style.fontFamily = FONTES_SISTEMA[estLeg.fonte]?.familia || 'inherit';
-          leg.style.fontSize = `${estLeg.tamanho_pt || 11}pt`;
-          leg.style.fontWeight = estLeg.peso || '400';
-          if (estLeg.cor) leg.style.color = estLeg.cor;
-        }
-        if (b.legenda_alinhamento && b.legenda_alinhamento !== 'estilo') {
-          leg.style.textAlign = b.legenda_alinhamento === 'justificado_esquerda' ? 'justify' : b.legenda_alinhamento;
-        }
+        this.aplicarTipografiaBloco(leg, b, 'legenda');
         leg.addEventListener('blur', () => { b.legenda_geral = leg.innerHTML; this.notificarMudancaRapida(); });
       }
 
@@ -2870,15 +2966,7 @@ export class EditorView {
         fonte.contentEditable = 'true';
         fonte.className = 'ath-bloco-fonte';
         fonte.innerHTML = b.fonte || 'Fonte: Autores (2026).';
-        if (estFonte) {
-          fonte.style.fontFamily = FONTES_SISTEMA[estFonte.fonte]?.familia || 'inherit';
-          fonte.style.fontSize = `${estFonte.tamanho_pt || 10.5}pt`;
-          fonte.style.fontWeight = estFonte.peso || '400';
-          if (estFonte.cor) fonte.style.color = estFonte.cor;
-        }
-        if (b.fonte_alinhamento && b.fonte_alinhamento !== 'estilo') {
-          fonte.style.textAlign = b.fonte_alinhamento;
-        }
+        this.aplicarTipografiaBloco(fonte, b, 'fonte');
         fonte.addEventListener('blur', () => { b.fonte = fonte.innerHTML; this.notificarMudancaRapida(); });
       }
 
@@ -2975,6 +3063,7 @@ export class EditorView {
       tit.innerHTML = `
         <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoTab}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuroTab}</span>
       `;
+      this.aplicarTipografiaBloco(tit, b, 'titulo', tit.querySelector('.ath-num-prefixo-fixo'));
       const spanEditavelTab = tit.querySelector('.ath-titulo-texto-editavel');
       spanEditavelTab.addEventListener('blur', () => {
         b.titulo = removerPrefixoNumeracaoTitulo(spanEditavelTab.innerText.trim());
@@ -2982,7 +3071,7 @@ export class EditorView {
       });
       tabBox.appendChild(tit);
 
-      const table = construirTabelaDom(b, 'ath-tabela-abnt', () => this.notificarMudancaRapida());
+      const table = construirTabelaDom(b, 'ath-tabela-abnt', () => this.notificarMudancaRapida(), this.doc.estilos);
       this._selTabelas.set(b.id, instalarSelecaoCelulas(table));
       tabBox.appendChild(table);
 
@@ -3000,6 +3089,7 @@ export class EditorView {
         fonte.contentEditable = 'true';
         fonte.className = 'ath-bloco-fonte';
         fonte.innerHTML = b.fonte || 'Fonte: Elaborada pelos autores.';
+        this.aplicarTipografiaBloco(fonte, b, 'fonte');
         fonte.addEventListener('blur', () => { b.fonte = fonte.innerHTML; this.notificarMudancaRapida(); });
         tabBox.appendChild(fonte);
       }
@@ -3019,6 +3109,7 @@ export class EditorView {
       tit.innerHTML = `
         <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoQuadro}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuroQuadro}</span>
       `;
+      this.aplicarTipografiaBloco(tit, b, 'titulo', tit.querySelector('.ath-num-prefixo-fixo'));
       const spanEditavelQuadro = tit.querySelector('.ath-titulo-texto-editavel');
       spanEditavelQuadro.addEventListener('blur', () => {
         b.titulo = removerPrefixoNumeracaoTitulo(spanEditavelQuadro.innerText.trim());
@@ -3026,7 +3117,7 @@ export class EditorView {
       });
       qBox.appendChild(tit);
 
-      const table = construirTabelaDom(b, 'ath-quadro-abnt', () => this.notificarMudancaRapida());
+      const table = construirTabelaDom(b, 'ath-quadro-abnt', () => this.notificarMudancaRapida(), this.doc.estilos);
       this._selTabelas.set(b.id, instalarSelecaoCelulas(table));
       qBox.appendChild(table);
 
@@ -3035,6 +3126,7 @@ export class EditorView {
         fonte.contentEditable = 'true';
         fonte.className = 'ath-bloco-fonte';
         fonte.innerHTML = b.fonte || 'Fonte: Referencial teórico.';
+        this.aplicarTipografiaBloco(fonte, b, 'fonte');
         fonte.addEventListener('blur', () => { b.fonte = fonte.innerHTML; this.notificarMudancaRapida(); });
         qBox.appendChild(fonte);
       }

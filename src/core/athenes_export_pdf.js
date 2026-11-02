@@ -6,11 +6,15 @@
  */
 
 import { dimensoesPapelMm } from './athenes_grid.js';
-import { estiloParaCss, FONTES_SISTEMA } from './athenes_estilos.js';
+import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssTipografia, estiloParaCssNumeracao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
 import { hifenizarHtml } from './athenes_hifenizacao.js';
+import { documentoComSugestoesResolvidas } from './athenes_diff.js';
+import { geometriaCorpoMm, resolverAreasPagina } from './athenes_paginacao.js';
+import { obterConfigNotas, aplicarRotulosNotasHtml, sanitizarHtmlNota } from './athenes_notas_rodape.js';
+import { descreverFigura, cssObjParaString, PLACEHOLDER_IMG } from './athenes_figura_layout.js';
 import { obterEstiloTabela, dimensoesTabela, resolverCelula, celulaParaCss, tabelaParaCss } from './athenes_tabela_estilo.js';
-import { gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento, obterTituloCompletoComNumeracao } from './athenes_documento.js';
+import { rotuloDaFigura, gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento, obterTituloCompletoComNumeracao } from './athenes_documento.js';
 
 export function escaparHtml(texto) {
   if (texto === undefined || texto === null) return '';
@@ -25,8 +29,54 @@ export function escaparHtml(texto) {
 /**
  * Renderiza um único bloco em HTML para a folha
  */
+/** CSS (objeto camelCase) → atributo style. */
+const cssDe = (o) => Object.entries(o).map(([k, v]) => `${k.replace(/[A-Z]/g, c => '-' + c.toLowerCase())}:${v}`).join(';');
+
+/** Cabeçalho ou rodapé em 3 zonas, posicionado na margem (distância da borda configurável). */
+function areaPaginaHtml(area, m) {
+  if (!area) return '';
+  const lado = area.tipo === 'cabecalho'
+    ? `top:${area.distancia_borda_mm}mm;${area.linha ? `border-bottom:${area.linha.espessura_pt}pt solid ${area.linha.cor};padding-bottom:1.5mm;` : ''}`
+    : `bottom:${area.distancia_borda_mm}mm;${area.linha ? `border-top:${area.linha.espessura_pt}pt solid ${area.linha.cor};padding-top:1.5mm;` : ''}`;
+  const z = (cls, txt) => `<div style="flex:1 1 0;min-width:0;text-align:${cls};overflow-wrap:anywhere;white-space:pre-wrap;">${escaparHtml(txt)}</div>`;
+  return `<${area.tipo === 'cabecalho' ? 'header' : 'footer'} class="ath-pg-area ath-folha-${area.tipo}" style="position:absolute;left:${m.l}mm;right:${m.r}mm;${lado}display:flex;align-items:flex-start;gap:3mm;${cssDe(area.css)}">${z('left', area.zonas.esquerda)}${z('center', area.zonas.centro)}${z('right', area.zonas.direita)}</${area.tipo === 'cabecalho' ? 'header' : 'footer'}>`;
+}
+
+/** Notas de rodapé da página: traço separador configurável + notas na tipografia própria. */
+function notasPaginaHtml(pag, documento) {
+  if (!pag.notas?.length) return '';
+  const cfg = obterConfigNotas(documento);
+  const fam = (FONTES_SISTEMA[cfg.fonte]?.familia || FONTES_SISTEMA.nunito.familia).replace(/"/g, "'");
+  const itens = pag.notas.map(seg => {
+    const num = seg.continuaDaAnterior ? '' : escaparHtml(pag.rotulosNotas?.[seg.id] ?? '');
+    return `<div class="ath-nota" style="display:flex;gap:1.2mm;align-items:baseline;margin:0 0 2pt 0;"><span style="flex:none;min-width:1.1em;font-size:.75em;position:relative;top:-.35em;font-weight:700;">${num}</span><div style="flex:1;min-width:0;overflow-wrap:anywhere;">${sanitizarHtmlNota(seg.html)}</div></div>`;
+  }).join('');
+  return `<div class="ath-notas-rodape" style="margin-top:auto;font-family:${fam};font-size:${cfg.tamanho_pt}pt;line-height:${cfg.entrelinha};color:${cfg.cor};"><div style="height:${cfg.separador.espessura_pt}pt;width:${cfg.separador.comprimento_pct}%;background:${cfg.separador.cor};margin:0 0 4pt 0;"></div>${itens}</div>`;
+}
+
+/**
+ * CSS do texto de um `papel` (titulo, legenda, fonte, sublegenda, subrotulo_texto) do bloco.
+ * Com estilo de texto escolhido no bloco (`${papel}_estilo_id`) aplica o estilo COMPLETO; sem escolha,
+ * mantém o visual padrão (`estPadrao` + `extraPadrao`). O alinhamento explícito do bloco sempre vence.
+ */
+function cssTextoPapel(bloco, papel, estilosMap, estPadrao, extraPadrao = '') {
+  const est = estilosMap[bloco[`${papel}_estilo_id`]];
+  const alin = bloco[`${papel}_alinhamento`];
+  if (est) return estiloParaCssComAlinhamento(est, alin);
+  return `${estPadrao ? estiloParaCss(estPadrao) : ''} ${extraPadrao} ${estiloParaCssComAlinhamento(null, alin)}`.trim();
+}
+
+/** Título numerado ("Tabela 1 — …") com o prefixo no estilo de numeração escolhido (se houver). */
+function tituloComNumeracaoHtml(bloco, estilosMap) {
+  const completo = obterTituloCompletoComNumeracao(bloco) || '';
+  const est = estilosMap[bloco.numeracao_estilo_id];
+  const m = /^(.*?\d+\s*[—–-]\s*)([\s\S]*)$/.exec(completo);
+  if (!est || !m) return completo;
+  return `<span style="${estiloParaCssNumeracao(est)}">${m[1]}</span>${m[2]}`;
+}
+
 /** Tabela/quadro com estilo declarativo (bordas, zebra, fundos, alinhamento) resolvido por célula. */
-function gerarTabelaHtmlEstilizada(bloco, classe) {
+function gerarTabelaHtmlEstilizada(bloco, classe, estilosMap = {}) {
   const estilo = obterEstiloTabela(bloco);
   const dim = dimensoesTabela(bloco);
   const temCab = bloco.com_cabecalho !== false;
@@ -39,9 +89,10 @@ function gerarTabelaHtmlEstilizada(bloco, classe) {
     ? '<thead><tr>' + (bloco.colunas || []).map((col, c) => '<th style="' + css(0, c) + '">' + escaparHtml(col) + '</th>').join('') + '</tr></thead>'
     : '';
   const corpo = (bloco.linhas || []).map((linha, ri) =>
-    '<tr>' + (Array.isArray(linha) ? linha : []).map((cel, c) => '<td style="' + css(ri + (temCab ? 1 : 0), c) + '">' + (cel || '') + '</td>').join('') + '</tr>'
+    '<tr>' + (Array.isArray(linha) ? linha : []).map((cel, c) => '<td style="' + css(ri + (temCab ? 1 : 0), c) + '">' + escaparHtml(cel || '') + '</td>').join('') + '</tr>'
   ).join('');
-  return '<table class="' + classe + '" style="' + tabelaParaCss('9.5pt') + '">' + colgroup + cab + '<tbody>' + corpo + '</tbody></table>';
+  const dados = estiloParaCssTipografia(estilosMap[bloco.dados_estilo_id]); // tipografia dos dados escolhida no bloco
+  return '<table class="' + classe + '" style="' + tabelaParaCss('9.5pt') + ';' + dados + '">' + colgroup + cab + '<tbody>' + corpo + '</tbody></table>';
 }
 
 export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
@@ -64,7 +115,7 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
   };
   const estiloCss = estiloParaCss(est);
   const deveHifenizar = bloco.hifenizacao !== undefined ? bloco.hifenizacao : Boolean(est.hifenizacao);
-  const textoFormatado = deveHifenizar ? hifenizarHtml(bloco.texto || '') : (bloco.texto || '');
+  const textoFormatado = aplicarRotulosNotasHtml(deveHifenizar ? hifenizarHtml(bloco.texto || '') : (bloco.texto || ''), opcoes.rotulosNotas);
 
   switch (bloco.tipo) {
     case 'titulo': {
@@ -118,40 +169,49 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       const estLegenda = estilosMap.legenda || estilosMap.corpo;
       const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
       return '<div class="ath-bloco ath-quadro-wrap" style="margin:12px 0; break-inside:avoid;" data-id="' + bloco.id + '">' +
-        (bloco.titulo ? '<div class="ath-legenda" style="' + estiloParaCss(estLegenda) + ' font-weight:800; text-align:left; margin-bottom:4px;">' + bloco.titulo + '</div>' : '') +
-        gerarTabelaHtmlEstilizada(bloco, 'ath-quadro') +
-        (bloco.fonte ? '<div class="ath-fonte" style="' + estiloParaCss(estFonte) + ' text-align:left; margin-top:4px;">' + bloco.fonte + '</div>' : '') +
+        (bloco.titulo ? '<div class="ath-legenda" style="' + cssTextoPapel(bloco, 'titulo', estilosMap, estLegenda, 'font-weight:800; text-align:left; margin-bottom:4px;') + '">' + tituloComNumeracaoHtml(bloco, estilosMap) + '</div>' : '') +
+        gerarTabelaHtmlEstilizada(bloco, 'ath-quadro', estilosMap) +
+        (bloco.fonte ? '<div class="ath-fonte" style="' + cssTextoPapel(bloco, 'fonte', estilosMap, estFonte, 'text-align:left; margin-top:4px;') + '">' + bloco.fonte + '</div>' : '') +
       '</div>';
     }
 
     case 'figura': {
       const estLegenda = estilosMap.legenda || estilosMap.corpo;
       const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
-      const layout = bloco.layout || '1';
-      const qtdSlots = (layout === '2_lado' || layout === '2_empilhado') ? 2
-        : (layout === '3_linha' || layout === '3_misto') ? 3
-        : (layout === '4_grade') ? 4
-        : (layout === '6_grade') ? 6 : 1;
-      const gridCols = layout === '2_lado' || layout === '4_grade' ? 2 : (layout === '3_linha' || layout === '6_grade' ? 3 : 1);
-      const itens = (Array.isArray(bloco.itens) ? bloco.itens : [{ url: bloco.src || '' }]).slice(0, qtdSlots);
-      
-      const itensHtml = itens.map((it, idx) => {
-        const sub = it.legenda_sub ? '<figcaption style="font-size:9pt; color:#64748B; font-style:italic;">' + escaparHtml(it.legenda_sub) + '</figcaption>' : '';
-        return '<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">' +
-          '<img src="' + (it.url || 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80') + '" style="max-width:100%; max-height:65mm; object-fit:contain; border-radius:3px;">' +
-          sub +
+      // mesma descrição de estilo usada no canvas do editor (moldura, sombra, grade, rótulos, largura, fluxo)
+      const d = descreverFigura(bloco, { margens_mm: opcoes.margens_mm || { l: 25, r: 20 }, permitirFlutuar: true });
+      const rot = rotuloDaFigura(bloco);
+
+      const itensHtml = d.itens.map((it) => {
+        const cssRotulo = cssTextoPapel(bloco, 'subrotulo_texto', estilosMap, null, 'font-weight:800; font-size:9pt; color:#1F2733;');
+        const cssSub = cssTextoPapel(bloco, 'sublegenda', estilosMap, null, 'font-size:9pt; color:#64748B; font-style:italic;');
+        const chip = it.subrotulo?.interno
+          ? '<span style="position:absolute; top:6px; left:6px; background:rgba(255,255,255,.92); padding:1px 6px; border-radius:5px; line-height:1.2; margin:0; text-indent:0; display:inline-block; ' + cssRotulo + '">' + escaparHtml(it.subrotulo.texto) + '</span>'
+          : '';
+        let legenda = '';
+        if (it.subrotulo && !it.subrotulo.interno) {
+          legenda = '<span style="' + cssSub + '"><span style="margin-right:4px; display:inline; text-indent:0; margin-left:0; padding:0; ' + cssRotulo + '">' + escaparHtml(it.subrotulo.texto) + '</span>' + escaparHtml(it.legenda_sub) + '</span>';
+        } else if (it.legenda_sub && d.qtd > 1) {
+          legenda = '<span style="' + cssSub + '">' + escaparHtml(rot + ' ' + (bloco.numero_sequencial || 1) + String.fromCharCode(97 + it.idx) + ' — ' + it.legenda_sub) + '</span>';
+        }
+        return '<div style="' + cssObjParaString(it.celula) + '">' +
+          '<div style="' + cssObjParaString(it.moldura) + '">' +
+            '<img src="' + escaparHtml(it.url || PLACEHOLDER_IMG) + '" alt="" style="' + cssObjParaString({ ...it.img, ...(it.img.maxHeight === undefined && !it.img.height ? { maxHeight: '65mm' } : {}) }) + '">' +
+            chip +
+          '</div>' +
+          legenda +
         '</div>';
       }).join('\n');
 
       const titFig = obterTituloCompletoComNumeracao(bloco);
 
-      return '<figure class="ath-bloco ath-figura-composta" style="margin:12px 0; break-inside:avoid;" data-id="' + bloco.id + '">' +
-        (titFig ? '<div class="ath-legenda" style="' + estiloParaCss(estLegenda) + ' font-weight:800; margin-bottom:6px;">' + titFig + '</div>' : '') +
-        '<div style="display:grid; grid-template-columns:repeat(' + gridCols + ', 1fr); gap:8px; padding:6px; background:#F8FAFC; border-radius:6px;">' +
+      return '<figure class="ath-bloco ath-figura-composta" style="margin:12px 0; break-inside:avoid; ' + cssObjParaString(d.bloco) + '" data-id="' + bloco.id + '">' +
+        (titFig ? '<div class="ath-legenda" style="' + cssTextoPapel(bloco, 'titulo', estilosMap, estLegenda, 'font-weight:800; margin-bottom:6px;') + '">' + tituloComNumeracaoHtml(bloco, estilosMap) + '</div>' : '') +
+        '<div style="' + cssObjParaString(d.grade) + '; padding:6px; background:#F8FAFC; border-radius:6px;">' +
           itensHtml +
         '</div>' +
-        (bloco.legenda_geral ? '<div style="font-size:9.5pt; color:#475569; margin-top:4px;">' + bloco.legenda_geral + '</div>' : '') +
-        (bloco.fonte ? '<div class="ath-fonte" style="' + estiloParaCss(estFonte) + ' margin-top:3px;">' + bloco.fonte + '</div>' : '') +
+        (bloco.legenda_geral ? '<div style="' + cssTextoPapel(bloco, 'legenda', estilosMap, null, 'font-size:9.5pt; color:#475569; margin-top:4px;') + '">' + bloco.legenda_geral + '</div>' : '') +
+        (bloco.fonte ? '<div class="ath-fonte" style="' + cssTextoPapel(bloco, 'fonte', estilosMap, estFonte, 'margin-top:3px;') + '">' + bloco.fonte + '</div>' : '') +
       '</figure>';
     }
 
@@ -175,9 +235,9 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       const estLegenda = estilosMap.legenda || estilosMap.corpo;
       const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
       return `<div class="ath-bloco ath-tabela-wrap" style="margin:12px 0; break-inside:avoid;" data-id="${bloco.id}">
-        ${obterTituloCompletoComNumeracao(bloco) ? `<div class="ath-legenda" style="${estiloParaCss(estLegenda)} text-align:left; margin-bottom:4px;">${obterTituloCompletoComNumeracao(bloco)}</div>` : ''}
-        ${gerarTabelaHtmlEstilizada(bloco, 'ath-tabela')}
-        ${bloco.fonte ? `<div class="ath-fonte" style="${estiloParaCss(estFonte)} text-align:left; margin-top:4px;">${bloco.fonte}</div>` : ''}
+        ${obterTituloCompletoComNumeracao(bloco) ? `<div class="ath-legenda" style="${cssTextoPapel(bloco, 'titulo', estilosMap, estLegenda, 'text-align:left; margin-bottom:4px;')}">${tituloComNumeracaoHtml(bloco, estilosMap)}</div>` : ''}
+        ${gerarTabelaHtmlEstilizada(bloco, 'ath-tabela', estilosMap)}
+        ${bloco.fonte ? `<div class="ath-fonte" style="${cssTextoPapel(bloco, 'fonte', estilosMap, estFonte, 'text-align:left; margin-top:4px;')}">${bloco.fonte}</div>` : ''}
       </div>`;
     }
 
@@ -279,6 +339,8 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
  * Gera o documento HTML completo com CSS Paged Media para impressão e exportação em PDF
  */
 export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
+  // Sugestões pendentes saem como "proposta aceita" (texto inserido mantido, excluído descartado); `sugestoes: 'manter'` preserva as marcas
+  if (opcoes.sugestoes !== 'manter') documento = documentoComSugestoesResolvidas(documento, 'aceitar');
   if (!documento.paginas || documento.paginas.length === 0) repaginarDocumento(documento);
   const estilosMap = {};
   for (const est of (documento.estilos || [])) {
@@ -291,52 +353,33 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
     const cols = modelo.grade?.colunas || 1;
     const gap = modelo.grade?.gap_mm || 0;
 
-    // Cabeçalho da página
-    let cabHtml = '';
-    if (modelo.cabecalho?.ativo) {
-      const textoCab = (modelo.cabecalho.texto || '')
-        .replace('{documento.titulo}', documento.titulo || '')
-        .replace('{documento.autor_principal}', documento.metadados?.autores?.[0]?.nome || '');
-      cabHtml = `<header class="ath-folha-cabecalho" style="text-align:${modelo.cabecalho.alinhamento || 'direita'}; border-bottom:${modelo.cabecalho.linha_divisoria ? '1px solid #E2E8F0' : 'none'}; padding-bottom:3mm; margin-bottom:5mm; font-size:8.5pt; color:#64748B;">
-        ${escaparHtml(textoCab)}
-      </header>`;
-    }
+    const geo = geometriaCorpoMm(modelo);
+    const areas = resolverAreasPagina(documento, modelo, pag, pag.numeroExibido ?? pag.numero ?? (index + 1), documento.paginas?.length || 1);
+    const cabHtml = areaPaginaHtml(areas.cabecalho, m);
 
     // Blocos da página
-    const blocosHtml = (pag.blocos || []).map(b => {
+    const opcoesPag = { ...opcoes, margens_mm: m, rotulosNotas: pag.rotulosNotas };
+    const blocosPag = pag.blocos || [];
+    const partes = [];
+    for (let i = 0; i < blocosPag.length; i++) {
+      const b = blocosPag[i];
       const span = Math.min(cols, b.span || 1);
       const gridCol = cols > 1 ? `grid-column: span ${span};` : '';
-      return `<div class="ath-bloco-grid" style="${gridCol}">${renderizarBlocoHtml(b, estilosMap, documento, opcoes)}</div>`;
-    }).join('\n');
-
-    // Rodapé da página com formatação avançada e numeração alternada
-    let rodHtml = '';
-    if (modelo.rodape?.ativo) {
-      const textoRod = (modelo.rodape.texto || '')
-        .replace('{documento.titulo}', documento.titulo || '')
-        .replace('{documento.autor_principal}', documento.metadados?.autores?.[0]?.nome || '');
-      
-      const numFormatado = modelo.rodape.numeracao !== false
-        ? formatarNumeroPagina(pag.numero || (index + 1), documento.paginas?.length || 1, modelo.rodape)
-        : '';
-      const numeroHtml = numFormatado ? `<span class="ath-num-pagina" style="font-weight:700;">${escaparHtml(numFormatado)}</span>` : '';
-
-      const pos = modelo.rodape.posicao_numero || 'direita';
-      const ehPar = (pag.numero || (index + 1)) % 2 === 0;
-      let rodEstilo = 'display:flex; justify-content:space-between; align-items:center;';
-      if (pos === 'alternado') {
-        if (ehPar) rodEstilo = 'display:flex; flex-direction:row-reverse; justify-content:space-between; align-items:center;';
-      } else if (pos === 'centro') {
-        rodEstilo = 'display:flex; justify-content:center; gap:20px; align-items:center;';
-      } else if (pos === 'esquerda') {
-        rodEstilo = 'display:flex; flex-direction:row-reverse; justify-content:space-between; align-items:center;';
+      const contorna = (b.tipo === 'figura' || b.tipo === 'imagem') && ['contornar_esq', 'contornar_dir'].includes(b.fluxo);
+      const prox = blocosPag[i + 1];
+      // texto contornando: a figura flutuante e o parágrafo seguinte dividem a mesma célula (contexto de fluxo)
+      if (contorna && prox && ['paragrafo', 'texto', 'citacao'].includes(prox.tipo)) {
+        partes.push(`<div class="ath-bloco-grid" style="${gridCol} display:flow-root;">${renderizarBlocoHtml(b, estilosMap, documento, opcoesPag)}${renderizarBlocoHtml(prox, estilosMap, documento, opcoesPag)}</div>`);
+        i++;
+        continue;
       }
-
-      rodHtml = `<footer class="ath-folha-rodape" style="${rodEstilo} border-top:${modelo.rodape.linha_divisoria ? '1px solid #E2E8F0' : 'none'}; padding-top:3mm; margin-top:auto; font-size:8.5pt; color:#64748B;">
-        <span>${escaparHtml(textoRod)}</span>
-        ${numeroHtml}
-      </footer>`;
+      partes.push(`<div class="ath-bloco-grid" style="${gridCol}">${renderizarBlocoHtml(b, estilosMap, documento, opcoesPag)}</div>`);
     }
+    const blocosHtml = partes.join('\n');
+
+    // Notas de rodapé (base do corpo) e rodapé em 3 zonas na margem
+    const notasHtml = notasPaginaHtml(pag, documento);
+    const rodHtml = areaPaginaHtml(areas.rodape, m);
 
     const { largura_mm, altura_mm } = dimensoesPapelMm(modelo.formato, modelo.orientacao);
 
@@ -382,15 +425,16 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
       }).join('\n');
     }
     
-return `<section class="ath-pagina" style="position:relative; width:${largura_mm}mm; min-height:${altura_mm}mm; padding:${m.t}mm ${m.r}mm ${m.b}mm ${m.l}mm;" data-pagina="${index + 1}">
+return `<section class="ath-pagina" style="position:relative; width:${largura_mm}mm; min-height:${altura_mm}mm; padding:${geo.topoMm}mm ${m.r}mm ${geo.baseMm}mm ${m.l}mm;" data-pagina="${index + 1}">
       ${elemRecHtml}
-      <div class="ath-folha-corpo" style="position:relative; z-index:1; display:flex; flex-direction:column; min-height:${altura_mm - m.t - m.b}mm;">
-        ${cabHtml}
+      ${cabHtml}
+      <div class="ath-folha-corpo" style="position:relative; z-index:1; display:flex; flex-direction:column; min-height:${altura_mm - geo.topoMm - geo.baseMm}mm;">
         <div class="ath-grid" style="display:grid; grid-template-columns:repeat(${cols}, minmax(0, 1fr)); column-gap:${gap}mm; flex:1;">
           ${blocosHtml}
         </div>
-        ${rodHtml}
+        ${notasHtml}
       </div>
+      ${rodHtml}
     </section>`;
   }).join('\n');
 
@@ -449,6 +493,9 @@ return `<section class="ath-pagina" style="position:relative; width:${largura_mm
       height: 1px;
     }
     .ath-sumario-num { flex-shrink: 0; }
+
+    sup.ath-nota-ref { font-weight: 700; }
+    ${opcoes.cssExtra || ''}
 
     @media print {
       body { background: #FFFFFF; }
