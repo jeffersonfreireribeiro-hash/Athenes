@@ -159,6 +159,9 @@ export class AthenesApp {
         this.autoSalvar();
         this.navegarParaDashboard();
       },
+      onLogout: () => {
+        this.fazerLogout();
+      },
       onAbrirExportar: () => {
         new PainelExportarModal(this.documentoAtivo);
       },

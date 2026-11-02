@@ -164,9 +164,6 @@ export class DashboardView {
             </span>
             <span class="ath-dash-user-edit">${svgIcone('lapis', 12)}</span>
           </button>
-          <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="athBtnLogoutDash" title="Encerrar sessão e mudar de conta" style="height:32px; padding:0 10px; font-size:11.5px; font-weight:750; color:#DC2626; display:inline-flex; align-items:center; gap:4px; border:1px solid #FECACA; background:#FEF2F2;">
-            Sair
-          </button>
         </div>
       </div>
 
@@ -272,11 +269,6 @@ export class DashboardView {
       this.abrirModalIdentificacaoLogin();
     });
 
-    root.querySelector('#athBtnLogoutDash')?.addEventListener('click', () => {
-      encerrarSessao();
-      this.onLogout();
-    });
-
     root.querySelector('#athBtnNovoDocModal').addEventListener('click', () => this.abrirModalNovoDoc());
 
     const inputBusca = root.querySelector('#athDashBusca');
@@ -358,6 +350,10 @@ export class DashboardView {
 
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
+    const fechar = () => {
+      modal.remove();
+      document.querySelectorAll('.ath-modal-backdrop').forEach(m => m.remove());
+    };
     modal.innerHTML = `
       <div class="ath-modal" style="max-width:540px;">
         <div class="ath-modal-head">
@@ -508,22 +504,22 @@ export class DashboardView {
       }
     });
 
-    modal.querySelector('#athBtnModalSairConta')?.addEventListener('click', () => {
+    modal.querySelector('#athBtnModalSairConta')?.addEventListener('click', (e) => {
+      e?.preventDefault?.();
       fechar();
       encerrarSessao();
-      this.onLogout();
+      if (typeof this.onLogout === 'function') {
+        this.onLogout();
+      }
     });
 
-    modal.querySelector('#athBtnModalDesconectarGoogle')?.addEventListener('click', () => {
+    modal.querySelector('#athBtnModalDesconectarGoogle')?.addEventListener('click', (e) => {
+      e?.preventDefault?.();
       fechar();
       encerrarSessao();
-      this.onLogout();
-    });
-
-    modal.querySelector('#athBtnModalSairConta')?.addEventListener('click', () => {
-      fechar();
-      encerrarSessao();
-      this.onLogout();
+      if (typeof this.onLogout === 'function') {
+        this.onLogout();
+      }
     });
 
     modal.querySelector('#athBtnModalSincronizarHub')?.addEventListener('click', async () => {
@@ -542,7 +538,7 @@ export class DashboardView {
       }
     });
 
-    const fechar = () => modal.remove();
+    // fechar já definido no topo do modal
     modal.querySelector('#athModalLoginFechar').addEventListener('click', fechar);
     modal.querySelector('#athBtnCancelarLogin').addEventListener('click', fechar);
     modal.addEventListener('click', e => { if (e.target === modal) fechar(); });

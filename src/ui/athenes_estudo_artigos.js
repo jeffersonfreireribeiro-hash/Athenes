@@ -2214,17 +2214,20 @@ export class EstudoArtigosView {
   }
 
   adicionarFolhaExtraNoPdf(art, paginasPdf) {
-    const novoNum = paginasPdf.length + 1;
-    paginasPdf.push({
+    const lista = Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.length > 0 ? art.conteudoPaginasPdf : paginasPdf;
+    const novoNum = lista.length + 1;
+    lista.push({
       numero: novoNum,
-      cabecalho: `${art.titulo.slice(0, 55)} · Folha de Anotações Manuscritas #${novoNum}`,
+      extra: true,
+      cabecalho: `${(art.titulo || 'Artigo').slice(0, 55)} · Folha de Anotações Manuscritas #${novoNum}`,
       titulo: `FOLHA DE RASCUNHO E ESQUEMAS VISUAIS (PÁGINA ${novoNum})`,
-      autores: 'Espaço livre estilo Samsung Notes para esquemas, mapas mentais e linhas retas sobre o artigo',
+      autores: 'Espaço livre estilo Samsung Notes para esquemas, mapas mentais e notas sobre o artigo',
       paragrafos: [
-        'Use a Caneta, o Modo Linha Reta ou as Notas Adesivas acima para desenhar esquemas e fixar lembretes nesta folha complementar.'
+        'Use a Caneta, o Marca-Texto, a Linha Reta ou as Notas Adesivas para desenhar esquemas, diagramas e fixar anotações nesta folha complementar.'
       ]
     });
-    art.totalPaginas = paginasPdf.length;
+    art.conteudoPaginasPdf = lista;
+    art.totalPaginas = lista.length;
     this.paginaAtual = novoNum;
     salvarArtigosEstudo(this.artigos);
     this.renderizar();
@@ -2311,13 +2314,14 @@ export class EstudoArtigosView {
               const qtdRiscos = (artAtivo.fichamento?.tracosPorPagina?.[numPag] || []).length;
               const qtdNotas = (artAtivo.fichamento?.notasPagina?.[numPag] || []).length;
               const qtdCitsPag = (artAtivo.fichamento?.citacoesMarcadas || []).filter(c => c.pagina === numPag).length;
+              const ehExtra = Boolean(pg.extra || (!pg.real && artAtivo.pdfBlobUrl && this._pdfDocs?.has(artAtivo.pdfBlobUrl) && idx >= (this._pdfDocs.get(artAtivo.pdfBlobUrl)?.n || 0)));
               return `
                 <li class="rm-bl ${isPagAtiva ? 'sel' : ''}" data-ir-pagina-esq="${numPag}">
                   <button type="button" class="rm-bl-nome">
-                    <strong>Página ${numPag} — ${escapeHtml((pg.titulo || 'Folha do Artigo').slice(0, 30))}</strong>
+                    <strong>Página ${numPag} — ${escapeHtml((pg.titulo || (ehExtra ? `Folha Extra #${numPag}` : 'Folha do Artigo')).slice(0, 30))}</strong>
                     <span>${qtdRiscos} risco(s) · ${qtdNotas} nota(s) · ${qtdCitsPag} citação(ões)</span>
                   </button>
-                  ${paginasPdf.length > 1 ? `
+                  ${(ehExtra || !artAtivo.pdfBlobUrl) && paginasPdf.length > 1 ? `
                     <div class="rm-bl-acoes">
                       <button type="button" class="rm-ic rm-ic-perigo" data-excluir-pag-pdf="${numPag}" title="Remover esta página">
                         ${svgIcone('fechar', 11)}
@@ -2373,6 +2377,7 @@ export class EstudoArtigosView {
         if (paginasPdf.length <= 1) return;
         const pgDel = parseInt(btn.dataset.excluirPagPdf, 10);
         artAtivo.conteudoPaginasPdf = paginasPdf.filter((_, i) => (i + 1) !== pgDel);
+        artAtivo.conteudoPaginasPdf.forEach((p, i) => { p.numero = i + 1; });
         artAtivo.totalPaginas = artAtivo.conteudoPaginasPdf.length;
         if (this.paginaAtual > artAtivo.totalPaginas) this.paginaAtual = artAtivo.totalPaginas;
         salvarArtigosEstudo(this.artigos);

@@ -138,6 +138,7 @@ export class EditorView {
     this.onAbrirConexoes = opcoes.onAbrirConexoes || (() => {});
     this.onRenderizado = opcoes.onRenderizado || (() => {});
     this.onEditarEstilo = opcoes.onEditarEstilo || (() => {});
+    this.onLogout = opcoes.onLogout || (() => {});
     this.menuTopoAberto = null;
     this.modoTrabalho = MODOS_TRABALHO.EDICAO; // 'edicao' | 'sugestao' | 'leitura'
     this.perfilColaborador = obterPerfilColaborador();
@@ -1189,11 +1190,9 @@ export class EditorView {
       });
 
       popNuvem.querySelector('#athBtnDesconectarGoogle')?.addEventListener('click', () => {
-        this.perfilColaborador.autenticadoGoogle = false;
-        delete this.perfilColaborador.email;
-        delete this.perfilColaborador.foto;
-        salvarPerfilColaborador(this.perfilColaborador);
-        this.renderizar();
+        fecharTodos();
+        encerrarSessao();
+        this.onLogout();
       });
 
       popNuvem.querySelector('#athBtnSincronizarHubDrive')?.addEventListener('click', async () => {

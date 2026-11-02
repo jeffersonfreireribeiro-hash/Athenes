@@ -30,21 +30,33 @@ class ReaderViewModel(
     private val _zoom = MutableStateFlow(1.0f)
     val zoom: StateFlow<Float> = _zoom.asStateFlow()
 
-    private val _ferramentaAtiva = MutableStateFlow(FerramentaLeitura.MARCADOR)
+    private val _ferramentaAtiva = MutableStateFlow(FerramentaLeitura.SELECAO)
     val ferramentaAtiva: StateFlow<FerramentaLeitura> = _ferramentaAtiva.asStateFlow()
 
-    // Paleta de 6 Cores Acadêmicas
+    // 6 Cores Exatas da Barra de Ferramentas Web do Athenes (athenes_estudo_artigos.js linha 972)
     val coresDisponiveis = listOf(
-        "#FDE047", // Amarelo clássico
-        "#86EFAC", // Verde menta
-        "#93C5FD", // Azul celeste
-        "#FCA5A5", // Rosa / Vermelho suave
-        "#D8B4FE", // Roxo lilás
-        "#FDBA74"  // Laranja quente
+        "#314F79", // Azul Marinho Athenes (Padrão Ativo)
+        "#DC2626", // Vermelho
+        "#059669", // Verde
+        "#D97706", // Laranja
+        "#7C3AED", // Roxo
+        "#FACC15"  // Amarelo
     )
 
-    private val _corAtiva = MutableStateFlow("#FDE047")
+    private val _corAtiva = MutableStateFlow("#314F79")
     val corAtiva: StateFlow<String> = _corAtiva.asStateFlow()
+
+    private val _modoLinhaReta = MutableStateFlow(false)
+    val modoLinhaReta: StateFlow<Boolean> = _modoLinhaReta.asStateFlow()
+
+    private val _modoRolagem = MutableStateFlow(ModoRolagemPdf.CONTINUA)
+    val modoRolagem: StateFlow<ModoRolagemPdf> = _modoRolagem.asStateFlow()
+
+    private val _modoAmbiente = MutableStateFlow(ModoAmbienteLeitura.LEITURA)
+    val modoAmbiente: StateFlow<ModoAmbienteLeitura> = _modoAmbiente.asStateFlow()
+
+    private val _marcadores = MutableStateFlow<Set<Int>>(setOf(1, 17))
+    val marcadores: StateFlow<Set<Int>> = _marcadores.asStateFlow()
 
     private val _painelEsquerdoAberto = MutableStateFlow(false)
     val painelEsquerdoAberto: StateFlow<Boolean> = _painelEsquerdoAberto.asStateFlow()
