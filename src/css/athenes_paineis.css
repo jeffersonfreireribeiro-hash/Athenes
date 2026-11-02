@@ -131,6 +131,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .ath-modal-head h2 {
@@ -143,7 +144,8 @@
 .ath-modal-corpo {
   padding: 20px;
   overflow-y: auto;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .ath-modal-foot {
@@ -153,6 +155,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 /* Rátulos que sáo botáes (seletor de arquivo) mantám texto legável dentro de .ath-prop-grupo */

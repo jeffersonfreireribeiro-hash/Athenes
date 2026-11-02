@@ -619,15 +619,15 @@ export class DashboardView {
     modal.className = 'ath-modal-backdrop';
 
     modal.innerHTML = `
-      <div class="ath-modal" style="max-width:540px;">
-        <div class="ath-modal-head">
+      <div class="ath-modal" style="max-width:580px; width:92%; max-height:88vh; box-shadow:0 20px 45px rgba(15,23,42,0.25);">
+        <div class="ath-modal-head" style="padding:16px 20px; border-bottom:1px solid var(--ath-line, #E2E8F0); flex-shrink:0;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span style="color:var(--ath-primary, #314F79);">${svgIcone('nuvem_ok', 20)}</span>
-            <h2>Sincronização & Backup Multi-PC</h2>
+            <span style="color:var(--ath-primary, #314F79); display:flex;">${svgIcone('nuvem_ok', 20)}</span>
+            <h2 style="margin:0; font-size:17px; font-weight:800; color:var(--ath-text, #1E293B);">Sincronização & Backup Multi-PC</h2>
           </div>
           <button type="button" class="ath-btn ath-btn-icon" id="athModalBackupFechar">${svgIcone('fechar', 16)}</button>
         </div>
-        <div class="ath-modal-corpo" style="display:flex; flex-direction:column; gap:16px;">
+        <div class="ath-modal-corpo" style="padding:18px 20px; display:flex; flex-direction:column; gap:14px; min-height:0; overflow-y:auto; flex:1 1 auto;">
           <div style="padding:12px 14px; background:#EEF4FA; border:1px solid #C8D7E6; border-radius:10px; font-size:12.5px; line-height:1.55; color:#1E293B;">
             <strong>Como acessar seus documentos e PDFs em outro computador:</strong>
             <ul style="margin:8px 0 0 18px; padding:0;">
@@ -636,29 +636,29 @@ export class DashboardView {
             </ul>
           </div>
 
-          <div style="border:1px solid #E2E8F0; border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:8px;">
+          <div style="border:1px solid #E2E8F0; border-radius:10px; padding:14px; background:#FFFFFF; display:flex; flex-direction:column; gap:8px;">
             <strong style="font-size:13px; color:#0F172A;">1. Baixar Backup Completo do Espaço</strong>
             <p style="font-size:12px; color:#64748B; margin:0;">Exporta todos os seus documentos de texto, fichamentos Zotero, citações e configurações para um arquivo <code>.athenes-workspace</code>.</p>
             <div style="margin-top:4px;">
-              <button type="button" class="ath-btn ath-btn-primary" id="athBtnBaixarBackupWorkspace" style="font-size:12.5px; height:32px;">
+              <button type="button" class="ath-btn ath-btn-primary" id="athBtnBaixarBackupWorkspace" style="font-size:12.5px; height:34px; padding:0 14px; display:inline-flex; align-items:center; gap:6px; font-weight:700;">
                 ${svgIcone('salvar', 14)} Baixar Arquivo de Backup (.athenes-workspace)
               </button>
             </div>
           </div>
 
-          <div style="border:1px solid #E2E8F0; border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:8px;">
+          <div style="border:1px solid #E2E8F0; border-radius:10px; padding:14px; background:#FFFFFF; display:flex; flex-direction:column; gap:8px;">
             <strong style="font-size:13px; color:#0F172A;">2. Restaurar Backup do Google Drive / Arquivo</strong>
             <p style="font-size:12px; color:#64748B; margin:0;">Carrega o arquivo de backup para restaurar todos os documentos e fichamentos instantaneamente neste computador.</p>
             <div style="margin-top:4px;">
-              <label class="ath-btn" style="cursor:pointer; font-size:12.5px; height:32px; display:inline-flex; align-items:center; gap:6px;">
+              <label class="ath-btn" style="cursor:pointer; font-size:12.5px; height:34px; padding:0 14px; display:inline-flex; align-items:center; gap:6px; font-weight:700; background:#F1F5F9; border:1px solid #CBD5E1;">
                 ${svgIcone('mais', 14)} Escolher Arquivo .athenes-workspace...
                 <input type="file" accept=".athenes-workspace,.json" id="athInputRestaurarBackup" style="display:none;">
               </label>
             </div>
           </div>
         </div>
-        <div class="ath-modal-rodape">
-          <button type="button" class="ath-btn" id="athModalBackupCancelar">Fechar</button>
+        <div class="ath-modal-foot" style="padding:12px 20px; border-top:1px solid var(--ath-line, #E2E8F0); background:var(--ath-surface-elevated, #F8FAFC); display:flex; justify-content:flex-end; gap:10px; flex-shrink:0;">
+          <button type="button" class="ath-btn" id="athModalBackupCancelar" style="padding:0 16px; height:32px; font-weight:700;">Fechar</button>
         </div>
       </div>
     `;
