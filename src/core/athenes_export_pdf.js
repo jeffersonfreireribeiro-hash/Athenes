@@ -40,8 +40,10 @@ function areaPaginaHtml(area, m) {
   const lado = area.tipo === 'cabecalho'
     ? `top:${area.distancia_borda_mm}mm;${area.linha ? `border-bottom:${area.linha.espessura_pt}pt solid ${area.linha.cor};padding-bottom:1.5mm;` : ''}`
     : `bottom:${area.distancia_borda_mm}mm;${area.linha ? `border-top:${area.linha.espessura_pt}pt solid ${area.linha.cor};padding-top:1.5mm;` : ''}`;
-  const z = (cls, txt) => `<div style="flex:1 1 0;min-width:0;text-align:${cls};overflow-wrap:anywhere;white-space:pre-wrap;">${escaparHtml(txt)}</div>`;
-  return `<${area.tipo === 'cabecalho' ? 'header' : 'footer'} class="ath-pg-area ath-folha-${area.tipo}" style="position:absolute;left:${m.l}mm;right:${m.r}mm;${lado}display:flex;align-items:flex-start;gap:3mm;${cssDe(area.css)}">${z('left', area.zonas.esquerda)}${z('center', area.zonas.centro)}${z('right', area.zonas.direita)}</${area.tipo === 'cabecalho' ? 'header' : 'footer'}>`;
+  // com uma única zona preenchida, as vazias não ocupam espaço (o texto usa a largura inteira da área)
+  const sozinha = [area.zonas.esquerda, area.zonas.centro, area.zonas.direita].filter(Boolean).length === 1;
+  const z = (cls, txt) => `<div style="flex:${sozinha && !txt ? '0 0 0' : '1 1 0'};min-width:0;text-align:${cls};overflow-wrap:anywhere;white-space:pre-wrap;">${escaparHtml(txt)}</div>`;
+  return `<${area.tipo === 'cabecalho' ? 'header' : 'footer'} class="ath-pg-area ath-folha-${area.tipo}" style="position:absolute;left:${m.l}mm;right:${m.r}mm;${lado}display:flex;align-items:flex-start;gap:${sozinha ? 0 : 3}mm;${cssDe(area.css)}">${z('left', area.zonas.esquerda)}${z('center', area.zonas.centro)}${z('right', area.zonas.direita)}</${area.tipo === 'cabecalho' ? 'header' : 'footer'}>`;
 }
 
 /** Notas de rodapé da página: traço separador configurável + notas na tipografia própria. */
@@ -434,7 +436,7 @@ return `<section class="ath-pagina" style="position:relative; width:${largura_mm
       ${elemRecHtml}
       ${cabHtml}
       <div class="ath-folha-corpo" style="position:relative; z-index:1; display:flex; flex-direction:column; min-height:${altura_mm - geo.topoMm - geo.baseMm}mm;">
-        <div class="ath-grid" style="display:grid; grid-template-columns:repeat(${cols}, minmax(0, 1fr)); column-gap:${gap}mm; flex:1;">
+        <div class="ath-grid" style="display:grid; align-content:start; grid-template-columns:repeat(${cols}, minmax(0, 1fr)); column-gap:${gap}mm; flex:1;">
           ${blocosHtml}
         </div>
         ${notasHtml}
