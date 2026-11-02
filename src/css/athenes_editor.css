@@ -578,6 +578,32 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
   user-select: text;
 }
 
+.rm-col-prev { position: relative; }
+
+/* Zoom do canvas (Ctrl + roda): escala via CSS zoom para preservar layout e rolagem.
+   Margens automáticas evitam que a folha ampliada fique cortada à esquerda. */
+.rm-prev-palco > .ath-folha-a4 {
+  zoom: var(--ath-zoom, 1);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ath-zoom-indicador {
+  position: absolute;
+  right: 22px;
+  bottom: 16px;
+  z-index: 5;
+  border: 1px solid #C8D7E6;
+  background: rgba(255, 255, 255, 0.92);
+  color: #314F79;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
 .ath-folha-a4.paisagem {
   width: 1123px;
   min-height: 794px;

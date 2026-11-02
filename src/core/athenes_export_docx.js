@@ -8,6 +8,46 @@ import { ZipBuilder } from './zip_builder.js';
 import { MM_PARA_DXA } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
 import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao } from './athenes_documento.js';
+import { obterEstiloTabela, dimensoesTabela, resolverCelula, celulaParaDocx, PADDINGS_CELULA } from './athenes_tabela_estilo.js';
+
+/** Tabela/quadro OOXML com bordas por célula, sombreamento, alinhamento e zebra do estilo declarativo. */
+function gerarTabelaDocxEstilizada(b) {
+  const estilo = obterEstiloTabela(b);
+  const dim = dimensoesTabela(b);
+  const cols = b.colunas || [];
+  const larg = Array.isArray(b.larguras_relativas) && b.larguras_relativas.length === cols.length ? b.larguras_relativas : null;
+  const somaLarg = larg ? (larg.reduce((x, y) => x + Number(y), 0) || 1) : 1;
+  const totalDxa = 9000;
+  const gridColsXml = cols.map((_, i) => `<w:gridCol w:w="${larg ? Math.round(totalDxa * Number(larg[i]) / somaLarg) : Math.round(totalDxa / (cols.length || 1))}"/>`).join('');
+  const padDxa = Math.round((PADDINGS_CELULA[estilo.padding] ?? 4) * 20);
+
+  const celula = (texto, r, c, ehCab) => {
+    const res = resolverCelula(estilo, dim, r, c);
+    const { tcPr, jc } = celulaParaDocx(res);
+    const rPr = `${res.negrito || ehCab ? '<w:b/>' : ''}${res.cor_texto ? `<w:color w:val="${res.cor_texto.replace('#', '')}"/>` : ''}<w:sz w:val="20"/>`;
+    return `<w:tc>${tcPr}<w:p><w:pPr><w:jc w:val="${jc}"/><w:spacing w:after="0"/></w:pPr><w:r><w:rPr>${rPr}</w:rPr><w:t xml:space="preserve">${escaparXml(texto)}</w:t></w:r></w:p></w:tc>`;
+  };
+
+  let rows = '';
+  const temCab = b.com_cabecalho !== false;
+  if (temCab && cols.length) {
+    rows += `<w:tr><w:trPr><w:tblHeader/></w:trPr>${cols.map((c, i) => celula(c, 0, i, true)).join('')}</w:tr>`;
+  }
+  (b.linhas || []).forEach((lin, ri) => {
+    rows += `<w:tr><w:trPr><w:cantSplit/></w:trPr>${(Array.isArray(lin) ? lin : []).map((v, ci) => celula(limparHtmlParaTexto(v), ri + (temCab ? 1 : 0), ci, false)).join('')}</w:tr>`;
+  });
+
+  return `<w:tbl>
+          <w:tblPr>
+            <w:tblW w:w="${totalDxa}" w:type="dxa"/>
+            <w:jc w:val="center"/>
+            <w:tblLayout w:type="fixed"/>
+            <w:tblCellMar><w:top w:w="${padDxa}" w:type="dxa"/><w:left w:w="${padDxa * 2}" w:type="dxa"/><w:bottom w:w="${padDxa}" w:type="dxa"/><w:right w:w="${padDxa * 2}" w:type="dxa"/></w:tblCellMar>
+          </w:tblPr>
+          <w:tblGrid>${gridColsXml}</w:tblGrid>
+          ${rows}
+        </w:tbl>`;
+}
 
 function escaparXml(texto) {
   if (texto === undefined || texto === null) return '';
@@ -443,43 +483,11 @@ export async function exportarParaDocx(documento) {
         const runs = htmlParaRunsDocx(`${b.titulo ? '<strong>' + b.titulo + ':</strong> ' : ''}${b.texto || ''}`, { tamanhoPt: 10 });
         bodyXmlParts.push(`<w:p><w:pPr><w:pBdr><w:left w:val="single" w:sz="24" w:space="12" w:color="314F79"/></w:pPr><w:shd w:val="clear" w:color="auto" w:fill="EEF4FA"/><w:ind w:left="360" w:right="360"/><w:spacing w:before="120" w:after="120"/></w:pPr>${runs.join('')}</w:p>`);
       } else if (b.tipo === 'quadro') {
-        const cols = b.colunas || [];
-        const linhas = b.linhas || [];
-        const gridColsXml = cols.map(() => '<w:gridCol w:w="2200"/>').join('');
-
-        let tblRowsXml = '';
-        if (b.com_cabecalho !== false && cols.length) {
-          const cels = cols.map(c => `<w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="F1F5F9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(c)}</w:t></w:r></w:p></w:tc>`).join('');
-          tblRowsXml += `<w:tr><w:trPr><w:tblHeader/></w:trPr>${cels}</w:tr>`;
-        }
-
-        for (const lin of linhas) {
-          const cels = (Array.isArray(lin) ? lin : []).map(val => `<w:tc><w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(limparHtmlParaTexto(val))}</w:t></w:r></w:p></w:tc>`).join('');
-          tblRowsXml += `<w:tr>${cels}</w:tr>`;
-        }
-
         const titQuadro = obterTituloCompletoComNumeracao(b);
         if (titQuadro) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titQuadro)}</w:t></w:r></w:p>`);
         }
-
-        bodyXmlParts.push(`<w:tbl>
-          <w:tblPr>
-            <w:tblW w:w="0" w:type="auto"/>
-            <w:jc w:val="center"/>
-            <w:tblBorders>
-              <w:top w:val="single" w:sz="12" w:space="0" w:color="1F2733"/>
-              <w:bottom w:val="single" w:sz="12" w:space="0" w:color="1F2733"/>
-              <w:insideH w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>
-              <w:insideV w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>
-              <w:left w:val="single" w:sz="12" w:space="0" w:color="1F2733"/>
-              <w:right w:val="single" w:sz="12" w:space="0" w:color="1F2733"/>
-            </w:tblBorders>
-          </w:tblPr>
-          <w:tblGrid>${gridColsXml}</w:tblGrid>
-          ${tblRowsXml}
-        </w:tbl>`);
-
+        bodyXmlParts.push(gerarTabelaDocxEstilizada(b));
         if (b.fonte) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(b.fonte)}</w:t></w:r></w:p>`);
         }
@@ -508,43 +516,11 @@ export async function exportarParaDocx(documento) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(b.fonte)}</w:t></w:r></w:p>`);
         }
       } else if (b.tipo === 'tabela') {
-        const cols = b.colunas || [];
-        const linhas = b.linhas || [];
-        const gridColsXml = cols.map(() => '<w:gridCol w:w="2200"/>').join('');
-
-        let tblRowsXml = '';
-        if (b.com_cabecalho !== false && cols.length) {
-          const cels = cols.map(c => `<w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="F1F5F9"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(c)}</w:t></w:r></w:p></w:tc>`).join('');
-          tblRowsXml += `<w:tr><w:trPr><w:tblHeader/></w:trPr>${cels}</w:tr>`;
+        const titTab = obterTituloCompletoComNumeracao(b);
+        if (titTab) {
+          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titTab)}</w:t></w:r></w:p>`);
         }
-
-        for (const lin of linhas) {
-          const cels = (Array.isArray(lin) ? lin : []).map(val => `<w:tc><w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(limparHtmlParaTexto(val))}</w:t></w:r></w:p></w:tc>`).join('');
-          tblRowsXml += `<w:tr>${cels}</w:tr>`;
-        }
-
-        const titQuadro = obterTituloCompletoComNumeracao(b);
-        if (titQuadro) {
-          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titQuadro)}</w:t></w:r></w:p>`);
-        }
-
-        bodyXmlParts.push(`<w:tbl>
-          <w:tblPr>
-            <w:tblW w:w="0" w:type="auto"/>
-            <w:jc w:val="center"/>
-            <w:tblBorders>
-              <w:top w:val="single" w:sz="12" w:space="0" w:color="1F2733"/>
-              <w:bottom w:val="single" w:sz="12" w:space="0" w:color="1F2733"/>
-              <w:insideH w:val="single" w:sz="4" w:space="0" w:color="E2E8F0"/>
-              <w:insideV w:val="none"/>
-              <w:left w:val="none"/>
-              <w:right w:val="none"/>
-            </w:tblBorders>
-          </w:tblPr>
-          <w:tblGrid>${gridColsXml}</w:tblGrid>
-          ${tblRowsXml}
-        </w:tbl>`);
-
+        bodyXmlParts.push(gerarTabelaDocxEstilizada(b));
         if (b.fonte) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(b.fonte)}</w:t></w:r></w:p>`);
         }

@@ -10,6 +10,7 @@
 
 import { criarEstilosPadrao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { criarModelosPaginaPadrao, MODOS_APLICACAO_MESTRA } from './athenes_documento.js';
+import { extrairEstiloGlobalTabela, sanitizarEstiloTabela, garantirEstiloTabela } from './athenes_tabela_estilo.js';
 
 export const VERSAO_SCHEMA_TEMA = 'athenes-tema-v1';
 
@@ -126,6 +127,12 @@ export function extrairConfiguracaoMoldurasDoDocumento(doc) {
     }
   }
 
+  // Estilo declarativo de células (bordas, zebra, cabeçalho...): sempre exportado, mesmo no padrão
+  const tabelaRef = todosBlocos.find(b => b.tipo === 'tabela' && b.estilo_tabela);
+  const quadroRef = todosBlocos.find(b => b.tipo === 'quadro' && b.estilo_tabela);
+  padroes.tabela.estilo_tabela = extrairEstiloGlobalTabela(tabelaRef || { tipo: 'tabela' });
+  padroes.quadro.estilo_tabela = extrairEstiloGlobalTabela(quadroRef || { tipo: 'quadro' });
+
   for (const b of todosBlocos) {
     if (b.tipo === 'formula' && b.moldura_tipo) {
       padroes.formula.moldura_tipo = b.moldura_tipo;
@@ -203,7 +210,32 @@ export function validarPacoteEstilo(conteudo) {
     layout_padrao_figuras: obj.layout_padrao_figuras || {}
   };
 
+  // Sanitiza o estilo declarativo de tabelas/quadros (cores hex, larguras, enums) vindo de JSON externo/IA
+  for (const tipo of ['tabela', 'quadro']) {
+    const conf = pacoteNormalizado.layout_padrao_figuras[tipo];
+    if (conf && typeof conf === 'object' && conf.estilo_tabela) {
+      conf.estilo_tabela = sanitizarEstiloTabela(conf.estilo_tabela, tipo);
+    }
+  }
+
   return { valido: true, pacote: pacoteNormalizado };
+}
+
+/**
+ * Aplica a parte global do estilo de tabela do tema ao bloco, preservando os ajustes
+ * pontuais (fundos/alinhamentos/bordas por célula, linha ou coluna) feitos pelo autor.
+ */
+function aplicarEstiloTabelaDoTema(bloco, estiloTema) {
+  if (!estiloTema) return;
+  const novo = sanitizarEstiloTabela(estiloTema, bloco.tipo === 'quadro' ? 'quadro' : 'tabela');
+  if (bloco.estilo_tabela) {
+    const atual = garantirEstiloTabela(bloco);
+    novo.camadas.linhas = atual.camadas.linhas;
+    novo.camadas.colunas = atual.camadas.colunas;
+    novo.camadas.celulas = atual.camadas.celulas;
+    novo.bordas_celulas = atual.bordas_celulas;
+  }
+  bloco.estilo_tabela = novo;
 }
 
 /**
@@ -254,10 +286,12 @@ export function aplicarPacoteEstilo(documento, pacote, opcoes = {}) {
         const conf = p.layout_padrao_figuras.tabela;
         if (conf.moldura_tipo) b.moldura_tipo = conf.moldura_tipo;
         if (conf.linha_estilo) b.linha_estilo = conf.linha_estilo;
+        aplicarEstiloTabelaDoTema(b, conf.estilo_tabela);
         blocosAtualizados++;
       } else if (b.tipo === 'quadro' && p.layout_padrao_figuras.quadro) {
         const conf = p.layout_padrao_figuras.quadro;
         if (conf.moldura_tipo) b.moldura_tipo = conf.moldura_tipo;
+        aplicarEstiloTabelaDoTema(b, conf.estilo_tabela);
         blocosAtualizados++;
       } else if (b.tipo === 'formula' && p.layout_padrao_figuras.formula) {
         const conf = p.layout_padrao_figuras.formula;
@@ -315,6 +349,15 @@ INSTRUÇÕES DE ANÁLISE:
    - moldura_tipo: "limpo" (sem borda), "linha_lateral" (tarja lateral elegante), "cartao" (fundo suave), "borda_completa" (caixa fechada técnica), ou "esquadro".
    - linha_estilo: "solida" (linha reta), "quadriculada_reta" (cantos retos 0px), "pontilhada", "tracejada", "dupla" (técnica) ou "ponto_destaque".
    - linha_cor: cor hexadecimal da linha decorativa (ex: "#314F79").
+
+4. ESTILO DE CÉLULAS DE TABELAS E QUADROS ("estilo_tabela" dentro de layout_padrao_figuras.tabela e .quadro):
+   - bordas.externas {t,r,b,l} e bordas.internas {h,v}: cada aresta é null (sem borda) ou { "largura_pt": 0.25-6, "estilo": "solida"|"tracejada"|"pontilhada"|"dupla", "cor": "#RRGGBB" }.
+     Tabela ABNT/IBGE: apenas topo e base externas e divisórias horizontais finas internas; Quadro: todas as bordas.
+   - cabecalho { ativo, fundo, cor_texto, negrito, borda_superior, borda_inferior } e rodape { ativo, fundo, negrito, borda_superior, borda_inferior }: contorno independente das células comuns (omita a chave para herdar).
+   - coluna_cabecalho { ativo, fundo, negrito, borda_direita }: primeira coluna destacada.
+   - zebra { ativo, cor_impar, cor_par }: preenchimento alternado das linhas de dados.
+   - padding: "compacto" (2pt) | "normal" (4pt) | "expandido" (8pt); quebra: "normal" | "forcada".
+   - camadas.tabela { fundo, h: "esquerda"|"centro"|"direita"|"justificado", v: "topo"|"centro"|"base" }: fundo e alinhamento padrão das células.
 
 FORMATO EXATO DE RESPOSTA:
 Responda EXCLUSIVAMENTE com o bloco JSON válido abaixo, sem texto antes ou depois, pronto para ser colado no importador do Athenes:
@@ -560,7 +603,20 @@ Responda EXCLUSIVAMENTE com o bloco JSON válido abaixo, sem texto antes ou depo
       "linha_cor": "#314F79",
       "padding_pt": 8,
       "posicao_titulo": "topo",
-      "posicao_fonte": "base"
+      "posicao_fonte": "base",
+      "estilo_tabela": {
+        "bordas": {
+          "externas": { "t": { "largura_pt": 1.1, "estilo": "solida", "cor": "#1F2733" }, "r": null, "b": { "largura_pt": 1.1, "estilo": "solida", "cor": "#1F2733" }, "l": null },
+          "internas": { "h": { "largura_pt": 0.75, "estilo": "solida", "cor": "#E2E8F0" }, "v": null }
+        },
+        "cabecalho": { "ativo": true, "fundo": null, "negrito": true, "borda_inferior": { "largura_pt": 1.1, "estilo": "solida", "cor": "#1F2733" } },
+        "rodape": { "ativo": false },
+        "coluna_cabecalho": { "ativo": false, "fundo": "#F1F5F9" },
+        "zebra": { "ativo": false, "cor_impar": "#FFFFFF", "cor_par": "#F1F5F9" },
+        "padding": "normal",
+        "quebra": "normal",
+        "camadas": { "tabela": { "h": "esquerda", "v": "topo" } }
+      }
     },
     "quadro": {
       "moldura_tipo": "borda_completa",
@@ -568,7 +624,18 @@ Responda EXCLUSIVAMENTE com o bloco JSON válido abaixo, sem texto antes ou depo
       "linha_cor": "#CBD5E1",
       "padding_pt": 10,
       "posicao_titulo": "topo",
-      "posicao_fonte": "base"
+      "posicao_fonte": "base",
+      "estilo_tabela": {
+        "bordas": {
+          "externas": { "t": { "largura_pt": 1.1, "estilo": "solida", "cor": "#1F2733" }, "r": { "largura_pt": 1.1, "estilo": "solida", "cor": "#1F2733" }, "b": { "largura_pt": 1.1, "estilo": "solida", "cor": "#1F2733" }, "l": { "largura_pt": 1.1, "estilo": "solida", "cor": "#1F2733" } },
+          "internas": { "h": { "largura_pt": 0.75, "estilo": "solida", "cor": "#1F2733" }, "v": { "largura_pt": 0.75, "estilo": "solida", "cor": "#1F2733" } }
+        },
+        "cabecalho": { "ativo": true, "fundo": "#F8FAFC", "negrito": true },
+        "zebra": { "ativo": false, "cor_impar": "#FFFFFF", "cor_par": "#F1F5F9" },
+        "padding": "normal",
+        "quebra": "normal",
+        "camadas": { "tabela": { "h": "esquerda", "v": "topo" } }
+      }
     },
     "formula": {
       "moldura_tipo": "limpo",

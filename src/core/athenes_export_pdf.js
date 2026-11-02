@@ -9,6 +9,7 @@ import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
 import { hifenizarHtml } from './athenes_hifenizacao.js';
+import { obterEstiloTabela, dimensoesTabela, resolverCelula, celulaParaCss, tabelaParaCss } from './athenes_tabela_estilo.js';
 import { gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento, obterTituloCompletoComNumeracao } from './athenes_documento.js';
 
 export function escaparHtml(texto) {
@@ -24,6 +25,25 @@ export function escaparHtml(texto) {
 /**
  * Renderiza um único bloco em HTML para a folha
  */
+/** Tabela/quadro com estilo declarativo (bordas, zebra, fundos, alinhamento) resolvido por célula. */
+function gerarTabelaHtmlEstilizada(bloco, classe) {
+  const estilo = obterEstiloTabela(bloco);
+  const dim = dimensoesTabela(bloco);
+  const temCab = bloco.com_cabecalho !== false;
+  const larg = bloco.larguras_relativas;
+  const colgroup = Array.isArray(larg) && larg.length === (bloco.colunas || []).length
+    ? '<colgroup>' + larg.map(w => '<col style="width:' + (Number(w) * 100 / (larg.reduce((x, y) => x + Number(y), 0) || 1)).toFixed(2) + '%">').join('') + '</colgroup>'
+    : '';
+  const css = (r, c) => celulaParaCss(resolverCelula(estilo, dim, r, c), estilo);
+  const cab = temCab
+    ? '<thead><tr>' + (bloco.colunas || []).map((col, c) => '<th style="' + css(0, c) + '">' + escaparHtml(col) + '</th>').join('') + '</tr></thead>'
+    : '';
+  const corpo = (bloco.linhas || []).map((linha, ri) =>
+    '<tr>' + (Array.isArray(linha) ? linha : []).map((cel, c) => '<td style="' + css(ri + (temCab ? 1 : 0), c) + '">' + (cel || '') + '</td>').join('') + '</tr>'
+  ).join('');
+  return '<table class="' + classe + '" style="' + tabelaParaCss('9.5pt') + '">' + colgroup + cab + '<tbody>' + corpo + '</tbody></table>';
+}
+
 export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
   const estBase = estilosMap[bloco.estiloId] || estilosMap.corpo || {};
   const est = {
@@ -97,18 +117,9 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
     case 'quadro': {
       const estLegenda = estilosMap.legenda || estilosMap.corpo;
       const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
-      const cabHtml = (bloco.colunas || []).map(col => '<th>' + escaparHtml(col) + '</th>').join('');
-      const linhasHtml = (bloco.linhas || []).map(linha => {
-        const celulas = (Array.isArray(linha) ? linha : []).map(cel => '<td>' + (cel || '') + '</td>').join('');
-        return '<tr>' + celulas + '</tr>';
-      }).join('\n');
-
       return '<div class="ath-bloco ath-quadro-wrap" style="margin:12px 0; break-inside:avoid;" data-id="' + bloco.id + '">' +
         (bloco.titulo ? '<div class="ath-legenda" style="' + estiloParaCss(estLegenda) + ' font-weight:800; text-align:left; margin-bottom:4px;">' + bloco.titulo + '</div>' : '') +
-        '<table class="ath-quadro" style="width:100%; border-collapse:collapse; border:1.5px solid #1F2733;">' +
-          (bloco.com_cabecalho !== false ? '<thead><tr style="background:#F8FAFC;">' + cabHtml + '</tr></thead>' : '') +
-          '<tbody>' + linhasHtml + '</tbody>' +
-        '</table>' +
+        gerarTabelaHtmlEstilizada(bloco, 'ath-quadro') +
         (bloco.fonte ? '<div class="ath-fonte" style="' + estiloParaCss(estFonte) + ' text-align:left; margin-top:4px;">' + bloco.fonte + '</div>' : '') +
       '</div>';
     }
@@ -163,21 +174,9 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
     case 'tabela': {
       const estLegenda = estilosMap.legenda || estilosMap.corpo;
       const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
-      const cabHtml = (bloco.colunas || []).map((col, idx) => {
-        const w = bloco.larguras_relativas?.[idx] ? `width:${Math.round(bloco.larguras_relativas[idx] * 100)}%;` : '';
-        return `<th style="${w}">${escaparHtml(col)}</th>`;
-      }).join('');
-      const linhasHtml = (bloco.linhas || []).map(linha => {
-        const celulas = (Array.isArray(linha) ? linha : []).map(cel => `<td>${cel || ''}</td>`).join('');
-        return `<tr>${celulas}</tr>`;
-      }).join('\n');
-
       return `<div class="ath-bloco ath-tabela-wrap" style="margin:12px 0; break-inside:avoid;" data-id="${bloco.id}">
         ${obterTituloCompletoComNumeracao(bloco) ? `<div class="ath-legenda" style="${estiloParaCss(estLegenda)} text-align:left; margin-bottom:4px;">${obterTituloCompletoComNumeracao(bloco)}</div>` : ''}
-        <table class="ath-tabela">
-          ${bloco.com_cabecalho !== false ? `<thead><tr>${cabHtml}</tr></thead>` : ''}
-          <tbody>${linhasHtml}</tbody>
-        </table>
+        ${gerarTabelaHtmlEstilizada(bloco, 'ath-tabela')}
         ${bloco.fonte ? `<div class="ath-fonte" style="${estiloParaCss(estFonte)} text-align:left; margin-top:4px;">${bloco.fonte}</div>` : ''}
       </div>`;
     }

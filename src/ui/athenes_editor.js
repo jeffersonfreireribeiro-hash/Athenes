@@ -49,6 +49,8 @@ import { escapeHtml } from '../core/athenes_seguranca.js';
 import { hifenizarHtml, removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
+import { construirTabelaDom, instalarSelecaoCelulas, abrirPopoverEstiloTabela } from './athenes_tabela_ui.js';
+import { instalarZoomCanvas } from './athenes_zoom_canvas.js';
 import { ModalEditorEstilo } from './athenes_editor_estilo_modal.js';
 import { ModalCentralEstilos } from './athenes_central_estilos_modal.js';
 import {
@@ -132,6 +134,8 @@ export class EditorView {
     this.rascunhoEstilo = null;
     this.estilosAberto = false;
     this._tSnap = null;
+    this._selTabelas = new Map();
+    this.zoomCanvas = 1;
 
     this.opcoes = opcoes;
     this.onAlterado = opcoes.onAlterado || (() => {});
@@ -463,6 +467,7 @@ export class EditorView {
 
           <!-- Palco de Páginas Reais -->
           <div class="rm-prev rm-prev-palco" id="rmPrevPalco"></div>
+          <button type="button" class="ath-zoom-indicador" id="athZoomIndicador" title="Ctrl + roda do mouse para zoom · clique para 100%">100%</button>
         </section>
 
         <!-- COLUNA DIREITA: Inspetor de Propriedades e Edição Composta -->
@@ -491,6 +496,18 @@ export class EditorView {
     this.pintarCursoresRemotosNaFolha();
 
     const palcoNovo = root.querySelector('#rmPrevPalco');
+    if (palcoNovo) {
+      const ind = root.querySelector('#athZoomIndicador');
+      const definir = (z) => {
+        this.zoomCanvas = z;
+        if (ind) ind.textContent = `${Math.round(z * 100)}%`;
+      };
+      instalarZoomCanvas(palcoNovo, { obter: () => this.zoomCanvas, definir });
+      ind?.addEventListener('click', () => {
+        palcoNovo.style.setProperty('--ath-zoom', '1');
+        definir(1);
+      });
+    }
     const esqNovo = root.querySelector('#rmColEsq');
     if (palcoNovo) palcoNovo.scrollTop = rolagem.palco;
     if (esqNovo) esqNovo.scrollTop = rolagem.esq;
@@ -2477,6 +2494,26 @@ export class EditorView {
         barra.appendChild(selMod);
       }
 
+      if (b.tipo === 'tabela' || b.tipo === 'quadro') {
+        const btnEstilo = document.createElement('button');
+        btnEstilo.type = 'button';
+        btnEstilo.className = 'ath-btn-rapido';
+        btnEstilo.dataset.athPopTabToggle = '1';
+        btnEstilo.title = 'Bordas, preenchimento, zebra e alinhamento das células';
+        btnEstilo.innerHTML = `${svgIcone('grade', 12)} <span style="font-weight:700; white-space:nowrap;">Estilo</span>`;
+        btnEstilo.addEventListener('click', (e) => {
+          e.stopPropagation();
+          abrirPopoverEstiloTabela({
+            bloco: b,
+            ancora: btnEstilo,
+            obterTabela: () => this.container.querySelector(`table[data-bloco-id="${b.id}"]`),
+            obterSelecao: () => this._selTabelas.get(b.id) || null,
+            aoAlterar: () => this.notificarMudancaRapida()
+          });
+        });
+        barra.appendChild(btnEstilo);
+      }
+
       const btnEdit = document.createElement('button');
       btnEdit.type = 'button';
       btnEdit.className = 'ath-btn-rapido';
@@ -2945,31 +2982,8 @@ export class EditorView {
       });
       tabBox.appendChild(tit);
 
-      const table = document.createElement('table');
-      table.className = 'ath-tabela-abnt';
-      const thead = document.createElement('thead');
-      const trH = document.createElement('tr');
-      (b.colunas || ['Coluna A', 'Coluna B']).forEach(c => {
-        const th = document.createElement('th');
-        th.contentEditable = 'true';
-        th.textContent = c;
-        trH.appendChild(th);
-      });
-      thead.appendChild(trH);
-      table.appendChild(thead);
-
-      const tbody = document.createElement('tbody');
-      (b.linhas || [['Dado 1', 'Dado 2']]).forEach(row => {
-        const tr = document.createElement('tr');
-        row.forEach(cell => {
-          const td = document.createElement('td');
-          td.contentEditable = 'true';
-          td.textContent = cell;
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      });
-      table.appendChild(tbody);
+      const table = construirTabelaDom(b, 'ath-tabela-abnt', () => this.notificarMudancaRapida());
+      this._selTabelas.set(b.id, instalarSelecaoCelulas(table));
       tabBox.appendChild(table);
 
       if (b.notas && b.mostrar_legenda !== false) {
@@ -3012,31 +3026,8 @@ export class EditorView {
       });
       qBox.appendChild(tit);
 
-      const table = document.createElement('table');
-      table.className = 'ath-quadro-abnt';
-      const thead = document.createElement('thead');
-      const trH = document.createElement('tr');
-      (b.colunas || ['Categoria', 'Definição']).forEach(c => {
-        const th = document.createElement('th');
-        th.contentEditable = 'true';
-        th.textContent = c;
-        trH.appendChild(th);
-      });
-      thead.appendChild(trH);
-      table.appendChild(thead);
-
-      const tbody = document.createElement('tbody');
-      (b.linhas || [['Dimensão A', 'Conteúdo descritivo A']]).forEach(row => {
-        const tr = document.createElement('tr');
-        row.forEach(cell => {
-          const td = document.createElement('td');
-          td.contentEditable = 'true';
-          td.textContent = cell;
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      });
-      table.appendChild(tbody);
+      const table = construirTabelaDom(b, 'ath-quadro-abnt', () => this.notificarMudancaRapida());
+      this._selTabelas.set(b.id, instalarSelecaoCelulas(table));
       qBox.appendChild(table);
 
       if (b.mostrar_fonte !== false) {

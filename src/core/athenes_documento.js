@@ -345,6 +345,7 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.larguras_relativas = dados.larguras_relativas || [0.4, 0.3, 0.3];
       b.com_cabecalho = dados.com_cabecalho !== undefined ? dados.com_cabecalho : true;
       b.bordas_abertas = true; // Estilo ABNT/IBGE (laterais verticais abertas)
+      if (dados.estilo_tabela) b.estilo_tabela = JSON.parse(JSON.stringify(dados.estilo_tabela)); // bordas/zebra/alinhamento das células
       b.numero_sequencial = dados.numero_sequencial || 1;
       b.moldura_tipo = dados.moldura_tipo || 'limpo';
       b.linha_estilo = dados.linha_estilo || 'solida';
@@ -367,6 +368,7 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.larguras_relativas = dados.larguras_relativas || [0.3, 0.4, 0.3];
       b.com_cabecalho = dados.com_cabecalho !== undefined ? dados.com_cabecalho : true;
       b.bordas_fechadas = true; // Estilo Quadro ABNT (caixa com todas as bordas fechadas)
+      if (dados.estilo_tabela) b.estilo_tabela = JSON.parse(JSON.stringify(dados.estilo_tabela));
       b.numero_sequencial = dados.numero_sequencial || 1;
       b.moldura_tipo = dados.moldura_tipo || 'caixa_borda';
       b.linha_estilo = dados.linha_estilo || 'solida';
