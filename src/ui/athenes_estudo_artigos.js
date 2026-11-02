@@ -2231,7 +2231,17 @@ export class EstudoArtigosView {
           <button type="button" class="rm-ic" data-fechar-pop-est>${svgIcone('fechar', 14)}</button>
         </div>
         <div class="rm-popover-body">
-          <label>Google OAuth Client ID
+          <label>Link da Pasta no Google Drive (onde ficam seus PDFs)
+            <input type="text" id="athPopDrivePastaInput" value="${escapeHtml(cfgDrive.pastaUrl || '')}" placeholder="Ex.: https://drive.google.com/drive/folders/1ABCxyz...">
+          </label>
+          ${cfgDrive.pastaUrl ? `
+            <div style="margin-bottom:8px;">
+              <a href="${cfgDrive.pastaUrl}" target="_blank" rel="noopener noreferrer" class="ath-btn ath-btn-sm" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#2563EB; text-decoration:none; height:28px;">
+                ${svgIcone('drive', 13)} Abrir Pasta no Google Drive Web ↗
+              </a>
+            </div>
+          ` : ''}
+          <label>Google OAuth Client ID (Opcional)
             <input type="text" id="athPopDriveClientIdInput" value="${escapeHtml(cfgDrive.clientId || '')}">
           </label>
           <button type="button" class="glx-btn ${driveConectado ? 'ath-btn-zotero-ok' : 'glx-btn-primary'} glx-btn-sm" id="athBtnPopAutenticarDrive" style="width:100%; justify-content:center; margin-bottom:6px;">
@@ -2250,6 +2260,9 @@ export class EstudoArtigosView {
           </div>
         </div>
       `;
+      popDrive.querySelector('#athPopDrivePastaInput')?.addEventListener('change', e => {
+        salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), pastaUrl: e.target.value.trim() });
+      });
       popDrive.querySelector('#athPopDriveClientIdInput').addEventListener('change', e => {
         salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), clientId: e.target.value.trim() });
       });

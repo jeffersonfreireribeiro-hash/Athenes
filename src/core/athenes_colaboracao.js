@@ -559,28 +559,45 @@ export class SessaoColaborativaRealtime {
 export const GOOGLE_DRIVE_ESCOPO = 'https://www.googleapis.com/auth/drive.file';
 export const DEFAULT_GOOGLE_CLIENT_ID = '948015162542-j898e50a80pf0a9fo69belsar291fh41.apps.googleusercontent.com';
 
+export function extrairIdPastaDrive(urlOuId) {
+  if (!urlOuId) return '';
+  const str = String(urlOuId).trim();
+  const match = str.match(/folders\/([a-zA-Z0-9_-]+)/);
+  if (match) return match[1];
+  const matchId = str.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (matchId) return matchId[1];
+  if (/^[a-zA-Z0-9_-]{15,}$/.test(str)) return str;
+  return str;
+}
+
 export function obterConfigGoogleDrive() {
   try {
     if (typeof localStorage !== 'undefined') {
       const salvo = localStorage.getItem('athenes_gdrive_config');
       if (salvo) {
         const parsed = JSON.parse(salvo);
+        const pastaUrl = parsed.pastaUrl || '';
         return {
           clientId: parsed.clientId || DEFAULT_GOOGLE_CLIENT_ID,
           apiKey: parsed.apiKey || '',
-          accessToken: parsed.accessToken || ''
+          accessToken: parsed.accessToken || '',
+          pastaUrl,
+          pastaId: parsed.pastaId || extrairIdPastaDrive(pastaUrl)
         };
       }
     }
   } catch (_) {}
-  return { clientId: DEFAULT_GOOGLE_CLIENT_ID, apiKey: '', accessToken: '' };
+  return { clientId: DEFAULT_GOOGLE_CLIENT_ID, apiKey: '', accessToken: '', pastaUrl: '', pastaId: '' };
 }
 
 export function salvarConfigGoogleDrive(cfg) {
+  const pastaUrl = (cfg?.pastaUrl || '').trim();
   const normalizado = {
     clientId: (cfg?.clientId || DEFAULT_GOOGLE_CLIENT_ID).trim(),
     apiKey: cfg?.apiKey || '',
-    accessToken: cfg?.accessToken || ''
+    accessToken: cfg?.accessToken || '',
+    pastaUrl,
+    pastaId: cfg?.pastaId || extrairIdPastaDrive(pastaUrl)
   };
   try {
     if (typeof localStorage !== 'undefined') {

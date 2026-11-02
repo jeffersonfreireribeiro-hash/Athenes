@@ -874,23 +874,34 @@ export class EditorView {
       const itemCard = li.querySelector('.rm-estilo-item');
       const btnEditar = li.querySelector('[data-acao="editar-estilo"]');
 
-      const selecionarEEmitir = () => {
+      const selecionarEAplicar = () => {
         this.estiloSelecionadoId = est.id;
         popEstilos.querySelectorAll('.rm-estilo-item').forEach(b => b.classList.remove('on'));
         itemCard.classList.add('on');
         atualizarPreviaTopo(est);
+        if (this.blocoSelecionado) {
+          this.blocoSelecionado.estiloId = est.id;
+          this.notificarMudanca();
+          this.renderizar();
+          this.onSelecionarBloco(this.blocoSelecionado, null);
+        }
         fecharTodos();
         this.onEditarEstilo(est);
       };
 
       itemCard.addEventListener('click', (e) => {
         if (e.target.closest('[data-acao="editar-estilo"]')) return;
-        selecionarEEmitir();
+        selecionarEAplicar();
       });
 
       btnEditar.addEventListener('click', (e) => {
         e.stopPropagation();
-        selecionarEEmitir();
+        this.estiloSelecionadoId = est.id;
+        popEstilos.querySelectorAll('.rm-estilo-item').forEach(b => b.classList.remove('on'));
+        itemCard.classList.add('on');
+        atualizarPreviaTopo(est);
+        fecharTodos();
+        this.onEditarEstilo(est);
       });
 
       listaEstilosTopo.appendChild(li);
@@ -1620,22 +1631,32 @@ export class EditorView {
       const itemCard = li.querySelector('.rm-estilo-item');
       const btnEditar = li.querySelector('[data-acao="editar-estilo"]');
 
-      const selecionarEEmitir = () => {
+      const selecionarEAplicar = () => {
         this.estiloSelecionadoId = est.id;
         sec.querySelectorAll('.rm-estilo-item').forEach(b => b.classList.remove('on'));
         itemCard.classList.add('on');
         atualizarPrevia(est);
+        if (this.blocoSelecionado) {
+          this.blocoSelecionado.estiloId = est.id;
+          this.notificarMudanca();
+          this.renderizar();
+          this.onSelecionarBloco(this.blocoSelecionado, null);
+        }
         this.opcoes.onEditarEstilo?.(est);
       };
 
       itemCard.addEventListener('click', (e) => {
         if (e.target.closest('[data-acao="editar-estilo"]')) return;
-        selecionarEEmitir();
+        selecionarEAplicar();
       });
 
       btnEditar.addEventListener('click', (e) => {
         e.stopPropagation();
-        selecionarEEmitir();
+        this.estiloSelecionadoId = est.id;
+        sec.querySelectorAll('.rm-estilo-item').forEach(b => b.classList.remove('on'));
+        itemCard.classList.add('on');
+        atualizarPrevia(est);
+        this.opcoes.onEditarEstilo?.(est);
       });
 
       lista.appendChild(li);
@@ -2922,10 +2943,24 @@ export class EditorView {
     barra.style.userSelect = 'none';
 
     barra.innerHTML = `
-      <select class="ath-barra-context-estilo" id="athBarraContextEstilo" style="font-family:var(--glx-font); font-size:11px; font-weight:700; border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:2px 8px; height:28px; background:var(--ath-surface-elevated, #F8FAFC); color:var(--ath-primary, #314F79); cursor:pointer;" title="Aplicar estilo de texto ao trecho selecionado">
-        <option value="" disabled selected>Estilo ▾</option>
-        ${(this.doc.estilos || []).map(est => `<option value="${est.id}">${est.nome}</option>`).join('')}
-      </select>
+      <!-- Dropdown de Estilo de Texto na Barra Flutuante -->
+      <div class="ath-ctx-dropdown-wrap" id="athWrapCtxEstilo">
+        <button type="button" class="ath-ctx-dropdown-btn" id="athBtnContextEstiloMenu" title="Aplicar Estilo de Texto ao Bloco" style="height:28px; padding:0 10px; font-weight:700;">
+          <span id="athRotuloCtxEstilo" style="font-size:11px; font-weight:700; max-width:115px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Estilo</span>
+          <span style="font-size:10px; opacity:0.8;">▾</span>
+        </button>
+        <div class="ath-ctx-dropdown-menu" id="athMenuContextEstilo" hidden style="width:230px; max-height:260px; overflow-y:auto;">
+          <div style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; padding:4px 8px; border-bottom:1px solid #EEF2F6;">
+            Estilos de Texto
+          </div>
+          ${(this.doc.estilos || []).map(est => `
+            <button type="button" class="ath-ctx-menu-item" data-ctx-estilo-id="${est.id}" style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px;">
+              <span style="font-weight:${est.peso || 400};">${est.nome}</span>
+              <small style="color:#64748B;">${est.tamanho_pt || 12}pt</small>
+            </button>
+          `).join('')}
+        </div>
+      </div>
       <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 2px;"></span>
       <button type="button" class="rm-ic-sm" data-cmd="bold" title="Negrito (Ctrl+B)"><b>B</b></button>
       <button type="button" class="rm-ic-sm" data-cmd="italic" title="Itálico (Ctrl+I)"><i>I</i></button>
@@ -3064,15 +3099,26 @@ export class EditorView {
 
     document.body.appendChild(barra);
 
+    const menuEstilo = barra.querySelector('#athMenuContextEstilo');
     const menuLista = barra.querySelector('#athMenuContextLista');
     const menuAlin = barra.querySelector('#athMenuContextAlin');
+    const btnEstiloMenu = barra.querySelector('#athBtnContextEstiloMenu');
     const btnListaMenu = barra.querySelector('#athBtnContextListaMenu');
     const btnAlinMenu = barra.querySelector('#athBtnContextAlinMenu');
 
     const fecharDropdownsCtx = () => {
+      if (menuEstilo) menuEstilo.hidden = true;
       if (menuLista) menuLista.hidden = true;
       if (menuAlin) menuAlin.hidden = true;
     };
+
+    btnEstiloMenu?.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const abrir = menuEstilo.hidden;
+      fecharDropdownsCtx();
+      menuEstilo.hidden = !abrir;
+    });
 
     btnListaMenu?.addEventListener('mousedown', e => {
       e.preventDefault();
@@ -3169,32 +3215,23 @@ export class EditorView {
       }
     });
 
-    // Eventos da barra flutuante
-    const selEstilo = barra.querySelector('#athBarraContextEstilo');
-    selEstilo.addEventListener('change', () => {
-      const estiloId = selEstilo.value;
-      const estilo = (this.doc.estilos || []).find(e => e.id === estiloId);
-      if (!estilo) return;
-
-      const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-      const range = sel.getRangeAt(0);
-
-      const span = document.createElement('span');
-      span.className = 'ath-estilo-span';
-      span.dataset.estiloId = estilo.id;
-      span.style.fontFamily = FONTES_SISTEMA[estilo.fonte]?.familia || 'Nunito, sans-serif';
-      span.style.fontSize = `${estilo.tamanho_pt || 12}pt`;
-      span.style.fontWeight = estilo.peso || '400';
-      if (estilo.cor) span.style.color = estilo.cor;
-      if (estilo.italico) span.style.fontStyle = 'italic';
-
-      const contents = range.extractContents();
-      span.appendChild(contents);
-      range.insertNode(span);
-
-      selEstilo.value = '';
-      this.notificarMudanca();
+    // Eventos da barra flutuante: Aplicar Estilo
+    barra.querySelectorAll('[data-ctx-estilo-id]').forEach(btn => {
+      btn.addEventListener('mousedown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const estiloId = btn.dataset.ctxEstiloId;
+        const estilo = (this.doc.estilos || []).find(x => x.id === estiloId);
+        if (estilo && this.blocoSelecionado) {
+          this.blocoSelecionado.estiloId = estilo.id;
+          const rotuloEl = barra.querySelector('#athRotuloCtxEstilo');
+          if (rotuloEl) rotuloEl.textContent = estilo.nome;
+          fecharDropdownsCtx();
+          this.notificarMudanca();
+          this.renderizar();
+          this.onSelecionarBloco(this.blocoSelecionado, null);
+        }
+      });
     });
     barra.querySelectorAll('[data-cmd]').forEach(btn => {
       btn.addEventListener('mousedown', e => {
@@ -3321,12 +3358,13 @@ export class EditorView {
           barra.style.left = `${rect.left + rect.width / 2}px`;
           barra.style.top = `${rect.top}px`;
 
-          // Reflete o estilo ativo do trecho
-          const spanEst = elPai.closest('.ath-estilo-span');
-          if (spanEst && spanEst.dataset.estiloId) {
-            selEstilo.value = spanEst.dataset.estiloId;
-          } else if (this.blocoSelecionado?.estiloId) {
-            selEstilo.value = this.blocoSelecionado.estiloId;
+          // Reflete o estilo ativo do trecho ou do bloco
+          const rotuloEstiloEl = barra.querySelector('#athRotuloCtxEstilo');
+          if (rotuloEstiloEl) {
+            const spanEst = elPai.closest('.ath-estilo-span');
+            const idAtivo = spanEst?.dataset.estiloId || this.blocoSelecionado?.estiloId;
+            const estAtual = (this.doc.estilos || []).find(x => x.id === idAtivo);
+            rotuloEstiloEl.textContent = estAtual ? estAtual.nome : 'Estilo';
           }
 
           // Reflete estado do menu de Alinhamento

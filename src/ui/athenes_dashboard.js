@@ -97,6 +97,7 @@ export class DashboardView {
     if (!this.container) return;
     this.container.innerHTML = '';
     this.perfilUsuario = obterPerfilColaborador();
+    const driveCfg = obterConfigGoogleDrive();
 
     const root = document.createElement('div');
     root.className = 'ath-dashboard';
@@ -129,7 +130,12 @@ export class DashboardView {
         </nav>
 
         <!-- Identificação de Quem Está Mexendo / Login -->
-        <div class="ath-dash-user-box">
+        <div class="ath-dash-user-box" style="display:flex; align-items:center; gap:8px;">
+          ${driveCfg.pastaUrl ? `
+            <a href="${driveCfg.pastaUrl}" target="_blank" rel="noopener noreferrer" class="ath-btn ath-btn-sm" style="height:32px; font-size:11.5px; display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#314F79; background:#fff; border:1px solid #C8D7E6;" title="Abrir sua pasta de PDFs e artigos no Google Drive Web">
+              ${svgIcone('drive', 14)} Pasta Drive ↗
+            </a>
+          ` : ''}
           <button type="button" class="ath-dash-user-pill" id="athBtnPerfilLoginDash" title="Clique para identificar quem está usando, trocar perfil ou conectar Google Drive e Zotero">
             <span class="ath-dash-user-avatar" style="background:${this.perfilUsuario.cor || '#314F79'};">${iniciais}</span>
             <span class="ath-dash-user-info">
@@ -313,8 +319,18 @@ export class DashboardView {
                 <input type="text" class="ath-input" id="athLoginZoteroId" value="${zoteroUserId}" placeholder="Ex.: 18806479" style="height:30px; font-size:11.5px;">
               </div>
             </div>
+            <div class="ath-prop-grupo" style="margin-bottom:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                <label style="font-size:11px; font-weight:700; color:#314F79; margin:0;">
+                  Link ou ID da Pasta no Google Drive (Web)
+                </label>
+                ${driveCfg.pastaUrl ? `<a href="${driveCfg.pastaUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px; color:#2563EB; font-weight:700; text-decoration:underline;">Abrir Pasta ↗</a>` : ''}
+              </div>
+              <input type="text" class="ath-input" id="athLoginDrivePastaUrl" value="${driveCfg.pastaUrl || ''}" placeholder="Ex.: https://drive.google.com/drive/folders/1ABCxyz... ou ID da pasta" style="height:30px; font-size:11.5px;">
+              <small style="font-size:10.5px; color:#64748B; margin-top:2px; display:block;">Cole aqui o link da pasta do Google Drive onde você guarda PDFs e backups. Não depende de letra de unidade (G:, C:) e abre em qualquer PC.</small>
+            </div>
             <div class="ath-prop-grupo" style="margin-bottom:0;">
-              <label style="font-size:11px;">Client ID Google Drive (OAuth)</label>
+              <label style="font-size:11px;">Client ID Google Drive (OAuth - Opcional)</label>
               <input type="text" class="ath-input" id="athLoginDriveClientId" value="${driveCfg.clientId || ''}" placeholder="Ex.: xxxx.apps.googleusercontent.com" style="height:30px; font-size:11.5px;">
             </div>
           </div>
@@ -353,9 +369,12 @@ export class DashboardView {
       salvarPerfilColaborador(novoPerfil);
 
       const clientIdDrive = modal.querySelector('#athLoginDriveClientId').value.trim();
-      if (clientIdDrive !== (driveCfg.clientId || '')) {
-        salvarConfigGoogleDrive({ ...driveCfg, clientId: clientIdDrive });
-      }
+      const pastaUrlDrive = modal.querySelector('#athLoginDrivePastaUrl')?.value.trim() || '';
+      salvarConfigGoogleDrive({
+        ...driveCfg,
+        clientId: clientIdDrive,
+        pastaUrl: pastaUrlDrive
+      });
 
       const zId = modal.querySelector('#athLoginZoteroId').value.trim();
       const zKey = modal.querySelector('#athLoginZoteroKey').value.trim();
