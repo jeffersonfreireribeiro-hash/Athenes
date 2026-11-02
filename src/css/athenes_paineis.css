@@ -155,7 +155,7 @@
   gap: 10px;
 }
 
-/* Rótulos que são botões (seletor de arquivo) mantêm texto legível dentro de .ath-prop-grupo */
+/* RÃ¡tulos que sÃ¡o botÃ¡es (seletor de arquivo) mantÃ¡m texto legÃ¡vel dentro de .ath-prop-grupo */
 .ath-prop-grupo label.ath-btn { color: #1F2733; font-size: 12px; font-weight: 700; display: inline-flex; margin: 0; }
 .ath-prop-grupo label.ath-btn.ath-btn-primary { color: #FFFFFF; background: #314F79; }
 .ath-prop-grupo label.ath-btn.ath-btn-primary svg { stroke: #FFFFFF; }

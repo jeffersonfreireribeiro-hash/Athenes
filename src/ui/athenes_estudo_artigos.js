@@ -429,7 +429,7 @@ export function gerarHtmlNotaZoteroDoArtigo(artigo) {
     f.metodologiaNotas ? `<h3>Notas de Metodologia & Reflexões</h3><p>${escapeHtml(f.metodologiaNotas)}</p>` : '',
     citacoes.length > 0
       ? `<h3>Citações Marcadas no PDF (${citacoes.length})</h3><ul>` +
-        citacoes.map(c => `<li><blockquote>"${escapeHtml(c.texto)}" ${escapeHtml(formatarCitacaoAbntDoArtigo(artigo, c.pagina))}</blockquote>${c.comentario ? `<p><em>Nota:</em> ${escapeHtml(c.comentario)}</p>` : ''}</li>`).join('') +
+        citacoes.map(c => `<li><blockquote>"${escapeHtml(c.texto)}" ${escapeHtml(formatarCitacaoAbntDoArtigo(artigo, c.paginaCitacao || c.pagina))}</blockquote>${c.comentario ? `<p><em>Nota:</em> ${escapeHtml(c.comentario)}</p>` : ''}</li>`).join('') +
         `</ul>`
       : '',
     todosPins.length > 0
@@ -1164,7 +1164,19 @@ export class EstudoArtigosView {
       });
       return;
     }
-    if (pdfInfo) paginasPdf = art.conteudoPaginasPdf;
+    if (pdfInfo) {
+      if (!Array.isArray(art.conteudoPaginasPdf) || art.conteudoPaginasPdf.length !== pdfInfo.n || !art.conteudoPaginasPdf[0]?.real) {
+        art.conteudoPaginasPdf = pdfInfo.dims.map((_, i) => ({
+          numero: i + 1,
+          real: true,
+          cabecalho: '',
+          titulo: `Folha ${i + 1} do PDF`,
+          autores: '',
+          paragrafos: []
+        }));
+      }
+      paginasPdf = art.conteudoPaginasPdf;
+    }
     const totalPags = paginasPdf.length;
     const folhasReais = [];
 
@@ -1175,20 +1187,26 @@ export class EstudoArtigosView {
       const isPagAtiva = numPag === this.paginaAtual;
       const dimPag = pdfInfo?.dims?.[idx];
       const alturaReal = dimPag ? Math.round(794 * dimPag.h / dimPag.w) : 1123;
+      const escalaZoom = this.zoomPct / 100;
+      const alturaWrapEscalada = pdfInfo ? Math.round(alturaReal * escalaZoom) : null;
 
       const folhaWrap = document.createElement('div');
       folhaWrap.className = 'ath-pdf-pagina-bloco-wrap';
       folhaWrap.dataset.wrapPagina = String(numPag);
+      if (alturaWrapEscalada && escalaZoom !== 1) {
+        folhaWrap.style.minHeight = `${alturaWrapEscalada + 36}px`;
+      }
 
       folhaWrap.innerHTML = `
         <div class="ath-pdf-etiqueta-pagina ${isPagAtiva ? 'ativa' : ''}" data-etiqueta-pag="${numPag}">
-          <span class="ath-pdf-etiqueta-num">Página ${numPag} de ${totalPags} — ${escapeHtml((pagDados.titulo || 'Folha do Artigo').slice(0, 62))}</span>
+          <span class="ath-pdf-etiqueta-num">Página ${numPag} de ${totalPags} — ${escapeHtml((pagDados.titulo || `Folha ${numPag} do PDF`).slice(0, 62))}</span>
           <span class="ath-pdf-etiqueta-stats" data-stats-pag="${numPag}">${tracosDaPagina.length} risco(s) · ${pinsDaPagina.length} nota(s)</span>
         </div>
 
-        <div class="ath-folha-a4 ath-pdf-folha-container ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" style="${pdfInfo ? `width:794px; height:${alturaReal}px; min-height:0; padding:0; ` : ''}transform: scale(${this.zoomPct / 100}); transform-origin: top center;">
+        <div class="ath-folha-a4 ath-pdf-folha-container ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" style="${pdfInfo ? `width:794px; height:${alturaReal}px; min-height:${alturaReal}px; max-height:${alturaReal}px; padding:0; flex-shrink:0; ` : ''}transform: scale(${escalaZoom}); transform-origin: top center;">
           ${pdfInfo ? `
             <canvas class="ath-pdf-render-canvas" style="width:794px; height:${alturaReal}px;"></canvas>
+            <div class="ath-pdf-grifos-layer" data-grifos-pag="${numPag}"></div>
             <div class="ath-pdf-folha-texto ath-pdf-text-layer" data-texto-pag="${numPag}"></div>
           ` : art.pdfBlobUrl && numPag === 1 ? `
             <embed src="${art.pdfBlobUrl}" type="application/pdf" class="ath-pdf-embed-nativo">
@@ -1218,7 +1236,10 @@ export class EstudoArtigosView {
       `;
 
       stack.appendChild(folhaWrap);
-      if (pdfInfo) folhasReais.push(folhaWrap.querySelector('.ath-pdf-folha-container'));
+      if (pdfInfo) {
+        folhasReais.push(folhaWrap.querySelector('.ath-pdf-folha-container'));
+        this.renderizarGrifosRetangularesDaPagina(folhaWrap.querySelector(`[data-grifos-pag="${numPag}"]`), art, numPag);
+      }
 
       // Renderiza as notas adesivas (pins) desta página
       this.renderizarPinsDaPagina(folhaWrap.querySelector(`[data-pins-pag="${numPag}"]`), art, numPag, root);
@@ -1339,11 +1360,27 @@ export class EstudoArtigosView {
         camada.style.setProperty('--scale-factor', String(escala));
         camada.style.setProperty('--total-scale-factor', String(escala));
         const lib = await carregarPdfJs();
+        const textContent = await page.getTextContent();
         await new lib.TextLayer({
-          textContentSource: page.streamTextContent(),
+          textContentSource: textContent,
           container: camada,
           viewport
         }).render();
+
+        // Detecta número editorial real da página (ex.: p. 253 em vez de apenas p. 17 do PDF)
+        const itensTxt = (textContent.items || [])
+          .map(it => String(it.str || '').trim())
+          .filter(Boolean);
+        const candidatos = [...itensTxt.slice(0, 6), ...itensTxt.slice(-6)];
+        for (const cand of candidatos) {
+          if (/^\d{1,5}$/.test(cand)) {
+            const numEditorial = parseInt(cand, 10);
+            if (numEditorial > 0 && numEditorial !== numPag) {
+              folha.dataset.pagEditorial = String(numEditorial);
+            }
+            break;
+          }
+        }
       }
     } catch (err) {
       console.warn('Athenes — falha ao desenhar página do PDF:', err);
@@ -1676,6 +1713,22 @@ export class EstudoArtigosView {
     });
   }
 
+  renderizarGrifosRetangularesDaPagina(layerEl, art, numPag) {
+    if (!layerEl) return;
+    layerEl.innerHTML = '';
+    const grifos = art.fichamento?.grifosPorPagina?.[numPag] || [];
+    grifos.forEach(g => {
+      const div = document.createElement('div');
+      div.className = 'ath-pdf-hl-rect';
+      div.style.left = `${g.xPct}%`;
+      div.style.top = `${g.yPct}%`;
+      div.style.width = `${g.wPct}%`;
+      div.style.height = `${g.hPct}%`;
+      div.style.background = g.cor || 'rgba(250, 204, 21, 0.45)';
+      layerEl.appendChild(div);
+    });
+  }
+
   /* ==========================================================================
      SELEÇÃO DE TEXTO INTERATIVA (GRIFAR TRECHO, CITAR NO ZOTERO, CRIAR NOTA)
      ========================================================================== */
@@ -1685,15 +1738,20 @@ export class EstudoArtigosView {
     if (!palco || !popSel) return;
 
     popSel.hidden = true;
-    let ultimaSelecao = null; // { texto, numPag, range }
+    let ultimaSelecao = null; // { texto, numPag, range, folhaTextoEl }
 
     const verificarSelecaoTexto = () => {
+      // Não exibe pílula flutuante se houver modal aberto na tela
+      if (document.querySelector('.ath-modal-backdrop')) {
+        popSel.hidden = true;
+        return;
+      }
       const sel = typeof window !== 'undefined' && window.getSelection ? window.getSelection() : null;
       if (!sel || sel.isCollapsed || !sel.rangeCount) {
         popSel.hidden = true;
         return;
       }
-      const texto = sel.toString().trim();
+      const texto = sel.toString().replace(/\s+/g, ' ').trim();
       if (texto.length < 2) {
         popSel.hidden = true;
         return;
@@ -1710,16 +1768,19 @@ export class EstudoArtigosView {
       }
 
       const numPag = parseInt(folhaTextoEl.dataset.textoPag, 10) || 1;
+      const folhaContainer = folhaTextoEl.closest('.ath-pdf-folha-container');
+      const pagCitacao = folhaContainer?.dataset?.pagEditorial || String(numPag);
       this.definirPaginaAtivaSilencioso(numPag, root);
       ultimaSelecao = {
         texto,
         numPag,
+        pagCitacao,
         range: range.cloneRange(),
         folhaTextoEl
       };
 
       const rectSel = range.getBoundingClientRect();
-      const top = Math.max(12, rectSel.top - 50);
+      const top = Math.max(12, rectSel.top - 48);
       const left = Math.max(180, Math.min(window.innerWidth - 180, rectSel.left + (rectSel.width / 2)));
 
       popSel.style.top = `${Math.round(top)}px`;
@@ -1736,27 +1797,49 @@ export class EstudoArtigosView {
       }
     });
 
-    // 1. Grifar Trecho no Texto (<mark>)
+    // 1. Grifar Trecho no Texto (funciona tanto em PDF real multi-span quanto em folha textual)
     popSel.querySelector('#athSelBtnGrifar').addEventListener('click', (e) => {
       e.stopPropagation();
       if (!ultimaSelecao) return;
-      try {
-        const mark = document.createElement('mark');
-        mark.className = 'ath-pdf-grifo-texto';
-        mark.style.backgroundColor = this.corTinta === '#314F79' ? '#FEF08A' : `${this.corTinta}44`;
-        ultimaSelecao.range.surroundContents(mark);
-        const colEl = ultimaSelecao.folhaTextoEl.querySelector(`[data-colunas-pag="${ultimaSelecao.numPag}"]`);
-        if (colEl && paginasPdf[ultimaSelecao.numPag - 1]) {
-          paginasPdf[ultimaSelecao.numPag - 1].htmlGrifado = colEl.innerHTML;
-          salvarArtigosEstudo(this.artigos);
+      const { numPag, range, folhaTextoEl } = ultimaSelecao;
+      const folhaContainer = folhaTextoEl.closest('.ath-pdf-folha-container');
+      const ehPdfReal = folhaTextoEl.classList.contains('ath-pdf-text-layer');
+      const corGrifo = this.corTinta === '#314F79' ? 'rgba(250, 204, 21, 0.45)' : `${this.corTinta}55`;
+
+      if (ehPdfReal && folhaContainer) {
+        const rectFolha = folhaContainer.getBoundingClientRect();
+        const rects = Array.from(range.getClientRects()).filter(r => r.width > 1 && r.height > 1);
+        if (!art.fichamento.grifosPorPagina) art.fichamento.grifosPorPagina = {};
+        if (!Array.isArray(art.fichamento.grifosPorPagina[numPag])) {
+          art.fichamento.grifosPorPagina[numPag] = [];
         }
-      } catch (_) {
-        // Caso a seleção cruze múltiplos parágrafos, registra também como destaque nas citações
-        this.abrirModalCitacaoPdf(art, {
-          pagina: ultimaSelecao.numPag,
-          texto: ultimaSelecao.texto,
-          comentario: 'Trecho grifado na leitura'
+        rects.forEach(r => {
+          art.fichamento.grifosPorPagina[numPag].push({
+            xPct: Number((((r.left - rectFolha.left) / rectFolha.width) * 100).toFixed(2)),
+            yPct: Number((((r.top - rectFolha.top) / rectFolha.height) * 100).toFixed(2)),
+            wPct: Number(((r.width / rectFolha.width) * 100).toFixed(2)),
+            hPct: Number(((r.height / rectFolha.height) * 100).toFixed(2)),
+            cor: corGrifo
+          });
         });
+        this.renderizarGrifosRetangularesDaPagina(
+          folhaContainer.querySelector(`[data-grifos-pag="${numPag}"]`),
+          art,
+          numPag
+        );
+        salvarArtigosEstudo(this.artigos);
+      } else {
+        try {
+          const mark = document.createElement('mark');
+          mark.className = 'ath-pdf-grifo-texto';
+          mark.style.backgroundColor = corGrifo;
+          range.surroundContents(mark);
+          const colEl = folhaTextoEl.querySelector(`[data-colunas-pag="${numPag}"]`);
+          if (colEl && paginasPdf[numPag - 1]) {
+            paginasPdf[numPag - 1].htmlGrifado = colEl.innerHTML;
+            salvarArtigosEstudo(this.artigos);
+          }
+        } catch (_) {}
       }
       window.getSelection()?.removeAllRanges();
       popSel.hidden = true;
@@ -1766,10 +1849,10 @@ export class EstudoArtigosView {
     popSel.querySelector('#athSelBtnCitar').addEventListener('click', (e) => {
       e.stopPropagation();
       if (!ultimaSelecao) return;
-      const { texto, numPag } = ultimaSelecao;
+      const { texto, numPag, pagCitacao } = ultimaSelecao;
       popSel.hidden = true;
       window.getSelection()?.removeAllRanges();
-      this.abrirModalCitacaoPdf(art, { pagina: numPag, texto });
+      this.abrirModalCitacaoPdf(art, { pagina: numPag, paginaCitacao: pagCitacao, texto });
     });
 
     // 3. Criar Nota Adesiva na página com o trecho selecionado
@@ -1786,7 +1869,7 @@ export class EstudoArtigosView {
     popSel.querySelector('#athSelBtnCopiarAbnt').addEventListener('click', (e) => {
       e.stopPropagation();
       if (!ultimaSelecao) return;
-      const formatada = `"${ultimaSelecao.texto}" ${formatarCitacaoAbntDoArtigo(art, ultimaSelecao.numPag)}`;
+      const formatada = `"${ultimaSelecao.texto}" ${formatarCitacaoAbntDoArtigo(art, ultimaSelecao.pagCitacao || ultimaSelecao.numPag)}`;
       navigator.clipboard?.writeText(formatada);
       const btn = popSel.querySelector('#athSelBtnCopiarAbnt span');
       if (btn) {
@@ -1803,8 +1886,14 @@ export class EstudoArtigosView {
      MODAL ELEGANTE PARA CRIAR OU EDITAR CITAÇÃO DO PDF (SEM WINDOW.PROMPT)
      ========================================================================== */
   abrirModalCitacaoPdf(art, dadosIniciais = {}) {
+    // Esconde imediatamente o popover de seleção de texto para nunca sobrepor o modal
+    const popSelAtivo = document.querySelector('#athPdfSelecaoPopover');
+    if (popSelAtivo) popSelAtivo.hidden = true;
+
     const editandoId = dadosIniciais.id || null;
-    const paginaInicial = dadosIniciais.pagina || this.paginaAtual || 1;
+    const paginaPdfInicial = dadosIniciais.pagina || this.paginaAtual || 1;
+    const folhaAtivaEl = this.container?.querySelector(`.ath-pdf-folha-container[data-num-pagina="${paginaPdfInicial}"]`);
+    const paginaCitacaoInicial = dadosIniciais.paginaCitacao || folhaAtivaEl?.dataset?.pagEditorial || String(paginaPdfInicial);
     const textoInicial = dadosIniciais.texto || '';
     const comentarioInicial = dadosIniciais.comentario || '';
     const corInicial = dadosIniciais.cor || this.corTinta || '#314F79';
@@ -1812,7 +1901,7 @@ export class EstudoArtigosView {
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
     modal.innerHTML = `
-      <div class="ath-modal" style="max-width:520px;">
+      <div class="ath-modal" style="max-width:540px;">
         <div class="ath-modal-head">
           <h2>${editandoId ? 'Editar Citação do Fichamento' : 'Guardar Citação Direta no Zotero'}</h2>
           <button type="button" class="ath-btn ath-btn-icon" id="athModalCitFechar">${svgIcone('fechar', 16)}</button>
@@ -1820,12 +1909,12 @@ export class EstudoArtigosView {
         <div class="ath-modal-corpo">
           <div class="ath-linha2">
             <div class="ath-prop-grupo">
-              <label>Página do PDF</label>
-              <input type="number" min="1" class="ath-input" id="athModalCitPagina" value="${escapeHtml(paginaInicial)}">
+              <label>Página da Citação (p. no Artigo / Revista)</label>
+              <input type="text" class="ath-input" id="athModalCitPagina" value="${escapeHtml(paginaCitacaoInicial)}" placeholder="Ex.: 253 ou 17">
             </div>
             <div class="ath-prop-grupo">
               <label>Referência Gerada (ABNT)</label>
-              <input type="text" class="ath-input" id="athModalCitPreviewAbnt" value="${escapeHtml(formatarCitacaoAbntDoArtigo(art, paginaInicial))}" readonly style="background:#F8FAFC; font-weight:700; color:#314F79;">
+              <input type="text" class="ath-input" id="athModalCitPreviewAbnt" value="${escapeHtml(formatarCitacaoAbntDoArtigo(art, paginaCitacaoInicial))}" readonly style="background:#F8FAFC; font-weight:700; color:#314F79;">
             </div>
           </div>
 
@@ -1857,13 +1946,13 @@ export class EstudoArtigosView {
     const inputPag = modal.querySelector('#athModalCitPagina');
     const previewAbnt = modal.querySelector('#athModalCitPreviewAbnt');
     inputPag.addEventListener('input', () => {
-      previewAbnt.value = formatarCitacaoAbntDoArtigo(art, parseInt(inputPag.value, 10) || 1);
+      previewAbnt.value = formatarCitacaoAbntDoArtigo(art, inputPag.value.trim() || paginaPdfInicial);
     });
 
     modal.querySelector('#athModalCitSalvar').addEventListener('click', () => {
       const txt = modal.querySelector('#athModalCitTexto').value.trim();
       if (!txt) return;
-      const pag = parseInt(inputPag.value, 10) || 1;
+      const pagCit = inputPag.value.trim() || String(paginaPdfInicial);
       const com = modal.querySelector('#athModalCitComentario').value.trim();
 
       if (!Array.isArray(art.fichamento.citacoesMarcadas)) {
@@ -1873,14 +1962,16 @@ export class EstudoArtigosView {
       if (editandoId) {
         const alvo = art.fichamento.citacoesMarcadas.find(x => x.id === editandoId);
         if (alvo) {
-          alvo.pagina = pag;
+          alvo.pagina = paginaPdfInicial;
+          alvo.paginaCitacao = pagCit;
           alvo.texto = txt;
           alvo.comentario = com;
         }
       } else {
         art.fichamento.citacoesMarcadas.unshift({
           id: 'cit_' + Date.now().toString(36),
-          pagina: pag,
+          pagina: paginaPdfInicial,
+          paginaCitacao: pagCit,
           texto: txt,
           comentario: com,
           cor: corInicial,
@@ -1891,15 +1982,24 @@ export class EstudoArtigosView {
       salvarArtigosEstudo(this.artigos);
       this.abaDireita = 'citacoes';
       fechar();
-      if (this.container) {
-        const abasDir = this.container.querySelectorAll('[data-aba-dir]');
-        abasDir.forEach(b => b.classList.toggle('ativo', b.dataset.abaDir === 'citacoes'));
-        this.renderizarPainelDireitoEstudio(this.container.querySelector('#athEstudioPainelCorpo'), art);
-        this.renderizarColunaEsquerdaEstudio(this.container.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
-      } else {
-        this.renderizar();
+      this.atualizarAbaCitacoesEContadores(art);
+    });
+  }
+
+  atualizarAbaCitacoesEContadores(art) {
+    if (!this.container) {
+      this.renderizar();
+      return;
+    }
+    const qtdCit = art.fichamento?.citacoesMarcadas?.length || 0;
+    this.container.querySelectorAll('.ath-estudio-aba').forEach(btn => {
+      btn.classList.toggle('on', btn.dataset.aba === this.abaDireita);
+      if (btn.dataset.aba === 'citacoes') {
+        btn.textContent = `Citações (${qtdCit})`;
       }
     });
+    this.renderizarPainelDireitoEstudio(this.container.querySelector('#athEstudioPainelCorpo'), art);
+    this.renderizarColunaEsquerdaEstudio(this.container.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
   }
 
   adicionarFolhaExtraNoPdf(art, paginasPdf) {
@@ -2583,7 +2683,9 @@ export class EstudoArtigosView {
             ` : citacoes.map(c => `
               <div class="ath-citacao-pdf-card" style="border-left: 4px solid ${escapeHtml(c.cor || '#314F79')};">
                 <div class="ath-citacao-pdf-topo">
-                  <span class="ath-citacao-pag-badge" data-ir-pag="${escapeHtml(c.pagina)}" title="Rolar até a página ${escapeHtml(c.pagina)}">Página ${escapeHtml(c.pagina)}</span>
+                  <span class="ath-citacao-pag-badge" data-ir-pag="${escapeHtml(c.pagina)}" title="Rolar até a página ${escapeHtml(c.pagina)} do PDF">
+                    Pág. PDF ${escapeHtml(c.pagina)}${c.paginaCitacao && String(c.paginaCitacao) !== String(c.pagina) ? ` · p. ${escapeHtml(c.paginaCitacao)}` : ''}
+                  </span>
                   <div style="display:flex; gap:4px;">
                     <button type="button" class="ath-btn ath-btn-sm" data-edit-cit="${escapeHtml(c.id)}" title="Editar esta citação" style="height:22px; padding:0 7px; font-size:10.5px;">✎ Editar</button>
                     <button type="button" class="ath-btn ath-btn-sm" data-copiar-cit="${escapeHtml(c.id)}" style="height:22px; padding:0 7px; font-size:10.5px;">Copiar ABNT</button>
@@ -2591,7 +2693,7 @@ export class EstudoArtigosView {
                   </div>
                 </div>
                 <blockquote class="ath-citacao-pdf-texto">"${escapeHtml(c.texto)}"</blockquote>
-                <div class="ath-citacao-pdf-ref">${escapeHtml(formatarCitacaoAbntDoArtigo(art, c.pagina))}</div>
+                <div class="ath-citacao-pdf-ref">${escapeHtml(formatarCitacaoAbntDoArtigo(art, c.paginaCitacao || c.pagina))}</div>
                 ${c.comentario ? `<div class="ath-citacao-pdf-nota">💡 ${escapeHtml(c.comentario)}</div>` : ''}
               </div>
             `).join('')}
@@ -2621,7 +2723,7 @@ export class EstudoArtigosView {
         btn.addEventListener('click', () => {
           const c = citacoes.find(x => x.id === btn.dataset.copiarCit);
           if (!c) return;
-          const formatada = `"${c.texto}" ${formatarCitacaoAbntDoArtigo(art, c.pagina)}`;
+          const formatada = `"${c.texto}" ${formatarCitacaoAbntDoArtigo(art, c.paginaCitacao || c.pagina)}`;
           navigator.clipboard?.writeText(formatada);
           btn.textContent = 'Copiado ✓';
           setTimeout(() => { btn.textContent = 'Copiar ABNT'; }, 1400);
@@ -2632,7 +2734,7 @@ export class EstudoArtigosView {
         btn.addEventListener('click', () => {
           f.citacoesMarcadas = citacoes.filter(x => x.id !== btn.dataset.delCit);
           salvarArtigosEstudo(this.artigos);
-          this.renderizar();
+          this.atualizarAbaCitacoesEContadores(art);
         });
       });
       return;

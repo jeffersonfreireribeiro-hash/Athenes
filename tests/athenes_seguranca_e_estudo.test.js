@@ -133,3 +133,15 @@ test('Estúdio de Artigos renderiza todas as páginas em rolagem contínua, supo
   assert.equal(diag.x, 250);
   assert.equal(diag.y, 240);
 });
+
+test('DashboardView possui sincronização com Supabase e backup de espaço para multi-PC', () => {
+  const codigoDash = fs.readFileSync(path.resolve('src/ui/athenes_dashboard.js'), 'utf8');
+
+  assert.equal(codigoDash.includes('athBtnSincronizarNuvem'), true);
+  assert.equal(codigoDash.includes('athBtnBackupEspaco'), true);
+  assert.equal(codigoDash.includes('sincronizarComSupabase'), true);
+  assert.equal(codigoDash.includes('exportarBackupEspaco'), true);
+  assert.equal(codigoDash.includes('restaurarBackupEspaco'), true);
+  assert.equal(codigoDash.includes('listarDocumentosDoSupabase'), true);
+  assert.equal(codigoDash.includes('carregarDocumentoDoSupabase'), true);
+});

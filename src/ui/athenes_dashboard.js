@@ -13,7 +13,9 @@ import {
   salvarPerfilColaborador,
   CORES_COLABORADORES,
   obterConfigGoogleDrive,
-  salvarConfigGoogleDrive
+  salvarConfigGoogleDrive,
+  listarDocumentosDoSupabase,
+  carregarDocumentoDoSupabase
 } from '../core/athenes_colaboracao.js';
 import { EstudoArtigosView } from './athenes_estudo_artigos.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
@@ -32,6 +34,9 @@ export class DashboardView {
 
     this.carregarDocumentosLocais();
     this.renderizar();
+    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+      setTimeout(() => this.sincronizarComSupabase(true), 1200);
+    }
   }
 
   carregarDocumentosLocais() {
@@ -143,9 +148,15 @@ export class DashboardView {
             <h1>Meus Documentos e Artigos</h1>
             <p>Ambiente de escrita e diagramação acadêmica em blocos com revisão estilo Google Docs e sincronia em tempo real.</p>
           </div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <button type="button" class="ath-btn" id="athBtnSincronizarNuvem" title="Sincronizar e baixar documentos salvos na nuvem Supabase" style="font-weight:700;">
+              ${svgIcone('nuvem', 14)} Sincronizar Nuvem
+            </button>
+            <button type="button" class="ath-btn" id="athBtnBackupEspaco" title="Exportar ou restaurar backup completo do seu perfil, artigos e documentos para Google Drive">
+              ${svgIcone('config', 14)} Backup / Drive
+            </button>
             <label class="ath-btn" style="cursor:pointer;" title="Importar arquivo .athenes ou .json">
-              ${svgIcone('mais', 14)} Importar JSON / Drive
+              ${svgIcone('mais', 14)} Importar JSON
               <input type="file" accept=".json,.athenes" id="athInputImportarJson" style="display:none;">
             </label>
             <button type="button" class="ath-btn ath-btn-primary" id="athBtnNovoDocModal">
@@ -210,6 +221,14 @@ export class DashboardView {
 
     const inputImportar = root.querySelector('#athInputImportarJson');
     inputImportar.addEventListener('change', e => this.importarDocumentoJson(e.target.files[0]));
+
+    root.querySelector('#athBtnSincronizarNuvem')?.addEventListener('click', () => {
+      this.sincronizarComSupabase(false);
+    });
+
+    root.querySelector('#athBtnBackupEspaco')?.addEventListener('click', () => {
+      this.abrirModalBackupEspaco();
+    });
 
     this.container.appendChild(root);
 
@@ -399,6 +418,7 @@ export class DashboardView {
         <div class="ath-doc-card-header">
           <span class="ath-badge ath-badge-primary">${doc.tipoDoc?.toUpperCase() || 'DOCUMENTO'}</span>
           <span class="ath-badge ${st.classe}">${st.rotulo}</span>
+          ${doc.salvoNuvem ? `<span class="ath-badge" style="background:#EEF4FA; color:#314F79; font-weight:700; border:1px solid #C8D7E6; display:inline-flex; align-items:center; gap:4px;">${svgIcone('nuvem_ok', 11)} NUVEM</span>` : ''}
         </div>
 
         <h3 class="ath-doc-card-titulo">${doc.titulo}</h3>
@@ -413,7 +433,7 @@ export class DashboardView {
         </div>
       `;
 
-      card.addEventListener('click', (ev) => {
+      card.addEventListener('click', async (ev) => {
         if (ev.target.closest('.ath-btn-excluir')) {
           ev.stopPropagation();
           this.documentos = this.documentos.filter(d => d.id !== doc.id);
@@ -421,7 +441,28 @@ export class DashboardView {
           this.atualizarGrid();
           return;
         }
-        this.onAbrirDocumento(doc);
+
+        let docParaAbrir = doc;
+        if (doc.precisaCarregarConteudo) {
+          const btnAbrir = card.querySelector('.ath-btn-abrir');
+          if (btnAbrir) btnAbrir.textContent = 'Baixando...';
+          try {
+            const remoto = await carregarDocumentoDoSupabase(doc.id);
+            if (remoto) {
+              docParaAbrir = remoto;
+              docParaAbrir.salvoNuvem = true;
+              docParaAbrir.precisaCarregarConteudo = false;
+              const idx = this.documentos.findIndex(d => String(d.id) === String(doc.id));
+              if (idx >= 0) this.documentos[idx] = docParaAbrir;
+              this.salvarDocumentosLocais();
+            }
+          } catch (e) {
+            alert(`Falha ao abrir documento da nuvem: ${e.message}`);
+            if (btnAbrir) btnAbrir.textContent = 'Abrir';
+            return;
+          }
+        }
+        this.onAbrirDocumento(docParaAbrir);
       });
 
       gridEl.appendChild(card);
@@ -511,6 +552,213 @@ export class DashboardView {
         }
       } catch (err) {
         alert(`Erro ao ler arquivo JSON: ${err.message}`);
+      }
+    };
+    reader.readAsText(arquivo);
+  }
+
+  async sincronizarComSupabase(silencioso = false) {
+    const btn = this.container?.querySelector('#athBtnSincronizarNuvem');
+    if (btn && !silencioso) {
+      btn.innerHTML = `${svgIcone('nuvem', 14)} Sincronizando...`;
+      btn.disabled = true;
+    }
+    try {
+      const listaNuvem = await listarDocumentosDoSupabase();
+      if (!Array.isArray(listaNuvem) || listaNuvem.length === 0) {
+        if (!silencioso) alert('Nenhum documento encontrado na sua nuvem Supabase.');
+        return;
+      }
+
+      let novos = 0;
+      for (const item of listaNuvem) {
+        const existente = this.documentos.find(d => String(d.id) === String(item.id));
+        if (!existente) {
+          this.documentos.unshift({
+            id: item.id,
+            titulo: item.titulo || 'Documento da Nuvem',
+            subtitulo: `Sincronizado do Supabase · ${item.atualizado_por || 'Autor'}`,
+            tipoDoc: 'artigo',
+            perfilId: item.norma || 'abnt',
+            dataModificacao: item.atualizado_em,
+            salvoNuvem: true,
+            precisaCarregarConteudo: true
+          });
+          novos++;
+        } else {
+          existente.salvoNuvem = true;
+          if (item.atualizado_em && (!existente.dataModificacao || new Date(item.atualizado_em) > new Date(existente.dataModificacao))) {
+            existente.precisaCarregarConteudo = true;
+            existente.dataModificacao = item.atualizado_em;
+            novos++;
+          }
+        }
+      }
+
+      if (novos > 0) {
+        this.salvarDocumentosLocais();
+        this.atualizarGrid();
+      }
+      if (!silencioso) {
+        alert(novos > 0 
+          ? `${novos} documento(s) da nuvem atualizados com sucesso!` 
+          : 'Seus documentos já estão atualizados com a nuvem.');
+      }
+    } catch (err) {
+      if (!silencioso) alert(`Não foi possível sincronizar com a nuvem: ${err.message}`);
+    } finally {
+      if (btn && !silencioso) {
+        btn.innerHTML = `${svgIcone('nuvem', 14)} Sincronizar Nuvem`;
+        btn.disabled = false;
+      }
+    }
+  }
+
+  abrirModalBackupEspaco() {
+    const modal = document.createElement('div');
+    modal.className = 'ath-modal-backdrop';
+
+    modal.innerHTML = `
+      <div class="ath-modal" style="max-width:540px;">
+        <div class="ath-modal-head">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:var(--ath-primary, #314F79);">${svgIcone('nuvem_ok', 20)}</span>
+            <h2>Sincronização & Backup Multi-PC</h2>
+          </div>
+          <button type="button" class="ath-btn ath-btn-icon" id="athModalBackupFechar">${svgIcone('fechar', 16)}</button>
+        </div>
+        <div class="ath-modal-corpo" style="display:flex; flex-direction:column; gap:16px;">
+          <div style="padding:12px 14px; background:#EEF4FA; border:1px solid #C8D7E6; border-radius:10px; font-size:12.5px; line-height:1.55; color:#1E293B;">
+            <strong>Como acessar seus documentos e PDFs em outro computador:</strong>
+            <ul style="margin:8px 0 0 18px; padding:0;">
+              <li><strong>Nuvem Supabase:</strong> Seus documentos de texto salvos na nuvem aparecem automaticamente ao clicar em <em>Sincronizar Nuvem</em>.</li>
+              <li><strong>Google Drive no Computador:</strong> Mantenha uma pasta sincronizada pelo app Google Drive Desktop com seus arquivos e PDFs de referência para acesso instantâneo em qualquer PC.</li>
+            </ul>
+          </div>
+
+          <div style="border:1px solid #E2E8F0; border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:8px;">
+            <strong style="font-size:13px; color:#0F172A;">1. Baixar Backup Completo do Espaço</strong>
+            <p style="font-size:12px; color:#64748B; margin:0;">Exporta todos os seus documentos de texto, fichamentos Zotero, citações e configurações para um arquivo <code>.athenes-workspace</code>.</p>
+            <div style="margin-top:4px;">
+              <button type="button" class="ath-btn ath-btn-primary" id="athBtnBaixarBackupWorkspace" style="font-size:12.5px; height:32px;">
+                ${svgIcone('salvar', 14)} Baixar Arquivo de Backup (.athenes-workspace)
+              </button>
+            </div>
+          </div>
+
+          <div style="border:1px solid #E2E8F0; border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:8px;">
+            <strong style="font-size:13px; color:#0F172A;">2. Restaurar Backup do Google Drive / Arquivo</strong>
+            <p style="font-size:12px; color:#64748B; margin:0;">Carrega o arquivo de backup para restaurar todos os documentos e fichamentos instantaneamente neste computador.</p>
+            <div style="margin-top:4px;">
+              <label class="ath-btn" style="cursor:pointer; font-size:12.5px; height:32px; display:inline-flex; align-items:center; gap:6px;">
+                ${svgIcone('mais', 14)} Escolher Arquivo .athenes-workspace...
+                <input type="file" accept=".athenes-workspace,.json" id="athInputRestaurarBackup" style="display:none;">
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="ath-modal-rodape">
+          <button type="button" class="ath-btn" id="athModalBackupCancelar">Fechar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const fechar = () => modal.remove();
+    modal.querySelector('#athModalBackupFechar').addEventListener('click', fechar);
+    modal.querySelector('#athModalBackupCancelar').addEventListener('click', fechar);
+    modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+
+    modal.querySelector('#athBtnBaixarBackupWorkspace').addEventListener('click', () => {
+      this.exportarBackupEspaco();
+    });
+
+    modal.querySelector('#athInputRestaurarBackup').addEventListener('change', e => {
+      const arq = e.target.files[0];
+      if (arq) {
+        this.restaurarBackupEspaco(arq, () => fechar());
+      }
+    });
+  }
+
+  exportarBackupEspaco() {
+    let artigosEstudo = [];
+    let zoteroCfg = {};
+    let perfil = {};
+    try {
+      artigosEstudo = JSON.parse(localStorage.getItem('athenes_artigos_estudo') || '[]');
+      zoteroCfg = JSON.parse(localStorage.getItem('athenes_zotero_cfg') || '{}');
+      perfil = JSON.parse(localStorage.getItem('athenes_perfil_colaborador') || '{}');
+    } catch (_) {}
+
+    const dados = {
+      tipo: 'athenes_workspace_backup',
+      versao: '1.0',
+      dataExportacao: new Date().toISOString(),
+      perfil,
+      zoteroCfg,
+      documentos: this.documentos,
+      artigosEstudo
+    };
+
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const nomeLimpo = (perfil.nome || 'usuario').toLowerCase().replace(/\s+/g, '_');
+    a.download = `athenes_backup_${nomeLimpo}_${new Date().toISOString().slice(0, 10)}.athenes-workspace`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  restaurarBackupEspaco(arquivo, callbackSucesso) {
+    if (!arquivo) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const dados = JSON.parse(ev.target.result);
+        if (Array.isArray(dados.documentos)) {
+          for (const doc of dados.documentos) {
+            const idx = this.documentos.findIndex(d => String(d.id) === String(doc.id));
+            if (idx >= 0) {
+              this.documentos[idx] = doc;
+            } else {
+              this.documentos.push(doc);
+            }
+          }
+          this.salvarDocumentosLocais();
+        }
+
+        if (Array.isArray(dados.artigosEstudo)) {
+          try {
+            const atuais = JSON.parse(localStorage.getItem('athenes_artigos_estudo') || '[]');
+            for (const art of dados.artigosEstudo) {
+              const idx = atuais.findIndex(a => String(a.id) === String(art.id));
+              if (idx >= 0) atuais[idx] = art;
+              else atuais.push(art);
+            }
+            localStorage.setItem('athenes_artigos_estudo', JSON.stringify(atuais));
+          } catch (_) {}
+        }
+
+        if (dados.zoteroCfg && Object.keys(dados.zoteroCfg).length > 0) {
+          try {
+            localStorage.setItem('athenes_zotero_cfg', JSON.stringify(dados.zoteroCfg));
+          } catch (_) {}
+        }
+
+        if (dados.perfil && Object.keys(dados.perfil).length > 0) {
+          try {
+            localStorage.setItem('athenes_perfil_colaborador', JSON.stringify(dados.perfil));
+          } catch (_) {}
+        }
+
+        alert('Backup restaurado com sucesso! Seus documentos e fichamentos foram sincronizados.');
+        if (callbackSucesso) callbackSucesso();
+        this.renderizar();
+      } catch (err) {
+        alert(`Erro ao restaurar backup: ${err.message}`);
       }
     };
     reader.readAsText(arquivo);
