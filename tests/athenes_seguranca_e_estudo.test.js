@@ -100,6 +100,8 @@ test('Estúdio de Artigos Zotero & PDF usa estrutura Full-Screen de 3 colunas id
   assert.equal(codigoEstudo.includes('athEstudioColDir'), true);
   assert.equal(codigoEstudo.includes('rm-barra-blocos'), true);
   assert.equal(cssDash.includes('.ath-dashboard.ath-dashboard-estudio-full'), true);
+  assert.equal(cssDash.includes('.ath-dashboard.ath-dashboard-estudio-full .ath-dash-sidebar'), true);
+  assert.equal(cssDash.includes('.ath-dashboard.ath-dashboard-estudio-full .ath-dash-pasta-banner'), true);
 });
 
 test('Estúdio de Artigos renderiza todas as páginas em rolagem contínua, suporta linha reta, editor inline sem prompt nativo e popover de seleção de texto', () => {
@@ -120,6 +122,12 @@ test('Estúdio de Artigos renderiza todas as páginas em rolagem contínua, supo
   assert.equal(codigoEstudo.includes('ath-pdf-pin-form'), true);
   assert.equal(codigoEstudo.includes('athPdfSelecaoPopover'), true);
   assert.equal(codigoEstudo.includes('athBtnModoLinhaReta'), true);
+
+  // Zoom fluido com Ctrl + +, Ctrl + -, Ctrl + 0 e wheel sem dicas poluindo a interface
+  assert.equal(codigoEstudo.includes('aplicarZoom'), true);
+  assert.equal(codigoEstudo.includes('_tecladoZoomHandler'), true);
+  assert.equal(codigoEstudo.includes('NumpadAdd'), true);
+  assert.equal(codigoEstudo.includes('NumpadSubtract'), true);
 
   // Teste geométrico do snap ortogonal da Linha Reta
   const horiz = calcularPontoFinalLinhaReta({ x: 100, y: 100 }, { x: 300, y: 104 });

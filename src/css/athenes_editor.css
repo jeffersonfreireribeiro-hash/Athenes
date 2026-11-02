@@ -2306,20 +2306,31 @@ del.ath-sug-del {
 
 .ath-dash-layout {
   display: flex;
-  min-height: calc(100vh - 65px);
+  flex: 1 1 auto;
+  min-height: 0;
+  height: calc(100vh - 84px);
+  max-height: calc(100vh - 84px);
   background: var(--ath-fundo, #F8FAFC);
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .ath-dash-sidebar {
   width: 275px;
   min-width: 275px;
+  height: 100%;
+  max-height: 100%;
   background: #FFFFFF;
   border-right: 1px solid #E2E8F0;
-  padding: 16px 12px;
+  padding: 14px 12px 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   box-sizing: border-box;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .ath-dash-sidebar-head {
@@ -2328,15 +2339,34 @@ del.ath-sug-del {
   justify-content: space-between;
   padding-bottom: 8px;
   border-bottom: 1px solid #F1F5F9;
+  flex-shrink: 0;
 }
 
 .ath-dash-pastas-lista {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 3px;
-  max-height: calc(100vh - 230px);
+  padding-right: 3px;
+}
+
+.ath-dash-pastas-lista::-webkit-scrollbar {
+  width: 5px;
+}
+
+.ath-dash-pastas-lista::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ath-dash-pastas-lista::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 999px;
+}
+
+.ath-dash-pastas-lista::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }
 
 .ath-dash-grupo-titulo {
@@ -2394,15 +2424,21 @@ del.ath-sug-del {
 }
 
 .ath-dash-sidebar-acoes {
+  flex-shrink: 0;
   padding-top: 10px;
+  padding-bottom: 2px;
   border-top: 1px solid #F1F5F9;
+  margin-top: auto;
 }
 
 .ath-dash-main-area {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
-  padding: 24px 32px;
+  height: 100%;
+  max-height: 100%;
+  padding: 20px 24px;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .ath-dash-pasta-banner {
@@ -2420,14 +2456,25 @@ del.ath-sug-del {
 @media (max-width: 860px) {
   .ath-dash-layout {
     flex-direction: column;
+    height: auto;
+    max-height: none;
+    overflow: visible;
   }
   .ath-dash-sidebar {
     width: 100%;
     min-width: 100%;
+    height: auto;
+    max-height: 380px;
     border-right: none;
     border-bottom: 1px solid #E2E8F0;
   }
+  .ath-dash-pastas-lista {
+    max-height: 220px;
+  }
   .ath-dash-main-area {
-    padding: 16px;
+    height: auto;
+    max-height: none;
+    padding: 14px;
+    overflow: visible;
   }
 }

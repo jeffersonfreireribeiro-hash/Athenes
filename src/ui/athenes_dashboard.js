@@ -150,10 +150,6 @@ export class DashboardView {
 
         <!-- Identificação de Quem Está Mexendo / Login -->
         <div class="ath-dash-user-box" style="display:flex; align-items:center; gap:8px;">
-          <a href="/athenes.apk" download="athenes.apk" class="ath-btn ath-btn-sm ath-btn-app-android" id="athBtnBaixarAppAndroid" style="height:32px; font-size:11.5px; display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#047857; background:#ECFDF5; border:1px solid #A7F3D0; text-decoration:none; border-radius:999px; padding:0 12px;" title="Baixar aplicativo Athenes para tablets e smartphones Android (.APK)">
-            ${svgIcone('android', 15)}
-            <span>App Android (.apk)</span>
-          </a>
           ${driveCfg.pastaUrl ? `
             <a href="${driveCfg.pastaUrl}" target="_blank" rel="noopener noreferrer" class="ath-btn ath-btn-sm" style="height:32px; font-size:11.5px; display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#314F79; background:#fff; border:1px solid #C8D7E6;" title="Abrir sua pasta de PDFs e artigos no Google Drive Web">
               ${svgIcone('drive', 14)} Pasta Drive ↗
@@ -456,6 +452,20 @@ export class DashboardView {
             <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnModalSincronizarHub" style="width:100%; height:30px; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:700; background:#FFFFFF; border:1px solid #CBD5E1; margin-top:6px;" title="Cria ou localiza automaticamente a pasta Hub 'Athenes' no Google Drive">
               ${svgIcone('pasta', 13)} Sincronizar / Criar Pasta Hub Athenes no Drive
             </button>
+          </div>
+
+          <!-- Opção discreta para download do App Android (.apk) no perfil -->
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; margin-top:8px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="color:#047857; display:flex;">${svgIcone('android', 16)}</span>
+              <div>
+                <span style="font-size:11.5px; font-weight:700; color:#334155; display:block;">Athenes para Android (.apk)</span>
+                <span style="font-size:10.5px; color:#64748B;">Versão para tablets e smartphones com leitura e fichamento offline</span>
+              </div>
+            </div>
+            <a href="/athenes.apk" download="athenes.apk" class="ath-btn ath-btn-sm" id="athBtnModalDownloadAndroid" style="height:26px; font-size:11px; font-weight:700; color:#047857; background:#ECFDF5; border:1px solid #A7F3D0; text-decoration:none; padding:0 10px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;" title="Baixar pacote de instalação para Android (.apk)">
+              Baixar .APK
+            </a>
           </div>
         </div>
         <div class="ath-modal-foot" style="display:flex; justify-content:space-between; align-items:center;">

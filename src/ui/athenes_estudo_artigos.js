@@ -548,6 +548,10 @@ export class EstudoArtigosView {
     const dashEl = this.container?.closest('.ath-dashboard');
     if (dashEl) {
       dashEl.classList.toggle('ath-dashboard-estudio-full', Boolean(ativo));
+      const sidebar = dashEl.querySelector('#athDashSidebar');
+      const banner = dashEl.querySelector('#athDashPastaBanner');
+      if (sidebar) sidebar.style.display = ativo ? 'none' : '';
+      if (banner) banner.style.display = ativo ? 'none' : '';
     }
     this.onModoFullScreenChange(Boolean(ativo));
   }
@@ -566,6 +570,10 @@ export class EstudoArtigosView {
       this.alternarModoDashboardFull(true);
       this.renderizarEstudioPdfFullScreen(this.artigoAberto, scrollSalvo);
     } else {
+      if (this._tecladoZoomHandler) {
+        window.removeEventListener('keydown', this._tecladoZoomHandler);
+        this._tecladoZoomHandler = null;
+      }
       this.alternarModoDashboardFull(false);
       this.renderizarCatalogoArtigos();
     }
@@ -1115,12 +1123,50 @@ export class EstudoArtigosView {
 
     // Eventos de Topo e Barra Flutuante
     const voltarParaCatalogo = () => {
+      if (this._tecladoZoomHandler) {
+        window.removeEventListener('keydown', this._tecladoZoomHandler);
+        this._tecladoZoomHandler = null;
+      }
       salvarArtigosEstudo(this.artigos);
       this.artigoAberto = null;
       this.renderizar();
     };
     root.querySelector('#athBrandVoltarCatalogo').addEventListener('click', voltarParaCatalogo);
     root.querySelector('#athBtnVoltarCatalogoArtigos').addEventListener('click', voltarParaCatalogo);
+
+    // Atalhos de Zoom silenciosos (Ctrl + +, Ctrl + -, Ctrl + 0)
+    if (this._tecladoZoomHandler) {
+      window.removeEventListener('keydown', this._tecladoZoomHandler);
+      this._tecladoZoomHandler = null;
+    }
+    this._tecladoZoomHandler = (e) => {
+      if (!this.artigoAberto) return;
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') {
+          e.preventDefault();
+          this.aplicarZoom(this.zoomPct + 10, root);
+        } else if (e.key === '-' || e.code === 'NumpadSubtract') {
+          e.preventDefault();
+          this.aplicarZoom(this.zoomPct - 10, root);
+        } else if (e.key === '0' || e.code === 'Numpad0') {
+          e.preventDefault();
+          this.aplicarZoom(100, root);
+        }
+      }
+    };
+    window.addEventListener('keydown', this._tecladoZoomHandler);
+
+    // Suporte a zoom com Ctrl + Roda do Mouse no Palco do PDF
+    const palcoZoomEl = root.querySelector('#athEstudioPalco');
+    if (palcoZoomEl) {
+      palcoZoomEl.addEventListener('wheel', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const delta = e.deltaY < 0 ? 10 : -10;
+          this.aplicarZoom(this.zoomPct + delta, root);
+        }
+      }, { passive: false });
+    }
 
     root.querySelector('#athInputTituloArtigoTopo').addEventListener('change', e => {
       art.titulo = e.target.value.trim() || art.titulo;
@@ -1354,9 +1400,7 @@ export class EstudoArtigosView {
       const folhaWrap = document.createElement('div');
       folhaWrap.className = 'ath-pdf-pagina-bloco-wrap';
       folhaWrap.dataset.wrapPagina = String(numPag);
-      if (escalaZoom !== 1) {
-        folhaWrap.style.minHeight = `${alturaWrapEscalada + 36}px`;
-      }
+      folhaWrap.style.minHeight = `${alturaWrapEscalada + 36}px`;
 
       folhaWrap.innerHTML = `
         <div class="ath-pdf-etiqueta-pagina ${isPagAtiva ? 'ativa' : ''}" data-etiqueta-pag="${numPag}">
@@ -1364,7 +1408,7 @@ export class EstudoArtigosView {
           <span class="ath-pdf-etiqueta-stats" data-stats-pag="${numPag}">${tracosDaPagina.length} risco(s) · ${pinsDaPagina.length} nota(s)</span>
         </div>
 
-        <div class="ath-folha-a4 ath-pdf-folha-container ${pagDados.extra ? 'ath-pdf-folha-extra' : ''} ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" style="${ehPaginaPdfReal ? `width:794px; height:${alturaReal}px; min-height:${alturaReal}px; max-height:${alturaReal}px; padding:0; flex-shrink:0; ` : 'width:794px; height:1123px; min-height:1123px; flex-shrink:0; background:#FFFFFF; '}transform: scale(${escalaZoom}); transform-origin: top center;">
+        <div class="ath-folha-a4 ath-pdf-folha-container ${pagDados.extra ? 'ath-pdf-folha-extra' : ''} ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" data-altura-real="${alturaReal}" style="${ehPaginaPdfReal ? `width:794px; height:${alturaReal}px; min-height:${alturaReal}px; max-height:${alturaReal}px; padding:0; flex-shrink:0; ` : 'width:794px; height:1123px; min-height:1123px; flex-shrink:0; background:#FFFFFF; '}transform: scale(${escalaZoom}); transform-origin: top center;">
           ${ehPaginaPdfReal ? `
             <canvas class="ath-pdf-render-canvas" style="width:794px; height:${alturaReal}px;"></canvas>
             <div class="ath-pdf-grifos-layer" data-grifos-pag="${numPag}"></div>
@@ -2629,7 +2673,7 @@ export class EstudoArtigosView {
               <option value="10" ${this.espessuraTinta === 10 ? 'selected' : ''}>Pincel Largo (10 px)</option>
             </select>
           </label>
-          <label>Escala / Zoom das Folhas PDF (${this.zoomPct}%)
+          <label id="athZoomRotulo">Escala / Zoom das Folhas PDF (${this.zoomPct}%)
             <div style="display:flex; gap:6px;">
               <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athZoomMenos">- 10%</button>
               <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="athZoom100">100%</button>
@@ -2642,16 +2686,13 @@ export class EstudoArtigosView {
         this.espessuraTinta = parseInt(e.target.value, 10) || 3;
       });
       popCaneta.querySelector('#athZoomMenos').addEventListener('click', () => {
-        this.zoomPct = Math.max(70, this.zoomPct - 10);
-        this.renderizar();
+        this.aplicarZoom(this.zoomPct - 10, root);
       });
       popCaneta.querySelector('#athZoom100').addEventListener('click', () => {
-        this.zoomPct = 100;
-        this.renderizar();
+        this.aplicarZoom(100, root);
       });
       popCaneta.querySelector('#athZoomMais').addEventListener('click', () => {
-        this.zoomPct = Math.min(140, this.zoomPct + 10);
-        this.renderizar();
+        this.aplicarZoom(this.zoomPct + 10, root);
       });
     }
 
@@ -2689,6 +2730,31 @@ export class EstudoArtigosView {
       nota: 'Fixar Nota Adesiva Editável'
     };
     return map[tool] || tool;
+  }
+
+  aplicarZoom(novoZoom, root) {
+    const lim = Math.max(50, Math.min(250, Math.round(novoZoom)));
+    this.zoomPct = lim;
+    const escala = this.zoomPct / 100;
+
+    const container = root || this.container;
+    const palco = container?.querySelector('#athEstudioPalco');
+    if (palco) {
+      const wraps = palco.querySelectorAll('.ath-pdf-pagina-bloco-wrap');
+      wraps.forEach(wrap => {
+        const folha = wrap.querySelector('.ath-pdf-folha-container');
+        if (folha) {
+          folha.style.transform = `scale(${escala})`;
+          folha.style.transformOrigin = 'top center';
+          const hOriginal = parseFloat(folha.dataset.alturaReal || folha.style.height) || 1123;
+          wrap.style.minHeight = `${Math.round(hOriginal * escala) + 36}px`;
+        }
+      });
+      const lbl = container.querySelector('#athZoomRotulo');
+      if (lbl) {
+        lbl.textContent = `Escala / Zoom das Folhas PDF (${this.zoomPct}%)`;
+      }
+    }
   }
 
   /* ==========================================================================
