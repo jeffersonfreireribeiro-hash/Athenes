@@ -39,7 +39,6 @@ import {
   buscarSecaoDoBloco,
   removerPrefixoNumeracaoTitulo,
   obterTextoPuroTitulo,
-  rotuloDoBloco,
   obterPrefixoNumeracao,
   obterTituloCompletoComNumeracao
 } from '../core/athenes_documento.js';
