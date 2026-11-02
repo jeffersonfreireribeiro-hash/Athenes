@@ -45,6 +45,7 @@ import {
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
+import { ModalEditorEstilo } from './athenes_editor_estilo_modal.js';
 import {
   MODOS_TRABALHO,
   obterPerfilColaborador,
@@ -2292,23 +2293,33 @@ export class EditorView {
       const hifAtivo = b.hifenizacao !== undefined ? b.hifenizacao : (estilos.find(e => e.id === b.estiloId)?.hifenizacao ?? false);
       btnHifen.className = `ath-btn-rapido ${hifAtivo ? 'ativo' : ''}`;
       btnHifen.title = hifAtivo ? 'Hifenização automática ATIVA (exem-plo) — clique para desativar' : 'Hifenização automática DESATIVADA — clique para ativar';
-      btnHifen.innerHTML = 'a-b';
-      btnHifen.addEventListener('click', () => {
+      btnHifen.innerHTML = '<span style="white-space:nowrap; letter-spacing:0.5px; font-weight:800;">a-b</span>';
+      btnHifen.addEventListener('click', (e) => {
+        e.stopPropagation();
         b.hifenizacao = !hifAtivo;
         this.notificarMudanca();
         this.renderizar();
       });
       barra.appendChild(btnHifen);
 
-      // 3. Botão para abrir o painel lateral focado exclusivamente em EDIÇÃO
+      // 3. Botão para abrir edição de estilo diretamente
       const btnEdit = document.createElement('button');
       btnEdit.type = 'button';
       btnEdit.className = 'ath-btn-rapido';
-      btnEdit.title = 'Editar propriedades deste estilo no painel lateral';
-      btnEdit.innerHTML = `${svgIcone('lapis', 12)} Editar`;
-      btnEdit.addEventListener('click', () => {
+      btnEdit.title = 'Editar propriedades deste estilo';
+      btnEdit.innerHTML = `${svgIcone('lapis', 12)} <span style="font-weight:700; white-space:nowrap;">Editar</span>`;
+      btnEdit.addEventListener('click', (e) => {
+        e.stopPropagation();
         const est = (this.doc.estilos || []).find(e => e.id === b.estiloId) || this.doc.estilos?.[0];
-        if (est) this.onEditarEstilo(est);
+        if (est) {
+          this.selecionarBloco(b, pag);
+          new ModalEditorEstilo(this.doc, est, {
+            onSalvar: () => {
+              this.notificarMudanca();
+              this.renderizar();
+            }
+          });
+        }
       });
       barra.appendChild(btnEdit);
     } else if (ehFigura) {
@@ -2371,14 +2382,21 @@ export class EditorView {
       });
       barra.appendChild(selSubgrade);
 
-      // 4. Botão de edição fina no painel lateral
+      // 4. Botão de edição avançada (Abre ModalLayoutBloco)
       const btnEdit = document.createElement('button');
       btnEdit.type = 'button';
       btnEdit.className = 'ath-btn-rapido';
-      btnEdit.title = 'Editar propriedades avançadas no painel lateral';
-      btnEdit.innerHTML = `${svgIcone('lapis', 12)} Editar`;
-      btnEdit.addEventListener('click', () => {
-        this.onSelecionarBloco(b, pag);
+      btnEdit.title = 'Editar moldura, slots de imagem e apresentação';
+      btnEdit.innerHTML = `${svgIcone('lapis', 12)} <span style="font-weight:700; white-space:nowrap;">Editar</span>`;
+      btnEdit.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.selecionarBloco(b, pag);
+        new ModalLayoutBloco(this.doc, b, {
+          onSalvar: () => {
+            this.notificarMudanca();
+            this.renderizar();
+          }
+        });
       });
       barra.appendChild(btnEdit);
     } else {
@@ -2393,10 +2411,17 @@ export class EditorView {
       const btnEdit = document.createElement('button');
       btnEdit.type = 'button';
       btnEdit.className = 'ath-btn-rapido';
-      btnEdit.title = 'Editar propriedades no painel lateral';
-      btnEdit.innerHTML = `${svgIcone('lapis', 12)} Editar`;
-      btnEdit.addEventListener('click', () => {
-        this.onSelecionarBloco(b, pag);
+      btnEdit.title = 'Editar propriedades e apresentação';
+      btnEdit.innerHTML = `${svgIcone('lapis', 12)} <span style="font-weight:700; white-space:nowrap;">Editar</span>`;
+      btnEdit.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.selecionarBloco(b, pag);
+        new ModalLayoutBloco(this.doc, b, {
+          onSalvar: () => {
+            this.notificarMudanca();
+            this.renderizar();
+          }
+        });
       });
       barra.appendChild(btnEdit);
     }

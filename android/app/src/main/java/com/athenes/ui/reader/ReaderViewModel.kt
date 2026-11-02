@@ -46,10 +46,10 @@ class ReaderViewModel(
     private val _corAtiva = MutableStateFlow("#FDE047")
     val corAtiva: StateFlow<String> = _corAtiva.asStateFlow()
 
-    private val _painelEsquerdoAberto = MutableStateFlow(true)
+    private val _painelEsquerdoAberto = MutableStateFlow(false)
     val painelEsquerdoAberto: StateFlow<Boolean> = _painelEsquerdoAberto.asStateFlow()
 
-    private val _painelDireitoAberto = MutableStateFlow(true)
+    private val _painelDireitoAberto = MutableStateFlow(false)
     val painelDireitoAberto: StateFlow<Boolean> = _painelDireitoAberto.asStateFlow()
 
     private val _abaDireitaAtiva = MutableStateFlow(AbaInspetorDireito.RESUMO_NOTAS)

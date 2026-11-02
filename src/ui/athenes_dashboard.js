@@ -15,7 +15,10 @@ import {
   obterConfigGoogleDrive,
   salvarConfigGoogleDrive,
   listarDocumentosDoSupabase,
-  carregarDocumentoDoSupabase
+  carregarDocumentoDoSupabase,
+  autenticarGoogleDrive,
+  obterInfoUsuarioGoogle,
+  obterOuCriarEstruturaPastasAthenes
 } from '../core/athenes_colaboracao.js';
 import { EstudoArtigosView } from './athenes_estudo_artigos.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
@@ -137,7 +140,9 @@ export class DashboardView {
             </a>
           ` : ''}
           <button type="button" class="ath-dash-user-pill" id="athBtnPerfilLoginDash" title="Clique para identificar quem está usando, trocar perfil ou conectar Google Drive e Zotero">
-            <span class="ath-dash-user-avatar" style="background:${this.perfilUsuario.cor || '#314F79'};">${iniciais}</span>
+            ${this.perfilUsuario.autenticadoGoogle && this.perfilUsuario.foto 
+              ? `<img src="${this.perfilUsuario.foto}" class="ath-dash-user-avatar" style="object-fit:cover; border:1px solid #CBD5E1;" alt="Avatar">`
+              : `<span class="ath-dash-user-avatar" style="background:${this.perfilUsuario.cor || '#314F79'};">${iniciais}</span>`}
             <span class="ath-dash-user-info">
               <strong>${this.perfilUsuario.nome || 'Autor Principal'}</strong>
               <small>${papelTxt} · ${instituicaoTxt}</small>
@@ -267,9 +272,27 @@ export class DashboardView {
           <button type="button" class="ath-btn ath-btn-icon" id="athModalLoginFechar">${svgIcone('fechar', 16)}</button>
         </div>
         <div class="ath-modal-corpo">
-          <p style="font-size:12.5px; color:var(--ath-text-secondary); margin-top:0;">
+          <p style="font-size:12.5px; color:var(--ath-text-secondary); margin-top:0; margin-bottom:12px;">
             Defina quem está editando ou revisando neste dispositivo. Seu nome e cor aparecerão nos cursores em tempo real, nos balões de sugestão e nos fichamentos de PDF.
           </p>
+
+          <!-- Login Oficial com Conta Google / Gmail -->
+          ${p.autenticadoGoogle ? `
+            <div class="ath-google-user-badge" style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-radius:10px; background:#F0FDF4; border:1px solid #BBF7D0; margin-bottom:14px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <img src="${p.foto || 'https://lh3.googleusercontent.com/avatar_exemplo.png'}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; border:1px solid #86EFAC;" alt="Foto">
+                <div>
+                  <strong style="display:block; font-size:12.5px; color:#166534;">${p.nome}</strong>
+                  <span style="font-size:11px; color:#15803D;">${p.email} · Conta Google Conectada</span>
+                </div>
+              </div>
+              <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnModalDesconectarGoogle" style="font-size:11px; padding:2px 8px;">Desconectar</button>
+            </div>
+          ` : `
+            <button type="button" class="glx-btn glx-btn-primary" id="athBtnModalLoginGoogle" style="width:100%; height:38px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:700; margin-bottom:14px; background:#FFFFFF; color:#1F2937; border:1px solid #CBD5E1; box-shadow:0 1px 3px rgba(0,0,0,0.08); font-size:12.5px; border-radius:8px; cursor:pointer;">
+              ${svgIcone('google', 16)} Entrar com a Conta Google (Gmail)
+            </button>
+          `}
 
           <div class="ath-linha2">
             <div class="ath-prop-grupo">
@@ -330,10 +353,9 @@ export class DashboardView {
               <input type="text" class="ath-input" id="athLoginDrivePastaUrl" value="${driveCfg.pastaUrl || ''}" placeholder="Ex.: https://drive.google.com/drive/folders/1ABCxyz... ou ID da pasta" style="height:30px; font-size:11.5px;">
               <small style="font-size:10.5px; color:#64748B; margin-top:2px; display:block;">Cole aqui o link da pasta do Google Drive onde você guarda PDFs e backups. Não depende de letra de unidade (G:, C:) e abre em qualquer PC.</small>
             </div>
-            <div class="ath-prop-grupo" style="margin-bottom:0;">
-              <label style="font-size:11px;">Client ID Google Drive (OAuth - Opcional)</label>
-              <input type="text" class="ath-input" id="athLoginDriveClientId" value="${driveCfg.clientId || ''}" placeholder="Ex.: xxxx.apps.googleusercontent.com" style="height:30px; font-size:11.5px;">
-            </div>
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnModalSincronizarHub" style="width:100%; height:30px; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:700; background:#FFFFFF; border:1px solid #CBD5E1; margin-top:6px;" title="Cria ou localiza automaticamente a pasta Hub 'Athenes' no Google Drive">
+              ${svgIcone('pasta', 13)} Sincronizar / Criar Pasta Hub Athenes no Drive
+            </button>
           </div>
         </div>
         <div class="ath-modal-foot">
@@ -353,6 +375,66 @@ export class DashboardView {
       });
     });
 
+    // Eventos Google no Modal
+    modal.querySelector('#athBtnModalLoginGoogle')?.addEventListener('click', async () => {
+      try {
+        const cfg = obterConfigGoogleDrive();
+        const token = await autenticarGoogleDrive(cfg.clientId);
+        if (token) {
+          const info = await obterInfoUsuarioGoogle(token).catch(() => null);
+          if (info) {
+            p.nome = info.name || p.nome;
+            p.email = info.email || p.email;
+            p.foto = info.picture;
+            p.autenticadoGoogle = true;
+            salvarPerfilColaborador(p);
+
+            modal.querySelector('#athLoginNome').value = p.nome;
+            if (p.email) modal.querySelector('#athLoginEmail').value = p.email;
+          }
+
+          // Cria ou localiza a pasta Athenes no Drive
+          const est = await obterOuCriarEstruturaPastasAthenes(token);
+          if (est?.pastaRaizId) {
+            const urlHub = `https://drive.google.com/drive/folders/${est.pastaRaizId}?usp=drive_link`;
+            const inpPasta = modal.querySelector('#athLoginDrivePastaUrl');
+            if (inpPasta) inpPasta.value = urlHub;
+          }
+
+          fechar();
+          this.abrirModalLogin();
+          this.renderizar();
+        }
+      } catch (err) {
+        alert('Erro ao conectar com Google: ' + err.message);
+      }
+    });
+
+    modal.querySelector('#athBtnModalDesconectarGoogle')?.addEventListener('click', () => {
+      p.autenticadoGoogle = false;
+      delete p.foto;
+      salvarPerfilColaborador(p);
+      fechar();
+      this.abrirModalLogin();
+      this.renderizar();
+    });
+
+    modal.querySelector('#athBtnModalSincronizarHub')?.addEventListener('click', async () => {
+      try {
+        const cfg = obterConfigGoogleDrive();
+        const token = cfg.accessToken || await autenticarGoogleDrive(cfg.clientId);
+        const est = await obterOuCriarEstruturaPastasAthenes(token);
+        if (est?.pastaRaizId) {
+          const urlHub = `https://drive.google.com/drive/folders/${est.pastaRaizId}?usp=drive_link`;
+          const inpPasta = modal.querySelector('#athLoginDrivePastaUrl');
+          if (inpPasta) inpPasta.value = urlHub;
+          alert('Pasta Hub Athenes pronta e vinculada com sucesso no Google Drive!');
+        }
+      } catch (err) {
+        alert('Erro ao sincronizar pasta Hub: ' + err.message);
+      }
+    });
+
     const fechar = () => modal.remove();
     modal.querySelector('#athModalLoginFechar').addEventListener('click', fechar);
     modal.querySelector('#athBtnCancelarLogin').addEventListener('click', fechar);
@@ -369,11 +451,9 @@ export class DashboardView {
       };
       salvarPerfilColaborador(novoPerfil);
 
-      const clientIdDrive = modal.querySelector('#athLoginDriveClientId').value.trim();
       const pastaUrlDrive = modal.querySelector('#athLoginDrivePastaUrl')?.value.trim() || '';
       salvarConfigGoogleDrive({
         ...driveCfg,
-        clientId: clientIdDrive,
         pastaUrl: pastaUrlDrive
       });
 
