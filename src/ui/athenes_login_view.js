@@ -14,7 +14,7 @@ import {
   obterOuCriarEstruturaPastasAthenes,
   obterConfigGoogleDrive
 } from '../core/athenes_colaboracao.js';
-import { svgIcone } from './athenes_icones.js';
+import { svgIcone, svgLogo } from './athenes_icones.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 
 export class TelaLoginView {
@@ -44,7 +44,7 @@ export class TelaLoginView {
         <!-- Cabeçalho com Logo Athenes -->
         <div class="ath-login-header">
           <div class="ath-login-logo-box">
-            ${svgIcone('documento', 28)}
+            ${svgLogo(36)}
           </div>
           <h1>Athenes</h1>
           <p class="ath-login-subtitulo">

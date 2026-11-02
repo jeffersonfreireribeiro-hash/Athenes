@@ -230,6 +230,10 @@ class ReaderViewModel(
         _mostrarDialogZoteroDrive.value = false
     }
 
+    fun alternarModoLinhaReta() {
+        _modoLinhaReta.value = !_modoLinhaReta.value
+    }
+
     fun desfazerTraco() {
         val art = obterArtigoAtivo()
         repository.desfazerUltimoTraco(art.id, _paginaAtiva.value)
@@ -242,12 +246,13 @@ class ReaderViewModel(
 
     fun adicionarTracoLivre(pontos: List<PontoTraco>) {
         val art = obterArtigoAtivo()
+        val ehReta = _modoLinhaReta.value || (_ferramentaAtiva.value == FerramentaLeitura.LINHA_RETA)
         val traco = TracoDesenho(
             pagina = _paginaAtiva.value,
             corHex = _corAtiva.value,
             espessura = if (_ferramentaAtiva.value == FerramentaLeitura.MARCADOR) 18f else 3f,
-            pontos = pontos,
-            ehLinhaReta = false,
+            pontos = if (ehReta && pontos.size > 1) listOf(pontos.first(), pontos.last()) else pontos,
+            ehLinhaReta = ehReta,
             ehMarcaTexto = (_ferramentaAtiva.value == FerramentaLeitura.MARCADOR)
         )
         repository.adicionarTraco(art.id, traco)

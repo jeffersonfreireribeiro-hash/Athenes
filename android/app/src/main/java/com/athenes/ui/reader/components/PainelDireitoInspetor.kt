@@ -96,7 +96,9 @@ fun PainelDireitoInspetor(
                     .padding(12.dp)
             ) {
                 when (abaAtiva) {
-                    AbaInspetorDireito.RESUMO_NOTAS -> ConteudoAbaResumoNotas(
+                    AbaInspetorDireito.ANOTACOES_ARTIGO,
+                    AbaInspetorDireito.RESUMO_NOTAS,
+                    AbaInspetorDireito.SUMARIO -> ConteudoAbaResumoNotas(
                         artigo = artigo,
                         onNovaNotaClick = onNovaNotaClick,
                         onRemoverNota = onRemoverNota
