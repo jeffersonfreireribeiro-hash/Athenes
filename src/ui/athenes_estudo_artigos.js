@@ -574,6 +574,10 @@ export class EstudoArtigosView {
         window.removeEventListener('keydown', this._tecladoZoomHandler);
         this._tecladoZoomHandler = null;
       }
+      if (this._selectionChangeHandler) {
+        document.removeEventListener('selectionchange', this._selectionChangeHandler);
+        this._selectionChangeHandler = null;
+      }
       this.alternarModoDashboardFull(false);
       this.renderizarCatalogoArtigos();
     }
@@ -1127,6 +1131,10 @@ export class EstudoArtigosView {
         window.removeEventListener('keydown', this._tecladoZoomHandler);
         this._tecladoZoomHandler = null;
       }
+      if (this._selectionChangeHandler) {
+        document.removeEventListener('selectionchange', this._selectionChangeHandler);
+        this._selectionChangeHandler = null;
+      }
       salvarArtigosEstudo(this.artigos);
       this.artigoAberto = null;
       this.renderizar();
@@ -1610,6 +1618,16 @@ export class EstudoArtigosView {
           viewport
         }).render();
 
+        let endOfContent = camada.querySelector('.endOfContent');
+        if (!endOfContent) {
+          endOfContent = document.createElement('div');
+          endOfContent.className = 'endOfContent';
+          camada.append(endOfContent);
+        }
+        camada.addEventListener('mousedown', () => {
+          camada.classList.add('selecting');
+        });
+
         // Detecta número editorial real da página (ex.: p. 253 em vez de apenas p. 17 do PDF)
         const itensTxt = (textContent.items || [])
           .map(it => String(it.str || '').trim())
@@ -2044,14 +2062,101 @@ export class EstudoArtigosView {
       popSel.hidden = false;
     };
 
-    palco.addEventListener('mouseup', () => setTimeout(verificarSelecaoTexto, 20));
-    palco.addEventListener('keyup', () => setTimeout(verificarSelecaoTexto, 20));
+    let prevRange = null;
+    let isPointerDown = false;
+
+    const resetEndOfContent = (end, textLayer) => {
+      if (end && textLayer) {
+        textLayer.append(end);
+        end.style.width = '';
+        end.style.height = '';
+        textLayer.classList.remove('selecting');
+      }
+    };
+
+    const encerrarModoSelecting = () => {
+      isPointerDown = false;
+      root.querySelectorAll('.ath-pdf-text-layer').forEach(layer => {
+        const end = layer.querySelector('.endOfContent');
+        if (end) resetEndOfContent(end, layer);
+      });
+    };
+
+    palco.addEventListener('mouseup', () => {
+      encerrarModoSelecting();
+      setTimeout(verificarSelecaoTexto, 20);
+    });
+    palco.addEventListener('keyup', () => {
+      if (!isPointerDown) encerrarModoSelecting();
+      setTimeout(verificarSelecaoTexto, 20);
+    });
     palco.addEventListener('scroll', () => { popSel.hidden = true; }, { passive: true });
     palco.addEventListener('pointerdown', (e) => {
+      isPointerDown = true;
       if (!e.target.closest('#athPdfSelecaoPopover')) {
         popSel.hidden = true;
       }
+      const layer = e.target.closest('.ath-pdf-text-layer');
+      if (layer) {
+        layer.classList.add('selecting');
+      }
     });
+
+    window.addEventListener('blur', encerrarModoSelecting);
+
+    if (this._selectionChangeHandler) {
+      document.removeEventListener('selectionchange', this._selectionChangeHandler);
+      this._selectionChangeHandler = null;
+    }
+
+    this._selectionChangeHandler = () => {
+      const selection = typeof window !== 'undefined' && window.getSelection ? window.getSelection() : null;
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+        if (!isPointerDown) {
+          encerrarModoSelecting();
+        }
+        return;
+      }
+
+      const activeLayers = new Set();
+      for (let i = 0; i < selection.rangeCount; i++) {
+        const r = selection.getRangeAt(i);
+        root.querySelectorAll('.ath-pdf-text-layer').forEach(layer => {
+          if (!activeLayers.has(layer) && r.intersectsNode(layer)) {
+            activeLayers.add(layer);
+          }
+        });
+      }
+
+      root.querySelectorAll('.ath-pdf-text-layer').forEach(layer => {
+        const end = layer.querySelector('.endOfContent');
+        if (activeLayers.has(layer)) {
+          layer.classList.add('selecting');
+        } else if (end) {
+          resetEndOfContent(end, layer);
+        }
+      });
+
+      const range = selection.getRangeAt(0);
+      const modifyStart = prevRange && (
+        range.compareBoundaryPoints(Range.END_TO_END, prevRange) === 0 ||
+        range.compareBoundaryPoints(Range.START_TO_END, prevRange) === 0
+      );
+      let anchor = modifyStart ? range.startContainer : range.endContainer;
+      if (anchor && anchor.nodeType === 3) {
+        anchor = anchor.parentNode;
+      }
+      const parentLayer = anchor?.closest?.('.ath-pdf-text-layer');
+      const endDiv = parentLayer?.querySelector?.('.endOfContent');
+      if (endDiv && anchor && anchor.parentElement === parentLayer) {
+        endDiv.style.width = '100%';
+        endDiv.style.height = '100%';
+        parentLayer.insertBefore(endDiv, modifyStart ? anchor : anchor.nextSibling);
+      }
+      prevRange = range.cloneRange();
+    };
+
+    document.addEventListener('selectionchange', this._selectionChangeHandler);
 
     const extrairCorRgbaGrifo = (cor, alpha = 0.42) => {
       if (!cor) return `rgba(250, 204, 21, ${alpha})`;

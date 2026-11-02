@@ -129,6 +129,13 @@ test('Estúdio de Artigos renderiza todas as páginas em rolagem contínua, supo
   assert.equal(codigoEstudo.includes('NumpadAdd'), true);
   assert.equal(codigoEstudo.includes('NumpadSubtract'), true);
 
+  // Estabilização de seleção de texto no PDF (evita que o mouse no espaço vazio/entre linhas selecione o bloco todo)
+  const cssDash = fs.readFileSync(path.resolve('src/css/athenes_dashboard.css'), 'utf8');
+  assert.equal(codigoEstudo.includes('_selectionChangeHandler'), true);
+  assert.equal(codigoEstudo.includes('endOfContent'), true);
+  assert.equal(cssDash.includes('.ath-pdf-text-layer.selecting .endOfContent'), true);
+  assert.equal(cssDash.includes('margin-bottom: -2px'), true);
+
   // Teste geométrico do snap ortogonal da Linha Reta
   const horiz = calcularPontoFinalLinhaReta({ x: 100, y: 100 }, { x: 300, y: 104 });
   assert.equal(horiz.y, 100);

@@ -1547,12 +1547,22 @@ mark.ath-pdf-grifo-texto {
   caret-color: transparent !important;
 }
 
+.ath-pdf-text-layer > :not(.markedContent),
+.ath-pdf-text-layer .markedContent span:not(.markedContent) {
+  z-index: 1;
+}
+
 .ath-pdf-text-layer span {
   color: transparent;
   position: absolute;
   white-space: pre;
   cursor: text;
   transform-origin: 0% 0%;
+  box-sizing: content-box;
+  padding-top: 1px;
+  padding-bottom: 2px;
+  margin-top: -1px;
+  margin-bottom: -2px;
 }
 
 .ath-pdf-text-layer span.markedContent {
@@ -1564,11 +1574,14 @@ mark.ath-pdf-grifo-texto {
   display: block;
   position: absolute;
   inset: 100% 0 0;
-  z-index: -1;
+  z-index: 0;
   cursor: default;
+  -webkit-user-select: none;
+  -moz-user-select: none;
   user-select: none;
 }
 
+.ath-pdf-text-layer.selecting .endOfContent,
 .ath-pdf-text-layer .endOfContent.active {
   top: 0;
 }
