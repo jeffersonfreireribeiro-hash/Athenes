@@ -171,4 +171,10 @@ test('Google Drive & PDF no Estúdio de Artigos: popover organizado, extração 
   const pastaExemplo = 'https://drive.google.com/drive/folders/1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv?usp=drive_link';
   const match = pastaExemplo.match(/folders\/([a-zA-Z0-9_-]+)/);
   assert.equal(match?.[1], '1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv');
+
+  // Proteção contra marcações espúrias na lateral da folha e pisca-pisca de seleção
+  const cssDash = fs.readFileSync(path.resolve('src/css/athenes_dashboard.css'), 'utf8');
+  assert.equal(cssDash.includes('.ath-pdf-text-layer br::selection'), true);
+  assert.equal(cssDash.includes('background: transparent !important;'), true);
+  assert.equal(cssDash.includes('caret-color: transparent !important;'), true);
 });
