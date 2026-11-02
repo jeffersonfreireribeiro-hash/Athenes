@@ -1929,5 +1929,271 @@ del.ath-sug-del {
   color: #FFFFFF;
 }
 
+/* ==========================================================================
+   POPOVER DE GOOGLE DRIVE & ARQUIVO PDF (ESTÚDIO DE ARTIGOS)
+   ========================================================================== */
+.ath-topo-popover-drive {
+  width: 440px !important;
+  max-width: min(440px, 94vw) !important;
+  padding: 16px 18px !important;
+  border-radius: 18px !important;
+  box-shadow: 0 16px 36px -6px rgba(15, 23, 42, 0.2), 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+}
+
+.ath-pop-drive-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding-bottom: 12px !important;
+  border-bottom: 1px solid var(--ath-primary-line, #C8D7E6) !important;
+  margin-bottom: 12px !important;
+}
+
+.ath-pop-drive-head strong {
+  font: 800 13px var(--glx-font, 'Nunito', sans-serif) !important;
+  color: var(--ath-primary, #314F79) !important;
+  letter-spacing: .02em !important;
+}
+
+.ath-pop-drive-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+.ath-pop-drive-card {
+  background: #F8FAFC !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+.ath-pop-drive-card-destaque {
+  background: #F0F7FF !important;
+  border-color: #BFDBFE !important;
+}
+
+.ath-pop-drive-card-tit {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-weight: 800 !important;
+  font-size: 12.5px !important;
+  color: #1E293B !important;
+}
+
+.ath-pop-label {
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  color: #475569 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.ath-pop-input {
+  height: 36px !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid #CBD5E1 !important;
+  font-size: 12px !important;
+  font-family: inherit !important;
+  background: #FFFFFF !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.ath-pop-drive-card-dica {
+  font-size: 11px !important;
+  color: #64748B !important;
+  line-height: 1.4 !important;
+}
+
+.ath-pop-drive-status-pdf {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 12px !important;
+  margin-top: 2px !important;
+}
+
+.ath-pop-tag-ok {
+  background: #DCFCE7 !important;
+  color: #15803D !important;
+  font-weight: 800 !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  flex-shrink: 0 !important;
+}
+
+.ath-pop-tag-aviso {
+  background: #FEF3C7 !important;
+  color: #B45309 !important;
+  font-weight: 800 !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  flex-shrink: 0 !important;
+}
+
+.ath-pop-nome-arquivo {
+  font-weight: 700 !important;
+  color: #1E293B !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 240px !important;
+}
+
+.ath-pop-nome-arquivo-vazio {
+  font-size: 11.5px !important;
+  color: #64748B !important;
+  font-style: italic !important;
+}
+
+.ath-pop-drive-details {
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 10px !important;
+  padding: 8px 12px !important;
+  background: #FFFFFF !important;
+}
+
+.ath-pop-drive-summary {
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  color: #64748B !important;
+  cursor: pointer !important;
+  user-select: none !important;
+}
+
+.ath-pop-drive-details-corpo {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  margin-top: 8px !important;
+  padding-top: 8px !important;
+  border-top: 1px dashed #E2E8F0 !important;
+}
+
+/* Aviso de vincular PDF na folha */
+.ath-pdf-folha-vincular-aviso {
+  width: 100%;
+  height: 100%;
+  min-height: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  box-sizing: border-box;
+}
+
+.ath-pdf-vincular-card {
+  max-width: 540px;
+  width: 100%;
+  padding: 36px 28px;
+  background: #FFFFFF;
+  border: 2px dashed #93C5FD;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.ath-pdf-vincular-icone {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: #EFF6FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2563EB;
+}
+
+.ath-pdf-vincular-titulo {
+  font: 800 18px var(--glx-font, 'Nunito', sans-serif);
+  color: var(--ath-primary, #314F79);
+  margin: 0;
+}
+
+.ath-pdf-vincular-sub {
+  font-size: 13.5px;
+  color: #334155;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.ath-pdf-vincular-instrucao {
+  font-size: 12px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.ath-pdf-vincular-botoes {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.ath-pdf-vincular-dropzone {
+  font-size: 11.5px;
+  color: #64748B;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ath-palco-dragover {
+  outline: 3px dashed #2563EB !important;
+  outline-offset: -8px;
+  background: rgba(239, 246, 255, 0.6) !important;
+}
+
+.ath-pdf-folha-vazia-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 500px;
+  text-align: center;
+  color: #94A3B8;
+  padding: 40px;
+  box-sizing: border-box;
+}
+
+.ath-pdf-folha-vazia-aviso {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.ath-pdf-folha-vazia-aviso span {
+  font-weight: 800;
+  font-size: 14px;
+  color: #64748B;
+}
+
+.ath-pdf-folha-vazia-aviso p {
+  font-size: 12px;
+  max-width: 320px;
+  margin: 0;
+  line-height: 1.4;
+}
+
+
 
 

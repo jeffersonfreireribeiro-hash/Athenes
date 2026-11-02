@@ -328,12 +328,16 @@ async function baixarPdfBlobDoDrive(fileId, accessToken) {
  * Retorna true quando conseguiu um PDF novo.
  */
 async function garantirPdfDoArtigo(art) {
-  if (!art || art.pdfBlobUrl) return false;
-  const local = await obterPdfLocal(art.id);
-  if (local) {
-    art.pdfBlobUrl = URL.createObjectURL(local);
-    return true;
-  }
+  if (!art) return false;
+  if (art.pdfBlobUrl) return true;
+  try {
+    const local = await obterPdfLocal(art.id);
+    if (local) {
+      art.pdfBlobUrl = URL.createObjectURL(local);
+      art.temPdfLocal = true;
+      return true;
+    }
+  } catch (_) {}
   const idDrive = String(art.driveFileId || '').trim();
   if (idDrive && !/^drive_pdf_/.test(idDrive)) {
     const cfg = obterConfigGoogleDrive();
@@ -342,6 +346,7 @@ async function garantirPdfDoArtigo(art) {
         const blob = await baixarPdfBlobDoDrive(idDrive, cfg.accessToken);
         salvarPdfLocal(art.id, blob);
         art.pdfBlobUrl = URL.createObjectURL(blob);
+        art.temPdfLocal = true;
         return true;
       } catch (_) {}
     }
@@ -362,6 +367,8 @@ export function carregarArtigosEstudo() {
       if (salvo !== null) {
         const parsed = JSON.parse(salvo);
         if (Array.isArray(parsed)) {
+          // Garante que URLs blob revogadas da sessão anterior não sejam mantidas
+          parsed.forEach(a => { if (a) a.pdfBlobUrl = null; });
           if (temChaveZotero) {
             const semExemplos = parsed.filter(a => !ehArtigoExemploFicticio(a));
             if (semExemplos.length !== parsed.length) {
@@ -387,8 +394,13 @@ export function carregarArtigosEstudo() {
 export function salvarArtigosEstudo(lista) {
   try {
     if (typeof localStorage !== 'undefined') {
-      // Remove pdfBlobUrl temporário antes de serializar se necessário, preservando na memória
-      localStorage.setItem(STORAGE_KEY_ARTIGOS, JSON.stringify(lista));
+      // Remove pdfBlobUrl efêmero antes de salvar no localStorage
+      const limpo = Array.isArray(lista) ? lista.map(a => {
+        if (!a) return a;
+        const { pdfBlobUrl, ...resto } = a;
+        return resto;
+      }) : lista;
+      localStorage.setItem(STORAGE_KEY_ARTIGOS, JSON.stringify(limpo));
     }
   } catch (_) {}
   return lista;
@@ -877,7 +889,7 @@ export class EstudoArtigosView {
                     <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </button>
-                <div class="rm-topo-popover" id="athPopoverEstDrive" role="dialog" hidden style="width:340px;"></div>
+                <div class="rm-topo-popover ath-topo-popover-drive" id="athPopoverEstDrive" role="dialog" hidden></div>
               </div>
 
               <div class="rm-menu-topo-item" data-menu-est="caneta">
@@ -1105,9 +1117,65 @@ export class EstudoArtigosView {
       const file = e.target.files?.[0];
       if (!file) return;
       registrarPdfLocalNoArtigo(art, file);
+      if (this._pdfFalhou) this._pdfFalhou.clear();
       salvarArtigosEstudo(this.artigos);
       this.renderizar();
     });
+
+    // Vincular PDF via botão do aviso na folha do palco
+    root.querySelectorAll('.ath-input-vincular-pdf-palco').forEach(inp => {
+      inp.addEventListener('change', e => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        registrarPdfLocalNoArtigo(art, file);
+        if (this._pdfFalhou) this._pdfFalhou.clear();
+        salvarArtigosEstudo(this.artigos);
+        this.renderizar();
+      });
+    });
+
+    // Abrir pasta no Google Drive a partir do botão da folha
+    root.querySelectorAll('[data-abrir-pasta-drive-palco]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cfg = obterConfigGoogleDrive();
+        let pasta = cfg.pastaUrl || 'https://drive.google.com/drive/folders/1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv?usp=drive_link';
+        const idPasta = extrairIdPastaDrive(pasta);
+        const urlFinal = idPasta ? `https://drive.google.com/drive/folders/${idPasta}` : (pasta.startsWith('http') ? pasta : `https://drive.google.com/drive/folders/${pasta}`);
+        window.open(urlFinal, '_blank', 'noopener,noreferrer');
+      });
+    });
+
+    // Drag & Drop de arquivo PDF direto no Palco central
+    const palcoEl = root.querySelector('#athEstudioPalco');
+    if (palcoEl && !palcoEl.dataset.dropPdfLigado) {
+      palcoEl.dataset.dropPdfLigado = '1';
+      ['dragenter', 'dragover'].forEach(evName => {
+        palcoEl.addEventListener(evName, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          palcoEl.classList.add('ath-palco-dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(evName => {
+        palcoEl.addEventListener(evName, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          palcoEl.classList.remove('ath-palco-dragover');
+        });
+      });
+      palcoEl.addEventListener('drop', e => {
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+          const pdfFile = Array.from(files).find(f => f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf');
+          if (pdfFile) {
+            registrarPdfLocalNoArtigo(art, pdfFile);
+            if (this._pdfFalhou) this._pdfFalhou.clear();
+            salvarArtigosEstudo(this.artigos);
+            this.renderizar();
+          }
+        }
+      });
+    }
 
     // Abas do painel lateral direito
     root.querySelectorAll('.ath-estudio-aba').forEach(btn => {
@@ -1208,9 +1276,7 @@ export class EstudoArtigosView {
             <canvas class="ath-pdf-render-canvas" style="width:794px; height:${alturaReal}px;"></canvas>
             <div class="ath-pdf-grifos-layer" data-grifos-pag="${numPag}"></div>
             <div class="ath-pdf-folha-texto ath-pdf-text-layer" data-texto-pag="${numPag}"></div>
-          ` : art.pdfBlobUrl && numPag === 1 ? `
-            <embed src="${art.pdfBlobUrl}" type="application/pdf" class="ath-pdf-embed-nativo">
-          ` : `
+          ` : (pagDados.paragrafos && pagDados.paragrafos.length > 0) ? `
             <div class="ath-pdf-folha-texto" data-texto-pag="${numPag}">
               <div class="ath-pdf-folha-cabecalho">${escapeHtml(pagDados.cabecalho || '')}</div>
               <h2 class="ath-pdf-folha-titulo">${escapeHtml(pagDados.titulo || '')}</h2>
@@ -1223,6 +1289,40 @@ export class EstudoArtigosView {
               <div class="ath-pdf-folha-rodape">
                 <span>DOI: ${escapeHtml(art.doi || '10.1000/athenes.zotero')}</span>
                 <span>Página ${numPag} de ${totalPags} · Google Drive (${escapeHtml(art.driveFileName || 'PDF')})</span>
+              </div>
+            </div>
+          ` : numPag === 1 ? `
+            <div class="ath-pdf-folha-vincular-aviso">
+              <div class="ath-pdf-vincular-card">
+                <div class="ath-pdf-vincular-icone">
+                  ${svgIcone('drive', 36)}
+                </div>
+                <h3 class="ath-pdf-vincular-titulo">Vincular Arquivo PDF a Este Artigo</h3>
+                <p class="ath-pdf-vincular-sub">
+                  O arquivo PDF de <strong>${escapeHtml(art.titulo || 'este artigo')}</strong> ainda não foi carregado neste computador.
+                </p>
+                <p class="ath-pdf-vincular-instrucao">
+                  Seus PDFs ficam salvos na sua pasta do Google Drive. Você pode abrir sua pasta para baixar o arquivo ou selecioná-lo diretamente no seu computador:
+                </p>
+                <div class="ath-pdf-vincular-botoes">
+                  <label class="glx-btn glx-btn-primary" style="cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+                    ${svgIcone('upload', 14)} Selecionar Arquivo PDF no Computador...
+                    <input type="file" accept=".pdf" class="ath-input-vincular-pdf-palco" hidden>
+                  </label>
+                  <button type="button" class="glx-btn glx-btn-soft" data-abrir-pasta-drive-palco style="display:inline-flex; align-items:center; gap:8px;">
+                    ${svgIcone('drive', 14)} Abrir Minha Pasta no Google Drive ↗
+                  </button>
+                </div>
+                <div class="ath-pdf-vincular-dropzone">
+                  💡 <strong>Dica rápida:</strong> Você também pode arrastar o arquivo <code>.pdf</code> e soltar em qualquer lugar desta tela!
+                </div>
+              </div>
+            </div>
+          ` : `
+            <div class="ath-pdf-folha-texto ath-pdf-folha-vazia-placeholder">
+              <div class="ath-pdf-folha-vazia-aviso">
+                <span>Página ${numPag} de ${totalPags}</span>
+                <p>Vincule o arquivo PDF na folha 1 para visualizar e anotar o conteúdo original desta página.</p>
               </div>
             </div>
           `}
@@ -2225,48 +2325,117 @@ export class EstudoArtigosView {
     if (popDrive) {
       const cfgDrive = obterConfigGoogleDrive();
       const driveConectado = Boolean(cfgDrive.accessToken);
+      const pastaAtual = cfgDrive.pastaUrl || 'https://drive.google.com/drive/folders/1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv?usp=drive_link';
+      if (!cfgDrive.pastaUrl) {
+        salvarConfigGoogleDrive({ ...cfgDrive, pastaUrl: pastaAtual });
+      }
+
       popDrive.innerHTML = `
-        <div class="rm-popover-head">
-          <strong>Conexão & PDF no Google Drive</strong>
+        <div class="rm-popover-head ath-pop-drive-head">
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${svgIcone('drive', 18)}
+            <strong>Google Drive & Arquivo PDF</strong>
+          </div>
           <button type="button" class="rm-ic" data-fechar-pop-est>${svgIcone('fechar', 14)}</button>
         </div>
-        <div class="rm-popover-body">
-          <label>Link da Pasta no Google Drive (onde ficam seus PDFs)
-            <input type="text" id="athPopDrivePastaInput" value="${escapeHtml(cfgDrive.pastaUrl || '')}" placeholder="Ex.: https://drive.google.com/drive/folders/1ABCxyz...">
-          </label>
-          ${cfgDrive.pastaUrl ? `
-            <div style="margin-bottom:8px;">
-              <a href="${cfgDrive.pastaUrl}" target="_blank" rel="noopener noreferrer" class="ath-btn ath-btn-sm" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#2563EB; text-decoration:none; height:28px;">
-                ${svgIcone('drive', 13)} Abrir Pasta no Google Drive Web ↗
-              </a>
+
+        <div class="rm-popover-body ath-pop-drive-body">
+          <!-- CARD 1: PASTA NO GOOGLE DRIVE -->
+          <div class="ath-pop-drive-card">
+            <div class="ath-pop-drive-card-tit">
+              ${svgIcone('drive', 14)}
+              <span>1. Pasta do Google Drive (Nuvem)</span>
             </div>
-          ` : ''}
-          <label>Google OAuth Client ID (Opcional)
-            <input type="text" id="athPopDriveClientIdInput" value="${escapeHtml(cfgDrive.clientId || '')}">
-          </label>
-          <button type="button" class="glx-btn ${driveConectado ? 'ath-btn-zotero-ok' : 'glx-btn-primary'} glx-btn-sm" id="athBtnPopAutenticarDrive" style="width:100%; justify-content:center; margin-bottom:6px;">
-            ${svgIcone('drive', 13)} ${driveConectado ? 'Google Drive Conectado ✓ (Reconectar)' : 'Autorizar / Conectar meu Google Drive'}
-          </button>
-          <div id="athPopDriveStatusMsg" style="font-size:11.5px; font-weight:700; color:#15803D;"></div>
-          <hr class="rm-popover-div">
-          <label>Nome do PDF no Google Drive
-            <input type="text" id="athPopDriveNomeInput" value="${escapeHtml(art.driveFileName || '')}">
-          </label>
-          <label>ID ou Link do Arquivo no Drive
-            <input type="text" id="athPopDriveIdInput" value="${escapeHtml(art.driveFileId || '')}" placeholder="ID do arquivo no Google Drive">
-          </label>
-          <div style="font-size:11px; color:#64748B;">
-            O PDF não é enviado ao Zotero: ele permanece no seu Google Drive e é lido/anotado diretamente aqui.
+            <label class="ath-pop-label">
+              Link da Pasta onde ficam seus PDFs:
+              <input type="text" id="athPopDrivePastaInput" class="glx-input ath-pop-input" value="${escapeHtml(pastaAtual)}" placeholder="https://drive.google.com/drive/folders/...">
+            </label>
+            <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="athBtnPopAbrirPastaDrive" style="width:100%; justify-content:center; gap:6px;">
+              ${svgIcone('drive', 14)} Abrir Pasta no Google Drive Web ↗
+            </button>
+            <div class="ath-pop-drive-card-dica">
+              Abre sua pasta do Drive em nova aba para baixar o PDF deste artigo para o computador.
+            </div>
           </div>
+
+          <!-- CARD 2: VINCULAR PDF DESTE ARTIGO -->
+          <div class="ath-pop-drive-card ath-pop-drive-card-destaque">
+            <div class="ath-pop-drive-card-tit">
+              ${svgIcone('artigo', 14)}
+              <span>2. Arquivo PDF deste Artigo</span>
+            </div>
+            
+            <div class="ath-pop-drive-status-pdf">
+              ${art.temPdfLocal || art.pdfBlobUrl ? `
+                <span class="ath-pop-tag-ok">✓ PDF Vinculado</span>
+                <span class="ath-pop-nome-arquivo" title="${escapeHtml(art.driveFileName || 'arquivo.pdf')}">${escapeHtml(art.driveFileName || 'arquivo.pdf')}</span>
+              ` : `
+                <span class="ath-pop-tag-aviso">⚠️ Sem PDF Vinculado</span>
+                <span class="ath-pop-nome-arquivo-vazio">Vincule o PDF para ler as páginas originais</span>
+              `}
+            </div>
+
+            <div class="ath-pop-drive-card-acoes" style="margin-top:8px;">
+              <label class="glx-btn glx-btn-primary glx-btn-sm" style="width:100%; justify-content:center; gap:6px; cursor:pointer;">
+                ${svgIcone('upload', 14)} ${art.temPdfLocal || art.pdfBlobUrl ? 'Trocar Arquivo PDF (.pdf)...' : 'Selecionar Arquivo PDF no Computador...'}
+                <input type="file" id="athPopDriveFileInput" accept=".pdf" hidden>
+              </label>
+            </div>
+            <div class="ath-pop-drive-card-dica">
+              O PDF é lido localmente e guardado com segurança no seu navegador (IndexedDB).
+            </div>
+          </div>
+
+          <!-- CARD 3 (AVANÇADO / COLAPSÁVEL): OAUTH E ID -->
+          <details class="ath-pop-drive-details">
+            <summary class="ath-pop-drive-summary">Configurações Avançadas & OAuth (Opcional)</summary>
+            <div class="ath-pop-drive-details-corpo">
+              <label class="ath-pop-label">Google OAuth Client ID:
+                <input type="text" id="athPopDriveClientIdInput" class="glx-input ath-pop-input" value="${escapeHtml(cfgDrive.clientId || '')}">
+              </label>
+              <button type="button" class="glx-btn ${driveConectado ? 'ath-btn-zotero-ok' : 'glx-btn-soft'} glx-btn-xs" id="athBtnPopAutenticarDrive" style="width:100%; justify-content:center; margin-top:4px;">
+                ${svgIcone('drive', 12)} ${driveConectado ? 'Conta Conectada ✓ (Reconectar)' : 'Conectar Conta Google via OAuth'}
+              </button>
+              <div id="athPopDriveStatusMsg" style="font-size:11px; font-weight:700; color:#15803D; margin-top:4px;"></div>
+              <label class="ath-pop-label" style="margin-top:8px;">Nome de Referência do Arquivo:
+                <input type="text" id="athPopDriveNomeInput" class="glx-input ath-pop-input" value="${escapeHtml(art.driveFileName || '')}">
+              </label>
+              <label class="ath-pop-label" style="margin-top:6px;">ID do Arquivo no Drive:
+                <input type="text" id="athPopDriveIdInput" class="glx-input ath-pop-input" value="${escapeHtml(art.driveFileId || '')}" placeholder="ID do arquivo no Google Drive">
+              </label>
+            </div>
+          </details>
         </div>
       `;
+
       popDrive.querySelector('#athPopDrivePastaInput')?.addEventListener('change', e => {
-        salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), pastaUrl: e.target.value.trim() });
+        const val = e.target.value.trim();
+        salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), pastaUrl: val });
       });
-      popDrive.querySelector('#athPopDriveClientIdInput').addEventListener('change', e => {
+
+      popDrive.querySelector('#athBtnPopAbrirPastaDrive')?.addEventListener('click', () => {
+        let raw = popDrive.querySelector('#athPopDrivePastaInput')?.value?.trim();
+        if (!raw) raw = 'https://drive.google.com/drive/folders/1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv?usp=drive_link';
+        const idPasta = extrairIdPastaDrive(raw);
+        const urlFinal = idPasta ? `https://drive.google.com/drive/folders/${idPasta}` : (raw.startsWith('http') ? raw : `https://drive.google.com/drive/folders/${raw}`);
+        salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), pastaUrl: urlFinal, pastaId: idPasta });
+        window.open(urlFinal, '_blank', 'noopener,noreferrer');
+      });
+
+      popDrive.querySelector('#athPopDriveFileInput')?.addEventListener('change', e => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        registrarPdfLocalNoArtigo(art, file);
+        if (this._pdfFalhou) this._pdfFalhou.clear();
+        salvarArtigosEstudo(this.artigos);
+        this.renderizar();
+      });
+
+      popDrive.querySelector('#athPopDriveClientIdInput')?.addEventListener('change', e => {
         salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), clientId: e.target.value.trim() });
       });
-      popDrive.querySelector('#athBtnPopAutenticarDrive').addEventListener('click', async () => {
+
+      popDrive.querySelector('#athBtnPopAutenticarDrive')?.addEventListener('click', async () => {
         const cid = popDrive.querySelector('#athPopDriveClientIdInput').value.trim();
         const msgEl = popDrive.querySelector('#athPopDriveStatusMsg');
         salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), clientId: cid });
@@ -2279,14 +2448,16 @@ export class EstudoArtigosView {
           this.renderizar();
         } catch (err) {
           msgEl.style.color = '#B42318';
-          msgEl.textContent = `Atenção: ${err.message || 'Autorize o domínio athenes.vercel.app no Google Cloud Console.'}`;
+          msgEl.textContent = `Atenção: ${err.message || 'Autorize o domínio no Google Cloud Console.'}`;
         }
       });
-      popDrive.querySelector('#athPopDriveNomeInput').addEventListener('change', e => {
+
+      popDrive.querySelector('#athPopDriveNomeInput')?.addEventListener('change', e => {
         art.driveFileName = e.target.value.trim();
         salvarArtigosEstudo(this.artigos);
       });
-      popDrive.querySelector('#athPopDriveIdInput').addEventListener('change', e => {
+
+      popDrive.querySelector('#athPopDriveIdInput')?.addEventListener('change', e => {
         art.driveFileId = e.target.value.trim();
         salvarArtigosEstudo(this.artigos);
       });

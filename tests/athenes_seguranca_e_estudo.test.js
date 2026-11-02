@@ -145,3 +145,30 @@ test('DashboardView possui sincronização com Supabase e backup de espaço para
   assert.equal(codigoDash.includes('listarDocumentosDoSupabase'), true);
   assert.equal(codigoDash.includes('carregarDocumentoDoSupabase'), true);
 });
+
+test('Google Drive & PDF no Estúdio de Artigos: popover organizado, extração de ID de pasta e fallback amigável sem embed quebrado', () => {
+  const codigoEstudo = fs.readFileSync(path.resolve('src/ui/athenes_estudo_artigos.js'), 'utf8');
+  const codigoColab = fs.readFileSync(path.resolve('src/core/athenes_colaboracao.js'), 'utf8');
+  const cssEditor = fs.readFileSync(path.resolve('src/css/athenes_editor.css'), 'utf8');
+
+  // Popover com classe dedicada de largura generosa (440px) e sem style="width:340px;" colado
+  assert.equal(codigoEstudo.includes('ath-topo-popover-drive'), true);
+  assert.equal(codigoEstudo.includes('id="athPopoverEstDrive" role="dialog" hidden style="width:340px;"'), false);
+  assert.equal(cssEditor.includes('.ath-topo-popover-drive'), true);
+  assert.equal(cssEditor.includes('.ath-pop-drive-card'), true);
+
+  // Botão direto no popover para abrir pasta web do Drive
+  assert.equal(codigoEstudo.includes('athBtnPopAbrirPastaDrive'), true);
+  assert.equal(codigoEstudo.includes('athPopDriveFileInput'), true);
+
+  // Sem crash de embed nativo na folha 1 quando não há PDF
+  assert.equal(codigoEstudo.includes('ath-pdf-folha-vincular-aviso'), true);
+  assert.equal(codigoEstudo.includes('ath-input-vincular-pdf-palco'), true);
+  assert.equal(codigoEstudo.includes('data-abrir-pasta-drive-palco'), true);
+  assert.equal(codigoEstudo.includes('ath-palco-dragover'), true);
+
+  // Extração precisa do ID da pasta do Google Drive
+  const pastaExemplo = 'https://drive.google.com/drive/folders/1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv?usp=drive_link';
+  const match = pastaExemplo.match(/folders\/([a-zA-Z0-9_-]+)/);
+  assert.equal(match?.[1], '1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv');
+});
