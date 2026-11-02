@@ -796,6 +796,11 @@ export class EstudoArtigosView {
     this.artigoAberto = art;
     this.paginaAtual = 1;
     this.pinEditandoId = null;
+    if (typeof window !== 'undefined') {
+      if (window.scrollY > 0) window.scrollTo(0, 0);
+      if (document.documentElement?.scrollTop > 0) document.documentElement.scrollTop = 0;
+      if (document.body?.scrollTop > 0) document.body.scrollTop = 0;
+    }
     this.renderizar();
     if (!art.pdfBlobUrl) {
       garantirPdfDoArtigo(art).then(carregou => {
@@ -811,10 +816,33 @@ export class EstudoArtigosView {
     if (!art.fichamento) {
       art.fichamento = { resumoPessoal: '', metodologiaNotas: '', citacoesMarcadas: [], notasPagina: {}, tracosPorPagina: {} };
     }
+
+    const pdfInfo = art.pdfBlobUrl ? this._pdfDocs?.get(art.pdfBlobUrl) : null;
+    if (pdfInfo) {
+      const atuais = Array.isArray(art.conteudoPaginasPdf) ? art.conteudoPaginasPdf : [];
+      const qtdReais = atuais.filter(p => p.real).length;
+      if (!atuais.length || !atuais[0]?.real || qtdReais !== pdfInfo.n) {
+        const paginasReais = pdfInfo.dims.map((_, i) => ({
+          numero: i + 1,
+          real: true,
+          cabecalho: '',
+          titulo: `Folha ${i + 1} do PDF`,
+          autores: '',
+          paragrafos: []
+        }));
+        const extras = atuais.filter(p => p.extra);
+        extras.forEach((ext, idx) => {
+          ext.numero = pdfInfo.n + idx + 1;
+        });
+        art.conteudoPaginasPdf = [...paginasReais, ...extras];
+      }
+    }
+
     const paginasPdf = Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.length > 0
       ? art.conteudoPaginasPdf
       : [{ numero: 1, cabecalho: art.publicacao || 'Artigo PDF', titulo: art.titulo, autores: '', paragrafos: [art.resumoOriginal || ''] }];
     art.conteudoPaginasPdf = paginasPdf;
+    art.totalPaginas = paginasPdf.length;
 
     const totalPags = paginasPdf.length;
     if (this.paginaAtual > totalPags) this.paginaAtual = totalPags;
@@ -1258,8 +1286,10 @@ export class EstudoArtigosView {
       return;
     }
     if (pdfInfo) {
-      if (!Array.isArray(art.conteudoPaginasPdf) || art.conteudoPaginasPdf.length !== pdfInfo.n || !art.conteudoPaginasPdf[0]?.real) {
-        art.conteudoPaginasPdf = pdfInfo.dims.map((_, i) => ({
+      const atuais = Array.isArray(art.conteudoPaginasPdf) ? art.conteudoPaginasPdf : [];
+      const qtdReais = atuais.filter(p => p.real).length;
+      if (!atuais.length || !atuais[0]?.real || qtdReais !== pdfInfo.n) {
+        const paginasReais = pdfInfo.dims.map((_, i) => ({
           numero: i + 1,
           real: true,
           cabecalho: '',
@@ -1267,8 +1297,14 @@ export class EstudoArtigosView {
           autores: '',
           paragrafos: []
         }));
+        const extras = atuais.filter(p => p.extra);
+        extras.forEach((ext, idx) => {
+          ext.numero = pdfInfo.n + idx + 1;
+        });
+        art.conteudoPaginasPdf = [...paginasReais, ...extras];
       }
       paginasPdf = art.conteudoPaginasPdf;
+      art.totalPaginas = paginasPdf.length;
     }
     const totalPags = paginasPdf.length;
     const folhasReais = [];
@@ -1278,31 +1314,32 @@ export class EstudoArtigosView {
       const pinsDaPagina = art.fichamento.notasPagina?.[numPag] || [];
       const tracosDaPagina = art.fichamento.tracosPorPagina?.[numPag] || [];
       const isPagAtiva = numPag === this.paginaAtual;
-      const dimPag = pdfInfo?.dims?.[idx];
+      const ehPaginaPdfReal = Boolean(pdfInfo && idx < pdfInfo.n && !pagDados.extra);
+      const dimPag = ehPaginaPdfReal ? pdfInfo.dims[idx] : null;
       const alturaReal = dimPag ? Math.round(794 * dimPag.h / dimPag.w) : 1123;
       const escalaZoom = this.zoomPct / 100;
-      const alturaWrapEscalada = pdfInfo ? Math.round(alturaReal * escalaZoom) : null;
+      const alturaWrapEscalada = Math.round(alturaReal * escalaZoom);
 
       const folhaWrap = document.createElement('div');
       folhaWrap.className = 'ath-pdf-pagina-bloco-wrap';
       folhaWrap.dataset.wrapPagina = String(numPag);
-      if (alturaWrapEscalada && escalaZoom !== 1) {
+      if (escalaZoom !== 1) {
         folhaWrap.style.minHeight = `${alturaWrapEscalada + 36}px`;
       }
 
       folhaWrap.innerHTML = `
         <div class="ath-pdf-etiqueta-pagina ${isPagAtiva ? 'ativa' : ''}" data-etiqueta-pag="${numPag}">
-          <span class="ath-pdf-etiqueta-num">Página ${numPag} de ${totalPags} — ${escapeHtml((pagDados.titulo || `Folha ${numPag} do PDF`).slice(0, 62))}</span>
+          <span class="ath-pdf-etiqueta-num">Página ${numPag} de ${totalPags} — ${escapeHtml((pagDados.titulo || (ehPaginaPdfReal ? `Folha ${numPag} do PDF` : `Folha Extra ${numPag}`)).slice(0, 62))}</span>
           <span class="ath-pdf-etiqueta-stats" data-stats-pag="${numPag}">${tracosDaPagina.length} risco(s) · ${pinsDaPagina.length} nota(s)</span>
         </div>
 
-        <div class="ath-folha-a4 ath-pdf-folha-container ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" style="${pdfInfo ? `width:794px; height:${alturaReal}px; min-height:${alturaReal}px; max-height:${alturaReal}px; padding:0; flex-shrink:0; ` : ''}transform: scale(${escalaZoom}); transform-origin: top center;">
-          ${pdfInfo ? `
+        <div class="ath-folha-a4 ath-pdf-folha-container ${pagDados.extra ? 'ath-pdf-folha-extra' : ''} ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" style="${ehPaginaPdfReal ? `width:794px; height:${alturaReal}px; min-height:${alturaReal}px; max-height:${alturaReal}px; padding:0; flex-shrink:0; ` : 'width:794px; height:1123px; min-height:1123px; flex-shrink:0; background:#FFFFFF; '}transform: scale(${escalaZoom}); transform-origin: top center;">
+          ${ehPaginaPdfReal ? `
             <canvas class="ath-pdf-render-canvas" style="width:794px; height:${alturaReal}px;"></canvas>
             <div class="ath-pdf-grifos-layer" data-grifos-pag="${numPag}"></div>
             <div class="ath-pdf-folha-texto ath-pdf-text-layer" data-texto-pag="${numPag}"></div>
           ` : (pagDados.paragrafos && pagDados.paragrafos.length > 0) ? `
-            <div class="ath-pdf-folha-texto" data-texto-pag="${numPag}">
+            <div class="ath-pdf-folha-texto ${pagDados.extra ? 'ath-pdf-folha-extra-corpo' : ''}" data-texto-pag="${numPag}">
               <div class="ath-pdf-folha-cabecalho">${escapeHtml(pagDados.cabecalho || '')}</div>
               <h2 class="ath-pdf-folha-titulo">${escapeHtml(pagDados.titulo || '')}</h2>
               ${pagDados.autores ? `<div class="ath-pdf-folha-autores">${escapeHtml(pagDados.autores)}</div>` : ''}
@@ -1313,7 +1350,7 @@ export class EstudoArtigosView {
               </div>
               <div class="ath-pdf-folha-rodape">
                 <span>DOI: ${escapeHtml(art.doi || '10.1000/athenes.zotero')}</span>
-                <span>Página ${numPag} de ${totalPags} · Google Drive (${escapeHtml(art.driveFileName || 'PDF')})</span>
+                <span>Página ${numPag} de ${totalPags} · ${pagDados.extra ? 'Folha de Anotações e Esquemas' : `Google Drive (${escapeHtml(art.driveFileName || 'PDF')})`}</span>
               </div>
             </div>
           ` : numPag === 1 ? `
@@ -1353,7 +1390,7 @@ export class EstudoArtigosView {
           `}
 
           <!-- Camada Transparente de Risco Livre, Linha Reta e Marca-Texto (Samsung Notes Canvas) -->
-          <canvas class="ath-pdf-ink-canvas" data-canvas-pag="${numPag}" width="794" height="${pdfInfo ? alturaReal : 1123}" style="pointer-events: ${this.ferramentaAtiva === 'cursor' ? 'none' : 'auto'}; cursor: ${this.ferramentaAtiva === 'cursor' ? 'text' : 'crosshair'};"></canvas>
+          <canvas class="ath-pdf-ink-canvas" data-canvas-pag="${numPag}" width="794" height="${ehPaginaPdfReal ? alturaReal : 1123}" style="pointer-events: ${this.ferramentaAtiva === 'cursor' ? 'none' : 'auto'}; cursor: ${this.ferramentaAtiva === 'cursor' ? 'text' : 'crosshair'};"></canvas>
 
           <!-- Camada de Notas Adesivas Editáveis na Página -->
           <div class="ath-pdf-pins-layer" data-pins-pag="${numPag}"></div>
@@ -1361,7 +1398,7 @@ export class EstudoArtigosView {
       `;
 
       stack.appendChild(folhaWrap);
-      if (pdfInfo) {
+      if (ehPaginaPdfReal) {
         folhasReais.push(folhaWrap.querySelector('.ath-pdf-folha-container'));
         this.renderizarGrifosRetangularesDaPagina(folhaWrap.querySelector(`[data-grifos-pag="${numPag}"]`), art, numPag);
       }
@@ -1441,17 +1478,23 @@ export class EstudoArtigosView {
         return { w: v.width, h: v.height };
       }));
       const atuais = art.conteudoPaginasPdf || [];
-      if (atuais.length !== n || !atuais[0]?.real) {
-        art.conteudoPaginasPdf = dims.map((_, i) => ({
+      const qtdReais = atuais.filter(p => p.real).length;
+      if (!atuais.length || !atuais[0]?.real || qtdReais !== n) {
+        const pagsReais = dims.map((_, i) => ({
           numero: i + 1,
           real: true,
           cabecalho: '',
-          titulo: 'Folha do PDF',
+          titulo: `Folha ${i + 1} do PDF`,
           autores: '',
           paragrafos: []
         }));
+        const extras = atuais.filter(p => p.extra);
+        extras.forEach((ext, idx) => {
+          ext.numero = n + idx + 1;
+        });
+        art.conteudoPaginasPdf = [...pagsReais, ...extras];
       }
-      art.totalPaginas = n;
+      art.totalPaginas = art.conteudoPaginasPdf.length;
       this._pdfDocs.set(url, { doc, dims, n });
       return true;
     } catch (err) {
@@ -1534,10 +1577,23 @@ export class EstudoArtigosView {
   rolarParaPagina(numPag, root) {
     this.definirPaginaAtivaSilencioso(numPag, root);
     const wrapPag = root?.querySelector(`[data-wrap-pagina="${numPag}"]`);
-    if (wrapPag && wrapPag.scrollIntoView) {
+    const palco = root?.querySelector('#athEstudioPalco');
+    if (wrapPag && palco) {
       try {
-        wrapPag.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const palcoRect = palco.getBoundingClientRect();
+        const wrapRect = wrapPag.getBoundingClientRect();
+        const diferenca = wrapRect.top - palcoRect.top;
+        palco.scrollTo({
+          top: palco.scrollTop + diferenca - 16,
+          behavior: 'smooth'
+        });
       } catch (_) {}
+    }
+    // Garante que o documento/window não seja deslocado para cima mantendo a barra de topo 100% visível
+    if (typeof window !== 'undefined') {
+      if (window.scrollY > 0) window.scrollTo(0, 0);
+      if (document.documentElement?.scrollTop > 0) document.documentElement.scrollTop = 0;
+      if (document.body?.scrollTop > 0) document.body.scrollTop = 0;
     }
   }
 

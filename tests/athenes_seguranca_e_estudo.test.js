@@ -146,6 +146,32 @@ test('DashboardView possui sincronização com Supabase e backup de espaço para
   assert.equal(codigoDash.includes('carregarDocumentoDoSupabase'), true);
 });
 
+test('DashboardView possui barra lateral de pastas do Google Drive, subpastas e filtro estrito', () => {
+  const codigoDash = fs.readFileSync(path.resolve('src/ui/athenes_dashboard.js'), 'utf8');
+  const cssEditor = fs.readFileSync(path.resolve('src/css/athenes_editor.css'), 'utf8');
+
+  // Estrutura de layout com sidebar e banner
+  assert.equal(codigoDash.includes('ath-dash-sidebar'), true);
+  assert.equal(codigoDash.includes('athDashPastasLista'), true);
+  assert.equal(codigoDash.includes('athBtnNovaSubpastaModal'), true);
+  assert.equal(codigoDash.includes('athBtnVincularPastaModal'), true);
+  assert.equal(codigoDash.includes('ath-dash-pasta-banner'), true);
+
+  // Métodos de seleção e renderização
+  assert.equal(codigoDash.includes('selecionarPasta('), true);
+  assert.equal(codigoDash.includes('renderizarPastasLateral('), true);
+  assert.equal(codigoDash.includes('montarItemPastaComSubpastas('), true);
+  assert.equal(codigoDash.includes('renderizarBannerPasta('), true);
+  assert.equal(codigoDash.includes('abrirModalNovaSubpasta('), true);
+  assert.equal(codigoDash.includes('abrirModalVincularPasta('), true);
+
+  // CSS da barra lateral
+  assert.equal(cssEditor.includes('.ath-dash-layout'), true);
+  assert.equal(cssEditor.includes('.ath-dash-sidebar'), true);
+  assert.equal(cssEditor.includes('.ath-pasta-item'), true);
+  assert.equal(cssEditor.includes('.ath-pasta-item.active'), true);
+});
+
 test('Google Drive & PDF no Estúdio de Artigos: popover organizado, extração de ID de pasta e fallback amigável sem embed quebrado', () => {
   const codigoEstudo = fs.readFileSync(path.resolve('src/ui/athenes_estudo_artigos.js'), 'utf8');
   const codigoColab = fs.readFileSync(path.resolve('src/core/athenes_colaboracao.js'), 'utf8');

@@ -20,7 +20,15 @@ import {
   obterInfoUsuarioGoogle,
   obterOuCriarEstruturaPastasAthenes,
   salvarNotaZoteroNoGoogleDrive,
-  salvarRelatorioPdfNoGoogleDrive
+  salvarRelatorioPdfNoGoogleDrive,
+  obterPastasDriveLocais,
+  salvarPastasDriveLocais,
+  adicionarSubpastaDriveLocal,
+  adicionarPastaCompartilhadaDriveLocal,
+  removerPastaDriveLocal,
+  listarSubpastasDoGoogleDrive,
+  criarSubpastaNoGoogleDrive,
+  listarItensDaPastaDrive
 } from '../src/core/athenes_colaboracao.js';
 
 describe('Athenes — Colaboração, Modos Google Docs, Supabase e Google Drive', () => {
@@ -249,5 +257,79 @@ describe('Athenes — Colaboração, Modos Google Docs, Supabase e Google Drive'
     }, mockUploadZotero);
     assert.equal(resNota.id, 'file_zotero_123');
     assert.ok(uploadZoteroChamado);
+  });
+
+  it('7. Árvore de Pastas do Drive: 2 raízes padrão (Bibliografia e Relatórios), subpastas e compartilhadas', async () => {
+    // 7.1 Raízes padrão locais
+    const pastas = obterPastasDriveLocais();
+    assert.equal(pastas.length, 2);
+    assert.equal(pastas[0].tipo, 'bibliografia');
+    assert.equal(pastas[1].tipo, 'relatorios');
+
+    // 7.2 Adicionar subpasta na árvore hierárquica
+    const sub1 = adicionarSubpastaDriveLocal({
+      parentId: pastas[1].id,
+      nome: 'Artigo SBPC 2026',
+      tipo: 'relatorios'
+    });
+    assert.ok(sub1.id);
+    assert.equal(sub1.nome, 'Artigo SBPC 2026');
+    assert.equal(sub1.parentId, pastas[1].id);
+
+    const pastasComSub = obterPastasDriveLocais();
+    const relAtual = pastasComSub.find(p => p.id === pastas[1].id);
+    assert.equal(relAtual.subpastas.length, 1);
+    assert.equal(relAtual.subpastas[0].nome, 'Artigo SBPC 2026');
+
+    // 7.3 Adicionar e remover pasta compartilhada
+    const comp = adicionarPastaCompartilhadaDriveLocal({
+      url: 'https://drive.google.com/drive/folders/1CompartilhadaXYZ999',
+      nome: 'Laboratório de Urbanismo - Orientação',
+      dono: 'Prof. Orientador'
+    });
+    assert.equal(comp.id, '1CompartilhadaXYZ999');
+    assert.equal(comp.origem, 'compartilhada');
+
+    let pastasComComp = obterPastasDriveLocais();
+    assert.equal(pastasComComp.length, 3);
+
+    removerPastaDriveLocal('1CompartilhadaXYZ999');
+    let pastasAposRemover = obterPastasDriveLocais();
+    assert.equal(pastasAposRemover.length, 2);
+
+    // 7.4 Chamada API mock de subpastas e arquivos isolados por pasta
+    let chamadaSubpastasUrl = '';
+    const mockFetchDrive = async (url, init) => {
+      chamadaSubpastasUrl = decodeURIComponent(url);
+      if (chamadaSubpastasUrl.includes("mimeType = 'application/vnd.google-apps.folder'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            files: [
+              { id: 'sub_gdrive_1', name: 'Capítulo 1' }
+            ]
+          })
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          files: [
+            { id: 'file_1', name: 'Documento_SBPC.athenes', mimeType: 'application/json' },
+            { id: 'file_2', name: 'Grafico.pdf', mimeType: 'application/pdf' }
+          ]
+        })
+      };
+    };
+
+    const subsRemotas = await listarSubpastasDoGoogleDrive('token_fake', 'pasta_pai_123', mockFetchDrive);
+    assert.equal(subsRemotas.length, 1);
+    assert.ok(chamadaSubpastasUrl.includes("'pasta_pai_123' in parents"));
+
+    const itensRemotos = await listarItensDaPastaDrive('token_fake', 'pasta_alvo_456', mockFetchDrive);
+    assert.equal(itensRemotos.length, 2);
+    assert.ok(chamadaSubpastasUrl.includes("'pasta_alvo_456' in parents"));
   });
 });

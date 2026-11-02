@@ -2299,3 +2299,135 @@ del.ath-sug-del {
 
 
 
+
+/* ==========================================================================
+   ATHENES — BARRA LATERAL DE PASTAS DO GOOGLE DRIVE NO DASHBOARD
+   ========================================================================== */
+
+.ath-dash-layout {
+  display: flex;
+  min-height: calc(100vh - 65px);
+  background: var(--ath-fundo, #F8FAFC);
+}
+
+.ath-dash-sidebar {
+  width: 275px;
+  min-width: 275px;
+  background: #FFFFFF;
+  border-right: 1px solid #E2E8F0;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.ath-dash-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.ath-dash-pastas-lista {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: calc(100vh - 230px);
+}
+
+.ath-dash-grupo-titulo {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 12px 6px 4px 6px;
+}
+
+.ath-pasta-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #1E293B;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.ath-pasta-item:hover {
+  background: #F1F5F9;
+}
+
+.ath-pasta-item.active {
+  background: #EEF4FA;
+  color: #314F79;
+  font-weight: 750;
+  border-color: #C8D7E6;
+}
+
+.ath-pasta-item-sub {
+  margin-left: 16px;
+  font-size: 11.5px;
+}
+
+.ath-pasta-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #F1F5F9;
+  color: #64748B;
+  font-weight: 700;
+}
+
+.ath-pasta-item.active .ath-pasta-badge {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+
+.ath-dash-sidebar-acoes {
+  padding-top: 10px;
+  border-top: 1px solid #F1F5F9;
+}
+
+.ath-dash-main-area {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 32px;
+  overflow-y: auto;
+}
+
+.ath-dash-pasta-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+@media (max-width: 860px) {
+  .ath-dash-layout {
+    flex-direction: column;
+  }
+  .ath-dash-sidebar {
+    width: 100%;
+    min-width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #E2E8F0;
+  }
+  .ath-dash-main-area {
+    padding: 16px;
+  }
+}

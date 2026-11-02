@@ -11,6 +11,7 @@ import { PERFIS_FORMATACAO } from '../core/athenes_estilos.js';
 import {
   obterPerfilColaborador,
   salvarPerfilColaborador,
+  encerrarSessao,
   CORES_COLABORADORES,
   obterConfigGoogleDrive,
   salvarConfigGoogleDrive,
@@ -18,7 +19,16 @@ import {
   carregarDocumentoDoSupabase,
   autenticarGoogleDrive,
   obterInfoUsuarioGoogle,
-  obterOuCriarEstruturaPastasAthenes
+  obterOuCriarEstruturaPastasAthenes,
+  obterPastasDriveLocais,
+  salvarPastasDriveLocais,
+  adicionarSubpastaDriveLocal,
+  adicionarPastaCompartilhadaDriveLocal,
+  removerPastaDriveLocal,
+  buscarPastaNaArvore,
+  criarSubpastaNoGoogleDrive,
+  listarSubpastasDoGoogleDrive,
+  extrairIdPastaDrive
 } from '../core/athenes_colaboracao.js';
 import { EstudoArtigosView } from './athenes_estudo_artigos.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
@@ -33,6 +43,8 @@ export class DashboardView {
     this.filtroBusca = '';
     this.filtroTipo = 'todos';
     this.abaAtiva = opcoes.abaInicial || 'escrita'; // 'escrita' | 'artigos_zotero'
+    this.pastaAtivaId = opcoes.pastaInicialId || 'todas';
+    this.pastasDrive = obterPastasDriveLocais();
     this.perfilUsuario = obterPerfilColaborador();
     this.estudoView = null;
 
@@ -61,6 +73,7 @@ export class DashboardView {
         tipoDoc: 'artigo'
       });
       docExemplo1.estado = 'em_revisao';
+      docExemplo1.pastaId = 'pasta_rel_raiz';
 
       const docExemplo2 = criarDocumento({
         titulo: 'Relatório Técnico de Diagnóstico Urbanístico e Infraestrutura',
@@ -69,6 +82,7 @@ export class DashboardView {
         tipoDoc: 'relatorio'
       });
       docExemplo2.estado = 'rascunho';
+      docExemplo2.pastaId = 'pasta_rel_raiz';
 
       this.documentos = [docExemplo1, docExemplo2];
       this.salvarDocumentosLocais();
@@ -156,58 +170,95 @@ export class DashboardView {
         </div>
       </div>
 
-      <!-- Conteúdo da Aba 1: Escrita & Documentos -->
-      <section id="athSecaoDashEscrita" ${this.abaAtiva === 'escrita' ? '' : 'hidden'}>
-        <header class="ath-dash-head">
-          <div class="ath-dash-titulo">
-            <h1>Meus Documentos e Artigos</h1>
-            <p>Ambiente de escrita e diagramação acadêmica em blocos com revisão estilo Google Docs e sincronia em tempo real.</p>
-          </div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-            <button type="button" class="ath-btn" id="athBtnSincronizarNuvem" title="Sincronizar e baixar documentos salvos na nuvem Supabase" style="font-weight:700;">
-              ${svgIcone('nuvem', 14)} Sincronizar Nuvem
+      <!-- Layout Principal com Barra Lateral de Pastas do Google Drive e Conteúdo Filtrado -->
+      <div class="ath-dash-layout">
+        <!-- Barra Lateral de Pastas do Google Drive -->
+        <aside class="ath-dash-sidebar" id="athDashSidebar" aria-label="Pastas do Google Drive">
+          <div class="ath-dash-sidebar-head">
+            <div style="display:flex; align-items:center; gap:6px;">
+              ${svgIcone('drive', 16)}
+              <strong style="font-size:12px; color:#314F79; letter-spacing:0.03em; text-transform:uppercase;">Pastas do Drive</strong>
+            </div>
+            <button type="button" class="ath-btn ath-btn-xs" id="athBtnRecarregarPastasDrive" title="Recarregar árvore de pastas do Drive" style="padding:2px 7px; height:24px; font-size:11px;">
+              ↻
             </button>
-            <button type="button" class="ath-btn" id="athBtnBackupEspaco" title="Exportar ou restaurar backup completo do seu perfil, artigos e documentos para Google Drive">
-              ${svgIcone('config', 14)} Backup / Drive
-            </button>
-            <label class="ath-btn" style="cursor:pointer;" title="Importar arquivo .athenes ou .json">
-              ${svgIcone('mais', 14)} Importar JSON
-              <input type="file" accept=".json,.athenes" id="athInputImportarJson" style="display:none;">
-            </label>
-            <button type="button" class="ath-btn ath-btn-primary" id="athBtnNovoDocModal">
-              ${svgIcone('mais', 14)} Novo Documento
-            </button>
-          </div>
-        </header>
-
-        <div class="ath-dash-filtros">
-          <div class="ath-busca-box">
-            ${svgIcone('busca', 16)}
-            <input type="text" class="ath-input" id="athDashBusca" placeholder="Pesquisar por título, autor ou palavra-chave...">
           </div>
 
-          <select class="ath-select" style="max-width:200px;" id="athDashFiltroTipo">
-            <option value="todos">Todos os tipos</option>
-            ${TIPOS_DOCUMENTO.map(t => `<option value="${t.id}">${t.rotulo}</option>`).join('')}
-          </select>
+          <div class="ath-dash-pastas-lista" id="athDashPastasLista">
+            <!-- Preenchido por this.renderizarPastasLateral() -->
+          </div>
+
+          <div class="ath-dash-sidebar-acoes">
+            <button type="button" class="ath-btn ath-btn-sm" id="athBtnNovaSubpastaModal" style="width:100%; justify-content:center; gap:6px; font-weight:700; font-size:11.5px;">
+              ${svgIcone('mais', 13)} Nova Subpasta
+            </button>
+            <button type="button" class="ath-btn ath-btn-sm" id="athBtnVincularPastaModal" style="width:100%; justify-content:center; gap:6px; font-weight:700; font-size:11.5px; margin-top:6px; background:#fff;">
+              ${svgIcone('elo', 13)} Vincular Compartilhada
+            </button>
+          </div>
+        </aside>
+
+        <!-- Área Principal de Conteúdo -->
+        <div class="ath-dash-main-area">
+          <!-- Banner / Breadcrumbs da Pasta Selecionada -->
+          <div class="ath-dash-pasta-banner" id="athDashPastaBanner">
+            <!-- Preenchido por this.renderizarBannerPasta() -->
+          </div>
+
+          <!-- Conteúdo da Aba 1: Escrita & Documentos -->
+          <section id="athSecaoDashEscrita" ${this.abaAtiva === 'escrita' ? '' : 'hidden'}>
+            <header class="ath-dash-head">
+              <div class="ath-dash-titulo">
+                <h1>Meus Documentos e Artigos</h1>
+                <p>Ambiente de escrita e diagramação acadêmica em blocos com revisão estilo Google Docs e sincronia em tempo real.</p>
+              </div>
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <button type="button" class="ath-btn" id="athBtnSincronizarNuvem" title="Sincronizar e baixar documentos salvos na nuvem Supabase" style="font-weight:700;">
+                  ${svgIcone('nuvem', 14)} Sincronizar Nuvem
+                </button>
+                <button type="button" class="ath-btn" id="athBtnBackupEspaco" title="Exportar ou restaurar backup completo do seu perfil, artigos e documentos para Google Drive">
+                  ${svgIcone('config', 14)} Backup / Drive
+                </button>
+                <label class="ath-btn" style="cursor:pointer;" title="Importar arquivo .athenes ou .json">
+                  ${svgIcone('mais', 14)} Importar JSON
+                  <input type="file" accept=".json,.athenes" id="athInputImportarJson" style="display:none;">
+                </label>
+                <button type="button" class="ath-btn ath-btn-primary" id="athBtnNovoDocModal">
+                  ${svgIcone('mais', 14)} Novo Documento
+                </button>
+              </div>
+            </header>
+
+            <div class="ath-dash-filtros">
+              <div class="ath-busca-box">
+                ${svgIcone('busca', 16)}
+                <input type="text" class="ath-input" id="athDashBusca" placeholder="Pesquisar por título, autor ou palavra-chave...">
+              </div>
+
+              <select class="ath-select" style="max-width:200px;" id="athDashFiltroTipo">
+                <option value="todos">Todos os tipos</option>
+                ${TIPOS_DOCUMENTO.map(t => `<option value="${t.id}">${t.rotulo}</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="ath-docs-grid" id="athDocsGrid">
+              <!-- Cards dos documentos -->
+            </div>
+          </section>
+
+          <!-- Conteúdo da Aba 2: Leitura de Artigos, Anotador de PDF (estilo Samsung Notes) & Zotero + Drive -->
+          <section id="athSecaoDashArtigosZotero" ${this.abaAtiva === 'artigos_zotero' ? '' : 'hidden'}>
+            <header class="ath-dash-head ath-dash-head-zotero" style="margin-bottom:18px;">
+              <div class="ath-dash-titulo">
+                <h1>Estúdio de Artigos, Leitura de PDF & Fichamento Zotero</h1>
+                <p>Leia os PDFs direto do seu Google Drive em Tela Cheia, risque à mão livre estilo Samsung Notes, marque citações e sincronize notas com o Zotero.</p>
+              </div>
+              <div id="athHeaderAcoesZotero" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"></div>
+            </header>
+            <div id="athContainerEstudoArtigos"></div>
+          </section>
         </div>
-
-        <div class="ath-docs-grid" id="athDocsGrid">
-          <!-- Cards dos documentos -->
-        </div>
-      </section>
-
-      <!-- Conteúdo da Aba 2: Leitura de Artigos, Anotador de PDF (estilo Samsung Notes) & Zotero + Drive -->
-      <section id="athSecaoDashArtigosZotero" ${this.abaAtiva === 'artigos_zotero' ? '' : 'hidden'}>
-        <header class="ath-dash-head ath-dash-head-zotero" style="margin-bottom:18px;">
-          <div class="ath-dash-titulo">
-            <h1>Estúdio de Artigos, Leitura de PDF & Fichamento Zotero</h1>
-            <p>Leia os PDFs direto do seu Google Drive em Tela Cheia, risque à mão livre estilo Samsung Notes, marque citações e sincronize notas com o Zotero.</p>
-          </div>
-          <div id="athHeaderAcoesZotero" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"></div>
-        </header>
-        <div id="athContainerEstudoArtigos"></div>
-      </section>
+      </div>
     `;
 
     root.querySelectorAll('[data-aba-dash]').forEach(btn => {
@@ -252,6 +303,35 @@ export class DashboardView {
     });
 
     this.container.appendChild(root);
+
+    // Inicialização da barra lateral de pastas do Google Drive
+    this.renderizarPastasLateral();
+    this.renderizarBannerPasta();
+
+    root.querySelector('#athBtnNovaSubpastaModal')?.addEventListener('click', () => {
+      this.abrirModalNovaSubpasta();
+    });
+
+    root.querySelector('#athBtnVincularPastaModal')?.addEventListener('click', () => {
+      this.abrirModalVincularPasta();
+    });
+
+    root.querySelector('#athBtnRecarregarPastasDrive')?.addEventListener('click', async () => {
+      const driveCfg = obterConfigGoogleDrive();
+      const btn = root.querySelector('#athBtnRecarregarPastasDrive');
+      if (btn) btn.textContent = '...';
+      if (driveCfg.accessToken) {
+        try {
+          await obterOuCriarEstruturaPastasAthenes(driveCfg.accessToken);
+        } catch (_) {}
+      }
+      this.pastasDrive = obterPastasDriveLocais();
+      if (btn) btn.textContent = '✓';
+      setTimeout(() => { if (btn) btn.textContent = '↻'; }, 900);
+      this.renderizarPastasLateral();
+      this.renderizarBannerPasta();
+      this.atualizarGrid();
+    });
 
     if (this.abaAtiva === 'escrita') {
       this.atualizarGrid();
@@ -500,6 +580,338 @@ export class DashboardView {
     });
   }
 
+  selecionarPasta(pastaId) {
+    this.pastaAtivaId = pastaId;
+    this.renderizarPastasLateral();
+    this.renderizarBannerPasta();
+    if (this.abaAtiva === 'escrita') {
+      this.atualizarGrid();
+    }
+  }
+
+  renderizarPastasLateral() {
+    const listaEl = this.container.querySelector('#athDashPastasLista');
+    if (!listaEl) return;
+    listaEl.innerHTML = '';
+
+    // 1. Item Todas as Pastas (Visão Geral)
+    const totalDocs = this.documentos.length;
+    const itemTodas = document.createElement('div');
+    itemTodas.className = `ath-pasta-item ${this.pastaAtivaId === 'todas' ? 'active' : ''}`;
+    itemTodas.innerHTML = `
+      <div style="display:flex; align-items:center; gap:7px;">
+        ${svgIcone('pasta', 15)}
+        <span>Todas as Pastas (Geral)</span>
+      </div>
+      <span class="ath-pasta-badge">${totalDocs}</span>
+    `;
+    itemTodas.addEventListener('click', () => this.selecionarPasta('todas'));
+    listaEl.appendChild(itemTodas);
+
+    // 2. Seção Minhas Pastas (Google Drive)
+    const tituloMinhas = document.createElement('div');
+    tituloMinhas.className = 'ath-dash-grupo-titulo';
+    tituloMinhas.textContent = 'Minhas Pastas (Drive)';
+    listaEl.appendChild(tituloMinhas);
+
+    const minhasPastas = this.pastasDrive.filter(p => p.origem !== 'compartilhada');
+    for (const pasta of minhasPastas) {
+      this.montarItemPastaComSubpastas(listaEl, pasta, 0);
+    }
+
+    // 3. Seção Pastas Compartilhadas Comigo
+    const compartilhadas = this.pastasDrive.filter(p => p.origem === 'compartilhada');
+    const tituloComp = document.createElement('div');
+    tituloComp.className = 'ath-dash-grupo-titulo';
+    tituloComp.textContent = 'Compartilhadas Comigo';
+    listaEl.appendChild(tituloComp);
+
+    if (compartilhadas.length === 0) {
+      const avisoVazio = document.createElement('div');
+      avisoVazio.style.cssText = 'font-size:11px; color:#94A3B8; padding:6px 8px; font-style:italic;';
+      avisoVazio.textContent = 'Nenhuma pasta compartilhada vinculada.';
+      listaEl.appendChild(avisoVazio);
+    } else {
+      for (const pasta of compartilhadas) {
+        this.montarItemPastaComSubpastas(listaEl, pasta, 0, true);
+      }
+    }
+  }
+
+  montarItemPastaComSubpastas(container, pasta, nivel = 0, ehCompartilhada = false) {
+    const item = document.createElement('div');
+    const ativo = (this.pastaAtivaId === pasta.id);
+    item.className = `ath-pasta-item ${ativo ? 'active' : ''} ${nivel > 0 ? 'ath-pasta-item-sub' : ''}`;
+    
+    const count = this.documentos.filter(d => {
+      const pId = d.pastaId || (d.tipoDoc === 'artigo' || d.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz');
+      return pId === pasta.id;
+    }).length;
+
+    const iconeNome = pasta.icone || (pasta.tipo === 'bibliografia' ? 'livro' : (pasta.tipo === 'relatorios' ? 'documento' : (ehCompartilhada ? 'usuarios' : 'pasta')));
+    const prefixo = nivel > 0 ? '↳ ' : '';
+
+    item.innerHTML = `
+      <div style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;">
+        ${svgIcone(iconeNome, 14)}
+        <span style="white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" title="${pasta.nome}">${prefixo}${pasta.nome}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:4px;">
+        <span class="ath-pasta-badge">${count}</span>
+        ${ehCompartilhada ? `
+          <button type="button" class="ath-btn ath-btn-xs ath-btn-remover-comp" title="Desvincular pasta compartilhada" style="padding:0 3px; height:18px; color:#DC2626; border:none; background:transparent;">
+            ✕
+          </button>
+        ` : ''}
+      </div>
+    `;
+
+    item.addEventListener('click', (ev) => {
+      if (ev.target.closest('.ath-btn-remover-comp')) {
+        ev.stopPropagation();
+        if (confirm(`Deseja desvincular a pasta compartilhada "${pasta.nome}"?`)) {
+          removerPastaDriveLocal(pasta.id);
+          this.pastasDrive = obterPastasDriveLocais();
+          if (this.pastaAtivaId === pasta.id) this.pastaAtivaId = 'todas';
+          this.renderizarPastasLateral();
+          this.renderizarBannerPasta();
+          this.atualizarGrid();
+        }
+        return;
+      }
+      this.selecionarPasta(pasta.id);
+    });
+
+    container.appendChild(item);
+
+    if (Array.isArray(pasta.subpastas) && pasta.subpastas.length > 0) {
+      for (const sub of pasta.subpastas) {
+        this.montarItemPastaComSubpastas(container, sub, nivel + 1, ehCompartilhada);
+      }
+    }
+  }
+
+  renderizarBannerPasta() {
+    const bannerEl = this.container.querySelector('#athDashPastaBanner');
+    if (!bannerEl) return;
+
+    if (this.pastaAtivaId === 'todas') {
+      bannerEl.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${svgIcone('pasta', 18)}
+          <div>
+            <strong style="display:block; font-size:13px; color:#1E293B;">Todas as Pastas (Visão Geral)</strong>
+            <small style="font-size:11px; color:#64748B;">Exibindo todos os documentos locais e sincronizados (${this.documentos.length} no total)</small>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoDocBanner">
+            ${svgIcone('mais', 13)} Novo Documento
+          </button>
+        </div>
+      `;
+    } else {
+      const pastaInfo = buscarPastaNaArvore(this.pastasDrive, this.pastaAtivaId) || { nome: 'Pasta Selecionada', tipo: 'relatorios' };
+      const docsNaPasta = this.documentos.filter(d => {
+        const pId = d.pastaId || (d.tipoDoc === 'artigo' || d.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz');
+        return pId === this.pastaAtivaId;
+      });
+
+      const ehBib = pastaInfo.tipo === 'bibliografia';
+
+      bannerEl.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+          ${svgIcone(ehBib ? 'livro' : 'pasta', 20)}
+          <div style="min-width:0;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Pasta do Drive:</span>
+              <strong style="font-size:13.5px; color:#314F79; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">${pastaInfo.nome}</strong>
+              <span class="ath-badge ath-badge-info" style="font-size:10px;">${pastaInfo.origem === 'compartilhada' ? 'Compartilhada' : 'Minha Pasta'}</span>
+            </div>
+            <small style="font-size:11px; color:#64748B; display:block; margin-top:1px;">
+              ${docsNaPasta.length} documento(s) nesta pasta · Mostrando apenas o conteúdo selecionado
+            </small>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${ehBib ? `
+            <button type="button" class="ath-btn ath-btn-sm" id="athBtnVerArtigosZoteroBanner" style="font-weight:700; background:#EEF4FA; color:#314F79; border:1px solid #C8D7E6;">
+              ${svgIcone('zotero', 13)} Ver Leituras & Fichamentos
+            </button>
+          ` : ''}
+          <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoDocBanner">
+            ${svgIcone('mais', 13)} Novo nesta Pasta
+          </button>
+        </div>
+      `;
+
+      bannerEl.querySelector('#athBtnVerArtigosZoteroBanner')?.addEventListener('click', () => {
+        this.abaAtiva = 'artigos_zotero';
+        this.renderizar();
+      });
+    }
+
+    bannerEl.querySelector('#athBtnNovoDocBanner')?.addEventListener('click', () => {
+      this.abrirModalNovoDoc({ pastaId: this.pastaAtivaId });
+    });
+  }
+
+  abrirModalNovaSubpasta() {
+    const modal = document.createElement('div');
+    modal.className = 'ath-modal-backdrop';
+
+    const opcoesMae = [];
+    function coletarPastas(lista, prefixo = '') {
+      for (const p of lista) {
+        opcoesMae.push({ id: p.id, nome: `${prefixo}${p.nome}`, tipo: p.tipo });
+        if (p.subpastas && p.subpastas.length > 0) {
+          coletarPastas(p.subpastas, `${prefixo}  ↳ `);
+        }
+      }
+    }
+    coletarPastas(this.pastasDrive);
+
+    const pastaPreselecionada = (this.pastaAtivaId !== 'todas' ? this.pastaAtivaId : 'pasta_rel_raiz');
+
+    modal.innerHTML = `
+      <div class="ath-modal" style="max-width:440px;">
+        <div class="ath-modal-head">
+          <h2>Nova Subpasta no Google Drive</h2>
+          <button type="button" class="ath-btn ath-btn-icon" id="athModalSubFechar">${svgIcone('fechar', 16)}</button>
+        </div>
+        <div class="ath-modal-corpo">
+          <p style="font-size:12px; color:var(--ath-text-secondary); margin-top:0;">
+            Crie uma subpasta para organizar seus artigos, relatórios técnicos ou revisões bibliográficas no Google Drive.
+          </p>
+          <div class="ath-prop-grupo">
+            <label>Nome da Subpasta</label>
+            <input type="text" class="ath-input" id="athSubpastaNome" placeholder="Ex.: Artigo SBPC 2026, Tese Doutorado..." autofocus>
+          </div>
+          <div class="ath-prop-grupo">
+            <label>Pasta-Mãe (Onde será criada)</label>
+            <select class="ath-select" id="athSubpastaPai">
+              ${opcoesMae.map(o => `<option value="${o.id}" ${o.id === pastaPreselecionada ? 'selected' : ''}>${o.nome}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="ath-modal-foot">
+          <button type="button" class="ath-btn" id="athBtnCancelarSub">Cancelar</button>
+          <button type="button" class="ath-btn ath-btn-primary" id="athBtnCriarSubpastaConfirmar">Criar Subpasta</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    const fechar = () => modal.remove();
+    modal.querySelector('#athModalSubFechar').addEventListener('click', fechar);
+    modal.querySelector('#athBtnCancelarSub').addEventListener('click', fechar);
+    modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+
+    modal.querySelector('#athBtnCriarSubpastaConfirmar').addEventListener('click', async () => {
+      const nome = modal.querySelector('#athSubpastaNome').value.trim();
+      if (!nome) {
+        alert('Por favor, informe um nome para a subpasta.');
+        return;
+      }
+      const parentId = modal.querySelector('#athSubpastaPai').value;
+      const pastaMae = buscarPastaNaArvore(this.pastasDrive, parentId);
+
+      const novaSub = adicionarSubpastaDriveLocal({
+        parentId,
+        nome,
+        tipo: pastaMae?.tipo || 'relatorios'
+      });
+
+      const driveCfg = obterConfigGoogleDrive();
+      if (driveCfg.accessToken) {
+        criarSubpastaNoGoogleDrive({
+          accessToken: driveCfg.accessToken,
+          nome,
+          parentFolderId: parentId.startsWith('pasta_') ? driveCfg.pastaId : parentId
+        }).catch(err => console.warn('[Athenes] Subpasta criada localmente; aviso sincronia Drive:', err));
+      }
+
+      this.pastasDrive = obterPastasDriveLocais();
+      fechar();
+      this.selecionarPasta(novaSub.id);
+    });
+  }
+
+  abrirModalVincularPasta() {
+    const modal = document.createElement('div');
+    modal.className = 'ath-modal-backdrop';
+
+    modal.innerHTML = `
+      <div class="ath-modal" style="max-width:480px;">
+        <div class="ath-modal-head">
+          <h2>Vincular Pasta Compartilhada do Google Drive</h2>
+          <button type="button" class="ath-btn ath-btn-icon" id="athModalCompFechar">${svgIcone('fechar', 16)}</button>
+        </div>
+        <div class="ath-modal-corpo">
+          <p style="font-size:12px; color:var(--ath-text-secondary); margin-top:0;">
+            Vincule uma pasta que um orientador, coautor ou laboratório compartilhou com você via Google Drive para acessar e colaborar diretamente nos resumos e documentos.
+          </p>
+          <div class="ath-prop-grupo">
+            <label>Link ou ID da Pasta Compartilhada no Google Drive</label>
+            <input type="text" class="ath-input" id="athCompUrl" placeholder="Ex.: https://drive.google.com/drive/folders/1ABCxyz... ou ID da pasta" autofocus>
+          </div>
+          <div class="ath-prop-grupo">
+            <label>Nome / Identificação da Pasta</label>
+            <input type="text" class="ath-input" id="athCompNome" placeholder="Ex.: Bibliografia Urbanismo - Prof. Carlos">
+          </div>
+          <div class="ath-linha2">
+            <div class="ath-prop-grupo">
+              <label>Quem Compartilhou</label>
+              <input type="text" class="ath-input" id="athCompDono" placeholder="Ex.: Prof. Orientador, Coautor...">
+            </div>
+            <div class="ath-prop-grupo">
+              <label>Tipo de Conteúdo</label>
+              <select class="ath-select" id="athCompTipo">
+                <option value="bibliografia">Bibliografia & Leituras</option>
+                <option value="relatorios">Relatórios & Artigos</option>
+                <option value="compartilhada">Geral / Compartilhada</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="ath-modal-foot">
+          <button type="button" class="ath-btn" id="athBtnCancelarComp">Cancelar</button>
+          <button type="button" class="ath-btn ath-btn-primary" id="athBtnVincularCompConfirmar">Vincular Pasta</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    const fechar = () => modal.remove();
+    modal.querySelector('#athModalCompFechar').addEventListener('click', fechar);
+    modal.querySelector('#athBtnCancelarComp').addEventListener('click', fechar);
+    modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+
+    modal.querySelector('#athBtnVincularCompConfirmar').addEventListener('click', () => {
+      const urlOuId = modal.querySelector('#athCompUrl').value.trim();
+      const pastaId = extrairIdPastaDrive(urlOuId);
+      if (!pastaId) {
+        alert('Por favor, informe um link ou ID válido de pasta do Google Drive.');
+        return;
+      }
+      const nome = modal.querySelector('#athCompNome').value.trim() || 'Pasta Compartilhada';
+      const dono = modal.querySelector('#athCompDono').value.trim() || 'Colega / Orientador';
+      const tipo = modal.querySelector('#athCompTipo').value;
+
+      const comp = adicionarPastaCompartilhadaDriveLocal({
+        id: pastaId,
+        nome,
+        url: urlOuId.startsWith('http') ? urlOuId : `https://drive.google.com/drive/folders/${pastaId}`,
+        dono,
+        tipo
+      });
+
+      this.pastasDrive = obterPastasDriveLocais();
+      fechar();
+      this.selecionarPasta(comp.id);
+    });
+  }
+
   atualizarGrid() {
     const gridEl = this.container.querySelector('#athDocsGrid');
     if (!gridEl) return;
@@ -509,14 +921,28 @@ export class DashboardView {
       const matchTipo = this.filtroTipo === 'todos' || doc.tipoDoc === this.filtroTipo;
       const str = `${doc.titulo} ${doc.subtitulo} ${doc.metadados?.autores?.map(a => a.nome).join(' ')}`.toLowerCase();
       const matchBusca = !this.filtroBusca || str.includes(this.filtroBusca);
-      return matchTipo && matchBusca;
+
+      let matchPasta = true;
+      if (this.pastaAtivaId && this.pastaAtivaId !== 'todas') {
+        const docPastaId = doc.pastaId || (doc.tipoDoc === 'artigo' || doc.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz');
+        matchPasta = (docPastaId === this.pastaAtivaId);
+      }
+
+      return matchTipo && matchBusca && matchPasta;
     });
 
     if (filtrados.length === 0) {
+      const pastaInfo = (this.pastaAtivaId && this.pastaAtivaId !== 'todas')
+        ? buscarPastaNaArvore(this.pastasDrive, this.pastaAtivaId)
+        : null;
       gridEl.innerHTML = `
         <div style="grid-column: 1 / -1; padding: 48px; text-align: center; color: var(--ath-muted);">
-          <p style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">Nenhum documento encontrado</p>
-          <p style="font-size: 13px; margin: 0;">Clique em "+ Novo Documento" para iniciar um artigo ou relatório.</p>
+          <p style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">
+            ${pastaInfo ? `Nenhum documento na pasta "${pastaInfo.nome}"` : 'Nenhum documento encontrado'}
+          </p>
+          <p style="font-size: 13px; margin: 0;">
+            ${pastaInfo ? 'Clique em "+ Novo nesta Pasta" acima para criar um documento diretamente aqui.' : 'Clique em "+ Novo Documento" para iniciar um artigo ou relatório.'}
+          </p>
         </div>
       `;
       return;
@@ -596,9 +1022,21 @@ export class DashboardView {
     }
   }
 
-  abrirModalNovoDoc() {
+  abrirModalNovoDoc(opcoes = {}) {
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
+
+    const pastaAlvoId = opcoes.pastaId || (this.pastaAtivaId !== 'todas' ? this.pastaAtivaId : 'pasta_rel_raiz');
+    const opcoesPastas = [];
+    function coletarPastas(lista, prefixo = '') {
+      for (const p of lista) {
+        opcoesPastas.push({ id: p.id, nome: `${prefixo}${p.nome}` });
+        if (p.subpastas && p.subpastas.length > 0) {
+          coletarPastas(p.subpastas, `${prefixo}  ↳ `);
+        }
+      }
+    }
+    coletarPastas(this.pastasDrive);
 
     modal.innerHTML = `
       <div class="ath-modal">
@@ -631,6 +1069,13 @@ export class DashboardView {
               </select>
             </div>
           </div>
+
+          <div class="ath-prop-grupo">
+            <label>Pasta de Destino (Google Drive)</label>
+            <select class="ath-select" id="athNovoDocPasta">
+              ${opcoesPastas.map(p => `<option value="${p.id}" ${p.id === pastaAlvoId ? 'selected' : ''}>${p.nome}</option>`).join('')}
+            </select>
+          </div>
         </div>
         <div class="ath-modal-foot">
           <button type="button" class="ath-btn" id="athBtnCancelarNovo">Cancelar</button>
@@ -651,14 +1096,24 @@ export class DashboardView {
       const subtitulo = modal.querySelector('#athNovoDocSubtitulo').value.trim();
       const tipoDoc = modal.querySelector('#athNovoDocTipo').value;
       const perfilId = modal.querySelector('#athNovoDocPerfil').value;
+      const pastaEscolhida = modal.querySelector('#athNovoDocPasta')?.value || pastaAlvoId;
 
       const novo = criarDocumento({ titulo, subtitulo, tipoDoc, perfilId });
       if (this.perfilUsuario?.nome && novo.metadados?.autores?.[0]) {
         novo.metadados.autores[0].nome = this.perfilUsuario.nome;
       }
+      novo.pastaId = pastaEscolhida;
       this.documentos.unshift(novo);
       this.salvarDocumentosLocais();
       fechar();
+
+      if (this.pastaAtivaId !== 'todas' && this.pastaAtivaId !== pastaEscolhida) {
+        this.selecionarPasta(pastaEscolhida);
+      } else {
+        this.renderizarPastasLateral();
+        this.renderizarBannerPasta();
+        this.atualizarGrid();
+      }
       this.onAbrirDocumento(novo);
     });
   }

@@ -976,6 +976,18 @@
   box-sizing: border-box !important;
 }
 
+.ath-estudio-full-shell,
+.ath-estudio-full-shell.rm-conteudo {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  background: var(--ath-bg, #EFF2F6) !important;
+}
+
 .ath-estudio-full-shell .rm-editor.rm-main {
   padding: 10px 12px;
   flex: 1 1 0;
@@ -984,11 +996,12 @@
   box-sizing: border-box;
 }
 
-.ath-estudio-full-shell .rm-conteudo {
-  flex: 1 1 0 !important;
-  min-height: 0 !important;
-  overflow: hidden !important;
-  box-sizing: border-box !important;
+.ath-pdf-folha-extra-corpo {
+  min-height: 100%;
+  box-sizing: border-box;
+  background-image: radial-gradient(#CBD5E1 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
+  background-position: 12px 12px;
 }
 
 .ath-estudio-full-shell .rm-ed-grade {

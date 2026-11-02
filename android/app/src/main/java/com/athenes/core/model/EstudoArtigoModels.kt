@@ -6,6 +6,41 @@ import java.util.UUID
  * Modelos de dados para o Estúdio de Leitura de Artigos, Risco em PDF e Fichamento Zotero.
  */
 
+enum class ModoAmbienteLeitura(val rotulo: String) {
+    LEITURA("Leitura"),
+    ANOTACAO("Anotação"),
+    ORGANIZACAO("Organização")
+}
+
+enum class ModoRolagemPdf(val rotulo: String) {
+    CONTINUA("Rolagem Contínua"),
+    PAGINA_A_PAGINA("Página a Página")
+}
+
+data class SecaoSumario(
+    val id: String = UUID.randomUUID().toString(),
+    val titulo: String,
+    val pagina: Int,
+    val nivel: Int = 1
+)
+
+enum class TipoAnotacao(val rotulo: String) {
+    TODOS("Todos"),
+    DESTAQUE("Destaques"),
+    NOTA("Notas"),
+    CITACAO("Citações")
+}
+
+data class ItemAnotacaoArtigo(
+    val id: String,
+    val pagina: Int,
+    val tipo: TipoAnotacao,
+    val titulo: String,
+    val trecho: String,
+    val corHex: String,
+    val referenciaAbnt: String = ""
+)
+
 data class CitacaoMarcada(
     val id: String = UUID.randomUUID().toString(),
     val pagina: Int,
@@ -76,21 +111,25 @@ data class ArtigoEstudoDetalhado(
     val citacoes: List<CitacaoMarcada> = emptyList(),
     val notas: List<NotaAdesiva> = emptyList(),
     val tracos: List<TracoDesenho> = emptyList(),
+    val sumario: List<SecaoSumario> = emptyList(),
+    val marcadores: Set<Int> = emptySet(),
     val zoteroConfig: ZoteroVinculoConfig = ZoteroVinculoConfig()
 )
 
-enum class FerramentaLeitura {
-    SELECAO,
-    MARCADOR,     // Marca-texto
-    SUBLINHADO,
-    CANETA,        // Desenho livre stylus
-    BORRACHA,
-    NOTA,          // Criar pin de nota
-    CITACAO        // Marcar citação
+enum class FerramentaLeitura(val rotulo: String) {
+    SELECAO("Selecionar Texto"),
+    CANETA("Caneta"),
+    MARCADOR("Marca-Texto"),
+    LINHA_RETA("Linha Reta"),
+    BORRACHA("Borracha"),
+    NOTA("Nota Adesiva"),
+    CITACAO("Citação")
 }
 
 enum class AbaInspetorDireito {
+    ANOTACOES_ARTIGO,
     RESUMO_NOTAS,
     CITACOES,
+    SUMARIO,
     ZOTERO_DRIVE
 }

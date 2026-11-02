@@ -988,3 +988,187 @@ function carregarScriptExterno(src) {
     document.head.appendChild(s);
   });
 }
+
+export const STORAGE_KEY_PASTAS_DRIVE = 'athenes_pastas_drive_v1';
+let _memoriaPastasDrive = null;
+
+export function obterPastasDriveLocais() {
+  const padrao = [
+    {
+      id: 'pasta_bib_raiz',
+      nome: 'Bibliografia & Leituras',
+      tipo: 'bibliografia',
+      origem: 'minhas',
+      icone: 'livro',
+      subpastas: []
+    },
+    {
+      id: 'pasta_rel_raiz',
+      nome: 'Relatórios & Artigos',
+      tipo: 'relatorios',
+      origem: 'minhas',
+      icone: 'documento',
+      subpastas: []
+    }
+  ];
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const salvo = localStorage.getItem(STORAGE_KEY_PASTAS_DRIVE);
+      if (salvo) {
+        const parsed = JSON.parse(salvo);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } else if (_memoriaPastasDrive) {
+      return JSON.parse(JSON.stringify(_memoriaPastasDrive));
+    }
+  } catch (_) {}
+  return padrao;
+}
+
+export function salvarPastasDriveLocais(pastas) {
+  _memoriaPastasDrive = JSON.parse(JSON.stringify(pastas));
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_PASTAS_DRIVE, JSON.stringify(pastas));
+    }
+  } catch (_) {}
+}
+
+export function buscarPastaNaArvore(pastas, id) {
+  if (!Array.isArray(pastas) || !id) return null;
+  for (const item of pastas) {
+    if (item.id === id) return item;
+    if (item.subpastas && item.subpastas.length > 0) {
+      const achou = buscarPastaNaArvore(item.subpastas, id);
+      if (achou) return achou;
+    }
+  }
+  return null;
+}
+
+export function adicionarSubpastaDriveLocal({ parentId, id, nome, tipo = 'relatorios' }) {
+  const pastas = obterPastasDriveLocais();
+  const novaSub = {
+    id: id || ('sub_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)),
+    nome: nome || 'Nova Subpasta',
+    tipo,
+    origem: 'minhas',
+    parentId,
+    subpastas: []
+  };
+
+  function inserirRec(lista) {
+    for (const item of lista) {
+      if (item.id === parentId) {
+        if (!item.subpastas) item.subpastas = [];
+        item.subpastas.push(novaSub);
+        return true;
+      }
+      if (item.subpastas && item.subpastas.length > 0) {
+        if (inserirRec(item.subpastas)) return true;
+      }
+    }
+    return false;
+  }
+
+  const inserido = inserirRec(pastas);
+  if (!inserido) {
+    const raiz = pastas.find(p => p.id === parentId || p.tipo === tipo || p.id === 'pasta_rel_raiz') || pastas[0];
+    if (raiz) {
+      if (!raiz.subpastas) raiz.subpastas = [];
+      raiz.subpastas.push(novaSub);
+    }
+  }
+
+  salvarPastasDriveLocais(pastas);
+  return novaSub;
+}
+
+export function adicionarPastaCompartilhadaDriveLocal({ id, nome, url, dono = 'Colega / Orientador', tipo = 'compartilhada' }) {
+  const pastas = obterPastasDriveLocais();
+  const pastaId = id || extrairIdPastaDrive(url);
+  if (!pastaId) throw new Error('ID ou link da pasta inválido.');
+
+  const existente = buscarPastaNaArvore(pastas, pastaId);
+  if (existente) return existente;
+
+  const novaCompartilhada = {
+    id: pastaId,
+    nome: nome || 'Pasta Compartilhada',
+    url: url || ('https://drive.google.com/drive/folders/' + pastaId),
+    dono,
+    tipo: tipo || 'compartilhada',
+    origem: 'compartilhada',
+    subpastas: []
+  };
+
+  pastas.push(novaCompartilhada);
+  salvarPastasDriveLocais(pastas);
+  return novaCompartilhada;
+}
+
+export function removerPastaDriveLocal(id) {
+  let pastas = obterPastasDriveLocais();
+  function removerRec(lista) {
+    return lista.filter(item => {
+      if (item.id === id) return false;
+      if (item.subpastas && item.subpastas.length > 0) {
+        item.subpastas = removerRec(item.subpastas);
+      }
+      return true;
+    });
+  }
+  pastas = removerRec(pastas);
+  salvarPastasDriveLocais(pastas);
+  return pastas;
+}
+
+export async function listarSubpastasDoGoogleDrive(accessToken, parentFolderId, fetchImpl = globalThis.fetch) {
+  if (!accessToken || !parentFolderId) return [];
+  const q = `trashed = false and mimeType = 'application/vnd.google-apps.folder' and '${parentFolderId}' in parents`;
+  const url = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,name,modifiedTime)&orderBy=name';
+  const resp = await fetchImpl(url, {
+    headers: { 'Authorization': 'Bearer ' + accessToken }
+  });
+  if (!resp.ok) return [];
+  const data = await resp.json();
+  return data.files || [];
+}
+
+export async function criarSubpastaNoGoogleDrive({ accessToken, nome, parentFolderId }, fetchImpl = globalThis.fetch) {
+  if (!accessToken) throw new Error('Token de acesso do Google Drive ausente.');
+  const body = {
+    name: nome,
+    mimeType: 'application/vnd.google-apps.folder',
+    ...(parentFolderId ? { parents: [parentFolderId] } : {})
+  };
+  const resp = await fetchImpl('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + accessToken,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!resp.ok) {
+    let errDet = '';
+    try { const ej = await resp.json(); errDet = ej.error?.message || ''; } catch (_) {}
+    throw new Error(`Erro ao criar subpasta no Drive (${resp.status}): ${errDet}`);
+  }
+  return await resp.json();
+}
+
+export async function listarItensDaPastaDrive(accessToken, folderId, fetchImpl = globalThis.fetch) {
+  if (!accessToken || !folderId) return [];
+  const q = `trashed = false and '${folderId}' in parents`;
+  const url = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,name,mimeType,modifiedTime,size,webViewLink)&orderBy=modifiedTime desc&pageSize=100';
+  const resp = await fetchImpl(url, {
+    headers: { 'Authorization': 'Bearer ' + accessToken }
+  });
+  if (!resp.ok) return [];
+  const data = await resp.json();
+  return data.files || [];
+}
