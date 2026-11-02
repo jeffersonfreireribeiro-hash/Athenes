@@ -24,7 +24,9 @@ import {
   autenticarGoogleDrive,
   salvarArquivoNoGoogleDrive,
   listarPdfsDoGoogleDrive,
-  salvarDocumentoNoSupabase
+  salvarDocumentoNoSupabase,
+  obterPastasDriveLocais,
+  buscarPastaNaArvore
 } from '../core/athenes_colaboracao.js';
 import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
@@ -43,6 +45,7 @@ export function criarArtigosEstudoExemplo() {
     {
       id: 'zot_art_01',
       chaveZotero: 'ZOT8K2M9',
+      pastaId: 'pasta_bib_raiz',
       titulo: 'Regularização Fundiária Urbana e Morfologia de Assentamentos Consolidados na América Latina',
       autores: [
         { sobrenome: 'Santos', prenome: 'Milton' },
@@ -136,6 +139,7 @@ export function criarArtigosEstudoExemplo() {
     {
       id: 'zot_art_02',
       chaveZotero: 'ZOT4P9L2',
+      pastaId: 'pasta_bib_raiz',
       titulo: 'Sistemas Colaborativos CRDT e Editoração Científica em Tempo Real na Web Moderna',
       autores: [
         { sobrenome: 'Kleppmann', prenome: 'Martin' },
@@ -197,6 +201,7 @@ export function criarArtigosEstudoExemplo() {
     {
       id: 'zot_art_03',
       chaveZotero: 'ZOT9R3X7',
+      pastaId: 'pasta_bib_raiz',
       titulo: 'Diretrizes de Desenho Universal e Infraestrutura Verde em Projetos de Reurbanização',
       autores: [
         { sobrenome: 'Gehl', prenome: 'Jan' },
@@ -490,6 +495,7 @@ export class EstudoArtigosView {
     this.pinEditandoId = null; // ID da nota adesiva atualmente aberta para edição na folha
     this.filtroBusca = '';
     this.filtroLateralEsq = '';
+    this.pastaFiltroId = opcoes.pastaFiltroId || 'todas';
     this.zoteroClient = new ZoteroClient();
     this.carregarConfigZotero();
     this.renderizar();
@@ -524,6 +530,18 @@ export class EstudoArtigosView {
 
   temZoteroConectado() {
     return Boolean(this.zoteroClient.apiKey);
+  }
+
+  filtrarPorPasta(pastaId) {
+    this.pastaFiltroId = pastaId || 'todas';
+    if (!this.artigoAberto) {
+      this.atualizarGridCatalogo();
+    } else {
+      const colEsq = this.container.querySelector('#athEstudioColEsq');
+      if (colEsq && this.artigoAberto) {
+        this.renderizarColunaEsquerdaEstudio(colEsq, this.artigoAberto, this.artigoAberto.conteudoPaginasPdf);
+      }
+    }
   }
 
   alternarModoDashboardFull(ativo) {
@@ -648,9 +666,10 @@ export class EstudoArtigosView {
     this.atualizarGridCatalogo();
   }
 
-  converterItemZoteroParaEstudo(item) {
+  converterItemZoteroParaEstudo(item, pastaId = 'pasta_bib_raiz') {
     return {
       id: 'zot_' + (item.id || Date.now().toString(36)),
+      pastaId: item.pastaId || pastaId || 'pasta_bib_raiz',
       chaveZotero: item.chave || item.id || 'ZOTLOCAL',
       titulo: item.titulo || 'Artigo sem título',
       autores: item.autores?.length ? item.autores : [{ sobrenome: 'Autor', prenome: '' }],
@@ -704,6 +723,10 @@ export class EstudoArtigosView {
     grid.innerHTML = '';
 
     const filtrados = this.artigos.filter(art => {
+      if (this.pastaFiltroId && this.pastaFiltroId !== 'todas') {
+        const pastaArt = art.pastaId || 'pasta_bib_raiz';
+        if (pastaArt !== this.pastaFiltroId) return false;
+      }
       if (!this.filtroBusca) return true;
       const autoresStr = (art.autores || []).map(a => `${a.prenome} ${a.sobrenome}`).join(' ');
       const tagsStr = (art.palavrasChave || []).join(' ');
@@ -713,12 +736,20 @@ export class EstudoArtigosView {
     });
 
     if (filtrados.length === 0) {
+      const pastaInfo = buscarPastaNaArvore(obterPastasDriveLocais(), this.pastaFiltroId);
+      const rotuloLocal = pastaInfo?.nome ? `na pasta "${pastaInfo.nome}"` : 'para este filtro';
       grid.innerHTML = `
         <div style="grid-column:1/-1; padding:42px; text-align:center; background:#fff; border-radius:16px; border:1px solid #E2E8F0;">
-          <p style="font-size:15px; font-weight:800; color:#1F2733; margin:0 0 6px 0;">Nenhum artigo encontrado para este filtro</p>
-          <p style="font-size:12.5px; color:#64748B; margin:0;">Sincronize sua biblioteca Zotero ou clique em "Vincular Artigo & PDF".</p>
+          <p style="font-size:15px; font-weight:800; color:#1F2733; margin:0 0 6px 0;">Nenhum artigo encontrado ${escapeHtml(rotuloLocal)}</p>
+          <p style="font-size:12.5px; color:#64748B; margin:0 0 14px 0;">Sincronize sua biblioteca Zotero ou vincule um novo PDF para esta pasta de bibliografia.</p>
+          <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnVincularArtigoVazio">
+            ${svgIcone('mais', 13)} Vincular Artigo & PDF
+          </button>
         </div>
       `;
+      grid.querySelector('#athBtnVincularArtigoVazio')?.addEventListener('click', () => {
+        this.abrirModalVincularArtigo({ pastaId: this.pastaFiltroId });
+      });
       return;
     }
 
@@ -2242,6 +2273,10 @@ export class EstudoArtigosView {
   renderizarColunaEsquerdaEstudio(colEsq, artAtivo, paginasPdf) {
     if (!colEsq) return;
     const artigosFiltrados = this.artigos.filter(a => {
+      if (this.pastaFiltroId && this.pastaFiltroId !== 'todas') {
+        const pastaArt = a.pastaId || 'pasta_bib_raiz';
+        if (pastaArt !== this.pastaFiltroId) return false;
+      }
       if (!this.filtroLateralEsq) return true;
       const str = `${a.titulo} ${(a.autores || []).map(x => x.sobrenome).join(' ')} ${a.ano}`.toLowerCase();
       return str.includes(this.filtroLateralEsq);
@@ -3757,9 +3792,28 @@ export class EstudoArtigosView {
     }
   }
 
-  abrirModalVincularArtigo() {
+  abrirModalVincularArtigo(opcoes = {}) {
     let arquivoPdfSelecionado = null;
     let driveFileIdSelecionado = '';
+
+    const pastasDrive = obterPastasDriveLocais();
+    const opcoesPastasBib = [];
+    function coletarPastasBib(lista, prefixo = '') {
+      for (const p of lista) {
+        if (p.tipo === 'bibliografia' || p.id === 'pasta_bib_raiz' || p.tipo === 'compartilhada') {
+          opcoesPastasBib.push({ id: p.id, nome: `${prefixo}${p.nome}` });
+          if (p.subpastas && p.subpastas.length > 0) {
+            coletarPastasBib(p.subpastas, `${prefixo}  ↳ `);
+          }
+        }
+      }
+    }
+    coletarPastasBib(pastasDrive);
+    if (opcoesPastasBib.length === 0) {
+      opcoesPastasBib.push({ id: 'pasta_bib_raiz', nome: 'Bibliografia & Leituras' });
+    }
+
+    const pastaAlvoId = opcoes.pastaId || (this.pastaFiltroId && this.pastaFiltroId !== 'todas' ? this.pastaFiltroId : 'pasta_bib_raiz');
 
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
@@ -3775,6 +3829,13 @@ export class EstudoArtigosView {
             <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnPuxarRefZoteroNoModal">
               ${svgIcone('zotero', 13)} Escolher do Zotero
             </button>
+          </div>
+
+          <div class="ath-prop-grupo">
+            <label>Pasta de Destino (Google Drive)</label>
+            <select class="ath-select" id="athNovoArtPasta">
+              ${opcoesPastasBib.map(o => `<option value="${escapeHtml(o.id)}" ${o.id === pastaAlvoId ? 'selected' : ''}>${escapeHtml(o.nome)}</option>`).join('')}
+            </select>
           </div>
 
           <div class="ath-prop-grupo">
@@ -3891,15 +3952,18 @@ export class EstudoArtigosView {
       const driveFileName = inputDriveNome.value.trim() || `${partesAutor[0]}_${ano}.pdf`;
       const resumo = modal.querySelector('#athNovoArtResumo').value.trim() || 'Artigo vinculado ao Zotero e ao Google Drive.';
 
+      const pastaDestinoId = modal.querySelector('#athNovoArtPasta')?.value || pastaAlvoId;
       const novoArt = this.converterItemZoteroParaEstudo({
         id: Date.now().toString(36),
+        pastaId: pastaDestinoId,
         chave: chaveZotero,
         titulo,
         autores: [{ sobrenome: partesAutor[0] || 'Autor', prenome: partesAutor[1] || '' }],
         ano,
         publicacao,
         resumo
-      });
+      }, pastaDestinoId);
+      novoArt.pastaId = pastaDestinoId;
       novoArt.driveFileName = driveFileName;
       if (driveFileIdSelecionado) {
         novoArt.driveFileId = driveFileIdSelecionado;

@@ -72,22 +72,22 @@ class ReaderTest {
     @Test
     fun testPaletaSeisCores() {
         assertEquals(6, viewModel.coresDisponiveis.size)
-        assertTrue("Amarelo deve estar disponível", viewModel.coresDisponiveis.contains("#FDE047"))
-        assertTrue("Verde deve estar disponível", viewModel.coresDisponiveis.contains("#86EFAC"))
-        assertTrue("Azul deve estar disponível", viewModel.coresDisponiveis.contains("#93C5FD"))
-        assertTrue("Rosa/Vermelho deve estar disponível", viewModel.coresDisponiveis.contains("#FCA5A5"))
-        assertTrue("Roxo deve estar disponível", viewModel.coresDisponiveis.contains("#D8B4FE"))
-        assertTrue("Laranja deve estar disponível", viewModel.coresDisponiveis.contains("#FDBA74"))
+        assertTrue("Azul Marinho Athenes deve estar disponível", viewModel.coresDisponiveis.contains("#314F79"))
+        assertTrue("Vermelho deve estar disponível", viewModel.coresDisponiveis.contains("#DC2626"))
+        assertTrue("Verde deve estar disponível", viewModel.coresDisponiveis.contains("#059669"))
+        assertTrue("Laranja deve estar disponível", viewModel.coresDisponiveis.contains("#D97706"))
+        assertTrue("Roxo deve estar disponível", viewModel.coresDisponiveis.contains("#7C3AED"))
+        assertTrue("Amarelo deve estar disponível", viewModel.coresDisponiveis.contains("#FACC15"))
 
         // Testar seleção de cada cor
-        viewModel.definirCor("#86EFAC")
-        assertEquals("#86EFAC", viewModel.corAtiva.value)
+        viewModel.definirCor("#DC2626")
+        assertEquals("#DC2626", viewModel.corAtiva.value)
 
-        viewModel.definirCor("#93C5FD")
-        assertEquals("#93C5FD", viewModel.corAtiva.value)
+        viewModel.definirCor("#059669")
+        assertEquals("#059669", viewModel.corAtiva.value)
 
-        viewModel.definirCor("#D8B4FE")
-        assertEquals("#D8B4FE", viewModel.corAtiva.value)
+        viewModel.definirCor("#314F79")
+        assertEquals("#314F79", viewModel.corAtiva.value)
     }
 
     @Test

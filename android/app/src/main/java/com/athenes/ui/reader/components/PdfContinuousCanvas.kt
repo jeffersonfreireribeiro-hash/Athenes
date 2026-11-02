@@ -53,6 +53,8 @@ fun PdfContinuousCanvas(
     onCriarCitacao: () -> Unit,
     onCriarNota: () -> Unit,
     onAdicionarTraco: (List<PontoTraco>) -> Unit,
+    onPaginaAnterior: () -> Unit = {},
+    onProximaPagina: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -68,14 +70,14 @@ fun PdfContinuousCanvas(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFE2E8F0))
+            .background(Color(0xFFF1F5F9))
     ) {
         // Rolagem Contínua das Páginas do PDF
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 68.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             itemsIndexed(artigo.paginas) { index, pagina ->
@@ -219,6 +221,62 @@ fun PdfContinuousCanvas(
                 }
             }
         }
+
+        // ========================================================
+        // INDICADOR FLUTUANTE DE PÁGINA (Ex.: < 1 / 33 >)
+        // Discreto e elegante no canto inferior direito do canvas
+        // ========================================================
+        Surface(
+            color = Color.White,
+            shape = RoundedCornerShape(999.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            shadowElevation = 4.dp,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 20.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                IconButton(
+                    onClick = onPaginaAnterior,
+                    enabled = paginaAtual > 1,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronLeft,
+                        contentDescription = "Página Anterior",
+                        tint = if (paginaAtual > 1) AthenesPrimary else AthenesTextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Text(
+                    text = "$paginaAtual / ${artigo.totalPaginas}",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = AthenesPrimary
+                    ),
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+
+                IconButton(
+                    onClick = onProximaPagina,
+                    enabled = paginaAtual < artigo.totalPaginas,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronRight,
+                        contentDescription = "Próxima Página",
+                        tint = if (paginaAtual < artigo.totalPaginas) AthenesPrimary else AthenesTextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -237,7 +295,9 @@ private fun FolhaPdfRenderizada(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.widthIn(max = 760.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 840.dp)
     ) {
         // Indicador do Topo da Folha
         Row(

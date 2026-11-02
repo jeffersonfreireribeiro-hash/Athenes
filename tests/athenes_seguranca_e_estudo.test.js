@@ -182,6 +182,12 @@ test('DashboardView possui barra lateral de pastas do Google Drive, subpastas e 
   assert.equal(codigoDash.includes('abrirModalNovaSubpasta('), true);
   assert.equal(codigoDash.includes('abrirModalVincularPasta('), true);
 
+  // Isolamento estrito entre Abas (Escrita mostra apenas Relatórios; Artigos/Zotero mostra apenas Bibliografia)
+  assert.equal(codigoDash.includes("const ehAbaBib = this.abaAtiva === 'artigos_zotero'"), true);
+  assert.equal(codigoDash.includes("p.tipo === 'bibliografia' || p.id === 'pasta_bib_raiz'"), true);
+  assert.equal(codigoDash.includes("p.tipo === 'relatorios' || p.id === 'pasta_rel_raiz'"), true);
+  assert.equal(codigoDash.includes("this.pastaAtivaId = 'todas'"), true);
+
   // CSS da barra lateral
   assert.equal(cssEditor.includes('.ath-dash-layout'), true);
   assert.equal(cssEditor.includes('.ath-dash-sidebar'), true);
@@ -242,4 +248,18 @@ test('Google Drive & PDF no Estúdio de Artigos: popover organizado, extração 
   assert.equal(codigoEditor.includes('renderizarListaEstilosContextuais'), true);
   assert.equal(codigoEditor.includes('abrirPainelZotero()'), true);
   assert.equal(codigoEditor.includes('this.doc.referencias.push(ref)'), true);
+});
+
+test('Estúdio de Artigos suporta isolamento por pasta, método filtrarPorPasta e vínculo em subpastas', () => {
+  const codigoEstudo = fs.readFileSync(path.resolve('src/ui/athenes_estudo_artigos.js'), 'utf8');
+
+  // Método e propriedade de filtro
+  assert.equal(codigoEstudo.includes('filtrarPorPasta(pastaId)'), true);
+  assert.equal(codigoEstudo.includes('this.pastaFiltroId ='), true);
+  assert.equal(codigoEstudo.includes("pastaArt !== this.pastaFiltroId"), true);
+
+  // Vínculo de artigo com pasta
+  assert.equal(codigoEstudo.includes('athNovoArtPasta'), true);
+  assert.equal(codigoEstudo.includes('coletarPastasBib'), true);
+  assert.equal(codigoEstudo.includes('novoArt.pastaId ='), true);
 });

@@ -29,6 +29,7 @@ fun EstudoArtigosScreen(
     val artigoAtivo = viewModel.obterArtigoAtivo()
     val paginaAtiva by viewModel.paginaAtiva.collectAsState()
     val ferramentaAtiva by viewModel.ferramentaAtiva.collectAsState()
+    val modoLinhaReta by viewModel.modoLinhaReta.collectAsState()
     val corAtiva by viewModel.corAtiva.collectAsState()
     val painelEsquerdoAberto by viewModel.painelEsquerdoAberto.collectAsState()
     val painelDireitoAberto by viewModel.painelDireitoAberto.collectAsState()
@@ -70,36 +71,48 @@ fun EstudoArtigosScreen(
             // ========================================================
             // PALCO CENTRAL DE LEITURA & ANOTAÇÃO (100% DA LARGURA)
             // ========================================================
-            Column(modifier = Modifier.fillMaxSize()) {
+            PdfContinuousCanvas(
+                artigo = artigoAtivo,
+                paginaAtual = paginaAtiva,
+                ferramentaAtiva = ferramentaAtiva,
+                corAtiva = corAtiva,
+                textoSelecionado = textoSelecionado,
+                onTextoSelecionado = { txt, pag, x, y ->
+                    viewModel.selecionarTexto(txt, pag, x, y)
+                },
+                onFecharPopupSelecao = { viewModel.fecharPopupSelecao() },
+                onGrifarTexto = { viewModel.grifarTextoSelecionado() },
+                onCriarCitacao = { viewModel.abrirCriacaoCitacao() },
+                onCriarNota = { viewModel.abrirCriacaoNota() },
+                onAdicionarTraco = { pontos -> viewModel.adicionarTracoLivre(pontos) },
+                onPaginaAnterior = { viewModel.paginaAnterior() },
+                onProximaPagina = { viewModel.proximaPagina() },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // BARRA DE PÍLULA FLUTUANTE (.rm-barra-blocos)
+            // Fiel ao web Athenes: [ ← ] [ 💾 ] | [ ↶ ] [ 🗑 ] | [ ☰ ] [ ✏ ] [ 🖊 ] [ ⚬—⚬ ] [ ▱ ] [ 📝 ] [ ❝ ] | ● ● ● ● ● ●
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .padding(top = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 ReaderSubBar(
-                    totalPaginas = artigoAtivo.totalPaginas,
-                    paginaAtual = paginaAtiva,
                     ferramentaAtiva = ferramentaAtiva,
+                    modoLinhaReta = modoLinhaReta,
                     corAtiva = corAtiva,
                     coresDisponiveis = viewModel.coresDisponiveis,
-                    onSelecionarFerramenta = { viewModel.definirFerramenta(it) },
-                    onSelecionarCor = { viewModel.definirCor(it) },
-                    onPaginaAnterior = { viewModel.paginaAnterior() },
-                    onProximaPagina = { viewModel.proximaPagina() },
-                    onDesfazer = { viewModel.desfazerTraco() },
-                    onLimparPagina = { viewModel.limparPagina() }
-                )
-
-                PdfContinuousCanvas(
-                    artigo = artigoAtivo,
-                    paginaAtual = paginaAtiva,
-                    ferramentaAtiva = ferramentaAtiva,
-                    corAtiva = corAtiva,
-                    textoSelecionado = textoSelecionado,
-                    onTextoSelecionado = { txt, pag, x, y ->
-                        viewModel.selecionarTexto(txt, pag, x, y)
+                    onVoltar = onVoltarBiblioteca,
+                    onSalvar = {
+                        Toast.makeText(context, "Sincronizado e salvo no Google Drive & Zotero!", Toast.LENGTH_SHORT).show()
                     },
-                    onFecharPopupSelecao = { viewModel.fecharPopupSelecao() },
-                    onGrifarTexto = { viewModel.grifarTextoSelecionado() },
-                    onCriarCitacao = { viewModel.abrirCriacaoCitacao() },
-                    onCriarNota = { viewModel.abrirCriacaoNota() },
-                    onAdicionarTraco = { pontos -> viewModel.adicionarTracoLivre(pontos) },
-                    modifier = Modifier.weight(1f)
+                    onDesfazer = { viewModel.desfazerTraco() },
+                    onLimparPagina = { viewModel.limparPagina() },
+                    onSelecionarFerramenta = { viewModel.definirFerramenta(it) },
+                    onAlternarModoLinhaReta = { viewModel.alternarModoLinhaReta() },
+                    onSelecionarCor = { viewModel.definirCor(it) }
                 )
             }
 

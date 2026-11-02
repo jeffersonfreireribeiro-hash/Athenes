@@ -30,7 +30,8 @@ import {
   listarSubpastasDoGoogleDrive,
   extrairIdPastaDrive
 } from '../core/athenes_colaboracao.js';
-import { EstudoArtigosView } from './athenes_estudo_artigos.js';
+import { escapeHtml } from '../core/athenes_seguranca.js';
+import { EstudoArtigosView, carregarArtigosEstudo } from './athenes_estudo_artigos.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 
 export class DashboardView {
@@ -260,8 +261,12 @@ export class DashboardView {
 
     root.querySelectorAll('[data-aba-dash]').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.abaAtiva = btn.dataset.abaDash;
-        this.renderizar();
+        const novaAba = btn.dataset.abaDash;
+        if (this.abaAtiva !== novaAba) {
+          this.abaAtiva = novaAba;
+          this.pastaAtivaId = 'todas';
+          this.renderizar();
+        }
       });
     });
 
@@ -329,7 +334,9 @@ export class DashboardView {
       this.atualizarGrid();
     } else {
       const boxEstudo = root.querySelector('#athContainerEstudoArtigos');
-      this.estudoView = new EstudoArtigosView(boxEstudo);
+      this.estudoView = new EstudoArtigosView(boxEstudo, {
+        pastaFiltroId: this.pastaAtivaId
+      });
     }
   }
 
@@ -582,6 +589,10 @@ export class DashboardView {
     this.renderizarBannerPasta();
     if (this.abaAtiva === 'escrita') {
       this.atualizarGrid();
+    } else {
+      if (this.estudoView && typeof this.estudoView.filtrarPorPasta === 'function') {
+        this.estudoView.filtrarPorPasta(pastaId);
+      }
     }
   }
 
@@ -590,33 +601,67 @@ export class DashboardView {
     if (!listaEl) return;
     listaEl.innerHTML = '';
 
-    // 1. Item Todas as Pastas (Visão Geral)
-    const totalDocs = this.documentos.length;
+    const ehAbaBib = this.abaAtiva === 'artigos_zotero';
+
+    // 1. Item Todas as Pastas (Visão Geral da Aba Ativa)
+    const totalItens = ehAbaBib
+      ? (this.estudoView?.artigos || carregarArtigosEstudo()).length
+      : this.documentos.length;
+    const rotuloTodas = ehAbaBib
+      ? 'Todas as Bibliografias'
+      : 'Todos os Documentos';
+    const iconeTodas = ehAbaBib ? 'livro' : 'pasta';
+
     const itemTodas = document.createElement('div');
     itemTodas.className = `ath-pasta-item ${this.pastaAtivaId === 'todas' ? 'active' : ''}`;
     itemTodas.innerHTML = `
       <div style="display:flex; align-items:center; gap:7px;">
-        ${svgIcone('pasta', 15)}
-        <span>Todas as Pastas (Geral)</span>
+        ${svgIcone(iconeTodas, 15)}
+        <span>${rotuloTodas}</span>
       </div>
-      <span class="ath-pasta-badge">${totalDocs}</span>
+      <span class="ath-pasta-badge">${totalItens}</span>
     `;
     itemTodas.addEventListener('click', () => this.selecionarPasta('todas'));
     listaEl.appendChild(itemTodas);
 
-    // 2. Seção Minhas Pastas (Google Drive)
+    // 2. Seção Minhas Pastas (Google Drive) - Estritamente filtrada por tipo da aba ativa
     const tituloMinhas = document.createElement('div');
     tituloMinhas.className = 'ath-dash-grupo-titulo';
-    tituloMinhas.textContent = 'Minhas Pastas (Drive)';
+    tituloMinhas.textContent = ehAbaBib
+      ? 'Pastas de Bibliografia (Drive)'
+      : 'Pastas de Documentos (Drive)';
     listaEl.appendChild(tituloMinhas);
 
-    const minhasPastas = this.pastasDrive.filter(p => p.origem !== 'compartilhada');
-    for (const pasta of minhasPastas) {
-      this.montarItemPastaComSubpastas(listaEl, pasta, 0);
+    const minhasPastas = this.pastasDrive.filter(p => {
+      if (p.origem === 'compartilhada') return false;
+      if (ehAbaBib) {
+        return p.tipo === 'bibliografia' || p.id === 'pasta_bib_raiz';
+      } else {
+        return p.tipo === 'relatorios' || p.id === 'pasta_rel_raiz';
+      }
+    });
+
+    if (minhasPastas.length === 0) {
+      const avisoVazio = document.createElement('div');
+      avisoVazio.style.cssText = 'font-size:11px; color:#94A3B8; padding:6px 8px; font-style:italic;';
+      avisoVazio.textContent = ehAbaBib ? 'Nenhuma pasta de bibliografia.' : 'Nenhuma pasta de documentos.';
+      listaEl.appendChild(avisoVazio);
+    } else {
+      for (const pasta of minhasPastas) {
+        this.montarItemPastaComSubpastas(listaEl, pasta, 0);
+      }
     }
 
-    // 3. Seção Pastas Compartilhadas Comigo
-    const compartilhadas = this.pastasDrive.filter(p => p.origem === 'compartilhada');
+    // 3. Seção Pastas Compartilhadas Comigo - Estritamente filtrada por tipo da aba ativa
+    const compartilhadas = this.pastasDrive.filter(p => {
+      if (p.origem !== 'compartilhada') return false;
+      if (ehAbaBib) {
+        return p.tipo === 'bibliografia' || p.tipo === 'compartilhada';
+      } else {
+        return p.tipo === 'relatorios' || p.tipo === 'compartilhada';
+      }
+    });
+
     const tituloComp = document.createElement('div');
     tituloComp.className = 'ath-dash-grupo-titulo';
     tituloComp.textContent = 'Compartilhadas Comigo';
@@ -625,7 +670,9 @@ export class DashboardView {
     if (compartilhadas.length === 0) {
       const avisoVazio = document.createElement('div');
       avisoVazio.style.cssText = 'font-size:11px; color:#94A3B8; padding:6px 8px; font-style:italic;';
-      avisoVazio.textContent = 'Nenhuma pasta compartilhada vinculada.';
+      avisoVazio.textContent = ehAbaBib
+        ? 'Nenhuma pasta de bibliografia compartilhada vinculada.'
+        : 'Nenhuma pasta de relatórios compartilhada vinculada.';
       listaEl.appendChild(avisoVazio);
     } else {
       for (const pasta of compartilhadas) {
@@ -639,10 +686,20 @@ export class DashboardView {
     const ativo = (this.pastaAtivaId === pasta.id);
     item.className = `ath-pasta-item ${ativo ? 'active' : ''} ${nivel > 0 ? 'ath-pasta-item-sub' : ''}`;
     
-    const count = this.documentos.filter(d => {
-      const pId = d.pastaId || (d.tipoDoc === 'artigo' || d.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz');
-      return pId === pasta.id;
-    }).length;
+    const ehAbaBib = this.abaAtiva === 'artigos_zotero';
+    let count = 0;
+    if (ehAbaBib) {
+      const artigos = this.estudoView?.artigos || carregarArtigosEstudo();
+      count = artigos.filter(a => {
+        const pId = a.pastaId || 'pasta_bib_raiz';
+        return pId === pasta.id;
+      }).length;
+    } else {
+      count = this.documentos.filter(d => {
+        const pId = d.pastaId || (d.tipoDoc === 'artigo' || d.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz');
+        return pId === pasta.id;
+      }).length;
+    }
 
     const iconeNome = pasta.icone || (pasta.tipo === 'bibliografia' ? 'livro' : (pasta.tipo === 'relatorios' ? 'documento' : (ehCompartilhada ? 'usuarios' : 'pasta')));
     const prefixo = nivel > 0 ? '↳ ' : '';
@@ -650,7 +707,7 @@ export class DashboardView {
     item.innerHTML = `
       <div style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;">
         ${svgIcone(iconeNome, 14)}
-        <span style="white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" title="${pasta.nome}">${prefixo}${pasta.nome}</span>
+        <span style="white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" title="${escapeHtml(pasta.nome)}">${prefixo}${escapeHtml(pasta.nome)}</span>
       </div>
       <div style="display:flex; align-items:center; gap:4px;">
         <span class="ath-pasta-badge">${count}</span>
@@ -671,7 +728,8 @@ export class DashboardView {
           if (this.pastaAtivaId === pasta.id) this.pastaAtivaId = 'todas';
           this.renderizarPastasLateral();
           this.renderizarBannerPasta();
-          this.atualizarGrid();
+          if (this.abaAtiva === 'escrita') this.atualizarGrid();
+          else this.estudoView?.filtrarPorPasta?.(this.pastaAtivaId);
         }
         return;
       }
@@ -691,72 +749,146 @@ export class DashboardView {
     const bannerEl = this.container.querySelector('#athDashPastaBanner');
     if (!bannerEl) return;
 
+    const ehAbaBib = this.abaAtiva === 'artigos_zotero';
+
     if (this.pastaAtivaId === 'todas') {
-      bannerEl.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px;">
-          ${svgIcone('pasta', 18)}
-          <div>
-            <strong style="display:block; font-size:13px; color:#1E293B;">Todas as Pastas (Visão Geral)</strong>
-            <small style="font-size:11px; color:#64748B;">Exibindo todos os documentos locais e sincronizados (${this.documentos.length} no total)</small>
-          </div>
-        </div>
-        <div style="display:flex; align-items:center; gap:8px;">
-          <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoDocBanner">
-            ${svgIcone('mais', 13)} Novo Documento
-          </button>
-        </div>
-      `;
-    } else {
-      const pastaInfo = buscarPastaNaArvore(this.pastasDrive, this.pastaAtivaId) || { nome: 'Pasta Selecionada', tipo: 'relatorios' };
-      const docsNaPasta = this.documentos.filter(d => {
-        const pId = d.pastaId || (d.tipoDoc === 'artigo' || d.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz');
-        return pId === this.pastaAtivaId;
-      });
-
-      const ehBib = pastaInfo.tipo === 'bibliografia';
-
-      bannerEl.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-          ${svgIcone(ehBib ? 'livro' : 'pasta', 20)}
-          <div style="min-width:0;">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Pasta do Drive:</span>
-              <strong style="font-size:13.5px; color:#314F79; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">${pastaInfo.nome}</strong>
-              <span class="ath-badge ath-badge-info" style="font-size:10px;">${pastaInfo.origem === 'compartilhada' ? 'Compartilhada' : 'Minha Pasta'}</span>
+      if (!ehAbaBib) {
+        bannerEl.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${svgIcone('pasta', 18)}
+            <div>
+              <strong style="display:block; font-size:13px; color:#1E293B;">Todas as Pastas de Documentos (Visão Geral)</strong>
+              <small style="font-size:11px; color:#64748B;">Exibindo todos os documentos locais e sincronizados (${this.documentos.length} no total)</small>
             </div>
-            <small style="font-size:11px; color:#64748B; display:block; margin-top:1px;">
-              ${docsNaPasta.length} documento(s) nesta pasta · Mostrando apenas o conteúdo selecionado
-            </small>
           </div>
-        </div>
-        <div style="display:flex; align-items:center; gap:8px;">
-          ${ehBib ? `
-            <button type="button" class="ath-btn ath-btn-sm" id="athBtnVerArtigosZoteroBanner" style="font-weight:700; background:#EEF4FA; color:#314F79; border:1px solid #C8D7E6;">
-              ${svgIcone('zotero', 13)} Ver Leituras & Fichamentos
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoDocBanner">
+              ${svgIcone('mais', 13)} Novo Documento
             </button>
-          ` : ''}
-          <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoDocBanner">
-            ${svgIcone('mais', 13)} Novo nesta Pasta
-          </button>
-        </div>
-      `;
+          </div>
+        `;
+        bannerEl.querySelector('#athBtnNovoDocBanner')?.addEventListener('click', () => {
+          this.abrirModalNovoDoc();
+        });
+      } else {
+        const totalArtigos = (this.estudoView?.artigos || carregarArtigosEstudo()).length;
+        bannerEl.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${svgIcone('livro', 18)}
+            <div>
+              <strong style="display:block; font-size:13px; color:#1E293B;">Todas as Pastas de Bibliografia & Leituras</strong>
+              <small style="font-size:11px; color:#64748B;">Exibindo todos os artigos, fichamentos e PDFs vinculados (${totalArtigos} no total)</small>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoArtigoBanner">
+              ${svgIcone('mais', 13)} Vincular Artigo & PDF
+            </button>
+          </div>
+        `;
+        bannerEl.querySelector('#athBtnNovoArtigoBanner')?.addEventListener('click', () => {
+          this.estudoView?.abrirModalVincularArtigo?.();
+        });
+      }
+    } else {
+      const pastaInfo = buscarPastaNaArvore(this.pastasDrive, this.pastaAtivaId) || {
+        nome: 'Pasta Selecionada',
+        tipo: ehAbaBib ? 'bibliografia' : 'relatorios'
+      };
 
-      bannerEl.querySelector('#athBtnVerArtigosZoteroBanner')?.addEventListener('click', () => {
-        this.abaAtiva = 'artigos_zotero';
-        this.renderizar();
-      });
+      if (!ehAbaBib) {
+        const docsNaPasta = this.documentos.filter(d => {
+          const pId = d.pastaId || (d.tipoDoc === 'artigo' || d.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz');
+          return pId === this.pastaAtivaId;
+        });
+
+        bannerEl.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+            ${svgIcone('pasta', 20)}
+            <div style="min-width:0;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Pasta de Documentos:</span>
+                <strong style="font-size:13.5px; color:#314F79; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">${escapeHtml(pastaInfo.nome)}</strong>
+                <span class="ath-badge ath-badge-info" style="font-size:10px;">${pastaInfo.origem === 'compartilhada' ? 'Compartilhada' : 'Minha Pasta'}</span>
+              </div>
+              <small style="font-size:11px; color:#64748B; display:block; margin-top:1px;">
+                ${docsNaPasta.length} documento(s) nesta pasta · Mostrando apenas relatórios e artigos selecionados
+              </small>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoDocBanner">
+              ${svgIcone('mais', 13)} Novo nesta Pasta
+            </button>
+          </div>
+        `;
+
+        bannerEl.querySelector('#athBtnNovoDocBanner')?.addEventListener('click', () => {
+          this.abrirModalNovoDoc({ pastaId: this.pastaAtivaId });
+        });
+      } else {
+        const artigos = this.estudoView?.artigos || carregarArtigosEstudo();
+        const artigosNaPasta = artigos.filter(a => {
+          const pId = a.pastaId || 'pasta_bib_raiz';
+          return pId === this.pastaAtivaId;
+        });
+
+        bannerEl.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+            ${svgIcone('livro', 20)}
+            <div style="min-width:0;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Pasta de Bibliografia:</span>
+                <strong style="font-size:13.5px; color:#314F79; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">${escapeHtml(pastaInfo.nome)}</strong>
+                <span class="ath-badge ath-badge-info" style="font-size:10px;">${pastaInfo.origem === 'compartilhada' ? 'Compartilhada' : 'Minha Pasta'}</span>
+              </div>
+              <small style="font-size:11px; color:#64748B; display:block; margin-top:1px;">
+                ${artigosNaPasta.length} artigo(s) / fichamento(s) nesta pasta · Mostrando apenas bibliografia selecionada
+              </small>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoArtigoBanner">
+              ${svgIcone('mais', 13)} Vincular Artigo nesta Pasta
+            </button>
+          </div>
+        `;
+
+        bannerEl.querySelector('#athBtnNovoArtigoBanner')?.addEventListener('click', () => {
+          this.estudoView?.abrirModalVincularArtigo?.({ pastaId: this.pastaAtivaId });
+        });
+      }
     }
-
-    bannerEl.querySelector('#athBtnNovoDocBanner')?.addEventListener('click', () => {
-      this.abrirModalNovoDoc({ pastaId: this.pastaAtivaId });
-    });
   }
 
   abrirModalNovaSubpasta() {
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
 
+    const ehAbaBib = this.abaAtiva === 'artigos_zotero';
+    const tipoFiltro = ehAbaBib ? 'bibliografia' : 'relatorios';
+
     const opcoesMae = [];
+    function coletarPastas(lista, prefixo = '') {
+      for (const p of lista) {
+        if (p.tipo === tipoFiltro || (!p.tipo && (ehAbaBib ? p.id === 'pasta_bib_raiz' : p.id === 'pasta_rel_raiz'))) {
+          opcoesMae.push({ id: p.id, nome: `${prefixo}${p.nome}`, tipo: p.tipo });
+          if (p.subpastas && p.subpastas.length > 0) {
+            coletarPastas(p.subpastas, `${prefixo}  ↳ `);
+          }
+        }
+      }
+    }
+    coletarPastas(this.pastasDrive);
+
+    if (opcoesMae.length === 0) {
+      if (ehAbaBib) opcoesMae.push({ id: 'pasta_bib_raiz', nome: 'Bibliografia & Leituras', tipo: 'bibliografia' });
+      else opcoesMae.push({ id: 'pasta_rel_raiz', nome: 'Relatórios & Artigos', tipo: 'relatorios' });
+    }
+
+    const pastaPreselecionada = (this.pastaAtivaId !== 'todas' && opcoesMae.some(o => o.id === this.pastaAtivaId))
+      ? this.pastaAtivaId
+      : opcoesMae[0].id;
     function coletarPastas(lista, prefixo = '') {
       for (const p of lista) {
         opcoesMae.push({ id: p.id, nome: `${prefixo}${p.nome}`, tipo: p.tipo });
@@ -815,7 +947,7 @@ export class DashboardView {
       const novaSub = adicionarSubpastaDriveLocal({
         parentId,
         nome,
-        tipo: pastaMae?.tipo || 'relatorios'
+        tipo: pastaMae?.tipo || (this.abaAtiva === 'artigos_zotero' ? 'bibliografia' : 'relatorios')
       });
 
       const driveCfg = obterConfigGoogleDrive();
@@ -863,9 +995,9 @@ export class DashboardView {
             <div class="ath-prop-grupo">
               <label>Tipo de Conteúdo</label>
               <select class="ath-select" id="athCompTipo">
-                <option value="bibliografia">Bibliografia & Leituras</option>
-                <option value="relatorios">Relatórios & Artigos</option>
-                <option value="compartilhada">Geral / Compartilhada</option>
+                <option value="relatorios" ${this.abaAtiva === 'escrita' ? 'selected' : ''}>Relatórios & Artigos</option>
+                <option value="bibliografia" ${this.abaAtiva === 'artigos_zotero' ? 'selected' : ''}>Bibliografia & Leituras</option>
+                <option value="compartilhada">Geral / Ambas as Abas</option>
               </select>
             </div>
           </div>
@@ -1022,17 +1154,24 @@ export class DashboardView {
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
 
-    const pastaAlvoId = opcoes.pastaId || (this.pastaAtivaId !== 'todas' ? this.pastaAtivaId : 'pasta_rel_raiz');
+    const pastaAlvoId = (opcoes.pastaId && opcoes.pastaId !== 'todas')
+      ? opcoes.pastaId
+      : (this.pastaAtivaId !== 'todas' ? this.pastaAtivaId : 'pasta_rel_raiz');
     const opcoesPastas = [];
     function coletarPastas(lista, prefixo = '') {
       for (const p of lista) {
-        opcoesPastas.push({ id: p.id, nome: `${prefixo}${p.nome}` });
-        if (p.subpastas && p.subpastas.length > 0) {
-          coletarPastas(p.subpastas, `${prefixo}  ↳ `);
+        if (p.tipo === 'relatorios' || p.id === 'pasta_rel_raiz' || p.tipo === 'compartilhada') {
+          opcoesPastas.push({ id: p.id, nome: `${prefixo}${p.nome}` });
+          if (p.subpastas && p.subpastas.length > 0) {
+            coletarPastas(p.subpastas, `${prefixo}  ↳ `);
+          }
         }
       }
     }
     coletarPastas(this.pastasDrive);
+    if (opcoesPastas.length === 0) {
+      opcoesPastas.push({ id: 'pasta_rel_raiz', nome: 'Relatórios & Artigos' });
+    }
 
     modal.innerHTML = `
       <div class="ath-modal">
