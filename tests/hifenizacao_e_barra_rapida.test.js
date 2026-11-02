@@ -1,0 +1,71 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {
+  silabarPalavraPt,
+  hifenizarPalavraPt,
+  hifenizarTexto,
+  hifenizarHtml,
+  removerHifensCondicionais,
+  SOFT_HYPHEN
+} from '../src/core/athenes_hifenizacao.js';
+
+test('Athenes — Hifenização Fonológica e Editorial em Língua Portuguesa (pt-BR)', async t => {
+  await t.test('silabarPalavraPt separa corretamente palavras acadêmicas reais', () => {
+    const casos = [
+      { palavra: 'científicos', esperado: ['cien', 'tí', 'fi', 'cos'] },
+      { palavra: 'relatórios', esperado: ['re', 'la', 'tó', 'rios'] },
+      { palavra: 'técnicos', esperado: ['téc', 'ni', 'cos'] },
+      { palavra: 'monografias', esperado: ['mo', 'no', 'gra', 'fias'] },
+      { palavra: 'facilidade', esperado: ['fa', 'ci', 'li', 'da', 'de'] },
+      { palavra: 'diagramar', esperado: ['dia', 'gra', 'mar'] },
+      { palavra: 'artigos', esperado: ['ar', 'ti', 'gos'] },
+      { palavra: 'escrita', esperado: ['es', 'cri', 'ta'] },
+      { palavra: 'fundamentação', esperado: ['fun', 'da', 'men', 'ta', 'ção'] },
+      { palavra: 'bibliográfica', esperado: ['bi', 'blio', 'grá', 'fi', 'ca'] },
+      { palavra: 'metodológica', esperado: ['me', 'to', 'do', 'ló', 'gi', 'ca'] },
+      { palavra: 'sólida', esperado: ['só', 'li', 'da'] },
+      { palavra: 'atualizada', esperado: ['atua', 'li', 'za', 'da'] }
+    ];
+
+    for (const { palavra, esperado } of casos) {
+      const obtido = silabarPalavraPt(palavra);
+      assert.deepEqual(obtido, esperado, `Falha na silabação de "${palavra}": obtido ${obtido.join('-')}, esperado ${esperado.join('-')}`);
+    }
+  });
+
+  await t.test('hifenizarPalavraPt insere soft hyphens e hifenizarTexto trata frases completas', () => {
+    const palavraHif = hifenizarPalavraPt('científicos');
+    assert.equal(palavraHif.includes(SOFT_HYPHEN), true);
+    assert.equal(removerHifensCondicionais(palavraHif), 'científicos');
+
+    const frase = 'A escrita científica exige precisão conceitual e clareza metodológica.';
+    const fraseHif = hifenizarTexto(frase);
+    assert.equal(fraseHif.includes(SOFT_HYPHEN), true);
+    assert.equal(removerHifensCondicionais(fraseHif), frase);
+  });
+
+  await t.test('hifenizarHtml preserva tags HTML e hifeniza apenas nós de texto', () => {
+    const htmlEntrada = '<p class="ath-paragrafo">A <b>escrita</b> científica com <a href="#">metodologia</a> rigorosa.</p>';
+    const htmlSaida = hifenizarHtml(htmlEntrada);
+
+    // Tags intactas
+    assert.equal(htmlSaida.includes('<p class="ath-paragrafo">'), true);
+    assert.equal(htmlSaida.includes('<b>'), true);
+    assert.equal(htmlSaida.includes('<a href="#">'), true);
+
+    // Texto hifenizado com soft hyphen
+    assert.equal(htmlSaida.includes(SOFT_HYPHEN), true);
+    assert.equal(removerHifensCondicionais(htmlSaida), htmlEntrada);
+  });
+});
+
+test('Athenes — Posicionamento da Barra Rápida do Bloco no Topo Direito (Sem Sobreposição)', async t => {
+  await t.test('CSS define .ath-bloco-barra-rapida em right: 6px e left: auto para não sobrepor cursor', () => {
+    const css = fs.readFileSync(path.resolve('src/css/athenes_editor.css'), 'utf8');
+    assert.match(css, /\.ath-bloco-barra-rapida\s*\{[^}]*right:\s*6px;/);
+    assert.match(css, /\.ath-bloco-barra-rapida\s*\{[^}]*left:\s*auto;/);
+  });
+});

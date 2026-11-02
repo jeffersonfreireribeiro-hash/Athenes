@@ -8,6 +8,7 @@
 import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
+import { hifenizarHtml } from './athenes_hifenizacao.js';
 import { gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento, obterTituloCompletoComNumeracao } from './athenes_documento.js';
 
 export function escaparHtml(texto) {
@@ -42,18 +43,20 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
     ...(bloco.espacamento_palavras_em !== undefined ? { espacamento_palavras_em: bloco.espacamento_palavras_em } : {})
   };
   const estiloCss = estiloParaCss(est);
+  const deveHifenizar = bloco.hifenizacao !== undefined ? bloco.hifenizacao : Boolean(est.hifenizacao);
+  const textoFormatado = deveHifenizar ? hifenizarHtml(bloco.texto || '') : (bloco.texto || '');
 
   switch (bloco.tipo) {
     case 'titulo': {
       const tag = `h${Math.min(4, Math.max(1, bloco.nivel || 1))}`;
-      return `<${tag} class="ath-bloco ath-titulo" style="${estiloCss}" data-id="${bloco.id}">${bloco.texto || ''}</${tag}>`;
+      return `<${tag} class="ath-bloco ath-titulo" style="${estiloCss}" data-id="${bloco.id}">${textoFormatado}</${tag}>`;
     }
 
     case 'subtitulo':
-      return `<div class="ath-bloco ath-subtitulo" style="${estiloCss}" data-id="${bloco.id}">${bloco.texto || ''}</div>`;
+      return `<div class="ath-bloco ath-subtitulo" style="${estiloCss}" data-id="${bloco.id}">${textoFormatado}</div>`;
 
     case 'paragrafo':
-      return `<p class="ath-bloco ath-paragrafo" style="${estiloCss}" data-id="${bloco.id}">${bloco.texto || ''}</p>`;
+      return `<p class="ath-bloco ath-paragrafo" style="${estiloCss}" data-id="${bloco.id}">${textoFormatado}</p>`;
 
     case 'citacao': {
       const estCitacao = estilosMap.citacao_direta || est;

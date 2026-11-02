@@ -46,6 +46,7 @@ import {
 } from '../core/athenes_documento.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
+import { hifenizarHtml, removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 import { ModalEditorEstilo } from './athenes_editor_estilo_modal.js';
@@ -2584,11 +2585,13 @@ export class EditorView {
       const heading = document.createElement(tag);
       heading.contentEditable = ehSomenteLeitura ? 'false' : 'true';
       heading.className = 'ath-titulo-editable';
+      heading.setAttribute('lang', 'pt-BR');
+      const hifAtivoTit = b.hifenizacao !== undefined ? b.hifenizacao : (estilos.find(e => e.id === b.estiloId)?.hifenizacao ?? false);
       heading.style.cssText = `${cssEstilo}; margin:0; outline:none;`;
-      heading.innerHTML = b.texto || 'Título da Seção';
+      heading.innerHTML = hifAtivoTit ? hifenizarHtml(b.texto || 'Título da Seção') : removerHifensCondicionais(b.texto || 'Título da Seção');
 
       heading.addEventListener('input', () => {
-        b.texto = heading.innerHTML;
+        b.texto = removerHifensCondicionais(heading.innerHTML);
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida();
       });
@@ -2600,6 +2603,8 @@ export class EditorView {
       const p = document.createElement('div');
       p.contentEditable = ehSomenteLeitura ? 'false' : 'true';
       p.className = 'ath-texto-editable';
+      p.setAttribute('lang', 'pt-BR');
+      const hifAtivoP = b.hifenizacao !== undefined ? b.hifenizacao : (estilos.find(e => e.id === b.estiloId)?.hifenizacao ?? false);
       p.style.cssText = `${cssEstilo}; outline:none;`;
 
       let conteudoHtml = b.texto || 'Escreva diretamente neste bloco...';
@@ -2611,7 +2616,7 @@ export class EditorView {
         }
       }
 
-      p.innerHTML = resolverReferenciasCruzadas(conteudoHtml, this.doc);
+      p.innerHTML = resolverReferenciasCruzadas(hifAtivoP ? hifenizarHtml(conteudoHtml) : removerHifensCondicionais(conteudoHtml), this.doc);
       this.aplicarConfigListaNoBloco(p, b);
 
       // Modo Sugestão (estilo Google Docs): intercepta deleção/digitação quando modoTrabalho === 'sugestao'
@@ -2636,7 +2641,7 @@ export class EditorView {
           });
           const htmlDel = gerarHtmlMarcacaoSugestao(sug);
           document.execCommand('insertHTML', false, htmlDel);
-          b.texto = p.innerHTML;
+          b.texto = removerHifensCondicionais(p.innerHTML);
           this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
           this.notificarMudancaRapida();
           return;

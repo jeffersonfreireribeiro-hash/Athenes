@@ -702,7 +702,8 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 .ath-bloco-barra-rapida {
   position: absolute;
   top: -34px;
-  left: 6px;
+  right: 6px;
+  left: auto;
   display: none;
   align-items: center;
   gap: 6px;
