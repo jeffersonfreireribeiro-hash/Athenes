@@ -104,7 +104,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 99999;
+}
+
+body:has(.ath-modal-backdrop) #athPillAcoesCursor,
+body:has(.ath-modal-backdrop) #athBarraContextualTexto,
+body:has(.ath-modal-backdrop) .ath-pill-cursor-acoes,
+body:has(.ath-modal-backdrop) .ath-barra-contextual {
+  display: none !important;
 }
 
 .ath-modal {

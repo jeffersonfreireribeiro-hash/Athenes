@@ -48,6 +48,11 @@ export class ModalLayoutBloco {
   }
 
   montar() {
+    const pill = document.getElementById('athPillAcoesCursor');
+    if (pill) pill.style.display = 'none';
+    const barra = document.getElementById('athBarraContextualTexto');
+    if (barra) barra.style.display = 'none';
+
     this.backdrop = document.createElement('div');
     this.backdrop.className = 'ath-modal-backdrop';
     this.backdrop.setAttribute('role', 'dialog');

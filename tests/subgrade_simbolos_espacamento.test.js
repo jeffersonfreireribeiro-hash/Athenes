@@ -172,3 +172,26 @@ test('Athenes — Ícones e Listas (Marcadores, Numerada e Alínea ABNT)', async
     assert.match(svgAlinea, /width="14"/);
   });
 });
+
+test('Athenes — Modelos de Apresentação e Prevenção de Sobreposição de Modais', async t => {
+  await t.test('obterModelosLayoutBloco retorna modelos ABNT, Cartão e Subgrade para figura e tabela', () => {
+    const modelosFig = obterModelosLayoutBloco('figura');
+    assert.ok(Array.isArray(modelosFig) && modelosFig.length >= 3, 'Deve conter ao menos 3 modelos para figura');
+    assert.ok(modelosFig.some(m => m.id === 'figura_abnt'));
+    assert.ok(modelosFig.some(m => m.id === 'figura_cartao'));
+    assert.ok(modelosFig.some(m => m.id === 'figura_legenda_lateral'));
+
+    const bloco = criarNovoBloco('figura');
+    aplicarModeloLayoutBloco(bloco, 'figura_cartao');
+    assert.equal(bloco.modelo_layout_id, 'figura_cartao');
+    assert.equal(bloco.moldura_tipo, 'cartao_suave');
+    assert.equal(bloco.fundo_ativo, true);
+  });
+
+  await t.test('CSS athenes_paineis.css define z-index 99999 para modal e oculta pílula flutuante', async () => {
+    const fs = await import('fs');
+    const css = fs.readFileSync('src/css/athenes_paineis.css', 'utf8');
+    assert.match(css, /z-index:\s*99999;/, 'Modal backdrop deve ter z-index 99999');
+    assert.match(css, /body:has\(\.ath-modal-backdrop\)\s*#athPillAcoesCursor/, 'Deve ocultar #athPillAcoesCursor quando modal estiver aberta');
+  });
+});

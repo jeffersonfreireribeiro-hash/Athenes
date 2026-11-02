@@ -37,12 +37,15 @@ import {
   formatarNumeroPagina,
   gerarCssMolduraBloco,
   buscarSecaoDoBloco,
+  obterModelosLayoutBloco,
+  aplicarModeloLayoutBloco,
   removerPrefixoNumeracaoTitulo,
   obterTextoPuroTitulo,
   obterPrefixoNumeracao,
   obterTituloCompletoComNumeracao
 } from '../core/athenes_documento.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
+import { escapeHtml } from '../core/athenes_seguranca.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 import { ModalEditorEstilo } from './athenes_editor_estilo_modal.js';
@@ -2409,6 +2412,22 @@ export class EditorView {
       });
       barra.appendChild(selLay);
 
+      // 3. Dropdown de Modelos de Apresentação
+      const modelosFig = obterModelosLayoutBloco(b.tipo, this.doc);
+      if (modelosFig && modelosFig.length > 0) {
+        const selMod = document.createElement('select');
+        selMod.className = 'ath-sel-rapido';
+        selMod.title = 'Modelos de Apresentação';
+        const modAtivo = b.modelo_layout_id || (b.moldura_tipo === 'cartao_suave' ? 'figura_cartao' : (b.subgrade_colunas === 2 ? 'figura_legenda_lateral' : 'figura_abnt'));
+        selMod.innerHTML = modelosFig.map(m => `<option value="${escapeHtml(m.id)}" ${modAtivo === m.id ? 'selected' : ''}>${escapeHtml(m.nome)}</option>`).join('');
+        selMod.addEventListener('change', e => {
+          aplicarModeloLayoutBloco(b, e.target.value, this.doc);
+          this.notificarMudanca();
+          this.renderizar();
+        });
+        barra.appendChild(selMod);
+      }
+
       // 3. Dropdown de Subgrade / Legenda
       const selSubgrade = document.createElement('select');
       selSubgrade.className = 'ath-sel-rapido';
@@ -2449,6 +2468,21 @@ export class EditorView {
       crachaTxt.style.color = '#314F79';
       crachaTxt.textContent = (TIPO_ROTULO[b.tipo] || b.tipo).toUpperCase();
       barra.appendChild(crachaTxt);
+
+      const modelosBloco = obterModelosLayoutBloco(b.tipo, this.doc);
+      if (modelosBloco && modelosBloco.length > 0) {
+        const selMod = document.createElement('select');
+        selMod.className = 'ath-sel-rapido';
+        selMod.title = 'Modelos de Apresentação';
+        const modAtivo = b.modelo_layout_id || (b.moldura_tipo === 'cartao_suave' ? (b.tipo === 'formula' ? 'formula_cartao' : 'tabela_cartao') : (b.tipo === 'formula' ? 'formula_limpo' : 'tabela_abnt'));
+        selMod.innerHTML = modelosBloco.map(m => `<option value="${escapeHtml(m.id)}" ${modAtivo === m.id ? 'selected' : ''}>${escapeHtml(m.nome)}</option>`).join('');
+        selMod.addEventListener('change', e => {
+          aplicarModeloLayoutBloco(b, e.target.value, this.doc);
+          this.notificarMudanca();
+          this.renderizar();
+        });
+        barra.appendChild(selMod);
+      }
 
       const btnEdit = document.createElement('button');
       btnEdit.type = 'button';
@@ -3691,6 +3725,13 @@ export class EditorView {
 
     // Monitora seleção de texto e posição do cursor
     const atualizarPosicaoBarra = () => {
+      // Se houver qualquer modal aberto na tela, oculta barra contextual e pill flutuante
+      if (document.querySelector('.ath-modal-backdrop') || document.querySelector('.ath-modal')) {
+        barra.style.display = 'none';
+        fecharDropdownsCtx();
+        if (pillCaret) pillCaret.style.display = 'none';
+        return;
+      }
       // Se algum menu dropdown da barra flutuante estiver aberto, não esconde nem reposiciona a barra
       if ((menuEstilo && !menuEstilo.hidden) || (menuLista && !menuLista.hidden) || (menuAlin && !menuAlin.hidden)) {
         return;
