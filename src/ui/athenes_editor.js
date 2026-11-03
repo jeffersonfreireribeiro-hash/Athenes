@@ -122,7 +122,8 @@ const MENUS_BLOCO = {
     { tipo: 'figura', subtipo: 'diagrama', icone: 'diagrama', rotulo: 'Diagrama', desc: 'Relações e estruturas entre elementos' },
     { tipo: 'figura', subtipo: 'fluxograma', icone: 'fluxograma', rotulo: 'Fluxograma', desc: 'Etapas e decisões de um processo' }
   ],
-  quadro: [
+  tabela: [
+    { tipo: 'tabela', icone: 'tabela', rotulo: 'Tabela', desc: 'Dados em linhas e colunas (ABNT/IBGE), numerada' },
     { tipo: 'quadro', icone: 'quadro', rotulo: 'Quadro', desc: 'Texto organizado em caixa fechada, numerado' },
     { tipo: 'campos', icone: 'campos', rotulo: 'Campos (rótulo e valor)', desc: 'Pares de rótulo e valor em colunas' }
   ]
@@ -606,10 +607,9 @@ export class EditorView {
               </button>
               <div class="rm-menu-bloco" role="menu" hidden></div>
             </div>
-            <button type="button" class="rm-ic-bt" id="rmAddTabela" data-tip="Tabela" title="Inserir Tabela (ABNT/IBGE)">${svgIcone('tabela', 16)}</button>
-            <div class="rm-grupo-bt" data-grupo="quadro">
-              <button type="button" class="rm-ic-bt tem-menu" id="rmAddQuadro" data-tip="Quadro" title="Quadro ou campos (rótulo e valor)" aria-haspopup="menu" aria-expanded="false">
-                ${svgIcone('quadro', 15)}
+            <div class="rm-grupo-bt" data-grupo="tabela">
+              <button type="button" class="rm-ic-bt tem-menu" id="rmAddTabela" data-tip="Tabela" title="Tabela, quadro ou campos (rótulo e valor)" aria-haspopup="menu" aria-expanded="false">
+                ${svgIcone('tabela', 15)}
                 <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="5.5" height="3.5" aria-hidden="true">
                   <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -768,7 +768,6 @@ export class EditorView {
     root.querySelector('#rmAddTitulo').addEventListener('click', () => adicionar('titulo', { texto: 'Novo Título' }));
     root.querySelector('#rmAddTexto').addEventListener('click', () => adicionar('paragrafo', { texto: 'Escreva seu parágrafo diretamente aqui...' }));
     this.ligarMenusDeBlocos(root, adicionar);
-    root.querySelector('#rmAddTabela').addEventListener('click', () => adicionar('tabela', { titulo: 'Tabela — Dados quantitativos' }));
     root.querySelector('#rmAddFormula').addEventListener('click', () => adicionar('formula', { latex: 'E = m \\cdot c^2' }));
     const btnNota = root.querySelector('#rmAddNota');
     btnNota.addEventListener('mousedown', (e) => e.preventDefault()); // mantém o cursor no texto
@@ -1894,7 +1893,7 @@ export class EditorView {
         fecharTodos();
         const dados = it.tipo === 'figura'
           ? { subtipo: it.subtipo, titulo: `${it.rotulo} — Descrição` }
-          : (it.tipo === 'quadro' ? { titulo: 'Quadro — Dados conceituais' } : {});
+          : (it.tipo === 'quadro' ? { titulo: 'Quadro — Dados conceituais' } : (it.tipo === 'tabela' ? { titulo: 'Tabela — Dados quantitativos' } : {}));
         adicionar(it.tipo, dados);
       }));
     });
