@@ -3878,11 +3878,11 @@ export class EditorView {
           <span id="athRotuloCtxEstilo" style="font-size:11px; font-weight:700; max-width:115px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Estilo</span>
           <span style="font-size:10px; opacity:0.8;">▾</span>
         </button>
-        <div class="ath-ctx-dropdown-menu" id="athMenuContextEstilo" hidden style="width:240px; max-height:280px; overflow-y:auto; padding:4px;">
+        <div class="ath-ctx-dropdown-menu" id="athMenuContextEstilo" hidden style="width:240px; overflow:hidden; padding:4px;">
           <div style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; padding:4px 8px; border-bottom:1px solid #EEF2F6; margin-bottom:4px;">
             Estilos de Texto
           </div>
-          <div id="athListaItensCtxEstilos" style="display:flex; flex-direction:column; gap:2px;"></div>
+          <div id="athListaItensCtxEstilos" class="ath-rolagem-interna" style="display:flex; flex-direction:column; gap:2px; max-height:236px; overflow-y:auto; padding-right:4px;"></div>
         </div>
       </div>
       <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 2px;"></span>

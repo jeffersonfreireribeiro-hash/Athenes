@@ -2639,3 +2639,10 @@ ins.ath-sug-ins:hover, del.ath-sug-del:hover { outline: 1.5px solid var(--ath-su
   width: var(--ath-marc-larg, 5.5mm); text-align: var(--ath-marc-alin, left);
   white-space: nowrap; user-select: none; pointer-events: none;
 }
+
+/* Lista com rolagem dentro do painel: barra fina, recuada das bordas arredondadas */
+.ath-rolagem-interna { scrollbar-width: thin; scrollbar-color: #C3CEDB transparent; }
+.ath-rolagem-interna::-webkit-scrollbar { width: 6px; }
+.ath-rolagem-interna::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
+.ath-rolagem-interna::-webkit-scrollbar-thumb { background: #C3CEDB; border-radius: 999px; }
+.ath-rolagem-interna::-webkit-scrollbar-thumb:hover { background: #9DB0C6; }
