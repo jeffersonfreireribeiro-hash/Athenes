@@ -3980,7 +3980,8 @@ export class EditorView {
       const divDepois = document.createElement('div');
       divDepois.appendChild(rangeDepois.cloneContents());
 
-      const bId = this.blocoSelecionado?.id;
+      // o bloco a dividir é o que contém o cursor (o selecionado no painel pode ser outro, se o foco veio por teclado ou por outro caminho)
+      const bId = editable.closest('[data-bloco-id]')?.dataset.blocoId || this.blocoSelecionado?.id;
       if (bId) {
         this.dividirBlocoAtual(bId, { textoAntes: removerPalavrasIniciais(divAntes.innerHTML), textoDepois: removerPalavrasIniciais(divDepois.innerHTML) });
       }
