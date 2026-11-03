@@ -1686,6 +1686,34 @@ export function duplicarBlocoNaSecao(doc, blocoId) {
  * @param {number|Object} [corte=null] - Índice do caractere onde cortar, ou objeto { textoAntes, textoDepois }.
  * @returns {Object|null} { blocoOriginal, novoBloco } ou null se o bloco não existir.
  */
+/**
+ * Une blocos de parágrafo vizinhos (mesma seção, em sequência) no primeiro deles; os demais saem. O resultado fica com o
+ * estilo do primeiro. modo 'continuo': um só texto corrido (junta com espaço quando não houver); 'linhas': cada bloco vira uma linha.
+ * Devolve { bloco, removidos } ou null se não der para unir.
+ */
+export function unirBlocosTexto(doc, ids, modo = 'continuo') {
+  const unicos = [...new Set(ids || [])];
+  const locs = unicos.map(id => localizarBloco(doc, id));
+  if (unicos.length < 2 || locs.some(l => !l)) return null;
+  const sec = locs[0].sec;
+  if (locs.some(l => l.sec !== sec || l.bloco.tipo !== 'paragrafo')) return null;
+  locs.sort((a, b) => a.idx - b.idx);
+  for (let i = 1; i < locs.length; i++) if (locs[i].idx !== locs[i - 1].idx + 1) return null; // só blocos em sequência
+  const vazio = (t) => !String(t ?? '').replace(/&nbsp;|<br\s*\/?>|\s/gi, '');
+  const textos = locs.map(l => String(l.bloco.texto ?? '')).filter(t => !vazio(t));
+  const primeiro = locs[0].bloco;
+  primeiro.texto = textos.reduce((acc, t, i) => {
+    if (i === 0) return t;
+    if (modo === 'linhas') return `${acc}<br>${t}`;
+    const colar = /(\s|&nbsp;)$/i.test(acc) || /^(\s|&nbsp;)/i.test(t);
+    return `${acc}${colar ? '' : ' '}${t}`;
+  }, '') || '&nbsp;';
+  const removidos = locs.slice(1).map(l => l.bloco.id);
+  sec.blocos = sec.blocos.filter(b => !removidos.includes(b.id));
+  repaginarDocumento(doc);
+  return { bloco: primeiro, removidos };
+}
+
 export function dividirBlocoTexto(doc, blocoId, corte = null) {
   const loc = localizarBloco(doc, blocoId);
   if (!loc) return null;

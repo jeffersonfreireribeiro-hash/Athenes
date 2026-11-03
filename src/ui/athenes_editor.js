@@ -56,6 +56,7 @@ import { modosPermitidos, modoInicialDoPapel } from '../core/athenes_compartilha
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { montarCitacao, indiceNaLista, referenciaDoBlocoCitacao } from '../core/athenes_citacao.js';
 import { mapaMarcadores, marcadorEfetivo, chaveMarcador } from '../core/athenes_marcadores.js';
+import { unirBlocosTexto } from '../core/athenes_documento.js';
 import { latexParaHtml } from '../core/athenes_formula.js';
 import { linhasEstimadas, porLinhaUsadoNoTexto, calibracaoDoTexto, definirCalibracaoTexto } from '../core/athenes_fragmentos.js';
 import { hifenizarHtml, removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
@@ -3911,7 +3912,48 @@ export class EditorView {
       document.body.appendChild(pillCaret);
     }
 
+    // Pílula "Unir blocos": aparece quando a seleção atravessa dois ou mais blocos de texto
+    let pillUnir = document.getElementById('athPillUnirBlocos');
+    if (!pillUnir) {
+      pillUnir = document.createElement('div');
+      pillUnir.id = 'athPillUnirBlocos';
+      pillUnir.className = 'ath-pill-cursor-acoes';
+      Object.assign(pillUnir.style, { display: 'none', position: 'fixed', zIndex: '9100' });
+      pillUnir.innerHTML = `
+        <button type="button" class="ath-pill-bt" id="athBtnUnirContinuo" title="Juntar os blocos selecionados em um só texto corrido">
+          ${svgIcone('divisor', 13)} <span id="athRotuloUnir">Unir blocos</span>
+        </button>
+        <span class="ath-pill-sep"></span>
+        <button type="button" class="ath-pill-bt" id="athBtnUnirLinhas" title="Juntar em um só bloco, cada bloco em uma linha">
+          <span>Unir em linhas</span>
+        </button>`;
+      document.body.appendChild(pillUnir);
+    }
+
     document.body.appendChild(barra);
+
+    // Blocos de parágrafo atingidos pela seleção (ids dos blocos de origem, na ordem do documento)
+    const blocosDaSelecao = (range) => {
+      const els = [...(this.container?.querySelectorAll('.ath-texto-editable') || [])].filter(el => range.intersectsNode(el));
+      const ids = [];
+      for (const el of els) {
+        const idDom = el.closest('[data-bloco-id]')?.dataset.blocoId;
+        const fb = (this.doc.paginas || []).flatMap(p => p.blocos || []).find(x => x.id === idDom);
+        const id = fb?._frag?.origemId || idDom;
+        const b = id ? this.buscarBlocoPorId(id) : null;
+        if (b && b.tipo === 'paragrafo' && !ids.includes(id)) ids.push(id);
+      }
+      return ids;
+    };
+    const unir = (modo) => {
+      const ids = this._idsParaUnir || [];
+      pillUnir.style.display = 'none';
+      const r = unirBlocosTexto(this.doc, ids, modo);
+      if (r) this.aposEstrutura(r.bloco);
+      else alert('Só dá para unir parágrafos em sequência, na mesma seção.');
+    };
+    pillUnir.querySelector('#athBtnUnirContinuo').addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); unir('continuo'); });
+    pillUnir.querySelector('#athBtnUnirLinhas').addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); unir('linhas'); });
 
     const menuEstilo = barra.querySelector('#athMenuContextEstilo');
     const btnEstiloMenu = barra.querySelector('#athBtnContextEstiloMenu');
@@ -4084,6 +4126,26 @@ export class EditorView {
       const comum = range.commonAncestorContainer;
       const elPai = comum.nodeType === Node.ELEMENT_NODE ? comum : comum.parentElement;
       const editable = elPai?.closest('.ath-texto-editable, .ath-titulo-editable, [contenteditable="true"]');
+
+      // Seleção que atravessa vários blocos de texto: oferece unir
+      if (!sel.isCollapsed && !editable && this.container?.contains(comum)) {
+        const ids = blocosDaSelecao(range);
+        const rectU = range.getBoundingClientRect();
+        if (ids.length >= 2 && rectU.height > 0 && estaVisivel(rectU)) {
+          barra.style.display = 'none';
+          if (pillCaret) pillCaret.style.display = 'none';
+          this._idsParaUnir = ids;
+          const area = areaVisivel();
+          pillUnir.querySelector('#athRotuloUnir').textContent = `Unir ${ids.length} blocos`;
+          pillUnir.style.display = 'flex';
+          pillUnir.style.left = `${Math.max(area.left + 150, Math.min(area.right - 150, rectU.left + rectU.width / 2))}px`;
+          pillUnir.style.top = `${rectU.top}px`;
+          pillUnir.style.transform = 'translate(-50%, -100%)';
+          pillUnir.style.marginTop = '-10px';
+          return;
+        }
+      }
+      pillUnir.style.display = 'none';
 
       if (!editable) {
         barra.style.display = 'none';
