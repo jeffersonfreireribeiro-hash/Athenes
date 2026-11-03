@@ -360,13 +360,13 @@ function setArestaCelula(e, r, c, lado, valor) {
  * @param {object} bloco
  * @param {string} preset  um de PRESETS_BORDA
  * @param {{r0,c0,r1,c1}|null} rect  null = tabela inteira
- * @param {{largura_pt,estilo,cor}} pincel
+ * @param {{largura_pt,estilo,cor}} pincel  com estilo 'nenhuma' o preset REMOVE a linha das arestas que atinge
  */
 export function aplicarPresetBorda(bloco, preset, rect, pincel) {
   if (!PRESETS_BORDA.includes(preset)) throw new Error(`Preset de borda inválido: ${preset}`);
   const e = garantirEstiloTabela(bloco);
   const dim = dimensoesTabela(bloco);
-  const traco = preset === 'nenhuma' ? null : normalizarBorda(pincel) || borda(0.75);
+  const traco = (preset === 'nenhuma' || pincel?.estilo === 'nenhuma') ? null : normalizarBorda(pincel) || borda(0.75);
   const alvo = rect && !cobreTudo(rect, dim) ? rect : null;
 
   if (!alvo) {

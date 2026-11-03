@@ -415,7 +415,7 @@ export function montarSecoesEstiloTabela(el, ctx) {
       </div>
       <div class="lin">
         <label>Espessura <input type="number" id="tpLargura" min="0.25" max="6" step="0.25" value="${pincel.largura_pt}" style="width:58px"> pt</label>
-        <label>Estilo <select id="tpEstilo"><option value="solida">Sólida</option><option value="tracejada">Tracejada</option><option value="pontilhada">Pontilhada</option><option value="dupla">Dupla</option></select></label>
+        <label>Estilo <select id="tpEstilo"><option value="solida">Sólida</option><option value="tracejada">Tracejada</option><option value="pontilhada">Pontilhada</option><option value="dupla">Dupla</option><option value="nenhuma">Sem linha</option></select></label>
         <label>Cor <input type="color" id="tpCorBorda" value="${pincel.cor}"></label>
       </div>
     </div>
@@ -484,6 +484,12 @@ export function montarSecoesEstiloTabela(el, ctx) {
     estilo: $('#tpEstilo').value,
     cor: corValida($('#tpCorBorda').value, '#1F2733')
   });
+  // "Sem linha": os botões de contorno removem a linha em vez de desenhar; espessura e cor não se aplicam
+  $('#tpEstilo').addEventListener('change', () => {
+    const sem = $('#tpEstilo').value === 'nenhuma';
+    $('#tpLargura').disabled = sem;
+    $('#tpCorBorda').disabled = sem;
+  });
   $('#tpGradeBordas').addEventListener('click', ev => {
     const bt = ev.target.closest('[data-preset]');
     if (!bt) return;
@@ -506,7 +512,7 @@ export function montarSecoesEstiloTabela(el, ctx) {
     c.ativo = $('#tpCabAtivo').checked;
     c.fundo = corValida($('#tpCabFundo').value);
     const w = Number($('#tpCabDiv').value) || 0;
-    c.borda_inferior = w > 0 ? normalizarBorda({ ...lerPincel(), largura_pt: w }) : null;
+    c.borda_inferior = w > 0 && lerPincel().estilo !== 'nenhuma' ? normalizarBorda({ ...lerPincel(), largura_pt: w }) : null;
     reaplicar(ctx);
   };
   ['#tpCabAtivo', '#tpCabFundo', '#tpCabDiv'].forEach(id => $(id).addEventListener('input', cabecalho));
@@ -516,7 +522,7 @@ export function montarSecoesEstiloTabela(el, ctx) {
     r.ativo = $('#tpRodAtivo').checked;
     r.fundo = corValida($('#tpRodFundo').value);
     const w = Number($('#tpRodDiv').value) || 0;
-    r.borda_superior = w > 0 ? normalizarBorda({ ...lerPincel(), largura_pt: w }) : undefined;
+    r.borda_superior = w > 0 && lerPincel().estilo !== 'nenhuma' ? normalizarBorda({ ...lerPincel(), largura_pt: w }) : undefined;
     reaplicar(ctx);
   };
   ['#tpRodAtivo', '#tpRodFundo', '#tpRodDiv'].forEach(id => $(id).addEventListener('input', rodape));
@@ -526,7 +532,7 @@ export function montarSecoesEstiloTabela(el, ctx) {
     cc.ativo = $('#tpColAtivo').checked;
     cc.fundo = corValida($('#tpColFundo').value);
     const w = Number($('#tpColDiv').value) || 0;
-    cc.borda_direita = w > 0 ? normalizarBorda({ ...lerPincel(), largura_pt: w }) : undefined;
+    cc.borda_direita = w > 0 && lerPincel().estilo !== 'nenhuma' ? normalizarBorda({ ...lerPincel(), largura_pt: w }) : undefined;
     reaplicar(ctx);
   };
   ['#tpColAtivo', '#tpColFundo', '#tpColDiv'].forEach(id => $(id).addEventListener('input', colChave));

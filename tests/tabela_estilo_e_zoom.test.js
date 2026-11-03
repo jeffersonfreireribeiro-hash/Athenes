@@ -320,3 +320,22 @@ test('"Linha de borda" funciona em todas as molduras (ligada, desligada e indefi
   assert.equal(bordaAtivaEfetiva({ moldura_tipo: 'limpo' }), false);
   assert.equal(bordaAtivaEfetiva({ moldura_tipo: 'caixa_borda' }), true);
 });
+
+test('"Sem linha": o preset remove só a linha das arestas que atinge, na tabela inteira e na seleção', () => {
+  const semLinha = { largura_pt: 1, estilo: 'nenhuma', cor: '#000000' };
+  const b = novaTabela();
+  const dim = dimensoesTabela(b);
+  aplicarPresetBorda(b, 'todas', null, pincel);
+  aplicarPresetBorda(b, 'horizontais_internas', null, semLinha);
+  const c = resolverCelula(obterEstiloTabela(b), dim, 2, 1);
+  assert.equal(c.bordas.t, null, 'horizontais internas removidas');
+  assert.equal(c.bordas.l.cor, '#FF0000', 'verticais continuam');
+
+  const p = novaTabela();
+  aplicarPresetBorda(p, 'todas', null, pincel);
+  aplicarPresetBorda(p, 'topo', { r0: 2, c0: 1, r1: 2, c1: 1 }, semLinha);
+  const alvo = resolverCelula(obterEstiloTabela(p), dim, 2, 1);
+  assert.equal(alvo.bordas.t, null, 'topo da célula selecionada sem linha');
+  assert.equal(alvo.bordas.b.cor, '#FF0000', 'as outras arestas ficam');
+  assert.equal(resolverCelula(obterEstiloTabela(p), dim, 1, 1).bordas.b, null, 'a aresta compartilhada some também na célula de cima');
+});
