@@ -17,7 +17,7 @@
  */
 
 import { lerConta, gravarConta } from '../core/athenes_conta.js';
-import { obterTokenOuConectar, obterTokenDrive } from '../core/athenes_drive_sync.js';
+import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive } from '../core/athenes_drive_sync.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import {
   obterPerfilColaborador,
@@ -528,6 +528,9 @@ export class EstudoArtigosView {
         isGroup: Boolean(this.zoteroClient.isGroup)
       }));
     } catch (_) {}
+    // depois de uma pausa curta, leva a conexão para o Drive (vale nos outros computadores da conta)
+    clearTimeout(this._tZoteroDrive);
+    this._tZoteroDrive = setTimeout(() => { obterTokenDrive().then(t => t && sincronizarZoteroComDrive(t)).catch(() => {}); }, 1500);
   }
 
   temZoteroConectado() {

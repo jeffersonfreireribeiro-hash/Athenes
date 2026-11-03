@@ -88,3 +88,32 @@ test('a pasta padrão antiga (de outra conta) é descartada e o link mostrado ve
   cfg = obterConfigGoogleDrive();
   assert.equal(cfg.pastaUrl, 'https://drive.google.com/drive/folders/PASTA_DESTA_CONTA');
 });
+
+test('Zotero: conectado num computador aparece no outro; só o lado que mudou vence', async () => {
+  const m = new Map();
+  globalThis.localStorage = { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), key: i => [...m.keys()][i], get length() { return m.size; } };
+  const { sincronizarZoteroComDrive } = await import('../src/core/athenes_drive_sync.js');
+  const { lerConta, gravarConta } = await import('../src/core/athenes_conta.js');
+  const drive = { arquivo: null }; // o "Drive" compartilhado entre os dois computadores
+  const fetchDrive = async (url, op = {}) => {
+    const u = new URL(url);
+    if (u.pathname === '/drive/v3/files' && /name = 'Athenes'/.test(u.searchParams.get('q') || '')) return resp({ files: [{ id: 'RAIZ' }] });
+    if (u.pathname === '/drive/v3/files' && /athenes_config\.json/.test(u.searchParams.get('q') || '')) return resp({ files: drive.arquivo ? [{ id: 'CFG' }] : [] });
+    if (u.pathname.startsWith('/upload/drive/v3/files')) { drive.arquivo = JSON.parse(String(op.body).split('\r\n').filter(l => l.startsWith('{"zotero"'))[0]); return resp({ id: 'CFG' }); }
+    if (u.pathname === '/drive/v3/files/CFG') return resp(drive.arquivo);
+    return resp({ files: [] });
+  };
+  // PC1 conecta o Zotero e sincroniza → vai para o Drive
+  gravarConta('athenes_zotero_cfg', JSON.stringify({ userId: '123', apiKey: 'CHAVE1', username: 'ana' }));
+  assert.equal(await sincronizarZoteroComDrive('T', { fetchImpl: fetchDrive }), 'enviou');
+  assert.equal(drive.arquivo.zotero.apiKey, 'CHAVE1');
+  // PC2 (sem nada) sincroniza → já aparece conectado
+  m.clear();
+  assert.equal(await sincronizarZoteroComDrive('T', { fetchImpl: fetchDrive }), 'baixou');
+  assert.deepEqual([JSON.parse(lerConta('athenes_zotero_cfg')).userId, JSON.parse(lerConta('athenes_zotero_cfg')).apiKey], ['123', 'CHAVE1']);
+  assert.equal(await sincronizarZoteroComDrive('T', { fetchImpl: fetchDrive }), 'igual');
+  // PC2 troca a chave → vai para o Drive; PC1 (que não mudou) recebe
+  gravarConta('athenes_zotero_cfg', JSON.stringify({ userId: '123', apiKey: 'CHAVE2', username: 'ana' }));
+  assert.equal(await sincronizarZoteroComDrive('T', { fetchImpl: fetchDrive }), 'enviou');
+  assert.equal(drive.arquivo.zotero.apiKey, 'CHAVE2');
+});

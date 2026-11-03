@@ -14,6 +14,7 @@ import {
   salvarArquivoNoGoogleDrive, obterOuCriarEstruturaPastasAthenes, explicarErroDrive,
   listarArquivosDoGoogleDrive, baixarArquivoDoGoogleDrive
 } from './athenes_colaboracao.js';
+import { lerConta, gravarConta } from './athenes_conta.js';
 
 const API = 'https://www.googleapis.com/drive/v3/files';
 const NOME_RAIZ = 'Athenes';
@@ -312,4 +313,50 @@ export async function importarPastasDoDrive(token, { fetchImpl = globalThis.fetc
   await visitar(pastas, raizId, null, 0);
   salvarPastasDriveLocais(pastas);
   return r;
+}
+
+// ───────────────────────────── Zotero conectado em um computador vale nos outros (pelo Drive da própria conta) ─────────────────────────────
+
+const NOME_CONFIG_DRIVE = 'athenes_config.json';
+const CHAVE_ZOTERO = 'athenes_zotero_cfg';
+const CHAVE_ZOTERO_MARCA = 'athenes_zotero_sync';
+const chaveZotero = (c) => `${c?.userId || ''}|${c?.apiKey || ''}|${c?.username || ''}|${c?.isGroup ? 1 : 0}`;
+const lerJson = (k) => { try { return JSON.parse(lerConta(k) || '{}') || {}; } catch { return {}; } };
+const zoteroCompleto = (c) => Boolean(c?.apiKey && c?.userId);
+
+/**
+ * Mantém a chave e o ID do Zotero iguais em todos os computadores da mesma conta Google, guardados num arquivo do app no
+ * Drive da própria pessoa (`athenes_config.json`, na pasta Athenes). Regras:
+ *  - só neste computador → envia; só no Drive → traz (aparece conectado sem digitar nada);
+ *  - nos dois e diferentes → vale o lado que mudou desde a última sincronização (sem histórico, vale o do Drive).
+ * Devolve 'enviou' | 'baixou' | 'igual' | 'nada'.
+ */
+export async function sincronizarZoteroComDrive(token, { fetchImpl = globalThis.fetch } = {}) {
+  const local = lerJson(CHAVE_ZOTERO);
+  const marca = lerJson(CHAVE_ZOTERO_MARCA);
+  const raizId = await obterPastaRaizDrive(token, fetchImpl);
+  const q = `trashed = false and name = '${aspas(NOME_CONFIG_DRIVE)}' and '${aspas(raizId)}' in parents`;
+  const achou = await chamar(fetchImpl, `${API}?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=1`, {}, token);
+  const arquivo = achou.files?.[0] || null;
+  let remoto = null; let remotoEm = '';
+  if (arquivo) {
+    const conteudo = await baixarArquivoDoGoogleDrive(arquivo.id, token, fetchImpl).catch(() => null);
+    remoto = conteudo?.zotero || null; remotoEm = conteudo?.atualizadoEm || '';
+  }
+  const marcar = (cfg, em) => gravarConta(CHAVE_ZOTERO_MARCA, JSON.stringify({ hash: chaveZotero(cfg), em: em || new Date().toISOString() }));
+  const enviar = async () => {
+    const em = new Date().toISOString();
+    await salvarArquivoNoGoogleDrive({ nomeArquivo: NOME_CONFIG_DRIVE, conteudoBlobOuTexto: JSON.stringify({ zotero: local, atualizadoEm: em }), mimeType: 'application/json', accessToken: token, driveFileId: arquivo?.id || null, pastaId: raizId }, fetchImpl);
+    marcar(local, em);
+    return 'enviou';
+  };
+  const baixar = () => { gravarConta(CHAVE_ZOTERO, JSON.stringify({ ...local, ...remoto })); marcar(remoto, remotoEm); return 'baixou'; };
+
+  const temLocal = zoteroCompleto(local); const temRemoto = zoteroCompleto(remoto);
+  if (!temLocal && temRemoto) return baixar();
+  if (temLocal && !temRemoto) return enviar();
+  if (!temLocal && !temRemoto) return 'nada';
+  if (chaveZotero(local) === chaveZotero(remoto)) { marcar(local, remotoEm); return 'igual'; }
+  const localMudou = Boolean(marca.hash) && chaveZotero(local) !== marca.hash;
+  return localMudou ? enviar() : baixar();
 }

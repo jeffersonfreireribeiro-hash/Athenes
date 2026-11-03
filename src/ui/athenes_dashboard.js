@@ -41,7 +41,7 @@ import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
-import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
+import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -671,6 +671,8 @@ export class DashboardView {
           apiKey: zKey !== undefined ? zKey : (zAtual.apiKey || '')
         }));
       } catch (_) {}
+      // chave do Zotero digitada aqui vai para o Drive (e vale nos outros computadores)
+      obterTokenDrive().then(t => t && sincronizarZoteroComDrive(t)).catch(() => {});
 
       fechar();
       this.renderizar();
@@ -1336,6 +1338,9 @@ export class DashboardView {
       if (!token) { if (!silencioso) alert('A sessão do Google Drive expirou. Reconecte o Drive.'); return; }
       // outro computador: sem a estrutura gravada, descobre/cria as pastas do Athenes e fixa a pasta de documentos desta conta
       try { const c = obterConfigGoogleDrive(); if (!c.pastaDocumentosId || !c.pastaRaizId) await obterOuCriarEstruturaPastasAthenes(token); } catch (e) { console.warn('[Athenes] Estrutura do Drive:', e.message); }
+      // Zotero conectado em outro computador desta conta aparece aqui (e o daqui vai para os outros)
+      let zotero = 'nada';
+      try { zotero = await sincronizarZoteroComDrive(token); } catch (e) { console.warn('[Athenes] Zotero pelo Drive:', e.message); }
       // 1) a estrutura de pastas do Drive (outro computador começa só com as padrão); 2) os documentos, já nas pastas certas
       let pastasNovas = { importadas: 0, vinculadas: 0, mapa: {} };
       try { pastasNovas = await importarPastasDoDrive(token); } catch (e) { console.warn('[Athenes] Pastas do Drive não importadas:', e.message); }
@@ -1349,8 +1354,8 @@ export class DashboardView {
       }
       if (!silencioso) {
         alert(r.novos || r.atualizados
-          ? `${r.novos} documento(s) novo(s) e ${r.atualizados} atualizado(s)${pastasNovas.importadas ? `, ${pastasNovas.importadas} pasta(s) trazida(s)` : ''} vindos do seu Google Drive.`
-          : 'Seus documentos já estão atualizados com o seu Google Drive.');
+          ? `${zotero === 'baixou' ? 'Zotero conectado trazido do seu Drive. ' : ''}${r.novos} documento(s) novo(s) e ${r.atualizados} atualizado(s)${pastasNovas.importadas ? `, ${pastasNovas.importadas} pasta(s) trazida(s)` : ''} vindos do seu Google Drive.`
+          : `${zotero === 'baixou' ? 'Zotero conectado trazido do seu Drive. ' : ''}Seus documentos já estão atualizados com o seu Google Drive.`);
       }
     } catch (err) {
       if (!silencioso) alert(`Não foi possível sincronizar com o Drive: ${err.message}`);
