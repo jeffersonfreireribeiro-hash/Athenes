@@ -9,6 +9,7 @@
  * - Coluna 3 (Direita): Inspetor de Bloco, Posição na Folha (12 colunas) e Blocos Compostos.
  */
 
+import { obterTokenOuConectar, obterTokenDrive } from '../core/athenes_drive_sync.js';
 import { elementosMestraHtml, renderizadoPeloCanvas, contextoVariaveisPagina } from '../core/athenes_mestra_render.js';
 import { margensEfetivasMm, elementosEfetivosDaPagina, caixaEnvolvente, sobrescreverNoDocumento, restaurarNoDocumento } from '../core/athenes_mestra_canvas.js';
 import { dimensoesPapelMm } from '../core/athenes_grid.js';
@@ -1443,7 +1444,7 @@ export class EditorView {
       popNuvem.querySelector('#athBtnSincronizarHubDrive')?.addEventListener('click', async () => {
         try {
           const cfg = obterConfigGoogleDrive();
-          const token = cfg.accessToken || await autenticarGoogleDrive(cfg.clientId);
+          const token = await obterTokenOuConectar(cfg);
           const est = await obterOuCriarEstruturaPastasAthenes(token);
           alert('Pasta Hub Athenes pronta no Google Drive!\n- Documentos: ' + est.pastaDocumentosId + '\n- Zotero: ' + est.pastaZoteroId + '\n- Relatórios: ' + est.pastaRelatoriosId);
         } catch (err) {
@@ -1465,7 +1466,7 @@ export class EditorView {
           return;
         }
         try {
-          const token = cfg.accessToken || await autenticarGoogleDrive(cfg.clientId);
+          const token = await obterTokenOuConectar(cfg);
           const salvo = await salvarArquivoNoGoogleDrive({
             nomeArquivo: nomeArq,
             conteudoBlobOuTexto: this.doc,
@@ -1505,7 +1506,7 @@ export class EditorView {
         boxDrive.hidden = false;
         boxDrive.innerHTML = '<span style="font-size:11px; color:#64748B;">Consultando Google Drive...</span>';
         try {
-          const token = cfg.accessToken || await autenticarGoogleDrive(cfg.clientId);
+          const token = await obterTokenOuConectar(cfg);
           const arqs = await listarArquivosDoGoogleDrive(token);
           if (!arqs.length) {
             boxDrive.innerHTML = '<span style="font-size:11px; color:#64748B;">Nenhum arquivo .athenes encontrado no seu Drive.</span>';

@@ -45,6 +45,11 @@ let renovacaoEmCurso = null;
  * Token do Drive utilizável agora: o guardado, se ainda vale; senão tenta renová-lo em silêncio (sem janela, sem consentimento).
  * Devolve null quando não dá (o usuário precisa reconectar). `renovar` é injetável para teste.
  */
+/** Token válido agora ou, sem ele, abre a conexão com o Google (janela do usuário). Substitui `cfg.accessToken || await autenticarGoogleDrive(...)`. */
+export async function obterTokenOuConectar(cfg = obterConfigGoogleDrive()) {
+  return (await obterTokenDrive({ cfg })) || (await import('./athenes_colaboracao.js')).autenticarGoogleDrive(cfg.clientId);
+}
+
 export async function obterTokenDrive({ renovar = null, cfg = obterConfigGoogleDrive(), agora = Date.now() } = {}) {
   if (tokenDriveValido(cfg, agora)) return cfg.accessToken;
   if (!cfg.accessToken && !cfg.accessTokenExpiraEm) return null; // nunca conectou

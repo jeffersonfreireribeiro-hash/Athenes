@@ -867,7 +867,7 @@ export async function exportarParaDocx(documento) {
       } else if (b.tipo === 'sumario') {
         const cfg = configEfetivaSumario(documento, b);
         const mg = mestra.margens_mm || mestra.margens || { l: 30, r: 20 };
-        const larguraDxa = (mestra.orientacao === 'paisagem' ? 16838 : 11906) - Math.round(((mg.l || 30) + (mg.r || 20)) * MM_PARA_DXA);
+        const larguraDxa = Math.round((dimensoesPapelMm(mestra.formato, mestra.orientacao, mestra.dimensoes_personalizadas).largura_mm - (mg.l ?? 30) - (mg.r ?? 20)) * MM_PARA_DXA); // largura útil real (A3, Carta, paisagem…)
         const mm = (v) => Math.round(v * MM_PARA_DXA);
         const jcTit = { esquerda: 'left', centro: 'center', direita: 'right' }[cfg.titulo.alinhamento];
         if (cfg.titulo.texto) bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="${jcTit}"/><w:spacing w:after="240"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>${escaparXml(cfg.titulo.texto)}</w:t></w:r></w:p>`);

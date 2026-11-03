@@ -16,6 +16,7 @@
  *      Salvar Citação no Zotero (p. X), Criar Nota Adesiva ou Copiar em formato ABNT.
  */
 
+import { obterTokenOuConectar, obterTokenDrive } from '../core/athenes_drive_sync.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import {
   obterPerfilColaborador,
@@ -345,10 +346,10 @@ async function garantirPdfDoArtigo(art) {
   } catch (_) {}
   const idDrive = String(art.driveFileId || '').trim();
   if (idDrive && !/^drive_pdf_/.test(idDrive)) {
-    const cfg = obterConfigGoogleDrive();
-    if (cfg.accessToken) {
+    const tokenDrive = await obterTokenDrive();
+    if (tokenDrive) {
       try {
-        const blob = await baixarPdfBlobDoDrive(idDrive, cfg.accessToken);
+        const blob = await baixarPdfBlobDoDrive(idDrive, tokenDrive);
         salvarPdfLocal(art.id, blob);
         art.pdfBlobUrl = URL.createObjectURL(blob);
         art.temPdfLocal = true;
@@ -3328,13 +3329,14 @@ export class EstudoArtigosView {
         statusEl.style.color = '#15803D';
         statusEl.textContent = `PDF "${fPdf.name}" carregado na folha!`;
       }
-      if (cfgDrivePainel.accessToken) {
+      const tokenPainel = await obterTokenDrive();
+      if (tokenPainel) {
         try {
           const salvo = await salvarArquivoNoGoogleDrive({
             nomeArquivo: fPdf.name,
             conteudoBlobOuTexto: fPdf,
             mimeType: 'application/pdf',
-            accessToken: cfgDrivePainel.accessToken,
+            accessToken: tokenPainel,
             pastaId: cfgDrivePainel.pastaId || null,
             driveFileId: art.driveFileId || null
           });
@@ -3356,7 +3358,7 @@ export class EstudoArtigosView {
       }
       try {
         const cfgDrive = obterConfigGoogleDrive();
-        const token = cfgDrive.accessToken || await autenticarGoogleDrive(cfgDrive.clientId);
+        const token = await obterTokenOuConectar(cfgDrive);
         const pdfBlob = await obterPdfLocal(art.id) || art.pdfBlob;
         if (!pdfBlob) {
           if (statusEl) {
@@ -3573,7 +3575,7 @@ export class EstudoArtigosView {
     const driveCfg = obterConfigGoogleDrive();
     if (driveCfg.accessToken || driveCfg.clientId) {
       try {
-        const token = driveCfg.accessToken || await autenticarGoogleDrive(driveCfg.clientId);
+        const token = await obterTokenOuConectar(driveCfg);
         const salvoDrive = await salvarArquivoNoGoogleDrive({
           nomeArquivo: `${(art.driveFileName || 'Artigo').replace(/\.pdf$/i, '')}.athenes-pdf.json`,
           conteudoBlobOuTexto: art,
@@ -3932,7 +3934,7 @@ export class EstudoArtigosView {
     const listaEl = modal.querySelector('#athListaPdfDriveModal');
 
     try {
-      const token = cfg.accessToken || await autenticarGoogleDrive(cfg.clientId);
+      const token = await obterTokenOuConectar(cfg);
       statusEl.textContent = 'Listando seus arquivos PDF no Google Drive...';
       const arquivos = await listarPdfsDoGoogleDrive(token);
       if (!arquivos || arquivos.length === 0) {
@@ -4141,20 +4143,17 @@ export class EstudoArtigosView {
       }
       if (arquivoPdfSelecionado) {
         registrarPdfLocalNoArtigo(novoArt, arquivoPdfSelecionado);
-        const cfgDrive = obterConfigGoogleDrive();
-        if (cfgDrive.accessToken) {
-          salvarArquivoNoGoogleDrive({
+        obterTokenDrive().then(tokenNovo => (tokenNovo ? salvarArquivoNoGoogleDrive({
             nomeArquivo: arquivoPdfSelecionado.name,
             conteudoBlobOuTexto: arquivoPdfSelecionado,
             mimeType: 'application/pdf',
-            accessToken: cfgDrive.accessToken
-          }).then(salvo => {
+            accessToken: tokenNovo
+          }) : null)).then(salvo => {
             if (salvo?.id) {
               novoArt.driveFileId = salvo.id;
               salvarArtigosEstudo(this.artigos);
             }
           }).catch(() => {});
-        }
       }
 
       this.artigos.unshift(novoArt);

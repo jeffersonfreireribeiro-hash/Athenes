@@ -38,7 +38,7 @@ import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
-import { driveConectado, tokenDriveValido, obterTokenDrive, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada } from '../core/athenes_drive_sync.js';
+import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -613,7 +613,7 @@ export class DashboardView {
     modal.querySelector('#athBtnModalSincronizarHub')?.addEventListener('click', async () => {
       try {
         const cfg = obterConfigGoogleDrive();
-        const token = cfg.accessToken || await autenticarGoogleDrive(cfg.clientId);
+        const token = await obterTokenOuConectar(cfg);
         const est = await obterOuCriarEstruturaPastasAthenes(token);
         if (est?.pastaRaizId) {
           const urlHub = `https://drive.google.com/drive/folders/${est.pastaRaizId}?usp=drive_link`;
