@@ -611,24 +611,30 @@ export class EstudoArtigosView {
 
     const conectado = this.temZoteroConectado();
     const labelZotero = conectado
-      ? `Zotero Conectado (${this.zoteroClient.userId ? '#' + this.zoteroClient.userId : 'API Ativa'})`
-      : 'Configurar Chave Zotero (API Key)';
+      ? `Zotero · ${this.zoteroClient.userId ? '#' + this.zoteroClient.userId : 'conectado'}`
+      : 'Conectar Zotero';
 
     const htmlBotoesAcao = `
-      <button type="button" class="ath-btn ${conectado ? 'ath-btn-zotero-ok' : ''}" id="athBtnConfigurarChaveZotero" title="Inserir sua API Key e User ID do Zotero">
+      <button type="button" class="ath-btn ${conectado ? 'ath-btn-zotero-ok' : ''}" id="athBtnConfigurarChaveZotero" title="${conectado ? 'Zotero conectado: clique para ver ou trocar a API Key e o User ID' : 'Inserir sua API Key e User ID do Zotero'}">
         <span class="ath-dot-conexao ${conectado ? 'on' : ''}"></span>
         ${svgIcone('zotero', 14)}
         <span>${escapeHtml(labelZotero)}</span>
       </button>
 
-      <button type="button" class="ath-btn" id="athBtnSincronizarZoteroHub" title="Buscar e sincronizar artigos da sua biblioteca Zotero">
-        ${svgIcone('zotero', 15)} <span>Sincronizar Biblioteca</span>
+      <button type="button" class="ath-btn ath-btn-icone" id="athBtnSincronizarZoteroHub" title="Sincronizar: busca na sua biblioteca do Zotero os artigos novos" aria-label="Sincronizar biblioteca do Zotero">
+        ${svgIcone('sincronizar', 17)}
       </button>
 
-      <label class="ath-btn" style="cursor:pointer;" title="Importar referências de arquivo .bib do Zotero">
-        ${svgIcone('documento', 14)} <span>Importar .bib</span>
+      <div class="ath-menu-importar" id="athMenuImportarBib">
+        <button type="button" class="ath-btn" id="athBtnImportarBib" aria-haspopup="menu" aria-expanded="false" title="Importar referências de um arquivo">
+          ${svgIcone('importar', 15)} Importar ${svgIcone('baixo', 12)}
+        </button>
+        <ul class="ath-menu-importar-lista" id="athMenuImportarBibLista" role="menu" hidden>
+          <li><button type="button" role="menuitem" data-importar-bib=".bib">${svgIcone('documento', 14)}<span><strong>BibTeX (.bib)</strong><small>Coleção exportada do Zotero</small></span></button></li>
+          <li><button type="button" role="menuitem" data-importar-bib=".txt">${svgIcone('documento', 14)}<span><strong>Texto (.txt)</strong><small>Referências em formato BibTeX, em texto</small></span></button></li>
+        </ul>
         <input type="file" accept=".bib,.txt" id="athInputImportarBibEstudo" style="display:none;">
-      </label>
+      </div>
 
       <button type="button" class="ath-btn ath-btn-primary" id="athBtnNovoArtigoDrive">
         ${svgIcone('mais', 14)} <span>Vincular Artigo & PDF</span>
@@ -667,9 +673,33 @@ export class EstudoArtigosView {
       this.abrirModalCredenciaisZotero();
     });
 
-    escopoBotoes.querySelector('#athBtnSincronizarZoteroHub')?.addEventListener('click', () => {
-      this.sincronizarComZoteroApi();
+    escopoBotoes.querySelector('#athBtnSincronizarZoteroHub')?.addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget;
+      btn.classList.add('ath-girando'); btn.disabled = true;
+      try { await this.sincronizarComZoteroApi(); } finally { btn.classList.remove('ath-girando'); btn.disabled = false; }
     });
+
+    // "Importar" como lista (mesmo padrão da página inicial)
+    const btnImp = escopoBotoes.querySelector('#athBtnImportarBib');
+    const listaImp = escopoBotoes.querySelector('#athMenuImportarBibLista');
+    const entradaBib = escopoBotoes.querySelector('#athInputImportarBibEstudo');
+    const fecharImp = () => { if (!listaImp) return; listaImp.hidden = true; btnImp?.setAttribute('aria-expanded', 'false'); };
+    btnImp?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const abrir = listaImp.hidden;
+      listaImp.hidden = !abrir;
+      btnImp.setAttribute('aria-expanded', String(abrir));
+      if (abrir) listaImp.querySelector('button')?.focus();
+    });
+    listaImp?.querySelectorAll('[data-importar-bib]').forEach(item => item.addEventListener('click', () => {
+      fecharImp();
+      entradaBib.accept = item.dataset.importarBib;
+      entradaBib.click();
+    }));
+    if (this._fecharImportarBib) document.removeEventListener('click', this._fecharImportarBib);
+    this._fecharImportarBib = (ev) => { if (!ev.target.closest?.('#athMenuImportarBib')) fecharImp(); };
+    document.addEventListener('click', this._fecharImportarBib);
+    escopoBotoes.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && listaImp && !listaImp.hidden) { fecharImp(); btnImp?.focus(); } });
 
     escopoBotoes.querySelector('#athInputImportarBibEstudo')?.addEventListener('change', e => {
       const arq = e.target.files?.[0];
