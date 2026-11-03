@@ -43,7 +43,7 @@ import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
-import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, registrarExclusoes, idsExcluidos, processarExclusoesPendentes, obterPastaRaizDrive, repararPastaDosDocumentos, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
+import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, docsRemovidosDoDrive, registrarExclusoes, idsExcluidos, processarExclusoesPendentes, obterPastaRaizDrive, repararPastaDosDocumentos, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -1402,6 +1402,18 @@ export class DashboardView {
       try { pastasNovas = await importarPastasDoDrive(token); } catch (e) { console.warn('[Athenes] Pastas do Drive não importadas:', e.message); }
       if (pastasNovas.importadas || pastasNovas.vinculadas) this.pastasDrive = obterPastasDriveLocais();
       const arquivos = await listarBibliotecaDoDrive(token);
+      // excluído em outro computador: o arquivo já está na lixeira do Drive, então sai da lista daqui também
+      let excluidosFora = 0;
+      if (arquivos.length < 1000) { // listagem completa (com 1000 ou mais pode haver arquivos fora dela)
+        try {
+          const sumiram = new Set((await docsRemovidosDoDrive(this.documentos, arquivos, token)).map(String));
+          if (sumiram.size) {
+            this.documentos = this.documentos.filter(d => !sumiram.has(String(d.id)));
+            excluidosFora = sumiram.size;
+            this.salvarDocumentosLocais(); this.atualizarGrid(); this.renderizarPastasLateral();
+          }
+        } catch (e) { console.warn('[Athenes] Exclusões feitas em outro computador:', e.message); }
+      }
       const r = mesclarBibliotecaDrive(this.documentos, arquivos, pastasNovas.mapa, obterPastasDriveLocais());
       const religados = repararPastaDosDocumentos(this.documentos, obterPastasDriveLocais()); // documentos trazidos de outro PC voltam para a pasta certa
       if (religados) r.atualizados += religados;
@@ -1416,8 +1428,8 @@ export class DashboardView {
       try { envio = await this.sincronizarComDrive({ aviso: false }); } catch (e) { console.warn('[Athenes] Envio ao Drive:', e.message); }
       if (envio?.rp?.criadas || envio?.rd?.enviados) { this.atualizarGrid(); }
       if (!silencioso) {
-        alert(r.novos || r.atualizados
-          ? `${zotero === 'baixou' ? 'Zotero conectado trazido do seu Drive. ' : ''}${r.novos} documento(s) novo(s) e ${r.atualizados} atualizado(s)${pastasNovas.importadas ? `, ${pastasNovas.importadas} pasta(s) trazida(s)` : ''} vindos do seu Google Drive.`
+        alert(r.novos || r.atualizados || excluidosFora
+          ? `${excluidosFora ? `${excluidosFora} documento(s) excluído(s) em outro computador saíram da lista. ` : ''}${zotero === 'baixou' ? 'Zotero conectado trazido do seu Drive. ' : ''}${r.novos} documento(s) novo(s) e ${r.atualizados} atualizado(s)${pastasNovas.importadas ? `, ${pastasNovas.importadas} pasta(s) trazida(s)` : ''} vindos do seu Google Drive.`
           : `${zotero === 'baixou' ? 'Zotero conectado trazido do seu Drive. ' : ''}Seus documentos já estão atualizados com o seu Google Drive.`);
       }
     } catch (err) {

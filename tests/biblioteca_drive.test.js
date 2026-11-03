@@ -200,3 +200,26 @@ test('documento excluído não volta ao sincronizar e o arquivo vai para a lixei
   assert.equal(await processarExclusoesPendentes('T', { fetchImpl: f }), 0, 'já está na lixeira: não repete');
   assert.equal(chamadas.length, 1);
 });
+
+test('excluído em outro computador: sai da lista só se o Drive confirma (lixeira/404) e não há alteração pendente', async () => {
+  const { docsRemovidosDoDrive } = await import('../src/core/athenes_drive_sync.js');
+  const sync = '2026-11-03T10:00:00Z';
+  const docs = [
+    { id: 'lixeira', driveFileId: 'F1', driveSincronizadoEm: sync, dataModificacao: '2026-11-03T09:00:00Z' },
+    { id: 'apagado', driveFileId: 'F2', driveSincronizadoEm: sync, dataModificacao: '2026-11-03T09:00:00Z' },
+    { id: 'renomeado', driveFileId: 'F3', driveSincronizadoEm: sync, dataModificacao: '2026-11-03T09:00:00Z' },
+    { id: 'editado_aqui', driveFileId: 'F4', driveSincronizadoEm: sync, dataModificacao: '2026-11-03T11:00:00Z' },
+    { id: 'de_outra_pessoa', driveFileId: 'F5', driveSincronizadoEm: sync, dataModificacao: sync, proprietarioExterno: true },
+    { id: 'na_lista', driveFileId: 'F6', driveSincronizadoEm: sync, dataModificacao: sync },
+    { id: 'nunca_enviado' }
+  ];
+  const f = async (url) => {
+    const id = decodeURIComponent(new URL(url).pathname.split('/').pop());
+    if (id === 'F1') return resp({ id, trashed: true });
+    if (id === 'F2') return resp({ error: { message: 'nf' } }, false, 404);
+    if (id === 'F3') return resp({ id, trashed: false }); // só saiu da listagem (renomeado): continua
+    throw new Error('consulta inesperada: ' + id);
+  };
+  const r = await docsRemovidosDoDrive(docs, [{ driveFileId: 'F6' }], 'T', { fetchImpl: f });
+  assert.deepEqual(r.sort(), ['apagado', 'lixeira']);
+});

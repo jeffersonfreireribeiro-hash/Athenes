@@ -450,3 +450,26 @@ export async function processarExclusoesPendentes(token, { fetchImpl = globalThi
   gravarConta(CHAVE_EXCLUIDOS, JSON.stringify(lista));
   return n;
 }
+
+/**
+ * Documentos que já foram sincronizados com o Drive e deixaram de existir lá (excluídos em OUTRO computador: foram para a
+ * lixeira ou apagados). Só entram aqui os documentos do próprio usuário SEM alteração pendente, e cada um é confirmado no
+ * Drive (lixeira/404) antes de sair da lista — sumir da listagem sozinho não basta (o arquivo pode ter sido renomeado).
+ * Devolve os ids a remover.
+ */
+export async function docsRemovidosDoDrive(documentos, arquivos, token, { fetchImpl = globalThis.fetch, limite = 25 } = {}) {
+  const noDrive = new Set((arquivos || []).map(a => a.driveFileId));
+  const candidatos = (documentos || []).filter(d => d.driveFileId && !noDrive.has(d.driveFileId)
+    && !d.proprietarioExterno && !d.compartilhadoComigo && d.driveSincronizadoEm && (d.dataModificacao || '') <= d.driveSincronizadoEm).slice(0, limite);
+  const removidos = [];
+  for (const d of candidatos) {
+    try {
+      const r = await chamar(fetchImpl, `${API}/${encodeURIComponent(d.driveFileId)}?fields=id,trashed`, {}, token);
+      if (r.trashed) removidos.push(d.id);
+    } catch (e) {
+      if (e.status === 404) removidos.push(d.id);
+      else if (e.sessaoExpirada) break; // outro erro: não remove nada por dúvida
+    }
+  }
+  return removidos;
+}
