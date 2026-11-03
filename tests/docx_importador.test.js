@@ -145,18 +145,21 @@ test('arquivos inválidos dão erro claro', async () => {
   await assert.rejects(importarTemplateDocx(v.build()), /vazio/);
 });
 
-test('conteúdo: traz o texto do arquivo, capa em seção própria, quebras de página e negrito/itálico inline', async () => {
+test('conteúdo: traz o texto do arquivo, capa em seção própria, quebras de página; sem formatação direta (alinhamento vira estilo)', async () => {
   const { template, relatorio } = await importarTemplateDocx(docxBagunçado(), { nome: 'm.docx', incluirConteudo: true });
   assert.equal(template.conteudoImportado, true);
   assert.deepEqual(template.secoes.map(s => s.mestraId), ['capa', 'corpo']);
   const capa = template.secoes[0].blocos, corpo = template.secoes[1].blocos;
   assert.equal(capa.length, 4);
   assert.match(capa[1].texto, /Título Grande do Trabalho/);
-  assert.equal(capa[1].alinhamento, 'centro');
+  assert.equal(capa[1].alinhamento, undefined, 'bloco sem sobrescrita de alinhamento');
+  const estCapa = template.config.estilos.find(e => e.id === capa[1].estiloId);
+  assert.equal(estCapa.alinhamento, 'centro', 'o alinhamento da capa mora no estilo');
   const textos = corpo.map(b => b.texto || '').join('\n');
   assert.match(textos, /Introdução Formal/);
-  assert.match(textos, /Texto normal com <strong><em>trecho forte<\/em><\/strong>/, 'negrito inline vira marcação do texto, não estilo');
-  assert.match(textos, /<em>|<strong>/);
+  assert.match(textos, /Texto normal com trecho forte/, 'o texto fica, sem tags de negrito/itálico');
+  assert.doesNotMatch(textos, /<em>|<strong>|<u>/);
+  for (const b of [...capa, ...corpo]) for (const k of ['alinhamento', 'fonte', 'cor', 'entrelinha', 'espaco_antes_pt', 'espaco_depois_pt', 'recuo_esquerdo_mm', 'recuo_primeira_linha_mm']) assert.equal(k in b, false, `${k} em ${b.tipo}`);
   assert.ok(corpo.some(b => b.tipo === 'titulo' && /Introdução/.test(b.texto)));
   assert.ok(relatorio.avisos.some(a => /tabela/.test(a)));
   // níveis de título consecutivos e ids de bloco únicos

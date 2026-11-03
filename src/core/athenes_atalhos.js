@@ -9,8 +9,8 @@
 
 export const CATEGORIAS = {
   historico: 'Histórico e área de transferência',
-  inline: 'Formatação de texto',
-  paragrafo: 'Parágrafo e alinhamento',
+  inline: 'Texto',
+  paragrafo: 'Parágrafo',
   busca: 'Busca e navegação',
   estrutura: 'Estrutura e inserção',
   sistema: 'Sistema'
@@ -27,23 +27,13 @@ export const CATALOGO = [
   { id: 'refazer', cat: 'historico', rotulo: 'Refazer', atalhos: ['Mod+Y', 'Mod+Shift+Z'], mac: ['Mod+Shift+Z'], escopo: 'global' },
   { id: 'recortar', cat: 'historico', rotulo: 'Recortar', atalhos: ['Mod+X'], escopo: 'edicao', nativo: true },
   { id: 'copiar', cat: 'historico', rotulo: 'Copiar', atalhos: ['Mod+C'], escopo: 'edicao', nativo: true },
-  { id: 'colar', cat: 'historico', rotulo: 'Colar (com formatação limpa)', atalhos: ['Mod+V'], escopo: 'edicao', nativo: true },
+  { id: 'colar', cat: 'historico', rotulo: 'Colar (só o texto, no estilo do bloco)', atalhos: ['Mod+V'], escopo: 'edicao', nativo: true },
   { id: 'colar_puro', cat: 'historico', rotulo: 'Colar como texto puro', atalhos: ['Mod+Shift+V'], escopo: 'edicao' },
   { id: 'selecionar_tudo', cat: 'historico', rotulo: 'Selecionar tudo (bloco, depois documento)', atalhos: ['Mod+A'], escopo: 'global' },
   // B. Inline
-  { id: 'negrito', cat: 'inline', rotulo: 'Negrito', atalhos: ['Mod+B'], escopo: 'edicao' },
-  { id: 'italico', cat: 'inline', rotulo: 'Itálico', atalhos: ['Mod+I'], escopo: 'edicao' },
-  { id: 'sublinhado', cat: 'inline', rotulo: 'Sublinhado', atalhos: ['Mod+U'], escopo: 'edicao' },
-  { id: 'tachado', cat: 'inline', rotulo: 'Tachado', atalhos: ['Alt+Shift+5', 'Mod+Shift+X'], mac: ['Mod+Shift+X'], escopo: 'edicao' },
-  { id: 'sobrescrito', cat: 'inline', rotulo: 'Sobrescrito', atalhos: ['Mod+.'], escopo: 'edicao' },
-  { id: 'subscrito', cat: 'inline', rotulo: 'Subscrito', atalhos: ['Mod+,'], escopo: 'edicao' },
   { id: 'link', cat: 'inline', rotulo: 'Inserir link', atalhos: ['Mod+K'], escopo: 'edicao' },
   { id: 'limpar_formatacao', cat: 'inline', rotulo: 'Limpar formatação', atalhos: ['Mod+\\', 'Mod+Space'], mac: ['Mod+\\'], escopo: 'edicao' },
   // C. Parágrafo
-  { id: 'alinhar_esquerda', cat: 'paragrafo', rotulo: 'Alinhar à esquerda', atalhos: ['Mod+Shift+L'], escopo: 'global' },
-  { id: 'alinhar_centro', cat: 'paragrafo', rotulo: 'Centralizar', atalhos: ['Mod+Shift+E'], escopo: 'global' },
-  { id: 'alinhar_direita', cat: 'paragrafo', rotulo: 'Alinhar à direita', atalhos: ['Mod+Shift+R'], escopo: 'global' },
-  { id: 'alinhar_justificado', cat: 'paragrafo', rotulo: 'Justificar', atalhos: ['Mod+Shift+J'], escopo: 'global' },
   { id: 'recuo_aumentar', cat: 'paragrafo', rotulo: 'Aumentar recuo', atalhos: ['Tab'], escopo: 'edicao' },
   { id: 'recuo_diminuir', cat: 'paragrafo', rotulo: 'Diminuir recuo', atalhos: ['Shift+Tab'], escopo: 'edicao' },
   // D. Busca
@@ -68,6 +58,16 @@ export const CATALOGO = [
 ];
 
 // ───────────────────────────── Plataforma ─────────────────────────────
+
+/**
+ * Formatação direta é proibida: o visual do texto vem só do Estilo de Texto. Atalhos que a aplicariam (negrito, itálico,
+ * sublinhado e alinhamento rápido do navegador) são bloqueados no editor.
+ */
+export function ehAtalhoDeFormatacaoDireta(e) {
+  if (!(e?.ctrlKey || e?.metaKey) || e.altKey) return false;
+  const k = String(e.code || '').replace(/^Key/, '').toUpperCase() || String(e.key || '').toUpperCase();
+  return e.shiftKey ? ['L', 'E', 'R', 'J'].includes(k) : ['B', 'I', 'U'].includes(k);
+}
 
 export function detectarMac(nav = (typeof navigator !== 'undefined' ? navigator : null)) {
   const s = `${nav?.userAgentData?.platform || nav?.platform || nav?.userAgent || ''}`;

@@ -19,7 +19,7 @@ import {
   calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
-import { htmlMarcadoresBloco, ligarMarcadoresBloco } from './athenes_marcadores_ui.js';
+import { sanearHtmlTexto, cssDoEstiloDeTrecho } from '../core/athenes_estilo_exclusivo.js';
 import { latexParaHtml } from '../core/athenes_formula.js';
 import { FORMATOS_NUMERO_FORMULA, idFormatoNumeroFormula } from '../core/athenes_documento.js';
 import { estiloIdDoTitulo } from '../core/athenes_sumario.js';
@@ -420,9 +420,6 @@ export class PainelPropriedades {
     // 1. TÍTULO / SUBTÍTULO
     if (b.tipo === 'titulo' || b.tipo === 'subtitulo') {
       const estiloDoTitulo = (b.tipo === 'titulo' ? estilos.find(e => e.id === estiloIdDoTitulo(Object.fromEntries(estilos.map(x => [x.id, x])), b)) : null) || estiloAtivo;
-      const alinAtivo = b.alinhamento || estiloAtivo.alinhamento || 'esquerda';
-      const corAtiva = b.cor || estiloAtivo.cor || '#1F2733';
-      const fonteAtiva = b.fonte || '';
 
       box.innerHTML = `
         <label style="font:700 12px var(--glx-font); width:100%; display:block;">Texto
@@ -447,120 +444,10 @@ export class PainelPropriedades {
           </div>
         </div>
 
-        <!-- FORMATO: 7 Modos de Alinhamento com Opção Do Estilo -->
-        <div>
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585);">
-              Formato
-            </span>
-            <button type="button" class="glx-btn glx-btn-xs ${!b.alinhamento ? 'glx-btn-primary' : 'glx-btn-soft'}" id="rmBtnAlinEstilo" style="font-size:10px; padding:2px 8px; font-weight:700;" title="Usar alinhamento herdado do estilo tipográfico">
-              Do estilo (${rotuloAlinhamento(estiloAtivo.alinhamento)})
-            </button>
-          </div>
-          <div class="rm-icg rm-icg-formato" style="width:100%; box-sizing:border-box;">
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Alinhar à esquerda: primeira e última linhas à esquerda">
-              ${svgIcone('alinhamento_esq', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'centro' ? 'on' : ''}" data-alin="centro" title="Centralizada: todo o texto centralizado">
-              ${svgIcone('alinhamento_cen', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'direita' ? 'on' : ''}" data-alin="direita" title="Direita: todo o texto alinhado à direita">
-              ${svgIcone('alinhamento_dir', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado' ? 'on' : ''}" data-alin="justificado" title="Justificada: todas as linhas preenchem toda a largura">
-              ${svgIcone('alinhamento_jus', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_esquerda' ? 'on' : ''}" data-alin="justificado_esquerda" title="Justificado com a última linha à esquerda (padrão editorial)">
-              ${svgIcone('alinhamento_jus_esq', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_centro' ? 'on' : ''}" data-alin="justificado_centro" title="Justificado com a última linha centralizada">
-              ${svgIcone('alinhamento_jus_cen', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_direita' ? 'on' : ''}" data-alin="justificado_direita" title="Justificado com a última linha à direita">
-              ${svgIcone('alinhamento_jus_dir', 16)}
-            </button>
-          </div>
-        </div>
-
-        <!-- Fonte -->
-        <label style="font:700 12px var(--glx-font);">Fonte
-          <select id="rmCampoFonte" class="glx-select" style="width:100%; margin-top:4px;">
-            <option value="" ${!fonteAtiva ? 'selected' : ''}>Do estilo (${FONTES_SISTEMA[estiloAtivo.fonte]?.rotulo || 'Nunito'})</option>
-            ${Object.values(FONTES_SISTEMA).map(f => `<option value="${f.id}" ${fonteAtiva === f.id ? 'selected' : ''}>${f.rotulo}</option>`).join('')}
-          </select>
-        </label>
-
-        <!-- COR DO TEXTO (Linha única estrita) -->
-        <div>
-          <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
-            Cor do texto
-          </span>
-          <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
-            <label class="rm-cor-linha-badge" style="position:relative; cursor:pointer; padding:4px 10px; border-radius:999px; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); margin:0;">
-              <span id="rmCorSwatch" style="width:18px; height:18px; border-radius:50%; background:${corAtiva}; border:1px solid rgba(0,0,0,0.18); display:inline-block; flex:none;"></span>
-              <span style="font-size:11.5px; font-weight:700; color:var(--ath-text, #1F2733);" id="rmCorStatus">${b.cor ? 'personalizada' : 'do estilo'}</span>
-              <input type="color" id="rmCampoCor" value="${corAtiva.startsWith('#') ? corAtiva : '#1F2733'}" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
-            </label>
-            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="rmBtnCorEstilo" style="white-space:nowrap !important; flex:none !important; flex-shrink:0 !important; font-size:11px;" title="Restaurar cor padrão do estilo">
-              Usar do estilo
-            </button>
-          </div>
-        </div>
-
-        <!-- Hifenização Automática no Bloco -->
-        <div style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-top:2px; margin-bottom:4px;">
-          <label class="rm-chk" style="font-size:12px; margin:0; display:flex; align-items:center; gap:8px; cursor:pointer;" title="Quebra automática de palavras com hífen ao fim da linha (exem-plo)">
-            <input type="checkbox" id="rmCampoHifenizacao" ${b.hifenizacao !== undefined ? (b.hifenizacao ? 'checked' : '') : (estiloAtivo.hifenizacao ? 'checked' : '')}>
-            <span>Hifenização automática (exem-plo)</span>
-          </label>
-          <span style="font-size:10px; color:var(--glx-muted);">${b.hifenizacao !== undefined ? 'local' : 'do estilo'}</span>
-        </div>
-
-        <!-- Fundo atrás do texto (Soft UI Badge com amostra e hex visíveis) -->
-        <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-          <label class="rm-chk" style="font-size:12.5px; margin:0; display:flex; align-items:center; gap:8px; cursor:pointer;">
-            <input type="checkbox" id="rmCampoFundoAtivo" ${b.fundo_ativo ? 'checked' : ''}>
-            <span>Fundo atrás do texto</span>
-          </label>
-          <label class="rm-cor-linha-badge" id="rmFundoBadge" style="display:${b.fundo_ativo ? 'inline-flex' : 'none'}; align-items:center; gap:6px; cursor:pointer; padding:3px 10px; border-radius:999px; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); margin:0; position:relative;" title="Clique para escolher a cor de fundo">
-            <span id="rmFundoSwatch" style="width:16px; height:16px; border-radius:50%; background:${b.fundo_cor || '#FFF2A8'}; border:1px solid rgba(0,0,0,0.25); display:inline-block; flex:none;"></span>
-            <span style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);" id="rmFundoHex">${b.fundo_cor || '#FFF2A8'}</span>
-            <input type="color" id="rmCampoFundoCor" value="${b.fundo_cor || '#FFF2A8'}" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
-          </label>
-        </div>
-
-        <!-- Bordas / Linhas de destaque -->
-        <div>
-          <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
-            Bordas / Linhas de destaque
-          </span>
-          <div class="rm-icg" style="display:inline-flex; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:3px; gap:2px;">
-            <button type="button" class="rm-ic-bt ${(!b.borda_tipo || b.borda_tipo === 'sem') ? 'on' : ''}" data-borda="sem" title="Sem borda / padrão">
-              ${svgIcone('borda_sem', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${b.borda_tipo === 'tachado' ? 'on' : ''}" data-borda="tachado" title="Linha média / tachado">
-              ${svgIcone('borda_tachado', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${b.borda_tipo === 'inferior' ? 'on' : ''}" data-borda="inferior" title="Linha inferior / sublinhado de destaque">
-              ${svgIcone('borda_inferior', 16)}
-            </button>
-          </div>
-        </div>
-
-        <!-- Distância entre Blocos (pt) -->
-        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:4px; background:#fff;">
-          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;">
-            <span>Distância entre Blocos</span>
-            <span style="font-size:10px; color:var(--glx-muted); text-transform:none; font-weight:600;">mm</span>
-          </div>
-          <input type="number" id="rmCampoEspacoDepois" class="glx-input" min="0" max="40" step="0.5" value="${ptParaMm(b.espaco_depois_pt ?? estiloAtivo.espaco_depois_pt ?? 8)}" style="width:100%; height:32px; padding:0 10px; box-sizing:border-box;">
-        </div>
-
         <label class="rm-chk" style="font-size:12px; margin-top:4px;">
           <input type="checkbox" id="rmCampoManter" ${b.manterComProximo ? 'checked' : ''}>
           Manter título com o parágrafo seguinte (evitar órfão)
         </label>
-        ${htmlMarcadoresBloco(b, estiloDoTitulo, estilos)}
         ${b.tipo === 'titulo' ? `
         <div style="display:flex; flex-direction:column; gap:8px; padding:10px; border:1px solid #E2E8F0; border-radius:10px; background:#F8FAFC;">
           <strong style="font:800 10.5px var(--glx-font); letter-spacing:.06em; text-transform:uppercase; color:var(--ath-primary,#314F79);">Numeração e sumário</strong>
@@ -577,8 +464,7 @@ export class PainelPropriedades {
         </div>` : ''}
       `;
 
-      ligarMarcadoresBloco(box, b, estiloDoTitulo, { aoMudar: (estrutural) => this.notificarMudanca(estrutural) });
-      box.querySelector('#rmCampoTexto').addEventListener('input', e => { b.texto = e.target.value; this.notificarMudanca(); });
+      box.querySelector('#rmCampoTexto').addEventListener('input', e => { b.texto = sanearHtmlTexto(e.target.value); this.notificarMudanca(); });
       box.querySelector('#rmCampoNivel').addEventListener('change', e => {
         b.nivel = parseInt(e.target.value, 10);
         if (/^titulo\d$/.test(b.estiloId || '')) b.estiloId = `titulo${Math.min(6, b.nivel)}`; // o estilo acompanha o nível
@@ -599,41 +485,7 @@ export class PainelPropriedades {
         this.notificarMudanca(true); this.renderizar?.();
       });
       box.querySelector('#rmCampoEstilo').addEventListener('change', e => { b.estiloId = e.target.value; this.notificarMudanca(); });
-      box.querySelector('#rmCampoFonte').addEventListener('change', e => { b.fonte = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmCampoManter').addEventListener('change', e => { b.manterComProximo = e.target.checked; this.notificarMudanca(); });
-
-      // Fundo em Título
-      const chkFundoT = box.querySelector('#rmCampoFundoAtivo');
-      const badgeFundoT = box.querySelector('#rmFundoBadge');
-      const inpFundoCorT = box.querySelector('#rmCampoFundoCor');
-      const swatchFundoT = box.querySelector('#rmFundoSwatch');
-      const hexFundoT = box.querySelector('#rmFundoHex');
-
-      if (chkFundoT && inpFundoCorT) {
-        chkFundoT.addEventListener('change', () => {
-          b.fundo_ativo = chkFundoT.checked;
-          if (b.fundo_ativo && !b.fundo_cor) b.fundo_cor = '#FFF2A8';
-          if (badgeFundoT) badgeFundoT.style.display = b.fundo_ativo ? 'inline-flex' : 'none';
-          this.notificarMudanca();
-          this.renderizar();
-        });
-        badgeFundoT?.addEventListener('click', () => {
-          inpFundoCorT.click();
-        });
-        inpFundoCorT.addEventListener('input', e => {
-          b.fundo_cor = e.target.value;
-          if (swatchFundoT) swatchFundoT.style.background = b.fundo_cor;
-          if (hexFundoT) hexFundoT.textContent = b.fundo_cor;
-          this.notificarMudanca();
-          this.renderizar();
-        });
-      }
-
-      box.querySelector('#rmCampoHifenizacao')?.addEventListener('change', e => {
-        b.hifenizacao = e.target.checked;
-        this.notificarMudanca();
-        this.renderizar();
-      });
 
       box.querySelector('#athBtnEditarEstiloDoBloco')?.addEventListener('click', () => {
         const est = (this.doc.estilos || []).find(e => e.id === b.estiloId) || this.doc.estilos?.[0];
@@ -645,70 +497,10 @@ export class PainelPropriedades {
         if (est) this.setEstilo(est);
       }));
 
-      // Bordas em Título
-      box.querySelectorAll('[data-borda]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          b.borda_tipo = btn.dataset.borda;
-          this.notificarMudanca();
-          this.renderizar();
-        });
-      });
-
-      // Distância entre blocos em Título
-      box.querySelector('#rmCampoEspacoDepois')?.addEventListener('input', e => {
-        b.espaco_depois_pt = mmParaPt(parseFloat(e.target.value));
-        this.notificarMudanca();
-      });
-
-      box.querySelector('#rmBtnAlinEstilo')?.addEventListener('click', () => {
-        delete b.alinhamento;
-        this.notificarMudanca();
-        this.renderizar();
-      });
-
-      box.querySelectorAll('[data-alin]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          b.alinhamento = btn.dataset.alin;
-          box.querySelectorAll('[data-alin]').forEach(el => el.classList.remove('on'));
-          btn.classList.add('on');
-          this.notificarMudanca();
-        });
-      });
-
-      const inpCor = box.querySelector('#rmCampoCor');
-      const swatchCor = box.querySelector('#rmCorSwatch');
-      const statusCor = box.querySelector('#rmCorStatus');
-      const btnCorEstilo = box.querySelector('#rmBtnCorEstilo');
-
-      inpCor.addEventListener('input', e => {
-        b.cor = e.target.value;
-        swatchCor.style.background = b.cor;
-        statusCor.textContent = 'personalizada';
-        this.notificarMudanca();
-      });
-
-      btnCorEstilo.addEventListener('click', () => {
-        delete b.cor;
-        const cEst = estiloAtivo.cor || '#1F2733';
-        swatchCor.style.background = cEst;
-        inpCor.value = cEst.startsWith('#') ? cEst : '#1F2733';
-        statusCor.textContent = 'do estilo';
-        this.notificarMudanca();
-      });
     }
 
     // 2. PARÁGRAFO / TEXTO CORPO COM CONTROLES COMPLETOS (DESIGN SOFT UI)
     else if (b.tipo === 'paragrafo' || b.tipo === 'citacao' || b.tipo === 'texto' || b.tipo === 'nota' || b.tipo === 'lista') {
-      const alinAtivo = b.alinhamento || estiloAtivo.alinhamento || 'esquerda';
-      const corAtiva = b.cor || estiloAtivo.cor || '#1F2733';
-      const fonteAtiva = b.fonte || '';
-      const temOverride = Boolean(
-        b.alinhamento || b.fonte || b.cor || b.fundo_ativo || b.borda_tipo || b.marcador_tipo ||
-        b.entrelinha || b.espaco_antes_pt !== undefined || b.espaco_depois_pt !== undefined ||
-        b.recuo_primeira_linha_mm !== undefined || b.recuo_esquerdo_mm !== undefined ||
-        b.recuo_direito_mm !== undefined || b.espacamento_letras_em !== undefined ||
-        b.espacamento_palavras_em !== undefined
-      );
 
       box.innerHTML = `
         <label style="font:700 12px var(--glx-font); width:100%; display:block;">Texto
@@ -737,97 +529,6 @@ export class PainelPropriedades {
           </button>
         </div>
 
-        <!-- FORMATO: 7 Modos de Alinhamento com Opção Do Estilo -->
-        <div>
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585);">
-              Formato
-            </span>
-            <button type="button" class="glx-btn glx-btn-xs ${!b.alinhamento ? 'glx-btn-primary' : 'glx-btn-soft'}" id="rmBtnAlinEstilo" style="font-size:10px; padding:2px 8px; font-weight:700;" title="Usar alinhamento herdado do estilo tipográfico">
-              Do estilo (${rotuloAlinhamento(estiloAtivo.alinhamento)})
-            </button>
-          </div>
-          <div class="rm-icg rm-icg-formato" style="width:100%; box-sizing:border-box;">
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Alinhar à esquerda: primeira e última linhas à esquerda">
-              ${svgIcone('alinhamento_esq', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'centro' ? 'on' : ''}" data-alin="centro" title="Centralizado: todo o texto centralizado">
-              ${svgIcone('alinhamento_cen', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'direita' ? 'on' : ''}" data-alin="direita" title="Alinhar à direita: todo o texto alinhado à direita">
-              ${svgIcone('alinhamento_dir', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado' ? 'on' : ''}" data-alin="justificado" title="Justificado total: todas as linhas preenchem toda a largura">
-              ${svgIcone('alinhamento_jus', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_esquerda' ? 'on' : ''}" data-alin="justificado_esquerda" title="Justificado com a última linha à esquerda (padrão ABNT e editorial)">
-              ${svgIcone('alinhamento_jus_esq', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_centro' ? 'on' : ''}" data-alin="justificado_centro" title="Justificado com a última linha centralizada (subtítulos e citações)">
-              ${svgIcone('alinhamento_jus_cen', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_direita' ? 'on' : ''}" data-alin="justificado_direita" title="Justificado com a última linha à direita (dedicatórias e notas)">
-              ${svgIcone('alinhamento_jus_dir', 16)}
-            </button>
-          </div>
-        </div>
-
-        <!-- Fonte -->
-        <label style="font:700 12px var(--glx-font);">Fonte
-          <select id="rmCampoFonte" class="glx-select" style="width:100%; margin-top:4px;">
-            <option value="" ${!fonteAtiva ? 'selected' : ''}>Do estilo (${FONTES_SISTEMA[estiloAtivo.fonte]?.rotulo || 'Nunito'})</option>
-            ${Object.values(FONTES_SISTEMA).map(f => `<option value="${f.id}" ${fonteAtiva === f.id ? 'selected' : ''}>${f.rotulo}</option>`).join('')}
-          </select>
-        </label>
-
-        <!-- COR DO TEXTO (Linha única estrita) -->
-        <div>
-          <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
-            Cor do texto
-          </span>
-          <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
-            <label class="rm-cor-linha-badge" style="position:relative; cursor:pointer; padding:4px 10px; border-radius:999px; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); margin:0;">
-              <span id="rmCorSwatch" style="width:18px; height:18px; border-radius:50%; background:${corAtiva}; border:1px solid rgba(0,0,0,0.18); display:inline-block; flex:none;"></span>
-              <span style="font-size:11.5px; font-weight:700; color:var(--ath-text, #1F2733);" id="rmCorStatus">${b.cor ? 'personalizada' : 'do estilo'}</span>
-              <input type="color" id="rmCampoCor" value="${corAtiva.startsWith('#') ? corAtiva : '#1F2733'}" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
-            </label>
-            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="rmBtnCorEstilo" style="white-space:nowrap !important; flex:none !important; flex-shrink:0 !important; font-size:11px;" title="Restaurar cor padrão do estilo">
-              Usar do estilo
-            </button>
-          </div>
-        </div>
-
-        <!-- Fundo atrás do texto (Soft UI Badge com amostra e hex visíveis) -->
-        <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-          <label class="rm-chk" style="font-size:12.5px; margin:0; display:flex; align-items:center; gap:8px; cursor:pointer;">
-            <input type="checkbox" id="rmCampoFundoAtivo" ${b.fundo_ativo ? 'checked' : ''}>
-            <span>Fundo atrás do texto</span>
-          </label>
-          <label class="rm-cor-linha-badge" id="rmFundoBadge" style="display:${b.fundo_ativo ? 'inline-flex' : 'none'}; align-items:center; gap:6px; cursor:pointer; padding:3px 10px; border-radius:999px; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); margin:0; position:relative;" title="Clique para escolher a cor de fundo">
-            <span id="rmFundoSwatch" style="width:16px; height:16px; border-radius:50%; background:${b.fundo_cor || '#FFF2A8'}; border:1px solid rgba(0,0,0,0.25); display:inline-block; flex:none;"></span>
-            <span style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);" id="rmFundoHex">${b.fundo_cor || '#FFF2A8'}</span>
-            <input type="color" id="rmCampoFundoCor" value="${b.fundo_cor || '#FFF2A8'}" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
-          </label>
-        </div>
-
-        <!-- Bordas / Linhas de destaque -->
-        <div>
-          <div class="rm-icg" style="display:inline-flex; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:999px; padding:3px; gap:2px;">
-            <button type="button" class="rm-ic-bt ${(!b.borda_tipo || b.borda_tipo === 'sem') ? 'on' : ''}" data-borda="sem" title="Sem borda / padrão">
-              ${svgIcone('borda_sem', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${b.borda_tipo === 'tachado' ? 'on' : ''}" data-borda="tachado" title="Linha média / tachado">
-              ${svgIcone('borda_tachado', 16)}
-            </button>
-            <button type="button" class="rm-ic-bt ${b.borda_tipo === 'inferior' ? 'on' : ''}" data-borda="inferior" title="Linha inferior / sublinhado de destaque">
-              ${svgIcone('borda_inferior', 16)}
-            </button>
-          </div>
-        </div>
-
-        <!-- MARCADORES E NUMERAÇÃO: o estilo de texto traz o padrão; o bloco sobrescreve -->
-        ${htmlMarcadoresBloco(b, estiloAtivo, estilos)}
-
         <!-- Divisão do Bloco de Texto -->
         <div style="margin-top:6px;">
           <button type="button" class="glx-btn glx-btn-sm glx-btn-secondary" id="athBtnDividirBlocoProps" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:700;" title="Dividir este bloco de texto em dois na posição atual do cursor ou ao meio">
@@ -835,33 +536,11 @@ export class PainelPropriedades {
           </button>
         </div>
 
-        <!-- Só a distância ENTRE BLOCOS é do bloco; entrelinha, recuos, espaço antes e entre parágrafos pertencem ao ESTILO de texto -->
-        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:6px; background:#fff;">
-          <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733); display:block;">Distância entre blocos (mm)
-            <input type="number" id="rmCampoEspacoDepois" class="glx-input" style="width:100%;" min="0" max="40" step="0.5" value="${ptParaMm(b.espaco_depois_pt ?? estiloAtivo.espaco_depois_pt ?? 8)}" title="Espaço depois deste bloco, até o próximo. Entrelinha, recuos e espaçamento entre parágrafos são definidos no estilo de texto.">
-          </label>
-          <p style="margin:6px 0 0; font-size:10.5px; color:var(--glx-muted); line-height:1.35;">Entrelinha, recuos e espaço entre parágrafos ficam no <strong>estilo de texto</strong> (Estilos de Texto).</p>
-        </div>
-
-        <!-- Indicador de Override Local e Redefinição do Estilo -->
-        <div id="rmBoxOverrideStatus" style="display:${temOverride ? 'flex' : 'none'}; flex-direction:column; gap:6px; padding:10px; border-radius:8px; background:var(--ath-primary-soft, #EEF4FA); border:1px solid var(--ath-primary-line, #C8D7E6); margin-top:4px;">
-          <span style="font:700 11.5px var(--glx-font); color:var(--ath-primary-ink, #1B2D47);">
-            ⚠️ Formatação local diferente do estilo
-          </span>
-          <div style="display:flex; gap:6px;">
-            <button type="button" class="glx-btn glx-btn-sm glx-btn-primary" id="rmBtnRedefinirEstilo" style="flex:1; font-size:11px;" title="Atualiza o estilo com estas propriedades para todos os blocos">
-              Redefinir estilo
-            </button>
-            <button type="button" class="glx-btn glx-btn-sm glx-btn-soft" id="rmBtnLimparOverride" style="flex:1; font-size:11px;" title="Remove ajustes locais e volta 100% ao estilo">
-              Limpar ajustes
-            </button>
-          </div>
-        </div>
       `;
 
       // Event Listeners
       box.querySelector('#rmCampoTexto')?.addEventListener('input', e => {
-        b.texto = e.target.value;
+        b.texto = sanearHtmlTexto(e.target.value);
         this.notificarMudanca();
       });
 
@@ -874,9 +553,6 @@ export class PainelPropriedades {
       box.querySelector('#athBtnAplicarEstiloBloco')?.addEventListener('click', () => {
         const selId = box.querySelector('#rmCampoEstilo')?.value;
         if (selId) b.estiloId = selId;
-        delete b.alinhamento;
-        delete b.fonte;
-        delete b.cor;
         this.notificarMudanca(true);
         this.renderizar();
       });
@@ -886,10 +562,11 @@ export class PainelPropriedades {
         const est = estilos.find(e => e.id === selId) || estiloAtivo;
         const selInfo = obterOuRestaurarSelecaoDoBloco(b.id);
         if (selInfo.ok && selInfo.texto.trim() && est) {
-          const cssInline = `font-family:${FONTES_SISTEMA[est.fonte]?.familia || 'inherit'}; font-size:${est.tamanho_pt || 12}pt; font-weight:${est.peso || 400}; color:${est.cor || '#1F2733'};`;
-          document.execCommand('insertHTML', false, `<span style="${cssInline}">${escapeHtml(selInfo.texto)}</span>`);
+          // trecho com estilo cadastrado: guarda só o id do estilo (o CSS vem do estilo, e muda junto com ele)
+          const cssInline = cssDoEstiloDeTrecho(est, FONTES_SISTEMA[est.fonte]?.familia || 'inherit').replace(/"/g, "'");
+          document.execCommand('insertHTML', false, `<span class="ath-estilo-span" data-estilo-id="${escapeHtml(est.id)}" style="${cssInline}">${escapeHtml(selInfo.texto)}</span>`);
           const elBlocoEditable = document.querySelector(`.ath-bloco-folha[data-bloco-id="${b.id}"] .ath-texto-editable`);
-          if (elBlocoEditable) b.texto = elBlocoEditable.innerHTML.replace(/<span class="ath-citacao-ref"[^>]*>.*?<\/span>/g, '');
+          if (elBlocoEditable) b.texto = sanearHtmlTexto(elBlocoEditable.innerHTML.replace(/<span class="ath-citacao-ref"[^>]*>.*?<\/span>/g, ''));
           this.notificarMudanca();
         } else if (selId) {
           b.estiloId = selId;
@@ -898,189 +575,16 @@ export class PainelPropriedades {
         }
       });
 
-      // Alinhamento
-      box.querySelector('#rmBtnAlinEstilo')?.addEventListener('click', () => {
-        delete b.alinhamento;
-        this.notificarMudanca();
-        this.renderizar();
-      });
-
-      box.querySelectorAll('[data-alin]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          b.alinhamento = btn.dataset.alin;
-          this.notificarMudanca();
-          this.renderizar();
-        });
-      });
-
-      // Fonte
-      box.querySelector('#rmCampoFonte').addEventListener('change', e => {
-        if (e.target.value) {
-          b.fonte = e.target.value;
-        } else {
-          delete b.fonte;
-        }
-        this.notificarMudanca();
-        this.renderizar();
-      });
-
-      // Cor do Texto
-      const inpCor = box.querySelector('#rmCampoCor');
-      box.querySelector('#rmCorSwatch').parentElement.addEventListener('click', () => {
-        inpCor.click();
-      });
-      inpCor.addEventListener('input', e => {
-        b.cor = e.target.value;
-        box.querySelector('#rmCorSwatch').style.backgroundColor = b.cor;
-        box.querySelector('#rmCorStatus').textContent = 'personalizada';
-        this.notificarMudanca();
-      });
-
-      box.querySelector('#rmBtnCorEstilo').addEventListener('click', () => {
-        delete b.cor;
-        this.notificarMudanca();
-        this.renderizar();
-      });
-
-      // Fundo Soft UI
-      const chkFundo = box.querySelector('#rmCampoFundoAtivo');
-      const badgeFundo = box.querySelector('#rmFundoBadge');
-      const inpFundoCor = box.querySelector('#rmCampoFundoCor');
-      const swatchFundo = box.querySelector('#rmFundoSwatch');
-      const hexFundo = box.querySelector('#rmFundoHex');
-
-      chkFundo.addEventListener('change', () => {
-        b.fundo_ativo = chkFundo.checked;
-        if (b.fundo_ativo && !b.fundo_cor) b.fundo_cor = '#FFF2A8';
-        if (badgeFundo) badgeFundo.style.display = b.fundo_ativo ? 'inline-flex' : 'none';
-        this.notificarMudanca();
-        this.renderizar();
-      });
-      badgeFundo?.addEventListener('click', () => {
-        inpFundoCor.click();
-      });
-      inpFundoCor.addEventListener('input', e => {
-        b.fundo_cor = e.target.value;
-        if (swatchFundo) swatchFundo.style.background = b.fundo_cor;
-        if (hexFundo) hexFundo.textContent = b.fundo_cor;
-        this.notificarMudanca();
-        this.renderizar();
-      });
-
       box.querySelector('#athBtnEditarEstiloDoBloco')?.addEventListener('click', () => {
         const est = (this.doc.estilos || []).find(e => e.id === b.estiloId) || this.doc.estilos?.[0];
         if (est) this.setEstilo(est);
       });
 
-      // Bordas
-      box.querySelectorAll('[data-borda]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          b.borda_tipo = btn.dataset.borda;
-          this.notificarMudanca();
-          this.renderizar();
-        });
-      });
-
-      // Marcadores e Numeração (Estilo Affinity Publisher)
+      // (marcadores, numeração, alinhamento, fonte, cor, fundo, borda, espaços e recuos pertencem ao Estilo de Texto)
       box.querySelector('#athBtnDividirBlocoProps')?.addEventListener('click', () => {
         this.onDividirBloco(b);
       });
 
-      const normalizarHtmlListaDoBloco = () => {
-        const tipo = b.marcador_tipo;
-        const txt = String(b.texto || '').trim();
-        if (!tipo || tipo === 'nenhum') {
-          delete b.marcador_tipo;
-          // Se havia lista simples envolvendo o bloco inteiro, desempacota os <li> em parágrafos/linhas
-          if (txt.startsWith('<ul') || txt.startsWith('<ol')) {
-            const tmp = document.createElement('div');
-            tmp.innerHTML = txt;
-            const itens = Array.from(tmp.querySelectorAll('li')).map(li => li.innerHTML);
-            if (itens.length > 0) {
-              b.texto = itens.join('<br>');
-            }
-          }
-          return;
-        }
-
-        // Converte entre <ul> e <ol> caso já exista tag de lista no HTML salvo
-        if (txt.includes('<ul') || txt.includes('<ol')) {
-          const tmp = document.createElement('div');
-          tmp.innerHTML = txt;
-          tmp.querySelectorAll('ul, ol').forEach(listaAntiga => {
-            const tagAlvo = tipo === 'numero' ? 'ol' : 'ul';
-            const novaLista = document.createElement(tagAlvo);
-            novaLista.innerHTML = listaAntiga.innerHTML;
-            listaAntiga.replaceWith(novaLista);
-          });
-          b.texto = tmp.innerHTML;
-        }
-      };
-
-      ligarMarcadoresBloco(box, b, estiloAtivo, {
-        aoTrocarTipo: normalizarHtmlListaDoBloco,
-        aoMudar: (estrutural) => this.notificarMudanca(estrutural)
-      });
-
-      box.querySelector('#rmCampoEspacoDepois')?.addEventListener('input', e => {
-        b.espaco_depois_pt = mmParaPt(parseFloat(e.target.value));
-        this.notificarMudanca();
-      });
-
-      // Botão Redefinir Estilo a partir da Seleção
-      const btnRedefinir = box.querySelector('#rmBtnRedefinirEstilo');
-      if (btnRedefinir) {
-        btnRedefinir.addEventListener('click', () => {
-          if (b.alinhamento) estiloAtivo.alinhamento = b.alinhamento;
-          if (b.fonte) estiloAtivo.fonte = b.fonte;
-          if (b.cor) estiloAtivo.cor = b.cor;
-          if (b.entrelinha) estiloAtivo.entrelinha = b.entrelinha;
-          if (b.espaco_antes_pt !== undefined) estiloAtivo.espaco_antes_pt = b.espaco_antes_pt;
-          if (b.espaco_depois_pt !== undefined) estiloAtivo.espaco_depois_pt = b.espaco_depois_pt;
-          if (b.recuo_primeira_linha_mm !== undefined) estiloAtivo.recuo_primeira_linha_mm = b.recuo_primeira_linha_mm;
-          if (b.recuo_esquerdo_mm !== undefined) estiloAtivo.recuo_esquerdo_mm = b.recuo_esquerdo_mm;
-          if (b.espacamento_letras_em !== undefined) estiloAtivo.espacamento_letras_em = b.espacamento_letras_em;
-
-          // Limpa overrides do bloco
-          delete b.alinhamento;
-          delete b.fonte;
-          delete b.cor;
-          delete b.entrelinha;
-          delete b.espaco_antes_pt;
-          delete b.espaco_depois_pt;
-          delete b.recuo_primeira_linha_mm;
-          delete b.recuo_esquerdo_mm;
-          delete b.espacamento_letras_em;
-
-          this.notificarMudanca();
-          this.renderizar();
-        });
-      }
-
-      // Botão Limpar Formatação Local
-      const btnLimpar = box.querySelector('#rmBtnLimparOverride');
-      if (btnLimpar) {
-        btnLimpar.addEventListener('click', () => {
-          delete b.alinhamento;
-          delete b.fonte;
-          delete b.cor;
-          delete b.fundo_ativo;
-          delete b.fundo_cor;
-          delete b.borda_tipo;
-          delete b.marcador_tipo;
-          delete b.entrelinha;
-          delete b.espaco_antes_pt;
-          delete b.espaco_depois_pt;
-          delete b.recuo_primeira_linha_mm;
-          delete b.recuo_esquerdo_mm;
-          delete b.recuo_direito_mm;
-          delete b.espacamento_letras_em;
-          delete b.espacamento_palavras_em;
-
-          this.notificarMudanca();
-          this.renderizar();
-        });
-      }
     }
 
     // 3. FIGURA (BLOCO COMPOSTO COM MULTI-ITENS, SLOTS, ENQUADRAMENTO E TIPOGRAFIA)

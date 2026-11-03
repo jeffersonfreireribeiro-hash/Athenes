@@ -10,6 +10,7 @@
  * são apagados depois de confirmado que todos os documentos estão no Drive.
  */
 import { lerConta, removerConta, obterContaAtiva } from './athenes_conta.js';
+import { sanearDocumentoEstilos } from './athenes_estilo_exclusivo.js';
 
 const CHAVE_LEGADO = 'athenes_docs_indice';
 const memoria = { conta: undefined, docs: [], legadoLido: false };
@@ -26,6 +27,7 @@ export function reiniciar() { Object.assign(memoria, { conta: undefined, docs: [
 /** Insere ou substitui um documento na lista da sessão (mais recente primeiro). */
 export function gravarDocumento(doc) {
   garantirConta();
+  sanearDocumentoEstilos(doc); // documento antigo vindo do servidor/Drive: só estilos, sem sobrescritas
   const i = memoria.docs.findIndex(d => String(d.id) === String(doc.id));
   if (i >= 0) memoria.docs[i] = doc; else memoria.docs.unshift(doc);
 }

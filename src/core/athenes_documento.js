@@ -5,6 +5,7 @@
  */
 
 import { extrairItensSumario, nivelDe } from './athenes_sumario.js';
+import { TIPOS_BLOCO_TEXTO, sanearHtmlTexto, ajusteDeFragmento } from './athenes_estilo_exclusivo.js';
 import { parametrosTextoPt, linhasEstimadas, lacunasInternasPt, alturaTabelaPt, dividirParaPagina, podeDividir } from './athenes_fragmentos.js';
 import { garantirEstilosDeTitulos } from './athenes_estilos.js';
 import { aplicarRegrasMestraNasPaginas, vincularOverridesAsPaginas } from './athenes_mestra_canvas.js';
@@ -267,6 +268,8 @@ function copiarTipografiaBloco(b, dados) {
  * Cria um novo bloco de conteúdo para o documento
  */
 export function criarNovoBloco(tipo, dados = {}) {
+  // Bloco de texto: só `estiloId` define o visual. Fonte, cor, alinhamento, entrelinha, espaços, recuos e marcadores são do estilo.
+  const ehTexto = TIPOS_BLOCO_TEXTO.includes(tipo || 'paragrafo');
   const b = {
     id: dados.id || gerarId('bloco'),
     tipo: tipo || 'paragrafo',
@@ -274,22 +277,22 @@ export function criarNovoBloco(tipo, dados = {}) {
     span: dados.span || 12,
     linha_grade: dados.linha_grade || null,
     estiloId: dados.estiloId || (tipo === 'titulo' ? 'titulo1' : tipo === 'subtitulo' ? 'subtitulo' : 'corpo'),
-    alinhamento: dados.alinhamento || 'esquerda',
+    ...(ehTexto ? {} : { alinhamento: dados.alinhamento || 'esquerda' }),
     manterComProximo: dados.manterComProximo !== undefined ? dados.manterComProximo : (tipo === 'titulo' || tipo === 'subtitulo'),
     quebra_antes: !!dados.quebra_antes,
-    ...(dados.fonte ? { fonte: dados.fonte } : {}),
-    ...(dados.cor ? { cor: dados.cor } : {}),
-    ...(dados.fundo_ativo ? { fundo_ativo: dados.fundo_ativo, fundo_cor: dados.fundo_cor } : {}),
-    ...(dados.borda_tipo ? { borda_tipo: dados.borda_tipo } : {}),
-    ...(dados.marcador_tipo ? { marcador_tipo: dados.marcador_tipo } : {}),
-    ...(dados.entrelinha ? { entrelinha: dados.entrelinha } : {}),
-    ...(dados.espaco_antes_pt !== undefined ? { espaco_antes_pt: dados.espaco_antes_pt } : {}),
-    ...(dados.espaco_depois_pt !== undefined ? { espaco_depois_pt: dados.espaco_depois_pt } : {}),
-    ...(dados.recuo_primeira_linha_mm !== undefined ? { recuo_primeira_linha_mm: dados.recuo_primeira_linha_mm } : {}),
-    ...(dados.recuo_esquerdo_mm !== undefined ? { recuo_esquerdo_mm: dados.recuo_esquerdo_mm } : {}),
-    ...(dados.recuo_direito_mm !== undefined ? { recuo_direito_mm: dados.recuo_direito_mm } : {}),
-    ...(dados.espacamento_letras_em !== undefined ? { espacamento_letras_em: dados.espacamento_letras_em } : {}),
-    ...(dados.espacamento_palavras_em !== undefined ? { espacamento_palavras_em: dados.espacamento_palavras_em } : {}),
+    ...(!ehTexto && dados.fonte ? { fonte: dados.fonte } : {}),
+    ...(!ehTexto && dados.cor ? { cor: dados.cor } : {}),
+    ...(!ehTexto && dados.fundo_ativo ? { fundo_ativo: dados.fundo_ativo, fundo_cor: dados.fundo_cor } : {}),
+    ...(!ehTexto && dados.borda_tipo ? { borda_tipo: dados.borda_tipo } : {}),
+    ...(!ehTexto && dados.marcador_tipo ? { marcador_tipo: dados.marcador_tipo } : {}),
+    ...(!ehTexto && dados.entrelinha ? { entrelinha: dados.entrelinha } : {}),
+    ...(!ehTexto && dados.espaco_antes_pt !== undefined ? { espaco_antes_pt: dados.espaco_antes_pt } : {}),
+    ...(!ehTexto && dados.espaco_depois_pt !== undefined ? { espaco_depois_pt: dados.espaco_depois_pt } : {}),
+    ...(!ehTexto && dados.recuo_primeira_linha_mm !== undefined ? { recuo_primeira_linha_mm: dados.recuo_primeira_linha_mm } : {}),
+    ...(!ehTexto && dados.recuo_esquerdo_mm !== undefined ? { recuo_esquerdo_mm: dados.recuo_esquerdo_mm } : {}),
+    ...(!ehTexto && dados.recuo_direito_mm !== undefined ? { recuo_direito_mm: dados.recuo_direito_mm } : {}),
+    ...(!ehTexto && dados.espacamento_letras_em !== undefined ? { espacamento_letras_em: dados.espacamento_letras_em } : {}),
+    ...(!ehTexto && dados.espacamento_palavras_em !== undefined ? { espacamento_palavras_em: dados.espacamento_palavras_em } : {}),
     ...(dados.grade_2d ? { grade_2d: dados.grade_2d } : {})
   };
 
@@ -305,7 +308,7 @@ export function criarNovoBloco(tipo, dados = {}) {
       break;
 
     case 'paragrafo':
-      b.texto = dados.texto || 'Digite o texto aqui...';
+      b.texto = sanearHtmlTexto(dados.texto || 'Digite o texto aqui...');
       break;
 
     case 'lista':
@@ -429,7 +432,6 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.numero_equacao = '(1)'; // sempre recalculado pela numeração automática
       b.numero = b.numero_equacao;
       if (dados.formato_numero) b.formato_numero = dados.formato_numero;
-      if (dados.formula_sintaxe === 'matlab') { b.formula_sintaxe = 'matlab'; b.formula_matlab = dados.formula_matlab || ''; }
       b.alinhamento = dados.alinhamento || 'centro';
       b.moldura_tipo = dados.moldura_tipo || 'limpo'; // 'limpo' (sem caixa/fundo), 'linha_esquerda', 'linhas_topo_base', 'cartao_suave', 'caixa_borda', 'personalizado'
       b.linha_estilo = dados.linha_estilo || 'solida';
@@ -498,11 +500,12 @@ export function criarNovoBloco(tipo, dados = {}) {
  */
 const TIPOS_DE_TEXTO = ['paragrafo', 'titulo', 'subtitulo', 'citacao'];
 
-/** Espaço antes/depois (pt) de um bloco de texto: o do bloco, senão o do estilo. null para os demais tipos. */
+/** Espaço antes/depois (pt) de um bloco de texto: o do estilo (só fragmentos de paginação ajustam). null para os demais tipos. */
 export function margensTextoPt(bloco, estilos) {
   if (!bloco || !TIPOS_DE_TEXTO.includes(bloco.tipo)) return null;
   const est = estilos[bloco.estiloId] || (bloco.tipo === 'titulo' ? estilos[`titulo${Math.min(6, bloco.nivel || 1)}`] : null) || estilos.corpo || {};
-  return { antes: bloco.espaco_antes_pt ?? est.espaco_antes_pt ?? 0, depois: bloco.espaco_depois_pt ?? est.espaco_depois_pt ?? 0 };
+  const aj = ajusteDeFragmento(bloco);
+  return { antes: aj.espaco_antes_pt ?? est.espaco_antes_pt ?? 0, depois: aj.espaco_depois_pt ?? est.espaco_depois_pt ?? 0 };
 }
 
 /**

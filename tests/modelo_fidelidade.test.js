@@ -43,11 +43,15 @@ test('fonte importada entra no catálogo, vai embutida no PDF e pode ser removid
 
 test('espaço entre parágrafos colapsa: vale o maior, não a soma (como no Word)', () => {
   const e = estilos();
-  const a = criarNovoBloco('paragrafo', { texto: 'a', espaco_depois_pt: 18 });
-  const b = criarNovoBloco('paragrafo', { texto: 'b', espaco_antes_pt: 12 });
+  // o espaço vem dos ESTILOS dos blocos (nenhum bloco guarda espaço próprio)
+  e.est_a = { ...e.corpo, id: 'est_a', espaco_depois_pt: 18 };
+  e.est_b = { ...e.corpo, id: 'est_b', espaco_antes_pt: 12 };
+  const a = criarNovoBloco('paragrafo', { texto: 'a', estiloId: 'est_a' });
+  const b = criarNovoBloco('paragrafo', { texto: 'b', estiloId: 'est_b' });
+  assert.equal('espaco_antes_pt' in b, false);
   assert.deepEqual(margensTextoPt(b, e), { antes: 12, depois: e.corpo.espaco_depois_pt ?? 0 });
   assert.equal(colapsoEntreBlocosPt(a, b, e), 12);
-  assert.equal(colapsoEntreBlocosPt(b, a, e), Math.min(b.espaco_depois_pt ?? e.corpo.espaco_depois_pt ?? 0, a.espaco_antes_pt ?? e.corpo.espaco_antes_pt ?? 0));
+  assert.equal(colapsoEntreBlocosPt(b, a, e), Math.min(e.est_b.espaco_depois_pt ?? 0, e.est_a.espaco_antes_pt ?? 0));
   assert.equal(colapsoEntreBlocosPt(a, criarNovoBloco('tabela', {}), e), 0, 'só entre blocos de texto');
   assert.equal(colapsoEntreBlocosPt(a, { ...b, grupo: 'g1' }, e), 0, 'blocos lado a lado não colapsam');
 });
@@ -55,9 +59,11 @@ test('espaço entre parágrafos colapsa: vale o maior, não a soma (como no Word
 test('PDF: margens colapsadas, topo da página sem espaço antes e sem margem padrão de <p>', () => {
   const doc = criarDocumento({ titulo: 'T' });
   const sec = doc.secoes.find(s => s.mestraId === 'corpo');
+  const corpo = doc.estilos.find(e => e.id === 'corpo');
+  doc.estilos.push({ ...corpo, id: 'est_p1', espaco_antes_pt: 10, espaco_depois_pt: 18 }, { ...corpo, id: 'est_p2', espaco_antes_pt: 12, espaco_depois_pt: 0 });
   sec.blocos = [
-    criarNovoBloco('paragrafo', { id: 'p1', texto: 'um', espaco_antes_pt: 10, espaco_depois_pt: 18 }),
-    criarNovoBloco('paragrafo', { id: 'p2', texto: 'dois', espaco_antes_pt: 12, espaco_depois_pt: 0 })
+    criarNovoBloco('paragrafo', { id: 'p1', texto: 'um', estiloId: 'est_p1' }),
+    criarNovoBloco('paragrafo', { id: 'p2', texto: 'dois', estiloId: 'est_p2' })
   ];
   repaginarDocumento(doc);
   const html = gerarDocumentoHtmlPdf(doc);
@@ -74,9 +80,10 @@ test('altura estimada de parágrafo respeita tamanho, entrelinha e largura (11 p
   const comEstilo = estimarAlturaBlocoPt(p, ctx);
   const antigo = estimarAlturaBlocoPt(p);
   assert.ok(comEstilo > 0 && comEstilo !== antigo);
-  const apertado = criarNovoBloco('paragrafo', { texto: 'x'.repeat(300), entrelinha: 1.0, espaco_antes_pt: 0, espaco_depois_pt: 0 });
-  assert.ok(estimarAlturaBlocoPt(apertado, ctx) < comEstilo, 'entrelinha menor ocupa menos');
-  const largo = estimarAlturaBlocoPt(criarNovoBloco('paragrafo', { texto: 'x'.repeat(300), entrelinha: 1.0, espaco_antes_pt: 0, espaco_depois_pt: 0 }), { ...ctx, larguraPt: 900 });
+  e.apertado = { ...e.corpo, id: 'apertado', entrelinha: 1.0, entrelinha_tipo: undefined, espaco_antes_pt: 0, espaco_depois_pt: 0 };
+  const apertado = criarNovoBloco('paragrafo', { texto: 'x'.repeat(300), estiloId: 'apertado' });
+  assert.ok(estimarAlturaBlocoPt(apertado, ctx) < comEstilo, 'entrelinha menor (no estilo) ocupa menos');
+  const largo = estimarAlturaBlocoPt(criarNovoBloco('paragrafo', { texto: 'x'.repeat(300), estiloId: 'apertado' }), { ...ctx, larguraPt: 900 });
   assert.ok(largo < estimarAlturaBlocoPt(apertado, ctx), 'coluna mais larga, menos linhas');
 });
 

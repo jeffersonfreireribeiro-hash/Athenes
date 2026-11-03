@@ -47,7 +47,8 @@ test('sanitizarDocumentoImportado higieniza títulos e blocos de documentos exte
   const limpo = sanitizarDocumentoImportado(doc);
   assert.equal(limpo.titulo.includes('<script>'), false);
   assert.equal(limpo.secoes[0].blocos[0].texto.includes('onerror='), false);
-  assert.equal(limpo.secoes[0].blocos[0].texto.includes('<i>mundo</i>'), true);
+  assert.equal(limpo.secoes[0].blocos[0].texto.includes('<i>'), false, 'sem formatação direta no texto');
+  assert.equal(limpo.secoes[0].blocos[0].texto.includes('mundo'), true);
 });
 
 test('Estúdio de Artigos Zotero & PDF gera citações ABNT com página e nota HTML para Zotero', () => {

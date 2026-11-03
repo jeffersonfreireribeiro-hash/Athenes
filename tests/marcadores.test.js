@@ -19,12 +19,13 @@ test('rótulos: números, letras, romanos e pontuação', () => {
   assert.equal(rotuloMarcador({ tipo: 'traco' }), '–');
 });
 
-test('o bloco sobrescreve o estilo e "nenhum" desliga o marcador herdado', () => {
+test('só o estilo define o marcador: o bloco não sobrescreve nada', () => {
   const estilo = { marcador_tipo: 'numero', marcador_estilo_num: 'upper_roman', marcador_tab_mm: 9 };
   assert.equal(marcadorEfetivo({}, estilo).estiloNum, 'upper_roman');
   assert.equal(marcadorEfetivo({}, estilo).tabMm, 9);
-  assert.equal(marcadorEfetivo({ marcador_tipo: 'circulo' }, estilo).tipo, 'circulo');
-  assert.equal(marcadorEfetivo({ marcador_tipo: 'nenhum' }, estilo), null);
+  assert.equal(marcadorEfetivo({ marcador_tipo: 'circulo' }, estilo).tipo, 'numero', 'campo solto no bloco é ignorado');
+  assert.equal(marcadorEfetivo({ marcador_tipo: 'nenhum' }, estilo).tipo, 'numero');
+  assert.equal(marcadorEfetivo({ marcador_tipo: 'circulo' }, {}), null);
   assert.equal(marcadorEfetivo({}, {}), null);
 });
 
@@ -32,12 +33,16 @@ function docComMarcadores() {
   const doc = criarDocumento();
   const corpo = doc.secoes[1] || doc.secoes[0];
   corpo.blocos.length = 0;
-  const t1 = criarNovoBloco('titulo', { texto: 'Objetivos', nivel: 2, marcador_tipo: 'numero' });
-  Object.assign(t1, { marcador_estilo_num: 'lower_alpha', marcador_separador: 'parentese' }); // como o painel grava
-  const p1 = criarNovoBloco('paragrafo', { texto: 'Primeiro', marcador_tipo: 'numero' });
-  const p2 = criarNovoBloco('paragrafo', { texto: 'Segundo', marcador_tipo: 'numero' });
+  // marcador e numeração são propriedades de ESTILOS (como no painel de estilos): um para o título e um para a lista numerada
+  const base = doc.estilos.find(e => e.id === 'corpo');
+  doc.estilos.push({ ...base, id: 'lista_num', nome: 'Lista numerada', marcador_tipo: 'numero' });
+  const baseT = doc.estilos.find(e => e.id === 'titulo2');
+  doc.estilos.push({ ...baseT, id: 'titulo2_alfa', nome: 'Título 2 alfa', marcador_tipo: 'numero', marcador_estilo_num: 'lower_alpha', marcador_separador: 'parentese' });
+  const t1 = criarNovoBloco('titulo', { texto: 'Objetivos', nivel: 2, estiloId: 'titulo2_alfa' });
+  const p1 = criarNovoBloco('paragrafo', { texto: 'Primeiro', estiloId: 'lista_num' });
+  const p2 = criarNovoBloco('paragrafo', { texto: 'Segundo', estiloId: 'lista_num' });
   const livre = criarNovoBloco('paragrafo', { texto: 'Sem marcador' });
-  const p3 = criarNovoBloco('paragrafo', { texto: 'Recomeça', marcador_tipo: 'numero' });
+  const p3 = criarNovoBloco('paragrafo', { texto: 'Recomeça', estiloId: 'lista_num' });
   corpo.blocos.push(t1, p1, p2, livre, p3);
   repaginarDocumento(doc);
   return { doc, t1, p1, p2, livre, p3 };
@@ -55,8 +60,7 @@ test('numeração corrida entre blocos seguidos e reinício depois de um bloco s
 
 test('estilo de texto com marcador vale para os blocos que o usam', () => {
   const { doc, p1 } = docComMarcadores();
-  delete p1.marcador_tipo;
-  doc.estilos.find(e => e.id === (p1.estiloId || 'corpo')).marcador_tipo = 'quadrado';
+  doc.estilos.find(e => e.id === p1.estiloId).marcador_tipo = 'quadrado'; // editar o estilo reflete nos blocos que o usam
   assert.equal(mapaMarcadores(doc).get(chaveMarcador(p1)).rotulo, '▪');
 });
 
@@ -91,7 +95,7 @@ test('linhas marcadas com Enter: cada item tem o seu rótulo, listas têm tipo p
 
 test('PDF e Word: bloco com linhas marcadas não vira <ul> dentro de <p> e sai um item por linha', async () => {
   const { doc, p1 } = docComMarcadores();
-  delete p1.marcador_tipo;
+  p1.estiloId = 'corpo';
   p1.texto = 'Antes<ul><li>linha um</li><li>linha dois</li></ul>';
   repaginarDocumento(doc);
   const html = gerarDocumentoHtmlPdf(doc).replace(/­/g, ''); // sem os hífens opcionais

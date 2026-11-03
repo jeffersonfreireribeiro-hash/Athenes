@@ -6,18 +6,14 @@
 
 import { GerenciadorAtalhos } from './athenes_atalhos_engine.js';
 import {
-  filtrarCatalogo, CATEGORIAS, localizarOcorrencias, sanitizarHtmlColado, acaoPorId, atalhosDaAcao, formatarAtalho
+  filtrarCatalogo, CATEGORIAS, localizarOcorrencias, ehAtalhoDeFormatacaoDireta, acaoPorId, atalhosDaAcao, formatarAtalho
 } from '../core/athenes_atalhos.js';
 import { criarNovoBloco, dividirBlocoTexto } from '../core/athenes_documento.js';
 import { modoSomenteLeitura } from '../core/athenes_colaboracao.js';
 
 const MAPA_TOOLTIPS = [
   ['#rmDesfazer', 'desfazer'], ['#rmRefazer', 'refazer'], ['#rmSalvar', 'salvar'], ['#rmAddNota', 'nota_rodape'],
-  ['#rmAddQuebra', 'quebra_pagina'], ['#athBtnExportarModal', 'exportar'],
-  ['[data-cmd="bold"]', 'negrito'], ['[data-cmd="italic"]', 'italico'], ['[data-cmd="underline"]', 'sublinhado'],
-  ['[data-cmd="strikeThrough"]', 'tachado'], ['[data-cmd="superscript"]', 'sobrescrito'], ['[data-cmd="subscript"]', 'subscrito'],
-  ['[data-alin="esquerda"]', 'alinhar_esquerda'], ['[data-alin="centro"]', 'alinhar_centro'],
-  ['[data-alin="direita"]', 'alinhar_direita'], ['[data-alin="justificado"]', 'alinhar_justificado']
+  ['#rmAddQuebra', 'quebra_pagina'], ['#athBtnExportarModal', 'exportar']
 ];
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -125,24 +121,12 @@ export class AtalhosDoEditor {
   // ───────────── registro das ações ─────────────
   registrar() {
     const g = this.gerenciador; const ed = this.ed;
-    const fmt = (cmd) => () => { if (this.somenteLeitura()) return false; document.execCommand(cmd, false, null); this.sinalizarEdicao(); };
     g.registrar('desfazer', () => this.historico('desfazer'));
     g.registrar('refazer', () => this.historico('refazer'));
     g.registrar('selecionar_tudo', (e, ctx) => this.selecionarTudo(ctx));
     g.registrar('colar_puro', () => { this.colarPuro = true; setTimeout(() => { this.colarPuro = false; }, 1000); return false; });
-    g.registrar('negrito', fmt('bold'));
-    g.registrar('italico', fmt('italic'));
-    g.registrar('sublinhado', fmt('underline'));
-    g.registrar('tachado', fmt('strikeThrough'));
-    g.registrar('sobrescrito', fmt('superscript'));
-    g.registrar('subscrito', fmt('subscript'));
     g.registrar('limpar_formatacao', () => { if (this.somenteLeitura()) return false; document.execCommand('removeFormat'); document.execCommand('unlink'); this.sinalizarEdicao(); });
     g.registrar('link', () => this.abrirLink());
-    const alin = (v) => () => this.aplicarNoBloco(b => { b.alinhamento = v; }) ? undefined : false;
-    g.registrar('alinhar_esquerda', alin('esquerda'));
-    g.registrar('alinhar_centro', alin('centro'));
-    g.registrar('alinhar_direita', alin('direita'));
-    g.registrar('alinhar_justificado', alin('justificado'));
     g.registrar('recuo_aumentar', () => this.recuo(+1));
     g.registrar('recuo_diminuir', () => this.recuo(-1));
     g.registrar('localizar', () => { this.abrirBusca(false); });
@@ -194,16 +178,19 @@ export class AtalhosDoEditor {
       if (!(alvo instanceof Element) || !alvo.isContentEditable || !this.ed.container.contains(alvo)) return;
       if (this.somenteLeitura()) return;
       e.preventDefault();
-      const cd = e.clipboardData;
-      const html = cd?.getData('text/html'); const txt = cd?.getData('text/plain') || '';
-      if (!this.colarPuro && html) document.execCommand('insertHTML', false, sanitizarHtmlColado(html));
-      else document.execCommand('insertText', false, txt);
+      // só `text/plain`: nada de HTML/RTF externo, o bloco mantém o Estilo de Texto dele
+      document.execCommand('insertText', false, e.clipboardData?.getData('text/plain') || '');
       this.colarPuro = false;
-      // o Chrome costuma "assar" fonte/tamanho do bloco nas tags coladas: remove para herdar o estilo de destino
-      alvo.querySelectorAll('b,strong,i,em,u,s,sub,sup,a,span[style*="font-"]').forEach(n => { if (n.tagName !== 'SPAN') n.removeAttribute('style'); else if (/font-family/.test(n.getAttribute('style') || '')) n.replaceWith(...n.childNodes); });
+    };
+    // formatação direta (Ctrl/Cmd+B, I, U e Ctrl/Cmd+Shift+L/E/R/J) não existe: o navegador não pode aplicá-la
+    const bloqueio = (e) => {
+      const alvo = e.target;
+      if (!(alvo instanceof Element) || !alvo.isContentEditable || !this.ed.container.contains(alvo)) return;
+      if (ehAtalhoDeFormatacaoDireta(e)) { e.preventDefault(); e.stopPropagation(); }
     };
     document.addEventListener('paste', h, true);
-    this.removerColagem = () => document.removeEventListener('paste', h, true);
+    document.addEventListener('keydown', bloqueio, true);
+    this.removerColagem = () => { document.removeEventListener('paste', h, true); document.removeEventListener('keydown', bloqueio, true); };
   }
 
   // ───────────── recuo ─────────────
@@ -218,8 +205,8 @@ export class AtalhosDoEditor {
     const noInicio = r.toString().length === 0;
     if (!noInicio && sentido > 0) { document.execCommand('insertText', false, '    '); this.sinalizarEdicao(); return; }
     if (!noInicio) return; // Shift+Tab no meio do texto: não faz nada (e não tira o foco)
-    const passo = 12.5;
-    this.aplicarNoBloco(x => { x.recuo_esquerdo_mm = Math.max(0, Math.min(100, (x.recuo_esquerdo_mm || 0) + sentido * passo)); });
+    // o recuo do parágrafo é propriedade do estilo: nada é gravado no bloco
+    return false;
   }
 
   // ───────────── conversão de bloco / quebra de página ─────────────

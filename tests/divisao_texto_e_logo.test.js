@@ -28,8 +28,7 @@ describe('Athenes — Divisão de Bloco de Texto e Novo Logo Coruja-Lápis', () 
     const sec = doc.secoes[0];
     const bloco = criarNovoBloco('paragrafo', {
       texto: 'Primeira parte do texto do artigo. Segunda parte que vai para o novo bloco.',
-      estiloId: 'corpo',
-      alinhamento: 'justificado_esquerda'
+      estiloId: 'corpo'
     });
     sec.blocos.push(bloco);
 
@@ -40,7 +39,7 @@ describe('Athenes — Divisão de Bloco de Texto e Novo Logo Coruja-Lápis', () 
     assert.strictEqual(res.blocoOriginal.texto, 'Primeira parte do texto do artigo.');
     assert.strictEqual(res.novoBloco.texto, ' Segunda parte que vai para o novo bloco.');
     assert.strictEqual(res.novoBloco.estiloId, 'corpo');
-    assert.strictEqual(res.novoBloco.alinhamento, 'justificado_esquerda');
+    assert.strictEqual(res.novoBloco.alinhamento, undefined, 'o alinhamento é do estilo, não do bloco');
 
     // O novo bloco deve estar imediatamente após o original
     const idxOrig = sec.blocos.indexOf(res.blocoOriginal);

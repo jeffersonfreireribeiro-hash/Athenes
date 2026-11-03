@@ -2,7 +2,7 @@
 /**
  * Athenes — Marcadores e numeração de parágrafos e títulos.
  *
- * A configuração mora no ESTILO de texto (`marcador_*`) e cada bloco pode sobrescrevê-la (`marcador_tipo: 'nenhum'` desliga).
+ * A configuração mora no ESTILO de texto (`marcador_*`) e só nele (o bloco não sobrescreve nada).
  * Este módulo resolve a configuração efetiva e a sequência dos números, para o editor, o PDF e o Word mostrarem o mesmo.
  */
 import { estiloIdDoTitulo } from './athenes_sumario.js';
@@ -40,18 +40,18 @@ const ALINHAMENTOS = new Set(['left', 'center', 'right']);
 
 const inteiro = (v, min, max, pad) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : pad; };
 
-/** Configuração efetiva do marcador (bloco sobrescreve estilo) ou null quando o parágrafo não tem marcador. */
+/** Configuração efetiva do marcador (só o estilo; `bloco` fica na assinatura por compatibilidade) ou null quando o parágrafo não tem marcador. */
 export function marcadorEfetivo(bloco, estilo) {
-  const tipo = bloco?.marcador_tipo ?? estilo?.marcador_tipo;
+  const tipo = estilo?.marcador_tipo;
   if (!tipo || tipo === 'nenhum' || !TIPOS_VALIDOS.has(tipo)) return null;
-  const pega = (k, pad) => bloco?.[k] ?? estilo?.[k] ?? pad;
+  const pega = (k, pad) => estilo?.[k] ?? pad;
   const alin = pega('marcador_alinhamento', 'left');
   return {
     tipo,
     estiloNum: pega('marcador_estilo_num', 'decimal'),
     separador: pega('marcador_separador', 'ponto'),
-    inicio: inteiro(bloco?.marcador_inicio ?? estilo?.marcador_inicio, 1, 999, 1),
-    inicioExplicito: inteiro(bloco?.marcador_inicio, 1, 999, 1) > 1,
+    inicio: inteiro(estilo?.marcador_inicio, 1, 999, 1),
+    inicioExplicito: false, // a numeração corre pelo documento; recomeça com um bloco sem marcador no meio
     nivel: inteiro(pega('marcador_nivel', 1), 1, 5, 1),
     tabMm: Math.max(3, parseFloat(pega('marcador_tab_mm', 7)) || 7),
     alinhamento: ALINHAMENTOS.has(alin) ? alin : 'left'
@@ -136,13 +136,13 @@ export function sanearCamposMarcador(estilo) {
 /** Configuração de aparência (nível, tabulação, alinhamento, numeração) para listas escritas no texto do bloco. */
 export function configListaDoBloco(bloco, estilo, padrao = {}) {
   const ef = marcadorEfetivo(bloco, estilo);
-  const alin = bloco?.marcador_alinhamento ?? estilo?.marcador_alinhamento ?? 'left';
+  const alin = estilo?.marcador_alinhamento ?? 'left';
   return {
     tipo: ef?.tipo || padrao.tipo || 'circulo',
-    estiloNum: ef?.estiloNum || bloco?.marcador_estilo_num || estilo?.marcador_estilo_num || 'decimal',
-    separador: ef?.separador || bloco?.marcador_separador || estilo?.marcador_separador || 'ponto',
-    nivel: inteiro(bloco?.marcador_nivel ?? estilo?.marcador_nivel, 1, 5, 1),
-    tabMm: Math.max(3, parseFloat(bloco?.marcador_tab_mm ?? estilo?.marcador_tab_mm) || 7),
+    estiloNum: ef?.estiloNum || estilo?.marcador_estilo_num || 'decimal',
+    separador: ef?.separador || estilo?.marcador_separador || 'ponto',
+    nivel: inteiro(estilo?.marcador_nivel, 1, 5, 1),
+    tabMm: Math.max(3, parseFloat(estilo?.marcador_tab_mm) || 7),
     alinhamento: ALINHAMENTOS.has(alin) ? alin : 'left'
   };
 }

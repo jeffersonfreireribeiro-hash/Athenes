@@ -552,10 +552,7 @@ function htmlDoParagrafo(p) {
   const html = pedacos.map(x => {
     if (x.br) return '<br>';
     let t = escHtml(x.s).replace(/\t/g, '&emsp;');
-    if (x.u) t = `<u>${t}</u>`;
-    if (x.i) t = `<em>${t}</em>`;
-    if (x.b) t = `<strong>${t}</strong>`;
-    return t;
+    return t; // negrito, itálico e sublinhado de trechos não entram no texto: o visual é só dos Estilos de Texto
   }).join('');
   return html.replace(/^(<br>)+|(<br>)+$/g, '').trim();
 }
@@ -568,6 +565,18 @@ function montarConteudo(paragrafos, papeis, cons, temCapa) {
   const capa = [], corpo = [];
   let alvo = temCapa ? capa : corpo;
   let noInicio = true;
+  const derivados = new Map();
+  const estiloDerivado = (base, ajustes) => {
+    if (!Object.keys(ajustes).length) return base.id;
+    const chave = base.id + JSON.stringify(ajustes);
+    if (!derivados.has(chave)) {
+      const id = `${base.id}__v${derivados.size + 1}`;
+      cons.estilos.push({ ...base, ...ajustes, id, nome: `${base.nome} (variação ${derivados.size + 1})` });
+      estilosPorId.set(id, cons.estilos.at(-1));
+      derivados.set(chave, id);
+    }
+    return derivados.get(chave);
+  };
   for (const p of paragrafos) {
     const id = cons.mapaParagrafo.get(p);
     const ehCapa = temCapa && alvo === capa;
@@ -579,19 +588,23 @@ function montarConteudo(paragrafos, papeis, cons, temCapa) {
     noInicio = false;
     const est = estilosPorId.get(id);
     const e = p.efetivo;
-    const dados = { estiloId: id, texto: htmlDoParagrafo(p), alinhamento: ALINHAMENTO[e.jc] || 'esquerda' };
+    const dados = { estiloId: id, texto: htmlDoParagrafo(p) };
     const rotulo = papeis.get(p);
     const mmv = (tw) => mm(tw || 0);
-    // diferenças em relação ao estilo canônico ficam no bloco (fidelidade sem criar mais estilos)
-    if (Math.abs(mmv(e.primeira) - est.recuo_primeira_linha_mm) > 0.5) dados.recuo_primeira_linha_mm = mmv(e.primeira);
-    if (Math.abs(mmv(e.esq) - est.recuo_esquerdo_mm) > 0.5) dados.recuo_esquerdo_mm = mmv(e.esq);
+    // diferenças em relação ao estilo canônico viram um ESTILO derivado (nunca sobrescrita no bloco): fidelidade sem formatação direta
+    const ajustes = {};
+    const alin = ALINHAMENTO[e.jc] || 'esquerda';
+    if (alin !== est.alinhamento) ajustes.alinhamento = alin;
+    if (Math.abs(mmv(e.primeira) - est.recuo_primeira_linha_mm) > 0.5) ajustes.recuo_primeira_linha_mm = mmv(e.primeira);
+    if (Math.abs(mmv(e.esq) - est.recuo_esquerdo_mm) > 0.5) ajustes.recuo_esquerdo_mm = mmv(e.esq);
     const antes = Math.round((e.antes || 0) / 20 * 10) / 10, depois = Math.round((e.depois || 0) / 20 * 10) / 10;
-    if (Math.abs(antes - est.espaco_antes_pt) > 0.5) dados.espaco_antes_pt = antes;
-    if (Math.abs(depois - est.espaco_depois_pt) > 0.5) dados.espaco_depois_pt = depois;
+    if (Math.abs(antes - est.espaco_antes_pt) > 0.5) ajustes.espaco_antes_pt = antes;
+    if (Math.abs(depois - est.espaco_depois_pt) > 0.5) ajustes.espaco_depois_pt = depois;
     const f = mapearFonteDocx(e.fonte);
-    if (f.id !== est.fonte) dados.fonte = f.id;
-    if (e.cor && e.cor !== est.cor) dados.cor = e.cor;
-    if (e.b && est.peso < 600 && dados.texto && !/^<strong>[\s\S]*<\/strong>$/.test(dados.texto)) dados.texto = `<strong>${dados.texto}</strong>`; // negrito do parágrafo que o estilo não tem
+    if (f.id !== est.fonte) ajustes.fonte = f.id;
+    if (e.cor && e.cor !== est.cor) ajustes.cor = e.cor;
+    if (e.b && est.peso < 600) ajustes.peso = 700; // negrito do parágrafo inteiro que o estilo não tem
+    if (rotulo?.papel !== 'titulo') dados.estiloId = estiloDerivado(est, ajustes); // títulos mantêm o estilo do nível (sumário e numeração dependem dele)
     const bloco = rotulo?.papel === 'titulo'
       ? criarNovoBloco('titulo', { ...dados, nivel: Number(id.slice(6)) || 1 })
       : criarNovoBloco('paragrafo', dados);

@@ -65,13 +65,12 @@ test('Athenes — Sistema de Formatação, 7 Alinhamentos e Cores de Marca em Az
     assert.ok(!cssEditor.includes('#FF6B2C'), 'athenes_editor.css não deve ter laranja legado');
   });
 
-  await t.test('renderiza bloco no PDF honrando alinhamento local e última linha', () => {
+  await t.test('renderiza bloco no PDF com alinhamento e cor do ESTILO (última linha incluída)', () => {
     const doc = criarDocumento();
-    const bloco = criarNovoBloco('paragrafo', {
-      texto: 'Texto acadêmico formatado com rigor editorial.',
-      alinhamento: 'justificado_esquerda',
-      cor: '#314F79'
-    });
+    const estilo = doc.estilos.find(e => e.id === 'corpo');
+    estilo.alinhamento = 'justificado_esquerda';
+    estilo.cor = '#314F79';
+    const bloco = criarNovoBloco('paragrafo', { texto: 'Texto acadêmico formatado com rigor editorial.' });
 
     const html = renderizarBlocoHtml(bloco, Object.fromEntries(doc.estilos.map(e => [e.id, e])), doc);
     assert.match(html, /text-align:\s*justify/);
@@ -81,13 +80,8 @@ test('Athenes — Sistema de Formatação, 7 Alinhamentos e Cores de Marca em Az
 
   await t.test('exporta para DOCX com alinhamento justificado e indentações dinâmicas', async () => {
     const doc = criarDocumento();
-    doc.secoes[1].blocos.push(criarNovoBloco('paragrafo', {
-      texto: 'Parágrafo com alinhamento e recuo personalizados.',
-      alinhamento: 'justificado_esquerda',
-      recuo_primeira_linha_mm: 15,
-      espaco_antes_pt: 6,
-      espaco_depois_pt: 12
-    }));
+    Object.assign(doc.estilos.find(e => e.id === 'corpo'), { alinhamento: 'justificado_esquerda', recuo_primeira_linha_mm: 15, espaco_antes_pt: 6, espaco_depois_pt: 12 });
+    doc.secoes[1].blocos.push(criarNovoBloco('paragrafo', { texto: 'Parágrafo com alinhamento e recuo vindos do estilo.' }));
 
     const blobDocx = await exportarParaDocx(doc);
     assert.ok(blobDocx instanceof Uint8Array);
@@ -141,18 +135,12 @@ test('Athenes — Sistema de Páginas Mestras (Fixa com Grade 2D vs Progressiva 
     assert.strictEqual(modeloRecuperado.cabecalho.texto, 'Cabeçalho Customizado Athenes');
   });
 
-  await t.test('bloco de título e subtítulo suportam os 7 alinhamentos e cores customizadas', () => {
+  await t.test('título e subtítulo suportam os 7 alinhamentos e cores, definidos no ESTILO', () => {
     const doc = criarDocumento();
-    const titulo = criarNovoBloco('titulo', {
-      texto: 'Título de Diagnóstico Urbano',
-      alinhamento: 'justificado_centro',
-      cor: '#314F79'
-    });
-    const subtitulo = criarNovoBloco('subtitulo', {
-      texto: 'Subtítulo com alinhamento justificado à esquerda',
-      alinhamento: 'justificado_esquerda',
-      cor: '#1F2733'
-    });
+    Object.assign(doc.estilos.find(e => e.id === 'titulo1'), { alinhamento: 'justificado_centro', cor: '#314F79' });
+    Object.assign(doc.estilos.find(e => e.id === 'subtitulo'), { alinhamento: 'justificado_esquerda', cor: '#1F2733' });
+    const titulo = criarNovoBloco('titulo', { texto: 'Título de Diagnóstico Urbano' });
+    const subtitulo = criarNovoBloco('subtitulo', { texto: 'Subtítulo com alinhamento justificado à esquerda' });
 
     const htmlTitulo = renderizarBlocoHtml(titulo, Object.fromEntries(doc.estilos.map(e => [e.id, e])), doc);
     assert.match(htmlTitulo, /text-align:\s*justify/);

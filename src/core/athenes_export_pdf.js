@@ -18,6 +18,7 @@ import { latexParaHtml } from './athenes_formula.js';
 import { hifenizarHtml } from './athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais } from './athenes_estilo_avancado.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
+import { ajusteDeFragmento, aplicarEstilosDeTrecho } from './athenes_estilo_exclusivo.js';
 import { geometriaCorpoMm, resolverAreasPagina } from './athenes_paginacao.js';
 import { obterConfigNotas, aplicarRotulosNotasHtml, sanitizarHtmlNota } from './athenes_notas_rodape.js';
 import { descreverFigura, cssObjParaString, PLACEHOLDER_IMG } from './athenes_figura_layout.js';
@@ -131,25 +132,11 @@ function marcadorDoBlocoPdf(bloco, opcoes) {
 
 export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
   const estBase = estilosMap[bloco.tipo === 'titulo' ? estiloIdDoTitulo(estilosMap, bloco) : (bloco.estiloId || (bloco.tipo === 'citacao' ? 'citacao_direta' : undefined))] || estilosMap.corpo || {};
-  const est = {
-    ...estBase,
-    ...(bloco.fonte ? { fonte: bloco.fonte } : {}),
-    ...(bloco.alinhamento ? { alinhamento: bloco.alinhamento } : {}),
-    ...(bloco.cor ? { cor: bloco.cor } : {}),
-    ...(bloco.fundo_ativo && bloco.fundo_cor ? { fundo_cor: bloco.fundo_cor } : {}),
-    ...(bloco.borda_tipo ? { borda_tipo: bloco.borda_tipo } : {}),
-    ...(bloco.entrelinha ? { entrelinha: bloco.entrelinha } : {}),
-    ...(bloco.espaco_antes_pt !== undefined ? { espaco_antes_pt: bloco.espaco_antes_pt } : {}),
-    ...(bloco.espaco_depois_pt !== undefined ? { espaco_depois_pt: bloco.espaco_depois_pt } : {}),
-    ...(bloco.recuo_primeira_linha_mm !== undefined ? { recuo_primeira_linha_mm: bloco.recuo_primeira_linha_mm } : {}),
-    ...(bloco.recuo_esquerdo_mm !== undefined ? { recuo_esquerdo_mm: bloco.recuo_esquerdo_mm } : {}),
-    ...(bloco.recuo_direito_mm !== undefined ? { recuo_direito_mm: bloco.recuo_direito_mm } : {}),
-    ...(bloco.espacamento_letras_em !== undefined ? { espacamento_letras_em: bloco.espacamento_letras_em } : {}),
-    ...(bloco.espacamento_palavras_em !== undefined ? { espacamento_palavras_em: bloco.espacamento_palavras_em } : {})
-  };
+  const est = { ...estBase, ...ajusteDeFragmento(bloco) }; // visual 100% do estilo; só o ajuste de fragmento (paginação) se soma
   const estiloCss = estiloParaCss(est);
-  const deveHifenizar = bloco.hifenizacao !== undefined ? bloco.hifenizacao : Boolean(est.hifenizacao);
-  const textoFormatado = aplicarRotulosNotasHtml(deveHifenizar ? hifenizarHtml(bloco.texto || '') : (bloco.texto || ''), opcoes.rotulosNotas);
+  const deveHifenizar = Boolean(est.hifenizacao); // só o estilo decide
+  const textoComTrechos = aplicarEstilosDeTrecho(bloco.texto || '', Object.values(estilosMap), (e) => (FONTES_SISTEMA[e.fonte] || FONTES_SISTEMA.nunito).familia); // trechos de estilo cadastrado: o CSS vem do estilo atual
+  const textoFormatado = aplicarRotulosNotasHtml(deveHifenizar ? hifenizarHtml(textoComTrechos) : textoComTrechos, opcoes.rotulosNotas);
 
   switch (bloco.tipo) {
     case 'titulo': {
@@ -186,7 +173,7 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       const cssCitacao = estiloParaCss(est); // estilo da citação já com os ajustes do bloco (e do fragmento: o 2º pedaço não repete o espaço antes), igual ao editor
       const ref = referenciaDoBlocoCitacao(bloco).html;
       return `<blockquote class="ath-bloco ath-citacao" style="${cssCitacao}" data-id="${bloco.id}">
-        ${bloco.texto || ''}
+        ${textoComTrechos}
         <span class="ath-citacao-ref">${ref}</span>
       </blockquote>`;
     }

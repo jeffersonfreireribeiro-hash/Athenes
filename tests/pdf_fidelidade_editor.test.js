@@ -16,7 +16,7 @@ test('PDF: a citação usa o estilo escolhido (fonte, recuo) e o 2º pedaço nã
   assert.match(html, /margin-top: 12pt/);
   const semEstilo = renderizarBlocoHtml(criarNovoBloco('citacao', { id: 'c2', texto: 'x' }), mapa(doc), doc);
   assert.match(semEstilo, /margin-left: 40mm/, 'sem estilo escolhido usa o estilo de citação do documento');
-  const continuacao = renderizarBlocoHtml({ ...cit, espaco_antes_pt: 0 }, mapa(doc), doc);
+  const continuacao = renderizarBlocoHtml({ ...cit, espaco_antes_pt: 0, _frag: { continuaDaAnterior: true } }, mapa(doc), doc); // só o fragmento de paginação ajusta o espaço
   assert.doesNotMatch(continuacao, /margin-top: 12pt/);
 });
 

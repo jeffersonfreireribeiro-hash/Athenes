@@ -5,6 +5,7 @@
  */
 
 import { cabecalhosSupabase, limparSessaoSupabase, temSessaoSupabase, trocarIdTokenPorSessao, decodificarJwt } from './athenes_supabase_auth.js';
+import { sanearBlocoDeTexto, sanearDocumentoEstilos } from './athenes_estilo_exclusivo.js';
 import { lerConta, gravarConta, definirContaAtiva, limparContaAtiva, obterContaAtiva } from './athenes_conta.js';
 export const SUPABASE_CONFIG_PADRAO = Object.freeze({
   url: 'https://xizxdtaxgvouopkqdbie.supabase.co',
@@ -697,12 +698,14 @@ export class SessaoColaborativaRealtime {
     }
 
     if (msg.tipo === 'bloco_editado' && msg.blocoSnapshot) {
+      sanearBlocoDeTexto(msg.blocoSnapshot, this.doc?.estilos); // cliente antigo: bloco de texto remoto também chega só com estilo
       this.opcoes.onBlocoRemotoAlterado?.(msg.blocoSnapshot, msg.sugestoes, msg.remetente);
       this.opcoes.onPresencaAlterada?.(this.obterColaboradoresAtivos());
       return;
     }
 
     if (msg.tipo === 'doc_sincronizado' && msg.docSnapshot) {
+      sanearDocumentoEstilos(msg.docSnapshot);
       this.opcoes.onDocumentoRemotoAlterado?.(msg.docSnapshot, msg.remetente);
       this.opcoes.onPresencaAlterada?.(this.obterColaboradoresAtivos());
     }

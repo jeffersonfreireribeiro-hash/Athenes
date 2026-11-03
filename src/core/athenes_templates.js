@@ -15,6 +15,7 @@ import { criarDocumento, criarModelosPaginaPadrao, criarNovoBloco, criarSecao, g
 import { criarEstilosPadrao } from './athenes_estilos.js';
 import { clonarComNovosIds } from './athenes_arquivos.js';
 import { sanitizarEstiloAvancado } from './athenes_estilo_avancado.js';
+import { sanearBlocoDeTexto, sanearDocumentoEstilos } from './athenes_estilo_exclusivo.js';
 
 export const CATEGORIAS_TEMPLATE = ['academic', 'report', 'user_custom'];
 export const ROTULO_CATEGORIA = { academic: 'Acadêmico', report: 'Relatório', user_custom: 'Meu template' };
@@ -120,7 +121,7 @@ export function criarDocumentoDeTemplate(template, { titulo, subtitulo = '', tip
   base.templateOrigemId = template.id || null;
   const { doc } = clonarComNovosIds(base);
   doc.id = base.id;
-  return doc;
+  return sanearDocumentoEstilos(doc);
 }
 
 // ---------------------------------------------------------------- templates nativos
@@ -160,11 +161,17 @@ export const sincronizarTemplatesUsuario = (opcoes) => templatesDoUsuario.sincro
 export const aoMudarTemplatesUsuario = (cb) => templatesDoUsuario.aoMudar(cb);
 export const reiniciarTemplatesUsuario = () => templatesDoUsuario.reiniciar();
 
+/** Template antigo (do navegador ou do servidor): tira as sobrescritas dos blocos de texto ao ler. */
+function saneadoParaEstilos(t) {
+  for (const s of t.secoes || []) for (const b of s.blocos || []) sanearBlocoDeTexto(b, t.config?.estilos);
+  return t;
+}
+
 export function listarTemplatesUsuario(storage = globalThis.localStorage) {
-  if (usaServidor(storage)) return templatesDoUsuario.obter().filter(t => t?.config);
+  if (usaServidor(storage)) return templatesDoUsuario.obter().filter(t => t?.config).map(saneadoParaEstilos);
   try {
     const v = JSON.parse(storage?.getItem(chaveConta(CHAVE_TEMPLATES_USUARIO)) || '[]');
-    return Array.isArray(v) ? v.filter(t => t?.config) : [];
+    return Array.isArray(v) ? v.filter(t => t?.config).map(saneadoParaEstilos) : [];
   } catch { return []; }
 }
 
@@ -251,6 +258,7 @@ export function sanitizarTemplate(t) {
   limpo.secoes = (Array.isArray(limpo.secoes) ? limpo.secoes : []).filter(s => s && typeof s === 'object').map(s => ({
     nome: String(s.nome || 'Seção').slice(0, 120), mestraId: String(s.mestraId || limpo.config.mestras[0].id), blocos: Array.isArray(s.blocos) ? s.blocos : []
   }));
+  for (const s of limpo.secoes) for (const b of s.blocos) sanearBlocoDeTexto(b, limpo.config.estilos); // template antigo: sem sobrescritas
   delete limpo.nativo;
   return limpo;
 }

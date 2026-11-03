@@ -74,6 +74,7 @@ import { construirGradeFiguraDom, criarBarraItemFigura, criarBotaoLayoutFigura }
 import { descreverFigura } from '../core/athenes_figura_layout.js';
 import { ModalEditorEstilo } from './athenes_editor_estilo_modal.js';
 import { ModalCentralEstilos } from './athenes_central_estilos_modal.js';
+import { sanearDocumentoEstilos, sanearHtmlTexto, aplicarEstilosDeTrecho, ehBlocoDeTexto, ajusteDeFragmento } from '../core/athenes_estilo_exclusivo.js';
 import { AtalhosDoEditor } from './athenes_atalhos_editor.js';
 import { abrirSalvarTemplateModal } from './athenes_novo_documento_modal.js';
 import { calcularNumeracaoSecoes, extrairItensSumario, sumarioHtml, configEfetivaSumario, tagDoNivel, nivelDe, estiloIdDoTitulo } from '../core/athenes_sumario.js';
@@ -149,7 +150,7 @@ const LIMITE_HISTORICO_CARACTERES = 24_000_000;
 export class EditorView {
   constructor(containerEl, documento, opcoes = {}) {
     this.container = containerEl;
-    this.doc = documento;
+    this.doc = sanearDocumentoEstilos(documento); // qualquer porta de entrada (abrir, importar, template): blocos de texto só com estilo
     this.blocoSelecionado = null;
     this.secaoAtivaId = documento.secoes?.[0]?.id || null;
     this.estiloSelecionadoId = documento.estilos?.[0]?.id || 'titulo1';
@@ -2236,7 +2237,7 @@ export class EditorView {
     }
     const nota = criarNotaRodape(this.doc, '');
     document.execCommand('insertHTML', false, htmlMarcadorNota(nota.id));
-    b.texto = removerPalavrasIniciais(removerHifensCondicionais(alvo.innerHTML));
+    b.texto = sanearHtmlTexto(removerPalavrasIniciais(removerHifensCondicionais(alvo.innerHTML)));
     this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
     this.notificarMudanca();
     this.renderizarFolhasPaginas();
@@ -2269,7 +2270,7 @@ export class EditorView {
       perfil: () => this.perfilColaborador,
       ativo: () => this.modoTrabalho === MODOS_TRABALHO.SUGESTAO,
       aoAlterar: () => {
-        b.texto = removerPalavrasIniciais(removerHifensCondicionais(elemento.innerHTML));
+        b.texto = sanearHtmlTexto(removerPalavrasIniciais(removerHifensCondicionais(elemento.innerHTML)));
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida();
       }
@@ -2760,20 +2761,7 @@ export class EditorView {
       });
       barra.appendChild(selEst);
 
-      // 2. Botão toggle de hifenização automática (exem-plo)
-      const btnHifen = document.createElement('button');
-      btnHifen.type = 'button';
-      const hifAtivo = b.hifenizacao !== undefined ? b.hifenizacao : (estilos.find(e => e.id === b.estiloId)?.hifenizacao ?? false);
-      btnHifen.className = `ath-btn-rapido ${hifAtivo ? 'ativo' : ''}`;
-      btnHifen.title = hifAtivo ? 'Hifenização automática ATIVA (exem-plo) — clique para desativar' : 'Hifenização automática DESATIVADA — clique para ativar';
-      btnHifen.innerHTML = '<span style="white-space:nowrap; letter-spacing:0.5px; font-weight:800;">a-b</span>';
-      btnHifen.addEventListener('click', (e) => {
-        e.stopPropagation();
-        b.hifenizacao = !hifAtivo;
-        this.notificarMudanca();
-        this.renderizar();
-      });
-      barra.appendChild(btnHifen);
+      // (hifenização, como o resto da tipografia, é propriedade do estilo: nada de interruptor local no bloco)
 
       // 3. Botão para abrir edição de estilo diretamente
       const btnEdit = document.createElement('button');
@@ -2977,30 +2965,31 @@ export class EditorView {
       el.style.gridColumn = `${b.grade_2d.coluna || 1} / span ${b.grade_2d.span_colunas || 1}`;
     }
 
-    // Mescla estilo base com sobrescritas locais do bloco
+    // Texto: visual 100% do estilo (só o ajuste de fragmento da paginação se soma); outros tipos de bloco mantêm os campos do próprio bloco
+    const ov = ehBlocoDeTexto(b) ? ajusteDeFragmento(b) : b;
     const estiloMesclado = {
       ...estilo,
-      ...(b.fonte ? { fonte: b.fonte } : {}),
-      ...(b.alinhamento ? { alinhamento: b.alinhamento } : {}),
-      ...(b.cor ? { cor: b.cor } : {}),
-      ...(b.fundo_ativo ? { fundo_cor: b.fundo_cor || '#FFF2A8' } : {}),
-      ...(b.borda_tipo ? { borda_tipo: b.borda_tipo } : {}),
-      ...(b.entrelinha ? { entrelinha: b.entrelinha } : {}),
-      ...(b.espaco_antes_pt !== undefined ? { espaco_antes_pt: b.espaco_antes_pt } : {}),
-      ...(b.espaco_depois_pt !== undefined ? { espaco_depois_pt: b.espaco_depois_pt } : {}),
-      ...(b.recuo_primeira_linha_mm !== undefined ? { recuo_primeira_linha_mm: b.recuo_primeira_linha_mm } : {}),
-      ...(b.recuo_esquerdo_mm !== undefined ? { recuo_esquerdo_mm: b.recuo_esquerdo_mm } : {}),
-      ...(b.recuo_direito_mm !== undefined ? { recuo_direito_mm: b.recuo_direito_mm } : {}),
-      ...(b.espacamento_letras_em !== undefined ? { espacamento_letras_em: b.espacamento_letras_em } : {}),
-      ...(b.espacamento_palavras_em !== undefined ? { espacamento_palavras_em: b.espacamento_palavras_em } : {}),
-      ...(b.hifenizacao !== undefined ? { hifenizacao: b.hifenizacao } : {})
+      ...(ov.fonte ? { fonte: ov.fonte } : {}),
+      ...(ov.alinhamento ? { alinhamento: ov.alinhamento } : {}),
+      ...(ov.cor ? { cor: ov.cor } : {}),
+      ...(ov.fundo_ativo ? { fundo_cor: ov.fundo_cor || '#FFF2A8' } : {}),
+      ...(ov.borda_tipo ? { borda_tipo: ov.borda_tipo } : {}),
+      ...(ov.entrelinha ? { entrelinha: ov.entrelinha } : {}),
+      ...(ov.espaco_antes_pt !== undefined ? { espaco_antes_pt: ov.espaco_antes_pt } : {}),
+      ...(ov.espaco_depois_pt !== undefined ? { espaco_depois_pt: ov.espaco_depois_pt } : {}),
+      ...(ov.recuo_primeira_linha_mm !== undefined ? { recuo_primeira_linha_mm: ov.recuo_primeira_linha_mm } : {}),
+      ...(ov.recuo_esquerdo_mm !== undefined ? { recuo_esquerdo_mm: ov.recuo_esquerdo_mm } : {}),
+      ...(ov.recuo_direito_mm !== undefined ? { recuo_direito_mm: ov.recuo_direito_mm } : {}),
+      ...(ov.espacamento_letras_em !== undefined ? { espacamento_letras_em: ov.espacamento_letras_em } : {}),
+      ...(ov.espacamento_palavras_em !== undefined ? { espacamento_palavras_em: ov.espacamento_palavras_em } : {}),
+      ...(!ehBlocoDeTexto(b) && b.hifenizacao !== undefined ? { hifenizacao: b.hifenizacao } : {})
     };
     // as margens verticais do estilo já vão no contêiner do bloco (abaixo); repetidas no texto, o espaço entre blocos saía em dobro
     const cssEstilo = estiloParaCss(estiloMesclado).replace(/margin-(?:top|bottom)\s*:[^;]*;?/g, '');
 
     // Espaçamentos e margens verticais entre blocos e entre parágrafos
-    const espacoDepoisPt = b.espaco_depois_pt ?? estiloMesclado.espaco_depois_pt ?? 8;
-    const espacoAntesPt = b.espaco_antes_pt ?? estiloMesclado.espaco_antes_pt ?? 0;
+    const espacoDepoisPt = ov.espaco_depois_pt ?? estiloMesclado.espaco_depois_pt ?? 8;
+    const espacoAntesPt = ov.espaco_antes_pt ?? estiloMesclado.espaco_antes_pt ?? 0;
     el.style.marginTop = `${espacoAntesPt}pt`;
     el.style.marginBottom = `${espacoDepoisPt}pt`;
 
@@ -3021,7 +3010,8 @@ export class EditorView {
       heading.setAttribute('lang', 'pt-BR');
       const hifAtivoTit = Boolean(estiloMesclado.hifenizacao);
       heading.style.cssText = `${cssEstilo}; margin:0; outline:none;`;
-      heading.innerHTML = aplicarRotulosNotasHtml(hifAtivoTit ? hifenizarHtml(b.texto || 'Título da Seção') : removerHifensCondicionais(b.texto || 'Título da Seção'), pag?.rotulosNotas);
+      const textoTit = this.comEstilosDeTrecho(b.texto || 'Título da Seção');
+      heading.innerHTML = aplicarRotulosNotasHtml(hifAtivoTit ? hifenizarHtml(textoTit) : removerHifensCondicionais(textoTit), pag?.rotulosNotas);
       const marcT = this.mapaMarc?.get(chaveMarcador(b));
       if (marcT) {
         // marcadores e numeração do título: o rótulo é CSS (data-marc), como o número de seção, e fica fora do texto
@@ -3035,7 +3025,7 @@ export class EditorView {
       }
 
       heading.addEventListener('input', () => {
-        b.texto = removerHifensCondicionais(heading.innerHTML);
+        b.texto = sanearHtmlTexto(removerHifensCondicionais(heading.innerHTML));
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida();
         this.agendarRepaginacao();
@@ -3055,7 +3045,7 @@ export class EditorView {
       const hifAtivoP = Boolean(estiloMesclado.hifenizacao);
       p.style.cssText = `${cssEstilo}; outline:none;`;
 
-      let conteudoHtml = b.texto || 'Escreva diretamente neste bloco...';
+      let conteudoHtml = this.comEstilosDeTrecho(b.texto || 'Escreva diretamente neste bloco...');
       const marcP = this.mapaMarc?.get(chaveMarcador(b));
       if (marcP && !b._frag?.continuaDaAnterior && !conteudoHtml.includes('<ul') && !conteudoHtml.includes('<ol')) {
         if (marcP.cfg.tipo === 'numero') {
@@ -3082,7 +3072,7 @@ export class EditorView {
       this.instalarSugestaoNoBloco(p, b);
 
       p.addEventListener('input', () => {
-        b.texto = removerPalavrasIniciais(p.innerHTML).replace(/<span class="ath-citacao-ref"[^>]*>.*?<\/span>/g, ''); // destaque de palavras iniciais e referência da citação são só de exibição
+        b.texto = sanearHtmlTexto(removerPalavrasIniciais(p.innerHTML).replace(/<span class="ath-citacao-ref"[^>]*>.*?<\/span>/g, '')); // destaque de palavras iniciais e referência da citação são só de exibição
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida(); // agenda gravação/histórico (adiados): fechar a aba com o cursor no campo não perde mais o texto
         this.agendarRepaginacao(); // o texto que cresce passa para a página seguinte na hora, sem precisar reabrir o arquivo
@@ -3090,7 +3080,7 @@ export class EditorView {
 
       p.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
-          if (e.ctrlKey || e.metaKey) {
+          if (e.ctrlKey || e.metaKey || (!e.shiftKey && marcP)) { // Ctrl+Enter divide; Enter num estilo com marcador/numeração abre o próximo item (novo bloco)
             e.preventDefault();
             const sel = window.getSelection();
             if (sel && sel.rangeCount > 0) {
@@ -3138,7 +3128,7 @@ export class EditorView {
         }
       });
       p.addEventListener('blur', () => {
-        b.texto = removerPalavrasIniciais(p.innerHTML);
+        b.texto = sanearHtmlTexto(removerPalavrasIniciais(p.innerHTML));
         this.notificarMudancaRapida();
       });
       el.appendChild(p);
@@ -3595,44 +3585,9 @@ export class EditorView {
     this.renderizarFolhasPaginas();
   }
 
-  /**
-   * Marcador/numeração só nas linhas selecionadas (cada linha criada com Enter vira um item, como no Word): usa a lista nativa
-   * do navegador sobre a seleção. Devolve false quando não há seleção dentro do texto do bloco (aí vale o marcador do bloco inteiro).
-   */
-  aplicarMarcadorNasLinhas(b, tipo, barra) {
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return false;
-    const range = sel.getRangeAt(0);
-    const no = range.commonAncestorContainer;
-    const editavel = (no.nodeType === 1 ? no : no.parentElement)?.closest?.('.ath-texto-editable');
-    if (!editavel || !this.container?.contains(editavel)) return false;
-    const idBloco = editavel.closest('[data-bloco-id]')?.dataset.blocoId;
-    if (idBloco && idBloco !== b.id) return false;
-
-    const comando = tipo === 'numero' ? 'insertOrderedList' : 'insertUnorderedList';
-    const listaAtual = (no.nodeType === 1 ? no : no.parentElement)?.closest?.('ul, ol');
-    if (tipo === 'nenhum') {
-      if (!listaAtual && !range.cloneContents().querySelector?.('li')) return true; // nada marcado na seleção
-      document.execCommand(listaAtual?.tagName === 'OL' ? 'insertOrderedList' : 'insertUnorderedList', false, null); // repetir tira a lista das linhas
-    } else {
-      document.execCommand(comando, false, null);
-      const estiloNum = barra.querySelector('#athCtxNumEstilo')?.value || b.marcador_estilo_num || 'decimal';
-      const separador = barra.querySelector('#athCtxNumSep')?.value || b.marcador_separador || 'ponto';
-      const fim = window.getSelection().rangeCount ? window.getSelection().getRangeAt(0) : range;
-      editavel.querySelectorAll('ul, ol').forEach(lista => {
-        if (!fim.intersectsNode(lista)) return;
-        if (lista.tagName === 'OL') { lista.dataset.numEstilo = estiloNum; lista.dataset.numSep = separador; }
-        else lista.dataset.marcador = tipo;
-        lista.dataset.marcLocal = '1'; // este tipo é só das linhas escolhidas
-      });
-      if (tipo === 'numero') { b.marcador_estilo_num = estiloNum; b.marcador_separador = separador; }
-    }
-    b.texto = removerPalavrasIniciais(editavel.innerHTML);
-    if (b.marcador_tipo && b.marcador_tipo !== 'nenhum' && /<(ul|ol)[\s>]/i.test(b.texto)) b.marcador_tipo = 'nenhum'; // o texto já traz as listas: não embrulhar o bloco todo de novo
-    this.notificarMudanca();
-    this.renderizar();
-    this.onSelecionarBloco(b, null);
-    return true;
+  /** Trechos de estilo cadastrado (`.ath-estilo-span`): o CSS vem SEMPRE do estilo atual, então editar o estilo reflete na hora. */
+  comEstilosDeTrecho(html) {
+    return aplicarEstilosDeTrecho(html, this.doc.estilos || [], (e) => (FONTES_SISTEMA[e.fonte] || FONTES_SISTEMA.nunito).familia || 'sans-serif');
   }
 
   /** Estilo de texto do bloco (título: o do nível). */
@@ -3867,14 +3822,14 @@ export class EditorView {
     if (!listas.length) return;
 
     const cfg = marc?.cfg;
-    const nivel = cfg?.nivel ?? Math.max(1, parseInt(b.marcador_nivel, 10) || 1);
-    const tabMm = cfg?.tabMm ?? Math.max(3, parseFloat(b.marcador_tab_mm) || 7);
+    const nivel = cfg?.nivel ?? 1;
+    const tabMm = cfg?.tabMm ?? 7;
     const indentMm = (nivel - 1) * 6;
-    const align = cfg?.alinhamento ?? (b.marcador_alinhamento || 'left');
-    const inicio = marc?.numero ?? Math.max(1, parseInt(b.marcador_inicio, 10) || 1);
+    const align = cfg?.alinhamento ?? 'left';
+    const inicio = marc?.numero ?? 1;
 
     listas.forEach(lista => {
-      const local = lista.dataset.marcLocal === '1'; // lista só de algumas linhas: guarda o próprio tipo e conta desde 1
+      const local = false; // o marcador é sempre do estilo (nada de lista local por linha)
       lista.classList.add('ath-lista-config');
       lista.style.setProperty('--ath-list-tab', `${tabMm}mm`);
       lista.style.setProperty('--ath-list-indent', `${indentMm}mm`);
@@ -3883,11 +3838,10 @@ export class EditorView {
       if (local) return;
 
       if (lista.tagName.toLowerCase() === 'ol') {
-        lista.dataset.numEstilo = cfg?.estiloNum ?? (b.marcador_estilo_num || 'decimal');
-        lista.dataset.numSep = cfg?.separador ?? (b.marcador_separador || 'ponto');
+        lista.dataset.numEstilo = cfg?.estiloNum ?? 'decimal';
+        lista.dataset.numSep = cfg?.separador ?? 'ponto';
       } else {
         const tipoMarc = (cfg && cfg.tipo !== 'numero') ? cfg.tipo
-          : (b.marcador_tipo && b.marcador_tipo !== 'numero' && b.marcador_tipo !== 'nenhum') ? b.marcador_tipo
           : lista.classList.contains('ath-lista-alinea') ? 'traco'
           : lista.classList.contains('ath-lista-ponto-traco') ? 'ponto_traco'
           : lista.classList.contains('ath-lista-quadrado') ? 'quadrado'
@@ -3932,115 +3886,6 @@ export class EditorView {
         </div>
       </div>
       <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 2px;"></span>
-      <button type="button" class="rm-ic-sm" data-cmd="bold" title="Negrito (Ctrl+B)"><b>B</b></button>
-      <button type="button" class="rm-ic-sm" data-cmd="italic" title="Itálico (Ctrl+I)"><i>I</i></button>
-      <button type="button" class="rm-ic-sm" data-cmd="underline" title="Sublinhado (Ctrl+U)"><u>U</u></button>
-      <button type="button" class="rm-ic-sm" data-cmd="strikeThrough" title="Tachado"><s>S</s></button>
-      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 2px;"></span>
-
-      <!-- Símbolo único de Lista / Marcadores e Numeração com Menu Dropdown (estilo Affinity) -->
-      <div class="ath-ctx-dropdown-wrap" id="athWrapCtxLista">
-        <button type="button" class="ath-ctx-dropdown-btn" id="athBtnContextListaMenu" title="Marcadores e Numeração (escolher tipo e estilo)">
-          <span id="athIconeCtxLista" style="display:inline-flex; align-items:center;">${svgIcone('lista', 14)}</span>
-          <span style="font-size:10px; opacity:0.8;">▾</span>
-        </button>
-        <div class="ath-ctx-dropdown-menu" id="athMenuContextLista" hidden style="width:270px;">
-          <div style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; padding:2px 6px 4px; border-bottom:1px solid #EEF2F6;">
-            Marcadores e Numeração
-          </div>
-          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="nenhum">
-            <span>Nenhuma lista</span>
-            <span class="ath-ctx-menu-simbolo">—</span>
-          </button>
-          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="circulo">
-            <span>Marcador — Ponto</span>
-            <span class="ath-ctx-menu-simbolo">•</span>
-          </button>
-          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="traco">
-            <span>Alínea / Travessão ABNT</span>
-            <span class="ath-ctx-menu-simbolo">–</span>
-          </button>
-          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="quadrado">
-            <span>Marcador — Quadrado</span>
-            <span class="ath-ctx-menu-simbolo">▪</span>
-          </button>
-          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="ponto_traco">
-            <span>Marcador — Ponto-traço</span>
-            <span class="ath-ctx-menu-simbolo">·–</span>
-          </button>
-          <button type="button" class="ath-ctx-menu-item" data-ctx-marcador="numero">
-            <span>Lista Numerada</span>
-            <span class="ath-ctx-menu-simbolo">1, a, I</span>
-          </button>
-
-          <!-- Sub-configuração rápida de Numeração estilo Affinity -->
-          <div id="athSubMenuCtxNumerico" style="display:flex; flex-direction:column; gap:6px; margin-top:4px; padding:8px; border-radius:10px; background:#F8FAFC; border:1px solid #E2E8F0;">
-            <span style="font:800 10px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase;">Configuração Numérica</span>
-            <label style="font:700 10.5px var(--glx-font); color:#475569; display:flex; flex-direction:column; gap:2px;">Estilo (Número / Letra / Romano)
-              <select id="athCtxNumEstilo" class="glx-select" style="height:26px; font-size:11px; padding:0 6px; border-radius:7px; border:1px solid #CBD5E1;">
-                <option value="decimal">1, 2, 3… (Número)</option>
-                <option value="decimal_zero">01, 02, 03… (Zero esq.)</option>
-                <option value="lower_alpha">a, b, c… (Minúscula)</option>
-                <option value="upper_alpha">A, B, C… (Maiúscula)</option>
-                <option value="lower_roman">i, ii, iii… (Romano min.)</option>
-                <option value="upper_roman">I, II, III… (Romano mai.)</option>
-              </select>
-            </label>
-            <div style="display:grid; grid-template-columns:1fr 72px; gap:6px; align-items:end;">
-              <label style="font:700 10.5px var(--glx-font); color:#475569; display:flex; flex-direction:column; gap:2px;">Formato
-                <select id="athCtxNumSep" class="glx-select" style="height:26px; font-size:11px; padding:0 6px; border-radius:7px; border:1px solid #CBD5E1;">
-                  <option value="ponto">\#. (1. / a.)</option>
-                  <option value="parentese">\#) (1) / a))</option>
-                  <option value="entre_parenteses">(\#) ((1))</option>
-                  <option value="travessao">\# – (1 –)</option>
-                </select>
-              </label>
-              <label style="font:700 10.5px var(--glx-font); color:#475569; display:flex; flex-direction:column; gap:2px;">Início
-                <input type="number" id="athCtxNumInicio" min="1" max="999" value="1" style="height:26px; font-size:11px; padding:0 6px; border-radius:7px; border:1px solid #CBD5E1; width:100%; box-sizing:border-box;">
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Símbolo único de Alinhamento com Menu Dropdown -->
-      <div class="ath-ctx-dropdown-wrap" id="athWrapCtxAlinhamento">
-        <button type="button" class="ath-ctx-dropdown-btn" id="athBtnContextAlinMenu" title="Alinhamento do Parágrafo">
-          <span id="athIconeCtxAlin" style="display:inline-flex; align-items:center;">${svgIcone('alinhamento_esq', 14)}</span>
-          <span id="athRotuloCtxAlin" style="font-size:10.5px;">Alinhar</span>
-          <span style="font-size:10px; opacity:0.8;">▾</span>
-        </button>
-        <div class="ath-ctx-dropdown-menu" id="athMenuContextAlin" hidden style="width:220px;">
-          <div style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; padding:2px 6px 4px; border-bottom:1px solid #EEF2F6;">
-            Alinhamento do Bloco
-          </div>
-          <button type="button" class="ath-ctx-menu-item" id="athBtnContextAlinEstilo">
-            <span>Do estilo de texto</span>
-            <span class="ath-ctx-menu-simbolo">Auto</span>
-          </button>
-          <button type="button" class="ath-ctx-menu-item" data-alin-rapido="esquerda">
-            <span>À Esquerda</span>
-            <span class="ath-ctx-menu-simbolo">${svgIcone('alinhamento_esq', 13)}</span>
-          </button>
-          <button type="button" class="ath-ctx-menu-item" data-alin-rapido="centro">
-            <span>Centralizado</span>
-            <span class="ath-ctx-menu-simbolo">${svgIcone('alinhamento_cen', 13)}</span>
-          </button>
-          <button type="button" class="ath-ctx-menu-item" data-alin-rapido="direita">
-            <span>À Direita</span>
-            <span class="ath-ctx-menu-simbolo">${svgIcone('alinhamento_dir', 13)}</span>
-          </button>
-          <button type="button" class="ath-ctx-menu-item" data-alin-rapido="justificado_esquerda">
-            <span>Justificado (últ. esq.)</span>
-            <span class="ath-ctx-menu-simbolo">${svgIcone('alinhamento_jus_esq', 13)}</span>
-          </button>
-          <button type="button" class="ath-ctx-menu-item" data-alin-rapido="justificado_direita">
-            <span>Justificado (últ. dir.)</span>
-            <span class="ath-ctx-menu-simbolo">${svgIcone('alinhamento_jus_dir', 13)}</span>
-          </button>
-        </div>
-      </div>
-
       <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 2px;"></span>
       <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnContextDividir" title="Dividir este bloco de texto em dois no cursor" style="height:28px; display:inline-flex; align-items:center; gap:4px; border-radius:999px;">${svgIcone('divisor', 13)} Dividir</button>
       <button type="button" class="glx-btn glx-btn-xs glx-btn-primary" id="athBtnContextCitar" title="Inserir citação Zotero" style="height:28px; display:inline-flex; align-items:center; border-radius:999px;">Citar Zotero</button>
@@ -4070,16 +3915,10 @@ export class EditorView {
     document.body.appendChild(barra);
 
     const menuEstilo = barra.querySelector('#athMenuContextEstilo');
-    const menuLista = barra.querySelector('#athMenuContextLista');
-    const menuAlin = barra.querySelector('#athMenuContextAlin');
     const btnEstiloMenu = barra.querySelector('#athBtnContextEstiloMenu');
-    const btnListaMenu = barra.querySelector('#athBtnContextListaMenu');
-    const btnAlinMenu = barra.querySelector('#athBtnContextAlinMenu');
 
     const fecharDropdownsCtx = () => {
       if (menuEstilo) menuEstilo.hidden = true;
-      if (menuLista) menuLista.hidden = true;
-      if (menuAlin) menuAlin.hidden = true;
     };
 
     const renderizarListaEstilosContextuais = () => {
@@ -4116,8 +3955,6 @@ export class EditorView {
 
     menuEstilo?.addEventListener('mousedown', e => e.stopPropagation());
     menuEstilo?.addEventListener('click', e => e.stopPropagation());
-    menuAlin?.addEventListener('mousedown', e => e.stopPropagation());
-    menuAlin?.addEventListener('click', e => e.stopPropagation());
 
     btnEstiloMenu?.addEventListener('mousedown', e => {
       e.preventDefault();
@@ -4128,136 +3965,6 @@ export class EditorView {
         renderizarListaEstilosContextuais();
       }
       menuEstilo.hidden = !abrir;
-    });
-
-    btnListaMenu?.addEventListener('mousedown', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      const abrir = menuLista.hidden;
-      fecharDropdownsCtx();
-      menuLista.hidden = !abrir;
-    });
-
-    btnAlinMenu?.addEventListener('mousedown', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      const abrir = menuAlin.hidden;
-      fecharDropdownsCtx();
-      menuAlin.hidden = !abrir;
-    });
-
-    menuLista?.addEventListener('mousedown', e => {
-      if (e.target.closest('select, input, label')) {
-        e.stopPropagation();
-      }
-    });
-
-    const aplicarMarcadorNoBlocoSelecionado = (tipo) => {
-      const b = this.blocoSelecionado;
-      if (!b) return;
-      if (b.tipo !== 'titulo' && b.tipo !== 'subtitulo' && this.aplicarMarcadorNasLinhas(b, tipo, barra)) return;
-      if (tipo === 'nenhum') {
-        if (marcadorEfetivo({}, this.estiloDoBloco(b))) b.marcador_tipo = 'nenhum'; // o estilo tem marcador: este bloco o desliga
-        else delete b.marcador_tipo;
-        const txt = String(b.texto || '').trim();
-        if (txt.startsWith('<ul') || txt.startsWith('<ol')) {
-          const tmp = document.createElement('div');
-          tmp.innerHTML = txt;
-          const itens = Array.from(tmp.querySelectorAll('li')).map(li => li.innerHTML);
-          if (itens.length > 0) b.texto = itens.join('<br>');
-        }
-      } else {
-        b.marcador_tipo = tipo;
-        if (tipo === 'numero') {
-          b.marcador_estilo_num = barra.querySelector('#athCtxNumEstilo')?.value || b.marcador_estilo_num || 'decimal';
-          b.marcador_separador = barra.querySelector('#athCtxNumSep')?.value || b.marcador_separador || 'ponto';
-          b.marcador_inicio = Math.max(1, parseInt(barra.querySelector('#athCtxNumInicio')?.value, 10) || b.marcador_inicio || 1);
-        }
-        const txt = String(b.texto || '').trim();
-        if (txt.includes('<ul') || txt.includes('<ol')) {
-          const tmp = document.createElement('div');
-          tmp.innerHTML = txt;
-          tmp.querySelectorAll('ul, ol').forEach(listaAntiga => {
-            const tagAlvo = tipo === 'numero' ? 'ol' : 'ul';
-            const novaLista = document.createElement(tagAlvo);
-            novaLista.innerHTML = listaAntiga.innerHTML;
-            listaAntiga.replaceWith(novaLista);
-          });
-          b.texto = tmp.innerHTML;
-        }
-      }
-      this.notificarMudanca();
-      this.renderizar();
-      this.onSelecionarBloco(b, null);
-    };
-
-    barra.querySelectorAll('[data-ctx-marcador]').forEach(btn => {
-      btn.addEventListener('mousedown', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        const tipo = btn.dataset.ctxMarcador;
-        aplicarMarcadorNoBlocoSelecionado(tipo);
-        if (tipo !== 'numero') {
-          fecharDropdownsCtx();
-        }
-      });
-    });
-
-    barra.querySelector('#athCtxNumEstilo')?.addEventListener('change', e => {
-      if (this.blocoSelecionado) {
-        this.blocoSelecionado.marcador_tipo = 'numero';
-        this.blocoSelecionado.marcador_estilo_num = e.target.value;
-        aplicarMarcadorNoBlocoSelecionado('numero');
-      }
-    });
-
-    barra.querySelector('#athCtxNumSep')?.addEventListener('change', e => {
-      if (this.blocoSelecionado) {
-        this.blocoSelecionado.marcador_tipo = 'numero';
-        this.blocoSelecionado.marcador_separador = e.target.value;
-        aplicarMarcadorNoBlocoSelecionado('numero');
-      }
-    });
-
-    barra.querySelector('#athCtxNumInicio')?.addEventListener('input', e => {
-      if (this.blocoSelecionado) {
-        this.blocoSelecionado.marcador_tipo = 'numero';
-        this.blocoSelecionado.marcador_inicio = Math.max(1, parseInt(e.target.value, 10) || 1);
-        aplicarMarcadorNoBlocoSelecionado('numero');
-      }
-    });
-
-    barra.querySelectorAll('[data-cmd]').forEach(btn => {
-      btn.addEventListener('mousedown', e => {
-        e.preventDefault();
-        document.execCommand(btn.dataset.cmd, false, null);
-      });
-    });
-
-    barra.querySelector('#athBtnContextAlinEstilo')?.addEventListener('mousedown', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (this.blocoSelecionado) {
-        delete this.blocoSelecionado.alinhamento;
-        fecharDropdownsCtx();
-        this.notificarMudanca();
-        this.renderizar();
-        this.onSelecionarBloco(this.blocoSelecionado, null);
-      }
-    });
-
-    barra.querySelectorAll('[data-alin-rapido]').forEach(btn => {
-      btn.addEventListener('mousedown', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (this.blocoSelecionado) {
-          this.blocoSelecionado.alinhamento = btn.dataset.alinRapido;
-          fecharDropdownsCtx();
-          this.notificarMudanca();
-          this.renderizar();
-          this.onSelecionarBloco(this.blocoSelecionado, null);
-        }
-      });
     });
 
     const acaoDividirRange = (range, editable) => {
@@ -4333,7 +4040,7 @@ export class EditorView {
         return;
       }
       // Se algum menu dropdown da barra flutuante estiver aberto, não esconde nem reposiciona a barra
-      if ((menuEstilo && !menuEstilo.hidden) || (menuLista && !menuLista.hidden) || (menuAlin && !menuAlin.hidden)) {
+      if (menuEstilo && !menuEstilo.hidden) {
         return;
       }
 
@@ -4406,54 +4113,6 @@ export class EditorView {
             rotuloEstiloEl.textContent = estAtual ? estAtual.nome : 'Estilo';
           }
 
-          // Reflete estado do menu de Alinhamento
-          const alinAtivo = this.blocoSelecionado?.alinhamento || '';
-          const btnCtxAlinEstilo = barra.querySelector('#athBtnContextAlinEstilo');
-          if (btnCtxAlinEstilo) {
-            btnCtxAlinEstilo.classList.toggle('on', !alinAtivo);
-          }
-          barra.querySelectorAll('[data-alin-rapido]').forEach(bt => {
-            bt.classList.toggle('on', bt.dataset.alinRapido === alinAtivo);
-          });
-          const rotuloAlinEl = barra.querySelector('#athRotuloCtxAlin');
-          if (rotuloAlinEl) {
-            const mapaAlin = {
-              '': 'Do estilo',
-              esquerda: 'Esquerda',
-              centro: 'Centro',
-              direita: 'Direita',
-              justificado_esquerda: 'Justif.',
-              justificado_direita: 'Justif. Dir.'
-            };
-            rotuloAlinEl.textContent = mapaAlin[alinAtivo] || 'Alinhar';
-          }
-
-          // Reflete estado do menu de Lista / Marcadores e Numeração
-          const marcCfg = this.blocoSelecionado ? marcadorEfetivo(this.blocoSelecionado, this.estiloDoBloco(this.blocoSelecionado)) : null;
-          const marcAtivo = marcCfg?.tipo || 'nenhum';
-          barra.querySelectorAll('[data-ctx-marcador]').forEach(bt => {
-            bt.classList.toggle('on', bt.dataset.ctxMarcador === marcAtivo);
-          });
-          btnListaMenu?.classList.toggle('on', marcAtivo !== 'nenhum');
-          const selNumEst = barra.querySelector('#athCtxNumEstilo');
-          const selNumSep = barra.querySelector('#athCtxNumSep');
-          const inpNumIni = barra.querySelector('#athCtxNumInicio');
-          if (selNumEst) selNumEst.value = this.blocoSelecionado?.marcador_estilo_num || 'decimal';
-          if (selNumSep) selNumSep.value = this.blocoSelecionado?.marcador_separador || 'ponto';
-          if (inpNumIni) inpNumIni.value = this.blocoSelecionado?.marcador_inicio ?? 1;
-
-          // Reflete estado dos botões de formatação inline
-          try {
-            const cmdB = barra.querySelector('[data-cmd="bold"]');
-            const cmdI = barra.querySelector('[data-cmd="italic"]');
-            const cmdU = barra.querySelector('[data-cmd="underline"]');
-            const cmdS = barra.querySelector('[data-cmd="strikeThrough"]');
-
-            if (cmdB) cmdB.classList.toggle('on', document.queryCommandState('bold'));
-            if (cmdI) cmdI.classList.toggle('on', document.queryCommandState('italic'));
-            if (cmdU) cmdU.classList.toggle('on', document.queryCommandState('underline'));
-            if (cmdS) cmdS.classList.toggle('on', document.queryCommandState('strikeThrough'));
-          } catch (_) {}
           return;
         }
       }
@@ -4580,7 +4239,7 @@ export class EditorView {
           if (spanExistente && spanExistente.textContent.trim() === textoSel) {
             spanExistente.dataset.estiloId = estilo.id;
             spanExistente.dataset.estiloNome = estilo.nome;
-            spanExistente.style.cssText = inlineCss;
+            spanExistente.style.cssText = inlineCss; // só exibição: ao salvar, o HTML guarda apenas o id do estilo
           } else {
             const fragment = range.extractContents();
             const span = document.createElement('span');
@@ -4600,7 +4259,7 @@ export class EditorView {
           }
 
           if (bloco && editable) {
-            bloco.texto = editable.innerHTML;
+            bloco.texto = sanearHtmlTexto(editable.innerHTML);
             try { this.onSelecionarBloco(bloco, null); } catch (_) {} // o painel passa a listar os estilos do texto
           }
         }

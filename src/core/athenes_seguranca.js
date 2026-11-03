@@ -22,6 +22,8 @@ export function escapeHtml(valor) {
     .replace(/'/g, '&#39;');
 }
 
+import { sanearDocumentoEstilos } from './athenes_estilo_exclusivo.js';
+
 /**
  * Sanitiza HTML editorial rico (parágrafos, títulos, listas e sugestões),
  * removendo tags executáveis (<script>, <iframe>, <object>, <embed>, <style>, <svg onload>)
@@ -67,7 +69,7 @@ export function sanitizarDocumentoImportado(doc) {
       if (typeof b.fonte === 'string') b.fonte = sanitizarHtmlEditorial(b.fonte);
     }
   }
-  return doc;
+  return sanearDocumentoEstilos(doc); // migração: blocos de texto só com estilo (sem sobrescritas nem HTML de formatação)
 }
 
 /**

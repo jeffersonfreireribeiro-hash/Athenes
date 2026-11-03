@@ -17,6 +17,7 @@ const VAZIOS = new Set(['br', 'img', 'hr', 'input', 'wbr']);
 const REGISTRO = new WeakMap();
 
 import { entrelinhaEfetiva } from './athenes_estilos.js';
+import { ajusteDeFragmento } from './athenes_estilo_exclusivo.js';
 export const ehFragmento = (b) => !!b?._frag;
 export const origemDoFragmento = (b) => REGISTRO.get(b)?.origem || null;
 
@@ -100,11 +101,12 @@ export const porLinhaUsadoNoTexto = (id) => POR_LINHA_USADO.get(id) || 0;
 export function parametrosTextoPt(bloco, ctx) {
   const est = ctx.estilos[bloco.estiloId] || (bloco.tipo === 'titulo' ? ctx.estilos[`titulo${Math.min(6, bloco.nivel || 1)}`] : null) || ctx.estilos.corpo;
   if (!est) return null;
-  const tam = bloco.tamanho_pt ?? est.tamanho_pt ?? 12;
-  const ent = entrelinhaEfetiva({ entrelinha: bloco.entrelinha ?? est.entrelinha ?? 1.4, fonte: bloco.fonte ?? est.fonte, tamanho_pt: tam, entrelinha_tipo: bloco.entrelinha !== undefined ? undefined : est.entrelinha_tipo, entrelinha_pt: est.entrelinha_pt }, 1.4); // mesma conta do CSS: a estimativa de altura acompanha o que é desenhado
-  const antes = bloco.espaco_antes_pt ?? est.espaco_antes_pt ?? 0;
-  const depois = bloco.espaco_depois_pt ?? est.espaco_depois_pt ?? 0;
-  const recuoMm = bloco.recuo_esquerdo_mm ?? est.recuo_esquerdo_mm ?? 0;
+  const aj = ajusteDeFragmento(bloco);
+  const tam = est.tamanho_pt ?? 12;
+  const ent = entrelinhaEfetiva({ entrelinha: est.entrelinha ?? 1.4, fonte: est.fonte, tamanho_pt: tam, entrelinha_tipo: est.entrelinha_tipo, entrelinha_pt: est.entrelinha_pt }, 1.4); // mesma conta do CSS: a estimativa de altura acompanha o que é desenhado
+  const antes = aj.espaco_antes_pt ?? est.espaco_antes_pt ?? 0;
+  const depois = aj.espaco_depois_pt ?? est.espaco_depois_pt ?? 0;
+  const recuoMm = est.recuo_esquerdo_mm ?? 0;
   const larg = Math.max(40, ctx.larguraPt * Math.min(12, Math.max(1, bloco.span || 12)) / 12 - recuoMm * PT_POR_MM);
   const largChar = tam * (est.caixa_alta ? 0.63 : 0.5) * ((est.peso || 400) >= 700 ? 1.06 : 1);
   const idOrigem = bloco._frag?.origemId || bloco.id;

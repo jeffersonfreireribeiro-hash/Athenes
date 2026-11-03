@@ -5,6 +5,7 @@
  */
 
 import { normalizarAvancado, aplicarPalavrasIniciais, separarPrimeiraLetra } from './athenes_estilo_avancado.js';
+import { ajusteDeFragmento, aplicarEstilosDeTrecho } from './athenes_estilo_exclusivo.js';
 import { ZipBuilder } from './zip_builder.js';
 import { MM_PARA_DXA, dimensoesPapelMm } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
@@ -139,7 +140,7 @@ function htmlParaRunsDocx(htmlTexto, estiloPadrao = {}) {
           runs.push(`<w:hyperlink w:anchor="${nomeMarcadorWord(alvoLink)}" w:history="1">${dentro.join('')}</w:hyperlink>`);
         }
         inicioLink = -1;
-      } else if (lower.startsWith('<span class="ath-pi"')) {
+      } else if (lower.startsWith('<span class="ath-pi"') || lower.startsWith('<span class="ath-estilo-span"')) {
         const css = /style="([^"]*)"/.exec(token)?.[1] || '';
         destaque = {
           negrito: /font-weight:\s*([6-9]00)/.test(css), italico: /font-style:\s*italic/.test(css),
@@ -710,7 +711,8 @@ export async function exportarParaDocx(documento) {
         const nivel = nivelDe(b);
         const estiloId = `Heading${nivel}`;
         const num = prefixosSecoes.get(b.id);
-        const runs = htmlParaRunsDocx(num ? (removerNumeroManual(b.texto) || b.texto) : b.texto);
+        const textoTit = aplicarEstilosDeTrecho(b.texto, documento.estilos || []);
+        const runs = htmlParaRunsDocx(num ? (removerNumeroManual(textoTit) || textoTit) : textoTit);
         const runsNum = num ? `<w:r><w:t xml:space="preserve">${escaparXml(num.prefixo)} </w:t></w:r>` : '';
         const mkT = marcadorDocx(b);
         const idMarca = ++contadorMarcadores;
@@ -723,7 +725,7 @@ export async function exportarParaDocx(documento) {
         const estAv = (documento.estilos || []).find(e => e.id === b.estiloId);
         const av = normalizarAvancado(estAv?.avancado);
         const ehContinuacao = Boolean(b._frag?.continuaDaAnterior);
-        let textoPar = b.texto;
+        let textoPar = aplicarEstilosDeTrecho(b.texto, documento.estilos || []); // trecho de estilo cadastrado: o realce vem do estilo atual
         let capitularXml = '';
         if (av?.capitular.ativa && !ehContinuacao) {
           const { letra, resto } = separarPrimeiraLetra(textoPar);
@@ -746,29 +748,36 @@ export async function exportarParaDocx(documento) {
           decoXml += `<w:pBdr><w:${lado} w:val="${tracado}" w:sz="${Math.min(96, Math.max(2, Math.round(bl.largura_pt * 8)))}" w:space="${Math.round(bl.distancia_mm * 2.83)}" w:color="${bl.cor.replace('#', '')}"/></w:pBdr>`;
         }
         if (av?.fundo_bloco.ativo) decoXml += `<w:shd w:val="clear" w:color="auto" w:fill="${av.fundo_bloco.cor.replace('#', '')}"/>`;
+        // tudo vem do estilo do bloco (alinhamento, recuos, espaços, entrelinha); só o ajuste de fragmento da paginação se soma
+        const aj = ajusteDeFragmento(b);
+        const alinEst = estAv?.alinhamento;
         let jcVal = 'both';
-        if (b.alinhamento === 'esquerda') jcVal = 'left';
-        else if (b.alinhamento === 'centro') jcVal = 'center';
-        else if (b.alinhamento === 'direita') jcVal = 'right';
-        else if (b.alinhamento === 'justificado' || b.alinhamento === 'justificado_esquerda') jcVal = 'both';
-        else if (b.alinhamento === 'justificado_centro') jcVal = 'center';
-        else if (b.alinhamento === 'justificado_direita') jcVal = 'right';
+        if (alinEst === 'esquerda') jcVal = 'left';
+        else if (alinEst === 'centro') jcVal = 'center';
+        else if (alinEst === 'direita') jcVal = 'right';
+        else if (alinEst === 'justificado' || alinEst === 'justificado_esquerda') jcVal = 'both';
+        else if (alinEst === 'justificado_centro') jcVal = 'center';
+        else if (alinEst === 'justificado_direita') jcVal = 'right';
 
-        const recuo1 = b.recuo_primeira_linha_mm !== undefined ? Math.round(b.recuo_primeira_linha_mm * 56.7) : 709;
-        const recuoEsq = b.recuo_esquerdo_mm !== undefined ? ` w:left="${Math.round(b.recuo_esquerdo_mm * 56.7)}"` : '';
-        const dirMm = b.recuo_direito_mm !== undefined ? b.recuo_direito_mm : estAv?.recuo_direito_mm;
+        const recuo1Mm = aj.recuo_primeira_linha_mm ?? estAv?.recuo_primeira_linha_mm;
+        const recuo1 = recuo1Mm !== undefined ? Math.round(recuo1Mm * 56.7) : 709;
+        const esqMm = estAv?.recuo_esquerdo_mm;
+        const recuoEsq = esqMm !== undefined ? ` w:left="${Math.round(esqMm * 56.7)}"` : '';
+        const dirMm = estAv?.recuo_direito_mm;
         const recuoDir = dirMm !== undefined ? ` w:right="${Math.round(dirMm * 56.7)}"` : '';
         const mkP = /<(ul|ol)[\s>]/i.test(String(b.texto)) ? null : marcadorDocx(b);
         const indXml = mkP
-          ? `<w:ind w:left="${mkP.left + (b.recuo_esquerdo_mm !== undefined ? Math.round(b.recuo_esquerdo_mm * TWIP_MM) : 0)}" w:hanging="${mkP.hanging}"${recuoDir}/>`
+          ? `<w:ind w:left="${mkP.left + (esqMm !== undefined ? Math.round(esqMm * TWIP_MM) : 0)}" w:hanging="${mkP.hanging}"${recuoDir}/>`
           : `<w:ind w:firstLine="${recuo1}"${recuoEsq}${recuoDir}/>`;
 
-        const antes = b.espaco_antes_pt !== undefined ? Math.round(b.espaco_antes_pt * 20) : 0;
-        const depois = b.espaco_depois_pt !== undefined ? Math.round(b.espaco_depois_pt * 20) : 0;
-        const tipoLinha = b.entrelinha_tipo ?? (b.entrelinha === undefined ? estAv?.entrelinha_tipo : undefined);
-        const ptLinha = Number(b.entrelinha_pt ?? estAv?.entrelinha_pt);
+        const antesPt = aj.espaco_antes_pt ?? estAv?.espaco_antes_pt;
+        const depoisPt = aj.espaco_depois_pt ?? estAv?.espaco_depois_pt;
+        const antes = antesPt !== undefined ? Math.round(antesPt * 20) : 0;
+        const depois = depoisPt !== undefined ? Math.round(depoisPt * 20) : 0;
+        const tipoLinha = estAv?.entrelinha_tipo;
+        const ptLinha = Number(estAv?.entrelinha_pt);
         const regraLinha = (tipoLinha === 'exatamente' || tipoLinha === 'pelo_menos') && ptLinha > 0;
-        const linha = regraLinha ? Math.round(ptLinha * 20) : (b.entrelinha ? Math.round(b.entrelinha * 240) : 360);
+        const linha = regraLinha ? Math.round(ptLinha * 20) : (estAv?.entrelinha ? Math.round(estAv.entrelinha * 240) : 360);
         const spacingXml = `<w:spacing w:line="${linha}" w:lineRule="${regraLinha ? (tipoLinha === 'exatamente' ? 'exact' : 'atLeast') : 'auto'}" w:before="${antes}" w:after="${depois}"/>`;
 
         if (capitularXml) bodyXmlParts.push(capitularXml);
