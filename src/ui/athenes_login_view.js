@@ -17,6 +17,7 @@ import {
   obterOuCriarEstruturaPastasAthenes,
   obterConfigGoogleDrive
 } from '../core/athenes_colaboracao.js';
+import { sincronizarZoteroComDrive } from '../core/athenes_drive_sync.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 
@@ -193,6 +194,8 @@ export class TelaLoginView {
         console.warn('[Athenes] Pasta do Drive será criada ou vinculada posteriormente:', errDrive);
       }
 
+      // Zotero já conectado nesta conta Google (em outro computador) vem junto com o login
+      try { await sincronizarZoteroComDrive(login.accessToken); } catch (errZ) { console.warn('[Athenes] Zotero pelo Drive:', errZ.message); }
       // tokens guardados já na conta recém-identificada (o Drive e a nuvem protegida usam o mesmo login)
       guardarTokenDrive(login.accessToken, login.expiresIn, cfg.clientId);
       try { await abrirSessaoDaNuvem(login); } catch (errNuvem) { console.warn('[Athenes] Nuvem protegida não aberta:', errNuvem.message); }

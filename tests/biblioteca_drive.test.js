@@ -117,3 +117,31 @@ test('Zotero: conectado num computador aparece no outro; só o lado que mudou ve
   assert.equal(await sincronizarZoteroComDrive('T', { fetchImpl: fetchDrive }), 'enviou');
   assert.equal(drive.arquivo.zotero.apiKey, 'CHAVE2');
 });
+
+test('dois computadores com pastas "Athenes" duplicadas passam a usar a mais antiga', async () => {
+  const m = new Map();
+  globalThis.localStorage = { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), key: i => [...m.keys()][i], get length() { return m.size; } };
+  const { obterPastaRaizDrive } = await import('../src/core/athenes_drive_sync.js');
+  const { salvarConfigGoogleDrive, obterConfigGoogleDrive } = await import('../src/core/athenes_colaboracao.js');
+  salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), pastaRaizId: 'RAIZ_NOVA', pastaDocumentosId: 'DOCS_NOVA', pastaId: 'DOCS_NOVA' });
+  const fetchFalso = async (url) => {
+    const u = new URL(url);
+    if (u.pathname === '/drive/v3/files/RAIZ_NOVA') return resp({ id: 'RAIZ_NOVA', trashed: false });
+    if (/orderBy=createdTime/.test(url)) return resp({ files: [{ id: 'RAIZ_ANTIGA' }, { id: 'RAIZ_NOVA' }] });
+    return resp({ files: [] });
+  };
+  const pastas = [{ id: 'p1', nome: 'X', driveId: 'D1', subpastas: [] }];
+  assert.equal(await obterPastaRaizDrive('TK', fetchFalso, pastas), 'RAIZ_ANTIGA');
+  const cfg = obterConfigGoogleDrive();
+  assert.equal(cfg.pastaRaizId, 'RAIZ_ANTIGA');
+  assert.ok(!cfg.pastaDocumentosId && !cfg.pastaId, 'a estrutura da pasta nova é descartada');
+  assert.equal(pastas[0].driveId, undefined, 'pastas locais esquecem os ids da raiz antiga para revincular');
+});
+
+test('documento vindo de outro computador volta para a pasta certa pelo vínculo com o Drive', async () => {
+  const { repararPastaDosDocumentos } = await import('../src/core/athenes_drive_sync.js');
+  const pastas = [{ id: 'pasta_rel_raiz', nome: 'Relatórios', driveId: 'F1', subpastas: [{ id: 'drive_F11', nome: 'ARQ.CON', driveId: 'F11', subpastas: [] }] }];
+  const docs = [{ id: 'a', pastaId: 'sub_do_outro_pc', driveFolderId: 'F11' }, { id: 'b', pastaId: 'pasta_rel_raiz', driveFolderId: 'F1' }, { id: 'c', pastaId: 'inexistente' }];
+  assert.equal(repararPastaDosDocumentos(docs, pastas), 1);
+  assert.deepEqual(docs.map(d => d.pastaId), ['drive_F11', 'pasta_rel_raiz', 'inexistente']);
+});

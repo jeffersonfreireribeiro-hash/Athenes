@@ -1033,7 +1033,7 @@ export async function obterOuCriarEstruturaPastasAthenes(accessToken, pastaRaizI
   const buscarPasta = async (nome, parentId = null) => {
     let q = `trashed = false and mimeType = 'application/vnd.google-apps.folder' and name = '${nome}'`;
     if (parentId) q += ` and '${parentId}' in parents`;
-    const resp = await fetchImpl(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`, { headers });
+    const resp = await fetchImpl(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,createdTime)&orderBy=createdTime`, { headers }); // a mais antiga: igual em todos os computadores
     if (!resp.ok) return null;
     const data = await resp.json();
     return data.files?.[0]?.id || null;

@@ -63,7 +63,8 @@ export async function obterTokenDrive({ renovar = null, cfg = obterConfigGoogleD
 /** Procura a pasta pelo nome dentro do pai; cria quando não existe. */
 export async function buscarOuCriarPasta(token, nome, paiId, fetchImpl = globalThis.fetch) {
   const q = `trashed = false and mimeType = 'application/vnd.google-apps.folder' and name = '${aspas(nome)}'${paiId ? ` and '${aspas(paiId)}' in parents` : ''}`;
-  const achou = await chamar(fetchImpl, `${API}?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=1`, {}, token);
+  // a mais antiga: em dois computadores, o primeiro cria a pasta e o segundo (que não a enxergava) pode ter criado outra; todos passam a usar a mesma
+  const achou = await chamar(fetchImpl, `${API}?q=${encodeURIComponent(q)}&fields=files(id,name,createdTime)&orderBy=createdTime&pageSize=10`, {}, token);
   if (achou.files?.[0]?.id) return { id: achou.files[0].id, criada: false };
   const nova = await chamar(fetchImpl, API, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -96,7 +97,17 @@ export async function obterPastaRaizDrive(token, fetchImpl = globalThis.fetch, p
   if (cfg.pastaRaizId) {
     const chave = `${cfg.pastaRaizId}|${token}`;
     if (raizValidada.has(chave)) return cfg.pastaRaizId;
-    if (await pastaDriveExiste(token, cfg.pastaRaizId, fetchImpl)) { raizValidada.add(chave); return cfg.pastaRaizId; }
+    if (await pastaDriveExiste(token, cfg.pastaRaizId, fetchImpl)) {
+      // existe, mas pode haver outra "Athenes" mais antiga criada por outro computador: a mais antiga é a de todos
+      const mais = (await chamar(fetchImpl, `${API}?q=${encodeURIComponent(`trashed = false and mimeType = 'application/vnd.google-apps.folder' and name = '${aspas(NOME_RAIZ)}'`)}&fields=files(id)&orderBy=createdTime&pageSize=1`, {}, token).catch(() => null))?.files?.[0]?.id;
+      if (!mais || mais === cfg.pastaRaizId) { raizValidada.add(chave); return cfg.pastaRaizId; }
+      salvarConfigGoogleDrive({ ...cfg, pastaRaizId: mais, pastaDocumentosId: '', pastaZoteroId: '', pastaRelatoriosId: '', pastaId: '', pastaUrl: '' });
+      const locais2 = obterPastasDriveLocais();
+      limparDriveIds(locais2); salvarPastasDriveLocais(locais2);
+      if (pastas) limparDriveIds(pastas);
+      raizValidada.add(`${mais}|${token}`);
+      return mais;
+    }
     salvarConfigGoogleDrive({ ...cfg, pastaRaizId: '', pastaDocumentosId: '', pastaZoteroId: '', pastaRelatoriosId: '' });
     const locais = obterPastasDriveLocais();
     limparDriveIds(locais); salvarPastasDriveLocais(locais);
@@ -359,4 +370,23 @@ export async function sincronizarZoteroComDrive(token, { fetchImpl = globalThis.
   if (chaveZotero(local) === chaveZotero(remoto)) { marcar(local, remotoEm); return 'igual'; }
   const localMudou = Boolean(marca.hash) && chaveZotero(local) !== marca.hash;
   return localMudou ? enviar() : baixar();
+}
+
+/**
+ * O `pastaId` de um documento é um id LOCAL da árvore de pastas daquele computador; em outro computador as pastas importadas
+ * têm outros ids. Quando o do documento não existe aqui, usa o vínculo com o Drive (`driveFolderId` = `driveId` da pasta).
+ * Devolve quantos documentos foram religados.
+ */
+export function repararPastaDosDocumentos(documentos, pastas) {
+  const todas = [];
+  const coletar = (l) => { for (const p of l || []) { todas.push(p); coletar(p.subpastas); } };
+  coletar(pastas);
+  const ids = new Set(todas.map(p => p.id));
+  let n = 0;
+  for (const d of documentos || []) {
+    if (d.pastaId && ids.has(d.pastaId)) continue;
+    const alvo = d.driveFolderId && todas.find(p => p.driveId === d.driveFolderId);
+    if (alvo && d.pastaId !== alvo.id) { d.pastaId = alvo.id; n++; }
+  }
+  return n;
 }

@@ -41,7 +41,7 @@ import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
-import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
+import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, obterPastaRaizDrive, repararPastaDosDocumentos, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -1336,6 +1336,7 @@ export class DashboardView {
     try {
       const token = await obterTokenDrive();
       if (!token) { if (!silencioso) alert('A sessão do Google Drive expirou. Reconecte o Drive.'); return; }
+      try { await obterPastaRaizDrive(token); } catch (e) { console.warn('[Athenes] Raiz do Drive:', e.message); } // adota a pasta Athenes mais antiga (a de todos os computadores)
       // outro computador: sem a estrutura gravada, descobre/cria as pastas do Athenes e fixa a pasta de documentos desta conta
       try { const c = obterConfigGoogleDrive(); if (!c.pastaDocumentosId || !c.pastaRaizId) await obterOuCriarEstruturaPastasAthenes(token); } catch (e) { console.warn('[Athenes] Estrutura do Drive:', e.message); }
       // Zotero conectado em outro computador desta conta aparece aqui (e o daqui vai para os outros)
@@ -1347,7 +1348,9 @@ export class DashboardView {
       if (pastasNovas.importadas || pastasNovas.vinculadas) this.pastasDrive = obterPastasDriveLocais();
       const arquivos = await listarBibliotecaDoDrive(token);
       const r = mesclarBibliotecaDrive(this.documentos, arquivos, pastasNovas.mapa);
-      if (pastasNovas.importadas) { this.salvarDocumentosLocais(); this.renderizar(); }
+      const religados = repararPastaDosDocumentos(this.documentos, obterPastasDriveLocais()); // documentos trazidos de outro PC voltam para a pasta certa
+      if (religados) r.atualizados += religados;
+      if (pastasNovas.importadas || religados) { this.pastasDrive = obterPastasDriveLocais(); this.salvarDocumentosLocais(); this.renderizar(); }
       else if (r.novos || r.atualizados) {
         this.salvarDocumentosLocais();
         this.atualizarGrid();
