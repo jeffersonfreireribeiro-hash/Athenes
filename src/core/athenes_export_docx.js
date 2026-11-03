@@ -4,6 +4,7 @@
  * Totalmente compatível com Microsoft Word e Google Docs com suporte a Seções e Mestras.
  */
 
+import { normalizarAvancado, aplicarPalavrasIniciais, separarPrimeiraLetra } from './athenes_estilo_avancado.js';
 import { ZipBuilder } from './zip_builder.js';
 import { MM_PARA_DXA } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
@@ -101,6 +102,7 @@ function htmlParaRunsDocx(htmlTexto, estiloPadrao = {}) {
     let negrito = Boolean(estiloPadrao.negrito);
     let italico = Boolean(estiloPadrao.italico);
     let sublinhado = Boolean(estiloPadrao.sublinhado);
+    let destaque = null; // <span class="ath-pi" style="..."> de palavras iniciais
 
     for (const token of tokens) {
       if (!token) continue;
@@ -123,6 +125,14 @@ function htmlParaRunsDocx(htmlTexto, estiloPadrao = {}) {
         italico = true;
       } else if (lower.startsWith('</em') || lower.startsWith('</i')) {
         italico = false;
+      } else if (lower.startsWith('<span class="ath-pi"')) {
+        const css = /style="([^"]*)"/.exec(token)?.[1] || '';
+        destaque = {
+          negrito: /font-weight:\s*([6-9]00)/.test(css), italico: /font-style:\s*italic/.test(css),
+          caixaAlta: /text-transform:\s*uppercase/.test(css), cor: /(?:^|;)\s*color:\s*#([0-9a-fA-F]{6})/.exec(css)?.[1] || ''
+        };
+      } else if (lower.startsWith('</span') && destaque) {
+        destaque = null;
       } else if (lower.startsWith('<u')) {
         sublinhado = true;
       } else if (lower.startsWith('</u')) {
@@ -136,8 +146,10 @@ function htmlParaRunsDocx(htmlTexto, estiloPadrao = {}) {
           if (estiloPadrao.fonte) rPr.push(`<w:rFonts w:ascii="${estiloPadrao.fonte}" w:hAnsi="${estiloPadrao.fonte}"/>`);
           if (estiloPadrao.tamanhoPt) rPr.push(`<w:sz w:val="${Math.round(estiloPadrao.tamanhoPt * 2)}"/>`);
           if (estiloPadrao.cor) rPr.push(`<w:color w:val="${estiloPadrao.cor.replace('#', '')}"/>`);
-          if (negrito) rPr.push('<w:b/>');
-          if (italico) rPr.push('<w:i/>');
+          if (negrito || destaque?.negrito) rPr.push('<w:b/>');
+          if (italico || destaque?.italico) rPr.push('<w:i/>');
+          if (destaque?.caixaAlta) rPr.push('<w:caps/>');
+          if (destaque?.cor) rPr.push(`<w:color w:val="${destaque.cor}"/>`);
           if (sublinhado) rPr.push('<w:u w:val="single"/>');
 
           runs.push(`<w:r>${rPr.length ? `<w:rPr>${rPr.join('')}</w:rPr>` : ''}<w:t xml:space="preserve">${textoLimpo}</w:t></w:r>`);
@@ -630,7 +642,32 @@ export async function exportarParaDocx(documento) {
         const runs = htmlParaRunsDocx(b.texto, { cor: '#64748B', tamanhoPt: 13 });
         bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr>${runs.join('')}</w:p>`);
       } else if (b.tipo === 'paragrafo') {
-        const runs = htmlParaRunsDocx(b.texto);
+        const estAv = (documento.estilos || []).find(e => e.id === b.estiloId);
+        const av = normalizarAvancado(estAv?.avancado);
+        const ehContinuacao = Boolean(b._frag?.continuaDaAnterior);
+        let textoPar = b.texto;
+        let capitularXml = '';
+        if (av?.capitular.ativa && !ehContinuacao) {
+          const { letra, resto } = separarPrimeiraLetra(textoPar);
+          if (letra) {
+            const tam = Math.round((estAv.tamanho_pt || 12) * av.capitular.linhas * 1.25 * 2);
+            capitularXml = `<w:p><w:pPr><w:framePr w:dropCap="drop" w:lines="${av.capitular.linhas}" w:wrap="around" w:vAnchor="text" w:hAnchor="text"/><w:spacing w:after="0" w:line="${Math.round(av.capitular.linhas * 240 * 1.1)}" w:lineRule="exact"/><w:textAlignment w:val="baseline"/></w:pPr><w:r><w:rPr><w:b w:val="${av.capitular.peso >= 600 ? 1 : 0}"/><w:color w:val="${av.capitular.cor.replace('#', '')}"/><w:position w:val="-${Math.round(tam * 0.18)}"/><w:sz w:val="${tam}"/></w:rPr><w:t>${escaparXml(letra.startsWith('&') ? letra.replace(/&amp;/g, '&') : letra)}</w:t></w:r></w:p>`;
+            textoPar = resto;
+          }
+        }
+        if (av?.palavras_iniciais.ativa && !ehContinuacao) textoPar = aplicarPalavrasIniciais(textoPar, estAv);
+        const runs = htmlParaRunsDocx(textoPar);
+        if (av?.ornamento_fim.ativo && !b._frag?.continuaNaProxima) {
+          const o = av.ornamento_fim;
+          runs.push(`<w:r><w:rPr><w:color w:val="${o.cor.replace('#', '')}"/><w:sz w:val="${Math.round((estAv.tamanho_pt || 12) * o.tamanho_em * 2)}"/></w:rPr><w:t xml:space="preserve"> ${escaparXml(o.glifo)}</w:t></w:r>`);
+        }
+        let decoXml = '';
+        if (av?.barra_lateral.ativa) {
+          const bl = av.barra_lateral, lado = bl.lado === 'direita' ? 'right' : 'left';
+          const tracado = { solida: 'single', tracejada: 'dashed', pontilhada: 'dotted' }[bl.estilo];
+          decoXml += `<w:pBdr><w:${lado} w:val="${tracado}" w:sz="${Math.min(96, Math.max(2, Math.round(bl.largura_pt * 8)))}" w:space="${Math.round(bl.distancia_mm * 2.83)}" w:color="${bl.cor.replace('#', '')}"/></w:pBdr>`;
+        }
+        if (av?.fundo_bloco.ativo) decoXml += `<w:shd w:val="clear" w:color="auto" w:fill="${av.fundo_bloco.cor.replace('#', '')}"/>`;
         let jcVal = 'both';
         if (b.alinhamento === 'esquerda') jcVal = 'left';
         else if (b.alinhamento === 'centro') jcVal = 'center';
@@ -641,7 +678,8 @@ export async function exportarParaDocx(documento) {
 
         const recuo1 = b.recuo_primeira_linha_mm !== undefined ? Math.round(b.recuo_primeira_linha_mm * 56.7) : 709;
         const recuoEsq = b.recuo_esquerdo_mm !== undefined ? ` w:left="${Math.round(b.recuo_esquerdo_mm * 56.7)}"` : '';
-        const recuoDir = b.recuo_direito_mm !== undefined ? ` w:right="${Math.round(b.recuo_direito_mm * 56.7)}"` : '';
+        const dirMm = b.recuo_direito_mm !== undefined ? b.recuo_direito_mm : estAv?.recuo_direito_mm;
+        const recuoDir = dirMm !== undefined ? ` w:right="${Math.round(dirMm * 56.7)}"` : '';
         const indXml = `<w:ind w:firstLine="${recuo1}"${recuoEsq}${recuoDir}/>`;
 
         const antes = b.espaco_antes_pt !== undefined ? Math.round(b.espaco_antes_pt * 20) : 0;
@@ -649,7 +687,8 @@ export async function exportarParaDocx(documento) {
         const linha = b.entrelinha ? Math.round(b.entrelinha * 240) : 360;
         const spacingXml = `<w:spacing w:line="${linha}" w:lineRule="auto" w:before="${antes}" w:after="${depois}"/>`;
 
-        bodyXmlParts.push(`<w:p><w:pPr>${indXml}<w:jc w:val="${jcVal}"/>${spacingXml}</w:pPr>${runs.join('')}</w:p>`);
+        if (capitularXml) bodyXmlParts.push(capitularXml);
+        bodyXmlParts.push(`<w:p><w:pPr>${decoXml}${indXml}<w:jc w:val="${jcVal}"/>${spacingXml}</w:pPr>${runs.join('')}</w:p>`);
       } else if (b.tipo === 'citacao') {
         const refTexto = ` (${b.autor || 'AUTOR'}, ${b.ano || 's.d.'}${b.pagina_citada ? ', p. ' + b.pagina_citada : ''})`;
         const textoCompleto = `${b.texto || ''}${refTexto}`;

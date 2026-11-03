@@ -9,6 +9,56 @@
 import { svgIcone } from './athenes_icones.js';
 import { FONTES_SISTEMA, PESOS_FONTE, estiloParaCss } from '../core/athenes_estilos.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
+import { AVANCADO_PADRAO, cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais, normalizarAvancado } from '../core/athenes_estilo_avancado.js';
+
+const LBL = 'font:700 11.5px var(--glx-font); color:#334155; display:flex; flex-direction:column; gap:3px;';
+const CHK = 'font-size:12px; font-weight:700; color:#334155;';
+const campo = (rot, path, tipo, extra = '') => `<label style="${LBL}">${rot}<input type="${tipo}" class="ath-input" data-av="${path}" ${extra} style="height:30px;${tipo === 'color' ? 'padding:1px;' : ''}"></label>`;
+const marca = (rot, path) => `<label class="rm-chk" style="${CHK}"><input type="checkbox" data-av="${path}"> ${rot}</label>`;
+const grupo = (titulo, ativaPath, corpo) => `<fieldset style="border:1px solid #E2E8F0; border-radius:8px; padding:8px 10px; margin:0; display:flex; flex-direction:column; gap:8px;">
+  <legend style="font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569; padding:0 4px;"><label style="cursor:pointer;"><input type="checkbox" data-av="${ativaPath}"> ${titulo}</label></legend>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px;">${corpo}</div></fieldset>`;
+
+/** Seção "Recuos e decorações" (estilos de parágrafo avançados); os valores vêm de data-av="caminho". */
+function secaoAvancadaHtml() {
+  return `<div id="athModalAvancado" style="display:flex; flex-direction:column; gap:10px;">
+    <span style="font:800 11.5px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569;">Recuos e decorações do parágrafo</span>
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
+      ${campo('1ª linha (mm)', 'recuo_primeira_linha_mm', 'number', 'step="0.5" min="-50" max="100"')}
+      ${campo('Esquerdo (mm)', 'recuo_esquerdo_mm', 'number', 'step="0.5" min="0" max="200"')}
+      ${campo('Direito (mm)', 'recuo_direito_mm', 'number', 'step="0.5" min="0" max="200"')}
+      ${campo('Deslocado (mm)', 'recuo_deslocado_mm', 'number', 'step="0.5" min="0" max="100"')}
+    </div>
+    ${grupo('Barra lateral', 'avancado.barra_lateral.ativa',
+      `<label style="${LBL}">Lado<select class="ath-select" data-av="avancado.barra_lateral.lado" style="height:30px;"><option value="esquerda">Esquerda</option><option value="direita">Direita</option></select></label>
+       ${campo('Largura (pt)', 'avancado.barra_lateral.largura_pt', 'number', 'step="0.5" min="0.5" max="24"')}
+       ${campo('Distância (mm)', 'avancado.barra_lateral.distancia_mm', 'number', 'step="0.5" min="0" max="20"')}
+       ${campo('Cor', 'avancado.barra_lateral.cor', 'color')}
+       <label style="${LBL}">Traço<select class="ath-select" data-av="avancado.barra_lateral.estilo" style="height:30px;"><option value="solida">Sólido</option><option value="tracejada">Tracejado</option><option value="pontilhada">Pontilhado</option></select></label>`)}
+    ${grupo('Fundo do bloco', 'avancado.fundo_bloco.ativo',
+      `${campo('Cor', 'avancado.fundo_bloco.cor', 'color')}${campo('Preenchimento (mm)', 'avancado.fundo_bloco.preenchimento_mm', 'number', 'step="0.5" min="0" max="15"')}`)}
+    ${grupo('Capitular (drop cap)', 'avancado.capitular.ativa',
+      `${campo('Linhas', 'avancado.capitular.linhas', 'number', 'step="1" min="2" max="6"')}${campo('Cor', 'avancado.capitular.cor', 'color')}
+       ${campo('Peso', 'avancado.capitular.peso', 'number', 'step="100" min="100" max="900"')}${campo('Afastamento (mm)', 'avancado.capitular.afastamento_mm', 'number', 'step="0.5" min="0" max="10"')}`)}
+    ${grupo('Palavras iniciais', 'avancado.palavras_iniciais.ativa',
+      `${campo('Quantidade', 'avancado.palavras_iniciais.quantidade', 'number', 'step="1" min="1" max="12"')}${campo('Peso', 'avancado.palavras_iniciais.peso', 'number', 'step="100" min="100" max="900"')}
+       ${campo('Cor', 'avancado.palavras_iniciais.cor', 'color')}${marca('Caixa alta', 'avancado.palavras_iniciais.caixa_alta')}${marca('Itálico', 'avancado.palavras_iniciais.italico')}`)}
+    ${grupo('Primeira linha', 'avancado.primeira_linha.ativa',
+      `${campo('Peso', 'avancado.primeira_linha.peso', 'number', 'step="100" min="100" max="900"')}${campo('Cor', 'avancado.primeira_linha.cor', 'color')}
+       ${campo('Espaç. letras (em)', 'avancado.primeira_linha.espacamento_letras_em', 'number', 'step="0.01" min="-0.1" max="1"')}${marca('Caixa alta', 'avancado.primeira_linha.caixa_alta')}${marca('Itálico', 'avancado.primeira_linha.italico')}`)}
+    ${grupo('Ornamento de fim de texto', 'avancado.ornamento_fim.ativo',
+      `${campo('Glifo', 'avancado.ornamento_fim.glifo', 'text', 'maxlength="3"')}${campo('Cor', 'avancado.ornamento_fim.cor', 'color')}
+       ${campo('Tamanho (em)', 'avancado.ornamento_fim.tamanho_em', 'number', 'step="0.1" min="0.4" max="3"')}${campo('Afastamento (em)', 'avancado.ornamento_fim.afastamento_em', 'number', 'step="0.1" min="0" max="3"')}`)}
+  </div>`;
+}
+
+const lerCaminho = (o, path) => path.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
+function gravarCaminho(o, path, valor) {
+  const ks = path.split('.');
+  const ultimo = ks.pop();
+  const alvo = ks.reduce((x, k) => (x[k] = x[k] && typeof x[k] === 'object' ? x[k] : {}, x[k]), o);
+  alvo[ultimo] = valor;
+}
 
 export class ModalEditorEstilo {
   constructor(documento, estilo, opcoes = {}) {
@@ -26,6 +76,8 @@ export class ModalEditorEstilo {
     if (!this.rascunho.entrelinha) this.rascunho.entrelinha = 1.5;
     if (this.rascunho.espaco_paragrafos_pt === undefined) this.rascunho.espaco_paragrafos_pt = 6;
     if (!this.rascunho.cor) this.rascunho.cor = '#1F2733';
+    this.rascunho.avancado = JSON.parse(JSON.stringify(this.rascunho.avancado || {}));
+    for (const k of Object.keys(AVANCADO_PADRAO)) this.rascunho.avancado[k] = { ...AVANCADO_PADRAO[k], ...(this.rascunho.avancado[k] || {}) };
 
     this.backdrop = null;
     this.montar();
@@ -152,6 +204,8 @@ export class ModalEditorEstilo {
             <input type="checkbox" id="athModalEstiloHifen" ${r.hifenizacao ? 'checked' : ''}> Hifenização (a-b)
           </label>
         </div>
+
+        ${secaoAvancadaHtml()}
       </div>
 
       <div class="ath-modal-rodape" style="display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid #E2E8F0; background:#F8FAFC;">
@@ -163,9 +217,16 @@ export class ModalEditorEstilo {
     this.backdrop.appendChild(modal);
     document.body.appendChild(this.backdrop);
 
+    const previaHtmlBase = modal.querySelector('#athModalEstiloPrevia')?.innerHTML || '';
+    const stPrevia = document.createElement('style');
+    modal.appendChild(stPrevia);
     const atualizarPrevia = () => {
       const prevEl = modal.querySelector('#athModalEstiloPrevia');
       if (prevEl) {
+        const est = { ...this.rascunho, id: '__previa' };
+        stPrevia.textContent = cssAvancadoDosEstilos([est]);
+        prevEl.className = classesAvancadasDoBloco(est);
+        prevEl.innerHTML = aplicarPalavrasIniciais(previaHtmlBase, est);
         prevEl.style.cssText = `min-height:56px; max-height:100px; overflow-y:auto; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; padding:10px 14px; ${estiloParaCss(this.rascunho)}`;
       }
     };
@@ -220,6 +281,22 @@ export class ModalEditorEstilo {
       atualizarPrevia();
     });
 
+    modal.querySelectorAll('[data-av]').forEach(inp => {
+      const path = inp.dataset.av;
+      const atual = lerCaminho(this.rascunho, path);
+      if (inp.type === 'checkbox') inp.checked = !!atual;
+      else if (atual !== undefined && atual !== '') inp.value = atual;
+      else if (inp.type === 'color') inp.value = '#314F79';
+      inp.addEventListener(inp.type === 'checkbox' || inp.tagName === 'SELECT' ? 'change' : 'input', () => {
+        let v;
+        if (inp.type === 'checkbox') v = inp.checked;
+        else if (inp.type === 'number') v = inp.value === '' ? 0 : parseFloat(inp.value);
+        else v = inp.value;
+        gravarCaminho(this.rascunho, path, v);
+        atualizarPrevia();
+      });
+    });
+
     modal.querySelectorAll('[data-alin]').forEach(btn => {
       btn.addEventListener('click', () => {
         modal.querySelectorAll('[data-alin]').forEach(b => b.classList.remove('on'));
@@ -238,7 +315,13 @@ export class ModalEditorEstilo {
     modal.querySelector('#athModalEstiloCancelar').addEventListener('click', fechar);
 
     modal.querySelector('#athModalEstiloSalvar').addEventListener('click', () => {
+      // grava o bloco avançado já saneado; sem nada ativo ele some do estilo
+      const av = normalizarAvancado(this.rascunho.avancado);
+      if (av) this.rascunho.avancado = av; else delete this.rascunho.avancado;
+      if (!this.rascunho.recuo_direito_mm) delete this.rascunho.recuo_direito_mm;
       if (this.estiloOriginal) {
+        if (!av) delete this.estiloOriginal.avancado;
+        if (!this.rascunho.recuo_direito_mm) delete this.estiloOriginal.recuo_direito_mm;
         Object.assign(this.estiloOriginal, this.rascunho);
       }
       this.onSalvar(this.rascunho);

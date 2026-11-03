@@ -17,6 +17,8 @@ import { PainelExportarModal } from './athenes_painel_exportar.js';
 import { ReguasController } from './athenes_reguas.js';
 
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
+import { driveConectado, enviarDocumentoAoDrive, marcarSessaoDriveExpirada } from '../core/athenes_drive_sync.js';
+import { obterConfigGoogleDrive } from '../core/athenes_colaboracao.js';
 
 export class AthenesApp {
   constructor(appContainer) {
@@ -259,9 +261,25 @@ export class AthenesApp {
     new PainelConexoes(corpo, this.documentoAtivo);
   }
 
-  autoSalvar() {
+  /** Com o Drive conectado, o documento sobe (na pasta dele) alguns segundos depois da última alteração. */
+  agendarEnvioDrive() {
+    if (!driveConectado()) return;
+    clearTimeout(this._tDrive);
+    const doc = this.documentoAtivo;
+    this._tDrive = setTimeout(async () => {
+      try {
+        await enviarDocumentoAoDrive(doc, obterConfigGoogleDrive().accessToken);
+        this.autoSalvar({ semDrive: true }); // grava driveFileId/driveFolderId sem reagendar nem mudar dataModificacao
+      } catch (e) {
+        if (e.sessaoExpirada) marcarSessaoDriveExpirada();
+        mostrarAviso(`Não foi possível enviar "${doc.titulo}" ao Google Drive: ${e.message}`);
+      }
+    }, 4000);
+  }
+
+  autoSalvar({ semDrive = false } = {}) {
     if (!this.documentoAtivo) return;
-    this.documentoAtivo.dataModificacao = new Date().toISOString();
+    if (!semDrive) this.documentoAtivo.dataModificacao = new Date().toISOString();
 
     try {
       const salvo = localStorage.getItem('athenes_docs_indice');
@@ -273,6 +291,7 @@ export class AthenesApp {
         lista.unshift(this.documentoAtivo);
       }
       localStorage.setItem('athenes_docs_indice', JSON.stringify(lista));
+      if (!semDrive) this.agendarEnvioDrive();
     } catch (e) {
       // antes falhava em silêncio e o documento voltava sem as alterações ao reabrir
       mostrarAviso(eErroDeCota(e)

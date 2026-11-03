@@ -670,6 +670,13 @@ export function extrairIdPastaDrive(urlOuId) {
   return str;
 }
 
+/** Ids da estrutura criada no Drive (antes eram descartados ao salvar a configuração e a estrutura se perdia). */
+function idsEstruturaDrive(o) {
+  const r = {};
+  for (const k of ['pastaRaizId', 'pastaDocumentosId', 'pastaZoteroId', 'pastaRelatoriosId']) if (o?.[k]) r[k] = o[k];
+  return r;
+}
+
 export function obterConfigGoogleDrive() {
   const pastaUrlPadrao = 'https://drive.google.com/drive/folders/1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv?usp=drive_link';
   const pastaIdPadrao = '1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv';
@@ -684,7 +691,8 @@ export function obterConfigGoogleDrive() {
           apiKey: parsed.apiKey || '',
           accessToken: parsed.accessToken || '',
           pastaUrl,
-          pastaId: parsed.pastaId || extrairIdPastaDrive(pastaUrl) || pastaIdPadrao
+          pastaId: parsed.pastaId || extrairIdPastaDrive(pastaUrl) || pastaIdPadrao,
+          ...idsEstruturaDrive(parsed)
         };
       }
     }
@@ -705,7 +713,8 @@ export function salvarConfigGoogleDrive(cfg) {
     apiKey: cfg?.apiKey || '',
     accessToken: cfg?.accessToken || '',
     pastaUrl,
-    pastaId: cfg?.pastaId || extrairIdPastaDrive(pastaUrl)
+    pastaId: cfg?.pastaId || extrairIdPastaDrive(pastaUrl),
+    ...idsEstruturaDrive(cfg)
   };
   try {
     if (typeof localStorage !== 'undefined') {

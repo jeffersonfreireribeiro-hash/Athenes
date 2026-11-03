@@ -51,6 +51,7 @@ import {
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { hifenizarHtml, removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
+import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais, removerPalavrasIniciais } from '../core/athenes_estilo_avancado.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 import { construirTabelaDom, instalarSelecaoCelulas, abrirPopoverEstiloTabela } from './athenes_tabela_ui.js';
@@ -2183,7 +2184,7 @@ export class EditorView {
     }
     const nota = criarNotaRodape(this.doc, '');
     document.execCommand('insertHTML', false, htmlMarcadorNota(nota.id));
-    b.texto = removerHifensCondicionais(alvo.innerHTML);
+    b.texto = removerPalavrasIniciais(removerHifensCondicionais(alvo.innerHTML));
     this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
     this.notificarMudanca();
     this.renderizarFolhasPaginas();
@@ -2216,7 +2217,7 @@ export class EditorView {
       perfil: () => this.perfilColaborador,
       ativo: () => this.modoTrabalho === MODOS_TRABALHO.SUGESTAO,
       aoAlterar: () => {
-        b.texto = removerHifensCondicionais(elemento.innerHTML);
+        b.texto = removerPalavrasIniciais(removerHifensCondicionais(elemento.innerHTML));
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida();
       }
@@ -2410,6 +2411,11 @@ export class EditorView {
     if (modoSomenteLeitura(this.modoTrabalho)) { this.renderizarVisaoRevisao(palco); return; }
     palco.classList.remove('ath-palco-revisao');
     palco.innerHTML = '';
+    // regras de pseudo-elementos dos estilos avançados (capitular, 1ª linha, ornamento de fim)
+    let stAv = document.getElementById('athEstiloAvancado');
+    if (!stAv) { stAv = document.createElement('style'); stAv.id = 'athEstiloAvancado'; document.head.appendChild(stAv); }
+    const cssAv = cssAvancadoDosEstilos(this.doc.estilos);
+    if (stAv.textContent !== cssAv) stAv.textContent = cssAv;
 
     repaginarDocumento(this.doc);
     recalcularNumeracaoAutomatica(this.doc);
@@ -2975,6 +2981,8 @@ export class EditorView {
       const p = document.createElement('div');
       p.contentEditable = ehSomenteLeitura ? 'false' : 'true';
       p.className = 'ath-texto-editable';
+      const classesAv = classesAvancadasDoBloco(estiloMesclado, b._frag);
+      if (classesAv) p.className += ` ${classesAv}`;
       p.setAttribute('lang', 'pt-BR');
       const hifAtivoP = Boolean(estiloMesclado.hifenizacao);
       p.style.cssText = `${cssEstilo}; outline:none;`;
@@ -2988,14 +2996,16 @@ export class EditorView {
         }
       }
 
-      p.innerHTML = aplicarRotulosNotasHtml(resolverReferenciasCruzadas(hifAtivoP ? hifenizarHtml(conteudoHtml) : removerHifensCondicionais(conteudoHtml), this.doc), pag?.rotulosNotas);
+      let htmlP = aplicarRotulosNotasHtml(resolverReferenciasCruzadas(hifAtivoP ? hifenizarHtml(conteudoHtml) : removerHifensCondicionais(conteudoHtml), this.doc), pag?.rotulosNotas);
+      if (classesAv && !b._frag?.continuaDaAnterior && b.texto) htmlP = aplicarPalavrasIniciais(htmlP, estiloMesclado);
+      p.innerHTML = htmlP;
       this.aplicarConfigListaNoBloco(p, b);
 
       // Modo Sugestão (estilo Google Docs): digitar/colar vira inserção, apagar vira exclusão tachada (sem alterar a base)
       this.instalarSugestaoNoBloco(p, b);
 
       p.addEventListener('input', () => {
-        b.texto = p.innerHTML;
+        b.texto = removerPalavrasIniciais(p.innerHTML); // o destaque de palavras iniciais é só de exibição
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
       });
 
@@ -3018,7 +3028,7 @@ export class EditorView {
               const divDepois = document.createElement('div');
               divDepois.appendChild(rangeDepois.cloneContents());
 
-              this.dividirBlocoAtual(b.id, { textoAntes: divAntes.innerHTML, textoDepois: divDepois.innerHTML });
+              this.dividirBlocoAtual(b.id, { textoAntes: removerPalavrasIniciais(divAntes.innerHTML), textoDepois: removerPalavrasIniciais(divDepois.innerHTML) });
             } else {
               this.dividirBlocoAtual(b.id);
             }
@@ -3049,7 +3059,7 @@ export class EditorView {
         }
       });
       p.addEventListener('blur', () => {
-        b.texto = p.innerHTML;
+        b.texto = removerPalavrasIniciais(p.innerHTML);
         this.notificarMudancaRapida();
       });
       el.appendChild(p);
@@ -3939,7 +3949,7 @@ export class EditorView {
 
       const bId = this.blocoSelecionado?.id;
       if (bId) {
-        this.dividirBlocoAtual(bId, { textoAntes: divAntes.innerHTML, textoDepois: divDepois.innerHTML });
+        this.dividirBlocoAtual(bId, { textoAntes: removerPalavrasIniciais(divAntes.innerHTML), textoDepois: removerPalavrasIniciais(divDepois.innerHTML) });
       }
     };
 

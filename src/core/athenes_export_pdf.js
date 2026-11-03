@@ -13,6 +13,7 @@ import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssTipografia, estiloParaCssNumeracao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
 import { hifenizarHtml } from './athenes_hifenizacao.js';
+import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais } from './athenes_estilo_avancado.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
 import { geometriaCorpoMm, resolverAreasPagina } from './athenes_paginacao.js';
 import { obterConfigNotas, aplicarRotulosNotasHtml, sanitizarHtmlNota } from './athenes_notas_rodape.js';
@@ -146,8 +147,11 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
     case 'subtitulo':
       return `<div class="ath-bloco ath-subtitulo" style="${estiloCss}" data-id="${bloco.id}">${textoFormatado}</div>`;
 
-    case 'paragrafo':
-      return `<p class="ath-bloco ath-paragrafo" style="${estiloCss}" data-id="${bloco.id}">${textoFormatado}</p>`;
+    case 'paragrafo': {
+      const av = classesAvancadasDoBloco(est, bloco._frag);
+      const texto = av && !bloco._frag?.continuaDaAnterior ? aplicarPalavrasIniciais(textoFormatado, est) : textoFormatado;
+      return `<p class="ath-bloco ath-paragrafo${av ? ' ' + av : ''}" style="${estiloCss}" data-id="${bloco.id}">${texto}</p>`;
+    }
 
     case 'citacao': {
       const estCitacao = estilosMap.citacao_direta || est;
@@ -519,6 +523,7 @@ return `<section class="ath-pagina" style="position:relative; width:${largura_mm
 
     sup.ath-nota-ref { font-weight: 700; }
     ${cssFontesImportadas(documento)}
+    ${cssAvancadoDosEstilos(documento.estilos)}
     ${opcoes.cssExtra || ''}
 
     @media print {

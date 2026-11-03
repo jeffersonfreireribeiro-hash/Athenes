@@ -8,6 +8,7 @@
  * - Prompt mestre com 1 clique para extração via IA (ChatGPT / Claude / Gemini)
  */
 
+import { listarTemplatesUsuario } from '../core/athenes_templates.js';
 import { importarArquivoDeFonte, excluirFonteImportada } from './athenes_fontes_ui.js';
 import { listarFontesImportadas, nomeSugerido } from '../core/athenes_fontes.js';
 import { FONTES_SISTEMA as FONTES } from '../core/athenes_estilos.js';
@@ -138,7 +139,7 @@ export class ModalCentralEstilos {
      ABA 1: EXPORTAR ESTILO ATUAL
      ========================================================================== */
   renderizarAbaExportar(corpo) {
-    const pacote = exportarPacoteEstilo(this.doc);
+    const pacote = exportarPacoteEstilo(this.doc, { templates: listarTemplatesUsuario() });
     const qtdEstilos = pacote.estilos.length;
     const qtdMestras = pacote.mestras.length;
     const jsonString = JSON.stringify(pacote, null, 2);
@@ -209,7 +210,7 @@ export class ModalCentralEstilos {
     const getPacoteAtualizado = () => {
       const nome = corpo.querySelector('#athExportNome')?.value?.trim();
       const autor = corpo.querySelector('#athExportAutor')?.value?.trim();
-      return exportarPacoteEstilo(this.doc, { nome, autor });
+      return exportarPacoteEstilo(this.doc, { nome, autor, templates: listarTemplatesUsuario() }); // Meus templates viajam com o tema
     };
 
     // Baixar arquivo
@@ -377,12 +378,13 @@ export class ModalCentralEstilos {
       try {
         // banners e logos do tema entram reduzidos: a imagem original de um tema lotava o armazenamento local
         await comprimirImagensDoPacote(this.pacoteValidado);
-        const resultado = aplicarPacoteEstilo(this.doc, this.pacoteValidado, { aplicarNosBlocosExistentes: propagar });
+        const resultado = aplicarPacoteEstilo(this.doc, this.pacoteValidado, { aplicarNosBlocosExistentes: propagar, storage: globalThis.localStorage });
         this.editor?.notificarMudanca?.();
         this.editor?.renderizar?.();
         this.onSucesso(resultado);
 
-        alert(`✓ Estilo "${resultado.temaNome}" aplicado com sucesso!\n${resultado.estilosQtd} estilos de texto e ${resultado.mestrasQtd} páginas mestras atualizados.`);
+        alert(`✓ Estilo "${resultado.temaNome}" aplicado com sucesso!\n${resultado.estilosQtd} estilos de texto e ${resultado.mestrasQtd} páginas mestras atualizados.${resultado.templatesImportados ? `
+${resultado.templatesImportados} template(s) adicionados em Meus templates.` : ''}`);
         this.backdrop.remove();
       } catch (err) {
         alert('Falha ao aplicar estilo: ' + err.message);

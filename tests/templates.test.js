@@ -72,3 +72,28 @@ test('Meus Templates: salvar, listar, remover e importar de arquivo', () => {
   assert.doesNotMatch(JSON.stringify(arq), /segredo do autor/);
   assert.throws(() => templateDeArquivoJson({ a: 1 }));
 });
+
+test('tema: Meus templates viajam no pacote athenes-tema-v1 e voltam saneados', async () => {
+  const { exportarPacoteEstilo, validarPacoteEstilo, aplicarPacoteEstilo } = await import('../src/core/athenes_pacote_estilo.js');
+  const { importarTemplatesDoPacote } = await import('../src/core/athenes_templates.js');
+  const st = memoria();
+  const d = criarDocumento({ titulo: 'Base' });
+  d.estilos.find(e => e.id === 'corpo').avancado = { capitular: { ativa: true, linhas: 99 } };
+  const t = salvarComoTemplate(d, { nome: 'Do tema', categoria: 'academic' }, st);
+  const pacote = exportarPacoteEstilo(d, { templates: listarTemplatesUsuario(st) });
+  assert.equal(pacote.templates.length, 1);
+  assert.equal(exportarPacoteEstilo(d).templates, undefined, 'sem templates, o campo não aparece');
+  const json = JSON.parse(JSON.stringify(pacote));
+  json.templates.push({ titulo: 'quebrado' }, { titulo: 'x', config: { estilos: [], mestras: [] } });
+  const v = validarPacoteEstilo(json);
+  assert.ok(v.valido, v.erro);
+  assert.equal(v.pacote.templates.length, 1, 'inválidos são descartados');
+  assert.equal(v.pacote.templates[0].config.estilos.find(e => e.id === 'corpo').avancado.capitular.linhas, 6, 'estilo avançado saneado');
+  const destino = memoria();
+  const r = aplicarPacoteEstilo(criarDocumento({ titulo: 'Outro' }), v.pacote, { storage: destino });
+  assert.equal(r.templatesImportados, 1);
+  assert.equal(listarTemplatesUsuario(destino)[0].titulo, 'Do tema');
+  assert.equal(importarTemplatesDoPacote(v.pacote.templates, destino), 0, 'importar de novo não duplica');
+  assert.equal(aplicarPacoteEstilo(criarDocumento({ titulo: 'Sem storage' }), v.pacote).templatesImportados, 0);
+  void t;
+});

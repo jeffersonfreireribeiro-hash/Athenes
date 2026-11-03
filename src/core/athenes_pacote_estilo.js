@@ -9,6 +9,8 @@
  */
 
 import { criarEstilosPadrao, FONTES_SISTEMA } from './athenes_estilos.js';
+import { sanitizarEstiloAvancado } from './athenes_estilo_avancado.js';
+import { templatesParaPacote, importarTemplatesDoPacote } from './athenes_templates.js';
 import { criarModelosPaginaPadrao, MODOS_APLICACAO_MESTRA, SEPARADORES_LEGENDA } from './athenes_documento.js';
 import { sanitizarNumeracao } from './athenes_paginacao.js';
 import { normalizarConfigSumario, normalizarNumeracaoSecoes } from './athenes_sumario.js';
@@ -81,7 +83,9 @@ export function exportarPacoteEstilo(documento, opcoes = {}) {
     estilos: estilos,
     mestras: mestras,
     modelos_blocos: modelosBlocos,
-    layout_padrao_figuras: layoutPadraoBlocos
+    layout_padrao_figuras: layoutPadraoBlocos,
+    // templates de documento (Meus templates) que acompanham o tema
+    ...(Array.isArray(opcoes.templates) && opcoes.templates.length ? { templates: templatesParaPacote(opcoes.templates) } : {})
   };
 
   return pacote;
@@ -244,10 +248,11 @@ export function validarPacoteEstilo(conteudo) {
       ...(Array.isArray(obj.configuracaoGlobal?.atribuicoes_mestra)
         ? { atribuicoes_mestra: normalizarRegrasMestra(obj.configuracaoGlobal.atribuicoes_mestra) } : {})
     },
-    estilos: obj.estilos,
+    estilos: obj.estilos.map(sanitizarEstiloAvancado),
     mestras: (Array.isArray(obj.mestras) && obj.mestras.length > 0 ? obj.mestras : criarModelosPaginaPadrao('abnt')).map(m => normalizarMestraCanvas(m)),
     modelos_blocos: Array.isArray(obj.modelos_blocos) ? obj.modelos_blocos : [],
-    layout_padrao_figuras: obj.layout_padrao_figuras || {}
+    layout_padrao_figuras: obj.layout_padrao_figuras || {},
+    ...(Array.isArray(obj.templates) ? { templates: templatesParaPacote(obj.templates) } : {})
   };
 
   // Sanitiza o estilo declarativo de tabelas/quadros (cores hex, larguras, enums) vindo de JSON externo/IA
@@ -364,10 +369,14 @@ export function aplicarPacoteEstilo(documento, pacote, opcoes = {}) {
     }
   }
 
+  // 6. Templates do pacote entram em "Meus templates" (quando o chamador informa o armazenamento)
+  const templatesImportados = opcoes.storage && p.templates?.length ? importarTemplatesDoPacote(p.templates, opcoes.storage) : 0;
+
   documento.dataModificacao = new Date().toISOString();
 
   return {
     sucesso: true,
+    templatesImportados,
     temaNome: p.metadados.nome,
     estilosQtd: documento.estilos.length,
     mestrasQtd: documento.mestras.length,
@@ -389,6 +398,18 @@ INSTRUÇÕES DE ANÁLISE:
    - Identifique os tamanhos em pontos (pt), pesos numéricos (300, 400, 600, 700, 800), cores hexadecimais (#1F2733, #314F79, etc.), itálico, sublinhado e caixa alta.
    - Identifique os alinhamentos ("esquerda", "centro", "direita", "justificado_esquerda", "justificado", "justificado_centro", "justificado_direita").
    - Identifique entrelinha (ex: 1.0 simples, 1.25, 1.5), espaçamento antes/depois do bloco em pt, e recuo da 1ª linha em mm (ex: 12.5mm ABNT, ou 0mm).
+   - Identifique também recuos persistentes do parágrafo: "recuo_esquerdo_mm", "recuo_direito_mm" (mm) e "recuo_deslocado_mm" (recuo francês/hanging).
+   - ESTILOS DE PARÁGRAFO AVANÇADOS (opcional, só quando o documento realmente os usa): adicione ao estilo o objeto "avancado" com apenas os grupos presentes:
+     "avancado": {
+       "barra_lateral": { "ativa": true, "lado": "esquerda"|"direita", "largura_pt": 0.5-24, "cor": "#hex", "distancia_mm": 0-20, "estilo": "solida"|"tracejada"|"pontilhada" },   // faixa vertical ao lado de citações/destaques
+       "fundo_bloco": { "ativo": true, "cor": "#hex", "preenchimento_mm": 0-15 },   // caixa de fundo atrás do parágrafo
+       "capitular": { "ativa": true, "linhas": 2-6, "cor": "#hex", "peso": 100-900, "afastamento_mm": 0-10 },   // letra capitular (drop cap) da 1ª letra
+       "palavras_iniciais": { "ativa": true, "quantidade": 1-12, "peso": 100-900, "cor": "#hex" ou "", "caixa_alta": false, "italico": false },   // primeiras palavras destacadas
+       "primeira_linha": { "ativa": true, "peso": 100-900, "cor": "#hex" ou "", "caixa_alta": false, "italico": false, "espacamento_letras_em": 0 },
+       "ornamento_fim": { "ativo": true, "glifo": "■" (até 3 caracteres), "cor": "#hex", "tamanho_em": 0.4-3, "afastamento_em": 0-3 }   // marca ao fim do texto (ex.: ■, ◆, ❦)
+     }
+     Não invente grupos que não aparecem no documento; omita "avancado" nos estilos comuns.
+   - TEMPLATES (opcional): se o documento for um modelo reutilizável, o pacote pode incluir "templates": [ { "id", "titulo", "descricao", "categoria": "academic"|"report"|"user_custom", "perfil", "tipoDoc", "config": { "pagina", "mestras": [...], "estilos": [...] (mesmo formato de "estilos"/"mestras" acima) }, "secoes": [ { "nome", "mestraId", "blocos": [] } ] } ]. Cada template inclui só o esqueleto (estilos, mestras e seções vazias).
    - Mapeie obrigatoriamente os seguintes estilos essenciais:
      * titulo1: Seção primária (ex: 14pt, peso 800, caixa alta, cor primária)
      * titulo2: Seção secundária (ex: 12pt, peso 700, cor primária)

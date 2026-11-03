@@ -4,6 +4,8 @@
  * Inspiração: Controles tipográficos do Affinity Publisher e InDesign adaptados para a Web.
  */
 
+import { cssAvancadoInline } from './athenes_estilo_avancado.js';
+
 // Não congelado: as fontes importadas pelo usuário entram aqui em tempo de execução (athenes_fontes.js)
 export const FONTES_SISTEMA = {
   nunito: {
@@ -671,6 +673,10 @@ export function estiloParaCss(estilo, fontesDisponiveis = FONTES_SISTEMA) {
   if (estilo.manter_com_proximo) {
     props.push('break-after: avoid; page-break-after: avoid;');
   }
+
+  // Recuo direito, barra lateral e fundo de bloco (estilos de parágrafo avançados)
+  const avancado = cssAvancadoInline(estilo);
+  if (avancado) props.push(avancado);
 
   return props.join(' ');
 }

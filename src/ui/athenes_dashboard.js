@@ -37,6 +37,7 @@ import { svgIcone, svgLogo } from './athenes_icones.js';
 import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal } from './athenes_novo_documento_modal.js';
+import { driveConectado, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -364,14 +365,9 @@ export class DashboardView {
     });
 
     root.querySelector('#athBtnRecarregarPastasDrive')?.addEventListener('click', async () => {
-      const driveCfg = obterConfigGoogleDrive();
       const btn = root.querySelector('#athBtnRecarregarPastasDrive');
       if (btn) btn.textContent = '...';
-      if (driveCfg.accessToken) {
-        try {
-          await obterOuCriarEstruturaPastasAthenes(driveCfg.accessToken);
-        } catch (_) {}
-      }
+      await this.sincronizarComDrive({ aviso: true });
       this.pastasDrive = obterPastasDriveLocais();
       if (btn) btn.textContent = '✓';
       setTimeout(() => { if (btn) btn.textContent = '↻'; }, 900);
@@ -970,19 +966,38 @@ export class DashboardView {
         tipo: pastaMae?.tipo || (this.abaAtiva === 'artigos_zotero' ? 'bibliografia' : 'relatorios')
       });
 
-      const driveCfg = obterConfigGoogleDrive();
-      if (driveCfg.accessToken) {
-        criarSubpastaNoGoogleDrive({
-          accessToken: driveCfg.accessToken,
-          nome,
-          parentFolderId: parentId.startsWith('pasta_') ? driveCfg.pastaId : parentId
-        }).catch(err => console.warn('[Athenes] Subpasta criada localmente; aviso sincronia Drive:', err));
-      }
-
-      this.pastasDrive = obterPastasDriveLocais();
       fechar();
+      // cria no Drive sob a pasta-mãe correspondente e guarda o driveId (falhas aparecem como aviso)
+      await this.sincronizarComDrive({ aviso: false, docs: false });
+      this.pastasDrive = obterPastasDriveLocais();
       this.selecionarPasta(novaSub.id);
     });
+  }
+
+  /**
+   * Cria no Google Drive as pastas que só existem aqui e envia os documentos pendentes (cada um na pasta dele).
+   * `aviso` mostra o resultado mesmo quando deu certo; erros sempre aparecem.
+   */
+  async sincronizarComDrive({ aviso = true, docs = true } = {}) {
+    if (!driveConectado()) {
+      if (aviso) mostrarAviso('Conecte o Google Drive para criar as pastas e enviar os documentos (menu da nuvem no editor ou tela de login).', { tipo: 'info' });
+      return null;
+    }
+    const token = obterConfigGoogleDrive().accessToken;
+    const pastas = obterPastasDriveLocais();
+    const rp = await sincronizarPastasComDrive(token, { pastas });
+    const rd = docs && !rp.sessaoExpirada ? await sincronizarDocumentosComDrive(this.documentos, token, { pastas }) : { enviados: 0, erros: [], sessaoExpirada: false };
+    this.salvarDocumentosLocais();
+    if (rp.sessaoExpirada || rd.sessaoExpirada) {
+      marcarSessaoDriveExpirada();
+      mostrarAviso('A sessão do Google Drive expirou. Reconecte o Drive e tente de novo.');
+    } else if (rp.erros.length || rd.erros.length) {
+      const primeiro = rp.erros[0] ? `${rp.erros[0].pasta}: ${rp.erros[0].erro}` : `${rd.erros[0].documento}: ${rd.erros[0].erro}`;
+      mostrarAviso(`Drive: ${rp.criadas} pasta(s) criada(s), ${rd.enviados} documento(s) enviado(s), ${rp.erros.length + rd.erros.length} falha(s). ${primeiro}`);
+    } else if (aviso) {
+      mostrarAviso(`Drive sincronizado: ${rp.criadas} pasta(s) criada(s), ${rd.enviados} documento(s) enviado(s).`, { tipo: 'info' });
+    }
+    return { rp, rd };
   }
 
   abrirModalVincularPasta() {
@@ -1197,6 +1212,7 @@ export class DashboardView {
           this.atualizarGrid();
         }
         this.onAbrirDocumento(novo);
+        this.sincronizarComDrive({ aviso: false }); // sobe a pasta (se nova) e o documento, sem bloquear a abertura
       }
     });
   }

@@ -12,6 +12,7 @@
 import { criarDocumento, criarModelosPaginaPadrao, criarNovoBloco, criarSecao, gerarId } from './athenes_documento.js';
 import { criarEstilosPadrao } from './athenes_estilos.js';
 import { clonarComNovosIds } from './athenes_arquivos.js';
+import { sanitizarEstiloAvancado } from './athenes_estilo_avancado.js';
 
 export const CATEGORIAS_TEMPLATE = ['academic', 'report', 'user_custom'];
 export const ROTULO_CATEGORIA = { academic: 'Acadêmico', report: 'Relatório', user_custom: 'Meu template' };
@@ -212,4 +213,47 @@ export function miniaturaSvg(template, largura = 120) {
   const rod = m.rodape?.ativo ? `<rect x="${(x + iw / 2 - 3).toFixed(1)}" y="${(alt - mg.b * k * 0.5).toFixed(1)}" width="6" height="1.6" rx=".8" fill="#94A3B8"/>` : '';
   const fotos = (m.elementos_recorrentes || []).filter(e => e.tipo === 'foto_capa' || e.tipo === 'forma').map(e => `<rect x="${((e.x_mm || 0) * k).toFixed(1)}" y="${((e.y_mm || 0) * k).toFixed(1)}" width="${((e.largura_mm || 30) * k).toFixed(1)}" height="${((e.altura_mm || 20) * k).toFixed(1)}" fill="#BFDBFE"/>`).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largura} ${alt}" width="${largura}" height="${alt}"><rect width="${largura}" height="${alt}" fill="#fff" stroke="#E2E8F0"/>${fotos}<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${iw.toFixed(1)}" height="${ih.toFixed(1)}" fill="none" stroke="#CBD5E1" stroke-dasharray="2 2" stroke-width=".5"/>${cab}${g}${rod}</svg>`;
+}
+
+// ---------------------------------------------------------------- templates no pacote de tema
+
+const LIMITE_TEMPLATES_PACOTE = 50;
+
+/** Valida e sanea um template vindo de JSON externo/IA. Devolve null quando inválido. */
+export function sanitizarTemplate(t) {
+  if (!t || typeof t !== 'object' || typeof t.titulo !== 'string' || !t.titulo.trim()) return null;
+  const cfg = t.config;
+  if (!cfg || typeof cfg !== 'object' || !Array.isArray(cfg.estilos) || !cfg.estilos.length || !Array.isArray(cfg.mestras) || !cfg.mestras.length) return null;
+  let limpo;
+  try { limpo = JSON.parse(JSON.stringify(t)); } catch { return null; }
+  limpo.titulo = limpo.titulo.trim().slice(0, 120);
+  limpo.descricao = typeof limpo.descricao === 'string' ? limpo.descricao.slice(0, 400) : '';
+  limpo.categoria = CATEGORIAS_TEMPLATE.includes(limpo.categoria) ? limpo.categoria : 'user_custom';
+  limpo.id = typeof limpo.id === 'string' && /^[\w-]{1,80}$/.test(limpo.id) ? limpo.id : gerarId('tpl');
+  limpo.config.estilos = limpo.config.estilos.filter(e => e && typeof e.id === 'string').map(sanitizarEstiloAvancado);
+  limpo.config.mestras = limpo.config.mestras.filter(m => m && typeof m.id === 'string');
+  if (!limpo.config.mestras.length || !limpo.config.estilos.length) return null;
+  limpo.secoes = (Array.isArray(limpo.secoes) ? limpo.secoes : []).filter(s => s && typeof s === 'object').map(s => ({
+    nome: String(s.nome || 'Seção').slice(0, 120), mestraId: String(s.mestraId || limpo.config.mestras[0].id), blocos: Array.isArray(s.blocos) ? s.blocos : []
+  }));
+  delete limpo.nativo;
+  return limpo;
+}
+
+/** Templates do usuário prontos para o pacote de tema (só os saneados, até o limite). */
+export function templatesParaPacote(lista) {
+  return (Array.isArray(lista) ? lista : []).map(sanitizarTemplate).filter(Boolean).slice(0, LIMITE_TEMPLATES_PACOTE);
+}
+
+/** Importa os templates de um pacote para "Meus templates"; ids repetidos viram cópias novas. Devolve quantos entraram. */
+export function importarTemplatesDoPacote(lista, storage = globalThis.localStorage) {
+  const novos = templatesParaPacote(lista);
+  if (!novos.length) return 0;
+  const atuais = listarTemplatesUsuario(storage);
+  const ids = new Set(atuais.map(t => t.id));
+  const titulos = new Set(atuais.map(t => t.titulo));
+  const entram = novos.filter(t => !ids.has(t.id) || !titulos.has(t.titulo)).map(t => ({ ...t, id: ids.has(t.id) ? gerarId('tpl') : t.id, criadoEm: new Date().toISOString() }));
+  if (!entram.length) return 0;
+  gravar([...entram, ...atuais], storage);
+  return entram.length;
 }
