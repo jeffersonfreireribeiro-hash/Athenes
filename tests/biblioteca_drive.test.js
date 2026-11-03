@@ -156,3 +156,15 @@ test('a pasta do Athenes no Drive é fixa: sempre a raiz, mesmo que alguém tent
   const cfg = obterConfigGoogleDrive();
   assert.deepEqual([cfg.pastaId, cfg.pastaUrl], ['RAIZ', 'https://drive.google.com/drive/folders/RAIZ']);
 });
+
+test('documento movido de pasta em outro computador segue o Drive, mas mudança local pendente não é desfeita', () => {
+  const mapa = { F1: 'pasta_rel_raiz', F11: 'drive_F11' };
+  // aqui o documento ainda está na pasta antiga e não há mudança pendente: segue o Drive
+  const a = [{ id: 'a', driveFileId: 'x', driveFolderId: 'F1', pastaId: 'pasta_rel_raiz', driveSincronizadoEm: '2026-11-01T00:00:00Z', dataModificacao: '2026-11-01T00:00:00Z' }];
+  mesclarBibliotecaDrive(a, [{ driveFileId: 'x', titulo: 'A', modificadoEm: '2026-11-01T00:00:00Z', driveFolderId: 'F11' }], mapa);
+  assert.deepEqual([a[0].pastaId, a[0].driveFolderId], ['drive_F11', 'F11']);
+  // aqui o usuário já moveu o documento para outra pasta e ainda não enviou: mantém a escolha local
+  const b = [{ id: 'b', driveFileId: 'y', driveFolderId: 'F1', pastaId: 'minha_outra_pasta', driveSincronizadoEm: '2026-11-01T00:00:00Z', dataModificacao: '2026-11-02T00:00:00Z' }];
+  mesclarBibliotecaDrive(b, [{ driveFileId: 'y', titulo: 'B', modificadoEm: '2026-11-01T00:00:00Z', driveFolderId: 'F11' }], mapa);
+  assert.equal(b[0].pastaId, 'minha_outra_pasta');
+});

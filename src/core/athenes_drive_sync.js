@@ -264,6 +264,12 @@ export function mesclarBibliotecaDrive(documentos, arquivos, mapaPastas = {}) {
         ...(f.driveFolderId ? { driveFolderId: f.driveFolderId } : {}), ...(mapaPastas[f.driveFolderId] ? { pastaId: mapaPastas[f.driveFolderId] } : {})
       });
       r.novos++;
+    } else if (f.driveFolderId && mapaPastas[f.driveFolderId] && f.driveFolderId !== local.driveFolderId
+      && (!local.pastaId || local.pastaId === mapaPastas[local.driveFolderId] || !mapaPastas[local.driveFolderId])) {
+      // o arquivo está noutra pasta do Drive (foi movido em outro computador) e aqui não há mudança de pasta pendente: segue o Drive
+      local.pastaId = mapaPastas[f.driveFolderId];
+      local.driveFolderId = f.driveFolderId;
+      r.atualizados++;
     } else if (!local.pastaId && mapaPastas[f.driveFolderId]) {
       local.pastaId = mapaPastas[f.driveFolderId]; // documento já importado antes, agora na pasta certa
       r.atualizados++;

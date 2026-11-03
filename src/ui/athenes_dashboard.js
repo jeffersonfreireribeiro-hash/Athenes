@@ -1356,6 +1356,11 @@ export class DashboardView {
         this.salvarDocumentosLocais();
         this.atualizarGrid();
       }
+      // por fim, o caminho de volta: cria no Drive (dentro da raiz Athenes) as pastas que só existem aqui e envia/move os documentos,
+      // para a estrutura ficar guardada no Drive e igual nos outros computadores
+      let envio = null;
+      try { envio = await this.sincronizarComDrive({ aviso: false }); } catch (e) { console.warn('[Athenes] Envio ao Drive:', e.message); }
+      if (envio?.rp?.criadas || envio?.rd?.enviados) { this.atualizarGrid(); }
       if (!silencioso) {
         alert(r.novos || r.atualizados
           ? `${zotero === 'baixou' ? 'Zotero conectado trazido do seu Drive. ' : ''}${r.novos} documento(s) novo(s) e ${r.atualizados} atualizado(s)${pastasNovas.importadas ? `, ${pastasNovas.importadas} pasta(s) trazida(s)` : ''} vindos do seu Google Drive.`
