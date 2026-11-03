@@ -19,6 +19,7 @@ export function templateDeTema(obj, nomeArquivo = '') {
   if (g.numeracao_secoes) config.numeracao_secoes = g.numeracao_secoes;
   if (g.notas_rodape) config.notas_config = g.notas_rodape;
   if (g.separador_legenda) config.separador_legenda = g.separador_legenda;
+  if (g.formato_numero_formula) config.formato_numero_formula = g.formato_numero_formula;
   if (g.sumario) config.sumario_config_padrao = g.sumario;
   if (g.paginacao) config.paginacao = g.paginacao;
   if (g.atribuicoes_mestra) config.atribuicoes_mestra = g.atribuicoes_mestra;

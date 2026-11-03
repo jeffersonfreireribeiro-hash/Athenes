@@ -20,6 +20,8 @@ import {
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
 import { htmlMarcadoresBloco, ligarMarcadoresBloco } from './athenes_marcadores_ui.js';
+import { latexDaEntrada, latexParaHtml } from '../core/athenes_formula.js';
+import { FORMATOS_NUMERO_FORMULA, idFormatoNumeroFormula } from '../core/athenes_documento.js';
 import { estiloIdDoTitulo } from '../core/athenes_sumario.js';
 import { montarPainelSumario } from './athenes_sumario_painel.js';
 import { NIVEL_MAX, nivelDe, blocoNumerado, normalizarNumeracaoSecoes, REGEX_NUMERO_MANUAL } from '../core/athenes_sumario.js';
@@ -1440,19 +1442,27 @@ export class PainelPropriedades {
           </button>
         </div>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <label style="font-weight:700; margin:0;">Expressão Matemática (LaTeX)</label>
-          <span style="font-size:10.5px; color:var(--glx-muted);">Símbolos e Operadores Especiais</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; gap:8px;">
+          <label style="font-weight:700; margin:0;">Expressão matemática</label>
+          <select id="rmFormulaSintaxe" class="glx-select" style="width:auto; height:26px; font-size:11px;" title="Como a expressão é escrita">
+            <option value="latex" ${b.formula_sintaxe !== 'matlab' ? 'selected' : ''}>Escrever em LaTeX</option>
+            <option value="matlab" ${b.formula_sintaxe === 'matlab' ? 'selected' : ''}>Escrever em MATLAB</option>
+          </select>
         </div>
 
         <!-- Seletor Rico de Símbolos Especiais Matemáticos e Lógicos -->
         <div id="athBoxPaletaSimbolosMat"></div>
 
-        <textarea id="rmFormulaLatex" rows="3" style="font-family:var(--glx-font-mono); font-size:12px;" placeholder="Ex: E = m \\cdot c^2">${escapeHtml(b.latex || b.formula || '')}</textarea>
+        <textarea id="rmFormulaLatex" rows="3" style="font-family:var(--glx-font-mono); font-size:12px;" placeholder="${b.formula_sintaxe === 'matlab' ? 'Ex: x = (-b + sqrt(b^2 - 4*a*c)) / (2*a)' : 'Ex: E = m \\cdot c^2'}">${escapeHtml(b.formula_sintaxe === 'matlab' ? (b.formula_matlab || '') : (b.latex || b.formula || ''))}</textarea>
+        <div id="rmFormulaPrevia" style="margin-top:4px; padding:6px 8px; border:1px dashed #CBD5E1; border-radius:6px; font-family:'Cambria Math','Times New Roman',serif; font-size:14px; min-height:20px;">${latexParaHtml(b.latex || b.formula || '')}</div>
+        <small id="rmFormulaErro" style="display:block; color:#DC2626; min-height:14px;"></small>
 
         <div class="rm-linha2" style="margin-top:8px;">
-          <label>Número da Equação
-            <input type="text" id="rmFormulaNum" value="${escapeHtml(b.numero_equacao || b.numero || '(1)')}">
+          <label>Número (automático: ${escapeHtml(b.numero_equacao || '(1)')})
+            <select id="rmFormulaFormato" class="glx-select">
+              <option value="" ${!b.formato_numero ? 'selected' : ''}>Padrão do documento (${FORMATOS_NUMERO_FORMULA.find(x => x.id === idFormatoNumeroFormula(this.doc, null)).exemplo})</option>
+              ${FORMATOS_NUMERO_FORMULA.map(x => `<option value="${x.id}" ${b.formato_numero === x.id ? 'selected' : ''}>${x.rotulo} — ${x.exemplo}</option>`).join('')}
+            </select>
           </label>
           <label>Posição do Número
             <select id="rmFormulaPosNum" class="glx-select">
@@ -1463,6 +1473,7 @@ export class PainelPropriedades {
             </select>
           </label>
         </div>
+        <button type="button" class="glx-btn glx-btn-soft glx-btn-xs" id="rmFormulaFormatoTodos" style="align-self:flex-start; margin-top:4px;">Usar este formato de número em todo o documento</button>
         <label>Legenda Explicativa ("onde:")
           <textarea id="rmFormulaLegenda" rows="2" placeholder="Ex: onde x é o deslocamento e t é o tempo">${escapeHtml(b.legenda_formula || b.legenda || '')}</textarea>
         </label>
@@ -1493,15 +1504,34 @@ export class PainelPropriedades {
           }
         });
       });
-      txtLatex.addEventListener('input', e => {
-        b.latex = e.target.value;
-        b.formula = b.latex;
+      const previa = box.querySelector('#rmFormulaPrevia');
+      const erro = box.querySelector('#rmFormulaErro');
+      const atualizarEntrada = () => {
+        const sintaxe = b.formula_sintaxe === 'matlab' ? 'matlab' : 'latex';
+        const r = latexDaEntrada(txtLatex.value, sintaxe);
+        if (sintaxe === 'matlab') b.formula_matlab = txtLatex.value;
+        erro.textContent = r.erro || '';
+        if (r.latex !== undefined) { b.latex = r.latex; b.formula = r.latex; previa.innerHTML = latexParaHtml(r.latex); }
         this.notificarMudanca();
+      };
+      txtLatex.addEventListener('input', atualizarEntrada);
+      box.querySelector('#rmFormulaSintaxe').addEventListener('change', e => {
+        if (e.target.value === 'matlab') { b.formula_sintaxe = 'matlab'; b.formula_matlab = b.formula_matlab || ''; }
+        else delete b.formula_sintaxe; // o LaTeX gerado fica e passa a ser editável
+        this.notificarMudanca(true);
+        this.renderizar();
       });
-      box.querySelector('#rmFormulaNum').addEventListener('input', e => {
-        b.numero_equacao = e.target.value;
-        b.numero = b.numero_equacao;
-        this.notificarMudanca();
+      if (b.formula_sintaxe === 'matlab' && boxPaleta) boxPaleta.style.display = 'none'; // a paleta insere LaTeX
+      box.querySelector('#rmFormulaFormato').addEventListener('change', e => {
+        if (e.target.value) b.formato_numero = e.target.value; else delete b.formato_numero;
+        this.notificarMudanca(true);
+        this.renderizar();
+      });
+      box.querySelector('#rmFormulaFormatoTodos').addEventListener('click', () => {
+        this.doc.formato_numero_formula = idFormatoNumeroFormula(this.doc, b);
+        for (const sec of this.doc.secoes || []) for (const x of sec.blocos || []) if (x.tipo === 'formula') delete x.formato_numero;
+        this.notificarMudanca(true);
+        this.renderizar();
       });
       box.querySelector('#rmFormulaPosNum').addEventListener('change', e => {
         b.posicao_numero = e.target.value;

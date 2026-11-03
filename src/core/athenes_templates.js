@@ -21,7 +21,7 @@ export const ROTULO_CATEGORIA = { academic: 'Acadêmico', report: 'Relatório', 
 export const CHAVE_TEMPLATES_USUARIO = 'athenes_templates_usuario';
 
 // Configurações de nível de documento que fazem parte do "layout" e acompanham o template
-const CONFIGS_DO_DOCUMENTO = ['paginacao', 'numeracao_secoes', 'notas_config', 'separador_legenda', 'sumario_config_padrao', 'atribuicoes_mestra', 'guias'];
+const CONFIGS_DO_DOCUMENTO = ['paginacao', 'numeracao_secoes', 'notas_config', 'separador_legenda', 'formato_numero_formula', 'sumario_config_padrao', 'atribuicoes_mestra', 'guias'];
 
 const clonar = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 const IDS_ESTILOS_ESSENCIAIS = ['titulo1', 'titulo2', 'titulo3', 'corpo'];

@@ -11,7 +11,7 @@
 import { criarEstilosPadrao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { sanitizarEstiloAvancado } from './athenes_estilo_avancado.js';
 import { templatesParaPacote, importarTemplatesDoPacote } from './athenes_templates.js';
-import { criarModelosPaginaPadrao, MODOS_APLICACAO_MESTRA, SEPARADORES_LEGENDA } from './athenes_documento.js';
+import { criarModelosPaginaPadrao, MODOS_APLICACAO_MESTRA, SEPARADORES_LEGENDA, FORMATOS_NUMERO_FORMULA } from './athenes_documento.js';
 import { sanitizarNumeracao } from './athenes_paginacao.js';
 import { normalizarConfigSumario, normalizarNumeracaoSecoes } from './athenes_sumario.js';
 import { normalizarMestraCanvas, normalizarRegrasMestra } from './athenes_mestra_canvas.js';
@@ -74,6 +74,7 @@ export function exportarPacoteEstilo(documento, opcoes = {}) {
       notas_rodape: obterConfigNotas(documento),
       // separador da legenda numerada ("Tabela 1 — Título")
       ...(documento.separador_legenda ? { separador_legenda: documento.separador_legenda } : {}),
+      ...(documento.formato_numero_formula ? { formato_numero_formula: documento.formato_numero_formula } : {}),
       // sumário (tipografia por nível, preenchimento) e numeração decimal das seções
       ...(configSumarioDoDocumento(documento) ? { sumario: normalizarConfigSumario(configSumarioDoDocumento(documento)) } : {}),
       ...(documento.numeracao_secoes ? { numeracao_secoes: normalizarNumeracaoSecoes(documento.numeracao_secoes) } : {}),
@@ -240,6 +241,7 @@ export function validarPacoteEstilo(conteudo) {
         ? { paginacao: sanitizarNumeracao(obj.configuracaoGlobal.paginacao) } : {}),
       ...(obj.configuracaoGlobal?.notas_rodape && typeof obj.configuracaoGlobal.notas_rodape === 'object'
         ? { notas_rodape: obterConfigNotas({ notas_config: obj.configuracaoGlobal.notas_rodape }) } : {}),
+      ...(FORMATOS_NUMERO_FORMULA.some(x => x.id === obj.configuracaoGlobal?.formato_numero_formula) ? { formato_numero_formula: obj.configuracaoGlobal.formato_numero_formula } : {}),
       ...(SEPARADORES_LEGENDA.some(x => x.id === obj.configuracaoGlobal?.separador_legenda) ? { separador_legenda: obj.configuracaoGlobal.separador_legenda } : {}),
       ...(obj.configuracaoGlobal?.sumario && typeof obj.configuracaoGlobal.sumario === 'object'
         ? { sumario: normalizarConfigSumario(obj.configuracaoGlobal.sumario) } : {}),
@@ -313,6 +315,10 @@ export function aplicarPacoteEstilo(documento, pacote, opcoes = {}) {
   if (p.configuracaoGlobal?.separador_legenda) {
     documento.separador_legenda = p.configuracaoGlobal.separador_legenda;
     if (aplicarNosBlocosExistentes) for (const sec of documento.secoes || []) for (const b of sec.blocos || []) delete b.separador_legenda;
+  }
+  if (p.configuracaoGlobal?.formato_numero_formula) {
+    documento.formato_numero_formula = p.configuracaoGlobal.formato_numero_formula;
+    if (aplicarNosBlocosExistentes) for (const sec of documento.secoes || []) for (const b of sec.blocos || []) delete b.formato_numero;
   }
   if (p.configuracaoGlobal?.sumario) {
     documento.sumario_config_padrao = JSON.parse(JSON.stringify(p.configuracaoGlobal.sumario));
@@ -451,6 +457,7 @@ INSTRUÇÕES DE ANÁLISE:
    - Atribuição de mestras por página ("configuracaoGlobal.atribuicoes_mestra"): [{ "mestraId", "de", "ate" }] (páginas 1-based; "ate" omitido = até o fim; vence o intervalo mais específico).
 
    - Separador da legenda numerada ("configuracaoGlobal.separador_legenda"): "travessao" (Tabela 1 — Título) | "meio_traco" (–) | "hifen" (-) | "dois_pontos" (Tabela 1: Título) | "ponto" (Tabela 1. Título) | "espaco" (Tabela 1 Título). Vale para figuras, tabelas, quadros e mapas.
+   - Número automático das fórmulas ("configuracaoGlobal.formato_numero_formula"): "parenteses" (1) | "capitulo" (2.1, reinicia a cada título de nível 1) | "colchetes" [1] | "simples" 1 | "eq" Eq. (1). O número nunca é digitado: o Athenes o calcula.
    - Títulos em N níveis ("nivel" 1 a 9; estilos "titulo1" a "titulo6", os níveis 7+ usam "titulo6") e numeração decimal progressiva
      ("configuracaoGlobal.numeracao_secoes": { "ativa", "separador": "." | "-" | "", "ate_nivel" (1-9), "iniciar_em" }), ex.: 1, 1.1, 1.1.1, 1.1.1.1.
    - Sumário ("configuracaoGlobal.sumario"): "profundidade_max" (1-9); "titulo": { "texto", "alinhamento": "esquerda" | "centro" | "direita" };

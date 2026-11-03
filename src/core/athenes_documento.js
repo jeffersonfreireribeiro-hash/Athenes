@@ -4,7 +4,7 @@
  * Arquitetura declarativa e reativa com repaginação automática e fluxo contínuo.
  */
 
-import { extrairItensSumario } from './athenes_sumario.js';
+import { extrairItensSumario, nivelDe } from './athenes_sumario.js';
 import { parametrosTextoPt, linhasEstimadas, lacunasInternasPt, alturaTabelaPt, dividirParaPagina, podeDividir } from './athenes_fragmentos.js';
 import { garantirEstilosDeTitulos } from './athenes_estilos.js';
 import { aplicarRegrasMestraNasPaginas, vincularOverridesAsPaginas } from './athenes_mestra_canvas.js';
@@ -426,8 +426,10 @@ export function criarNovoBloco(tipo, dados = {}) {
     case 'formula':
       b.latex = dados.latex || dados.formula || 'f(x) = \\int_{-\\infty}^{\\infty} e^{-x^2} dx';
       b.formula = b.latex;
-      b.numero_equacao = dados.numero_equacao || dados.numero || '(1)';
+      b.numero_equacao = '(1)'; // sempre recalculado pela numeração automática
       b.numero = b.numero_equacao;
+      if (dados.formato_numero) b.formato_numero = dados.formato_numero;
+      if (dados.formula_sintaxe === 'matlab') { b.formula_sintaxe = 'matlab'; b.formula_matlab = dados.formula_matlab || ''; }
       b.alinhamento = dados.alinhamento || 'centro';
       b.moldura_tipo = dados.moldura_tipo || 'limpo'; // 'limpo' (sem caixa/fundo), 'linha_esquerda', 'linhas_topo_base', 'cartao_suave', 'caixa_borda', 'personalizado'
       b.linha_estilo = dados.linha_estilo || 'solida';
@@ -1170,6 +1172,33 @@ export const SEPARADORES_LEGENDA = Object.freeze([
   { id: 'espaco', rotulo: 'Somente espaço', exemplo: 'Tabela 1 Título', valor: ' ' }
 ]);
 export const SEPARADOR_LEGENDA_PADRAO = 'travessao';
+
+/** Formato do número automático das fórmulas. Sempre calculado: não se digita o número. */
+export const FORMATOS_NUMERO_FORMULA = Object.freeze([
+  { id: 'parenteses', rotulo: 'Entre parênteses', exemplo: '(1)' },
+  { id: 'capitulo', rotulo: 'Por capítulo', exemplo: '(2.1)' },
+  { id: 'colchetes', rotulo: 'Entre colchetes', exemplo: '[1]' },
+  { id: 'simples', rotulo: 'Só o número', exemplo: '1' },
+  { id: 'eq', rotulo: 'Com "Eq."', exemplo: 'Eq. (1)' }
+]);
+export const FORMATO_NUMERO_FORMULA_PADRAO = 'parenteses';
+
+/** Id do formato em vigor: o do bloco, senão o do documento, senão "(1)". */
+export function idFormatoNumeroFormula(doc, bloco) {
+  const ok = (id) => FORMATOS_NUMERO_FORMULA.some(x => x.id === id) ? id : null;
+  return ok(bloco?.formato_numero) || ok(doc?.formato_numero_formula) || FORMATO_NUMERO_FORMULA_PADRAO;
+}
+
+/** Texto do número da fórmula `n` (e do capítulo `cap`, no formato por capítulo). */
+export function formatarNumeroFormula(formato, n, cap = 0) {
+  switch (formato) {
+    case 'capitulo': return `(${cap || 0}.${n})`;
+    case 'colchetes': return `[${n}]`;
+    case 'simples': return String(n);
+    case 'eq': return `Eq. (${n})`;
+    default: return `(${n})`;
+  }
+}
 const REG_SEP = '[-—–:]';
 
 /** Id do separador em vigor: o do bloco, senão o do documento, senão o travessão. */
@@ -1188,6 +1217,7 @@ export function recalcularNumeracaoAutomatica(doc) {
   if (!doc || !Array.isArray(doc.secoes)) return vazio;
 
   const cont = { mapa: 0, tabela: 0, quadro: 0, formula: 0 };
+  let capitulo = 0; let formulaNoCapitulo = 0; // formato "por capítulo": reinicia a cada título de nível 1
   const porSubtipo = {};
   const nomes = Object.values(ROTULOS_FIGURA).join('|');
   const prefixoFigura = new RegExp('^(' + nomes + ')\\s+\\d+\\s*(?:' + REG_SEP + '|\\.(?=\\s))', 'i');
@@ -1230,9 +1260,13 @@ export function recalcularNumeracaoAutomatica(doc) {
         const sepAnt = b.legenda_sep;
         b.legenda_sep = separadorLegenda(doc, b);
         b.titulo = renumerar(b.titulo, 'Quadro', cont.quadro, regRot('Quadro'), forcarAuto, b.legenda_sep, sepAnt);
+      } else if (b.tipo === 'titulo') {
+        if (nivelDe(b) === 1 && sec.mestraId !== 'capa' && sec.mestraId !== 'sumario') { capitulo += 1; formulaNoCapitulo = 0; } // o título da capa não é capítulo
       } else if (b.tipo === 'formula') {
         b.numero_sequencial = ++cont.formula;
-        b.numero_equacao = '(' + cont.formula + ')';
+        formulaNoCapitulo += 1;
+        const formato = idFormatoNumeroFormula(doc, b);
+        b.numero_equacao = formatarNumeroFormula(formato, formato === 'capitulo' ? formulaNoCapitulo : cont.formula, capitulo);
         b.numero = b.numero_equacao;
       }
     }

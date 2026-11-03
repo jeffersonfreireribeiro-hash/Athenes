@@ -14,6 +14,7 @@ import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssTipografia, es
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
 import { ancoraDaReferencia, referenciaDoBlocoCitacao } from './athenes_citacao.js';
 import { mapaMarcadores, chaveMarcador, configListaDoBloco, segmentosDeLista } from './athenes_marcadores.js';
+import { latexParaHtml } from './athenes_formula.js';
 import { hifenizarHtml } from './athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais } from './athenes_estilo_avancado.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
@@ -318,7 +319,7 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       const posNum = bloco.posicao_numero || 'direita';
       const numTxt = bloco.numero_equacao || bloco.numero || '';
       const numBadge = (posNum !== 'oculto' && numTxt) ? `<span style="font-size:10pt; color:#64748B; font-weight:700;">${escaparHtml(numTxt)}</span>` : '';
-      const formulaTxt = `<span style="font-family:'Cambria Math', 'Times New Roman', serif; font-size:12pt; font-style:italic; flex:1; text-align:center;">${escaparHtml(bloco.latex || bloco.formula || '')}</span>`;
+      const formulaTxt = `<span style="font-family:'Cambria Math', 'Times New Roman', serif; font-size:12pt; font-style:italic; flex:1; text-align:center;">${latexParaHtml(bloco.latex || bloco.formula || '')}</span>`;
 
       let linhaPrincipal = '';
       if (posNum === 'esquerda') linhaPrincipal = `<div style="display:flex; justify-content:space-between; align-items:center; width:100%;">${numBadge}${formulaTxt}</div>`;

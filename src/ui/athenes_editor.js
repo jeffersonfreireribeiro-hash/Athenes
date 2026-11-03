@@ -56,6 +56,7 @@ import { modosPermitidos, modoInicialDoPapel } from '../core/athenes_compartilha
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { montarCitacao, indiceNaLista, referenciaDoBlocoCitacao } from '../core/athenes_citacao.js';
 import { mapaMarcadores, marcadorEfetivo, chaveMarcador } from '../core/athenes_marcadores.js';
+import { latexParaHtml } from '../core/athenes_formula.js';
 import { linhasEstimadas, porLinhaUsadoNoTexto, calibracaoDoTexto, definirCalibracaoTexto } from '../core/athenes_fragmentos.js';
 import { hifenizarHtml, removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais, removerPalavrasIniciais } from '../core/athenes_estilo_avancado.js';
@@ -3400,7 +3401,7 @@ export class EditorView {
 
       const posNum = b.posicao_numero || 'direita';
       const numTxt = b.numero_equacao || b.numero || '(1)';
-      const corpoFormula = `<div class="ath-formula-corpo" style="flex:1; text-align:center;">${b.latex || b.formula || 'f(x) = \\int_{-\\infty}^{\\infty} e^{-x^2} dx'}</div>`;
+      const corpoFormula = `<div class="ath-formula-corpo" style="flex:1; text-align:center;">${latexParaHtml(b.latex || b.formula || 'f(x) = \\int_{-\\infty}^{\\infty} e^{-x^2} dx')}</div>`;
       const numBadge = posNum !== 'oculto' ? `<div class="ath-formula-numero" style="font-weight:700; color:#475569;">${numTxt}</div>` : '';
 
       let linhaPrincipalHtml = '';

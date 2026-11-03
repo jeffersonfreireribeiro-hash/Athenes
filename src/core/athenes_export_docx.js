@@ -10,6 +10,7 @@ import { MM_PARA_DXA, dimensoesPapelMm } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
 import { ancoraDaReferencia, nomeMarcadorWord, referenciaDoBlocoCitacao } from './athenes_citacao.js';
 import { mapaMarcadores, chaveMarcador, configListaDoBloco, segmentosDeLista } from './athenes_marcadores.js';
+import { latexParaTexto } from './athenes_formula.js';
 import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
 import { resolverAreasPagina, normalizarNumeracao, normalizarArea, estiloEfetivoNumeracao } from './athenes_paginacao.js';
@@ -907,7 +908,7 @@ export async function exportarParaDocx(documento) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(b.fonte)}</w:t></w:r></w:p>`);
         }
       } else if (b.tipo === 'formula') {
-        bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="center"/><w:shd w:val="clear" w:color="auto" w:fill="F8FAFC"/><w:spacing w:before="120" w:after="120"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Cambria Math" w:hAnsi="Cambria Math"/><w:i/><w:sz w:val="24"/></w:rPr><w:t>${escaparXml(b.formula || b.latex || '')}   ${escaparXml(b.numero || b.numero_equacao || '')}</w:t></w:r></w:p>`);
+        bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="center"/><w:shd w:val="clear" w:color="auto" w:fill="F8FAFC"/><w:spacing w:before="120" w:after="120"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Cambria Math" w:hAnsi="Cambria Math"/><w:i/><w:sz w:val="24"/></w:rPr><w:t>${escaparXml(latexParaTexto(b.formula || b.latex || ''))}   ${escaparXml(b.numero || b.numero_equacao || '')}</w:t></w:r></w:p>`);
       } else if (b.tipo === 'anexo') {
         bodyXmlParts.push(`<w:p><w:pPr><w:pBdr><w:left w:val="single" w:sz="12" w:space="8" w:color="2563EB"/></w:pPr><w:shd w:val="clear" w:color="auto" w:fill="EFF6FF"/><w:ind w:left="240" w:right="240"/><w:spacing w:before="100" w:after="100"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/><w:color w:val="1E40AF"/></w:rPr><w:t>ANEXO: ${escaparXml(b.titulo || b.nome || 'Arquivo')} </w:t></w:r><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="475569"/></w:rPr><w:t>(${escaparXml(b.nome_arquivo || b.descricao || 'Documento complementar')})</w:t></w:r></w:p>`);
       } else if (b.tipo === 'sumario') {
