@@ -38,6 +38,8 @@ import {
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { EstudoArtigosView, carregarArtigosEstudo } from './athenes_estudo_artigos.js';
 import { sincronizarPerfil } from '../core/athenes_perfil_servidor.js';
+import * as repositorio from '../core/athenes_repositorio.js';
+import { montarEstadoLocal, zoteroLocalParaPerfil, chaveDoZotero } from '../core/athenes_perfil_local.js';
 import { caminhoDaPasta } from '../core/athenes_arquivos.js';
 import { listarCompartilhadosComigo, marcarComoCompartilhado, carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
@@ -45,7 +47,7 @@ import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
-import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, pastasExcluidasRegistradas, registrarPastasExcluidas, processarPastasExcluidas, exclusoesRegistradas, docsRemovidosDoDrive, registrarExclusoes, idsExcluidos, processarExclusoesPendentes, obterPastaRaizDrive, repararPastaDosDocumentos, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
+import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, precisaEnviarAoDrive, pastasExcluidasRegistradas, registrarPastasExcluidas, processarPastasExcluidas, exclusoesRegistradas, docsRemovidosDoDrive, registrarExclusoes, idsExcluidos, processarExclusoesPendentes, obterPastaRaizDrive, repararPastaDosDocumentos, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -78,49 +80,18 @@ export class DashboardView {
     }
   }
 
+  /**
+   * A lista vem da memória da sessão (refeita a partir do servidor); nada é lido do navegador, exceto, uma única vez, os
+   * documentos que versões antigas deixaram lá (para não perder nada) até estarem todos a salvo no Drive.
+   */
   carregarDocumentosLocais() {
-    try {
-      const salvo = lerConta('athenes_docs_indice');
-      if (salvo) {
-        this.documentos = JSON.parse(salvo);
-      }
-    } catch (_) {
-      this.documentos = [];
-    }
-
-    // os documentos de exemplo são só da primeira conta do navegador: as demais começam vazias (antes todas "herdavam" os mesmos arquivos)
-    if ((!this.documentos || this.documentos.length === 0) && !contaEhPrimeira()) this.documentos = [];
-    else if (!this.documentos || this.documentos.length === 0) {
-      const docExemplo1 = criarDocumento({
-        titulo: 'Análise Espacial e Diretrizes de Reurbanização Sustentável',
-        subtitulo: 'Estudo de caso e proposições metodológicas para comunidades consolidadas',
-        perfilId: 'abnt',
-        tipoDoc: 'artigo'
-      });
-      docExemplo1.estado = 'em_revisao';
-      docExemplo1.pastaId = 'pasta_rel_raiz';
-
-      const docExemplo2 = criarDocumento({
-        titulo: 'Relatório Técnico de Diagnóstico Urbanístico e Infraestrutura',
-        subtitulo: 'Levantamento de campo, consolidação de parcelas e equipamentos públicos',
-        perfilId: 'abnt',
-        tipoDoc: 'relatorio'
-      });
-      docExemplo2.estado = 'rascunho';
-      docExemplo2.pastaId = 'pasta_rel_raiz';
-
-      this.documentos = [docExemplo1, docExemplo2];
-      this.salvarDocumentosLocais();
-    }
+    repositorio.carregarLegadoUmaVez();
+    this.documentos = [...repositorio.listar()];
   }
 
   salvarDocumentosLocais() {
+    repositorio.definir(this.documentos); // só memória: o servidor e o Drive guardam
     if (!this._aplicandoPerfil) this.agendarPerfil(); // mudou algo: o servidor precisa saber
-    try {
-      gravarConta('athenes_docs_indice', JSON.stringify(this.documentos));
-    } catch (e) {
-      mostrarAviso(eErroDeCota(e) ? 'Armazenamento do navegador cheio: as últimas alterações não foram salvas. Faça um backup ou exclua documentos antigos.' : `Não foi possível salvar: ${e.message}`);
-    }
   }
 
   /**
@@ -128,9 +99,10 @@ export class DashboardView {
    * (cota do navegador cheia, Supabase indisponível) para o gerenciador de arquivos desfazer a ação.
    */
   async persistirDocumentos(docs = []) {
-    gravarConta('athenes_docs_indice', JSON.stringify(this.documentos));
+    repositorio.definir(this.documentos);
+    this.agendarPerfil();
     for (const d of docs) {
-      if (d.salvoNuvem) await salvarDocumentoNoSupabase(d, this.perfilUsuario);
+      if (d.salvoNuvem || nuvemAutenticada()) { await salvarDocumentoNoSupabase(d, this.perfilUsuario, undefined, { preservarData: true }); d.salvoNuvem = true; }
     }
   }
 
@@ -908,6 +880,18 @@ export class DashboardView {
     }
   }
 
+  /**
+   * Versões antigas guardavam os documentos no navegador. Quando todos estão a salvo no Drive, essa cópia é apagada;
+   * enquanto houver algum que não esteja, ela fica (nada se perde) e a pessoa é avisada.
+   */
+  limparCopiaDoNavegador() {
+    if (!repositorio.legadoPendente()) return;
+    const pastas = obterPastasDriveLocais();
+    const apagou = repositorio.removerLegadoSeSeguro(d => d.proprietarioExterno || d.compartilhadoComigo || (d.driveFileId && !precisaEnviarAoDrive(d, pastas)));
+    if (apagou) mostrarAviso('Seus documentos já estão no Google Drive e no servidor: a cópia que ficava neste navegador foi apagada.', { tipo: 'info' });
+    else if (!this._avisouCopiaNavegador) { this._avisouCopiaNavegador = true; mostrarAviso('Alguns documentos ainda estão guardados só neste navegador. Conecte o Google Drive e clique em Sincronizar para movê-los; a cópia só é apagada depois que todos estiverem a salvo.', { tipo: 'info' }); }
+  }
+
   /** Pastas-base do app e pastas compartilhadas não são excluídas por aqui. */
   pastaPodeSerExcluida(pasta) {
     return Boolean(pasta) && pasta.origem !== 'compartilhada' && !['pasta_rel_raiz', 'pasta_bib_raiz'].includes(pasta.id);
@@ -1435,14 +1419,6 @@ export class DashboardView {
     this._tPerfil = setTimeout(() => this.sincronizarPerfilServidor(), atrasoMs);
   }
 
-  zoteroLocalParaPerfil() {
-    let cfg = {}; let marca = {};
-    try { cfg = JSON.parse(lerConta('athenes_zotero_cfg') || '{}') || {}; } catch (_) {}
-    try { marca = JSON.parse(lerConta('athenes_zotero_sync') || '{}') || {}; } catch (_) {}
-    const h = `${cfg.userId || ''}|${cfg.apiKey || ''}|${cfg.username || ''}|${cfg.isGroup ? 1 : 0}`;
-    return { cfg, mudou: !marca.hash || h !== marca.hash };
-  }
-
   /**
    * O SERVIDOR diz o que vale para este perfil: documentos (título, pasta, arquivo no Drive, o que foi excluído e o que mudou),
    * árvore de pastas, ids das pastas do Drive e a conexão do Zotero. Aqui só se aplica o que ele manda e se envia o que mudou
@@ -1453,14 +1429,7 @@ export class DashboardView {
     this._perfilEmCurso = true;
     try {
       const pastasAntes = obterPastasDriveLocais();
-      const d = obterConfigGoogleDrive();
-      const excluidos = {};
-      for (const x of exclusoesRegistradas()) excluidos[x.driveFileId ? `f:${x.driveFileId}` : `i:${x.id}`] = x.em;
-      const r = await sincronizarPerfil({
-        pastas: pastasAntes, documentos: this.documentos, excluidos, pastasExcluidas: pastasExcluidasRegistradas(),
-        drive: { pastaRaizId: d.pastaRaizId || '', pastaDocumentosId: d.pastaDocumentosId || '', pastaZoteroId: d.pastaZoteroId || '', pastaRelatoriosId: d.pastaRelatoriosId || '' },
-        zotero: this.zoteroLocalParaPerfil()
-      });
+      const r = await sincronizarPerfil(montarEstadoLocal(this.documentos));
       this._aplicandoPerfil = true;
       let mudou = false;
 
@@ -1470,12 +1439,12 @@ export class DashboardView {
         gravarConta('athenes_zotero_cfg', JSON.stringify({ ...atual, ...r.aplicarZotero }));
       }
       const cz = r.indice.zotero?.cfg;
-      if (cz) gravarConta('athenes_zotero_sync', JSON.stringify({ hash: `${cz.userId || ''}|${cz.apiKey || ''}|${cz.username || ''}|${cz.isGroup ? 1 : 0}`, em: new Date().toISOString() }));
+      if (cz) gravarConta('athenes_zotero_sync', JSON.stringify({ hash: chaveDoZotero(cz), em: new Date().toISOString() }));
 
       if (r.remover.length) { const rm = new Set(r.remover); this.documentos = this.documentos.filter(x => !rm.has(String(x.id))); mudou = true; }
       for (const e of r.adicionar) {
-        if (!e.driveFileId) continue; // ainda sem arquivo no Drive: aparece quando o computador de origem enviar
-        this.documentos.unshift({ id: e.id, titulo: e.titulo, subtitulo: e.subtitulo || 'Do seu Google Drive', tipoDoc: e.tipoDoc, perfilId: e.perfilId, pastaId: e.pastaId || undefined, driveFileId: e.driveFileId, driveFolderId: e.driveFolderId || undefined, dataModificacao: e.atualizadoEm, driveSincronizadoEm: e.conteudoEm || e.atualizadoEm, origemDrive: true, precisaCarregarConteudo: true });
+        if (!e.driveFileId && !e.salvoNuvem) continue; // ainda sem conteúdo em lugar nenhum: aparece quando o computador de origem enviar
+        this.documentos.unshift({ id: e.id, titulo: e.titulo, subtitulo: e.subtitulo || (e.driveFileId ? 'Do seu Google Drive' : 'Da sua nuvem'), tipoDoc: e.tipoDoc, perfilId: e.perfilId, pastaId: e.pastaId || undefined, driveFileId: e.driveFileId || undefined, driveFolderId: e.driveFolderId || undefined, dataModificacao: e.atualizadoEm, driveSincronizadoEm: e.driveFileId ? (e.conteudoEm || e.atualizadoEm) : undefined, origemDrive: Boolean(e.driveFileId), salvoNuvem: Boolean(e.salvoNuvem), precisaCarregarConteudo: true });
         mudou = true;
       }
       for (const { local, entrada: e } of r.atualizar) {
@@ -1603,7 +1572,7 @@ export class DashboardView {
       // por fim, o caminho de volta: cria no Drive (dentro da raiz Athenes) as pastas que só existem aqui e envia/move os documentos,
       // para a estrutura ficar guardada no Drive e igual nos outros computadores
       let envio = null;
-      try { envio = await this.sincronizarComDrive({ aviso: false }); await processarPastasExcluidas(token); } catch (e) { console.warn('[Athenes] Envio ao Drive:', e.message); }
+      try { envio = await this.sincronizarComDrive({ aviso: false }); await processarPastasExcluidas(token); this.limparCopiaDoNavegador(); } catch (e) { console.warn('[Athenes] Envio ao Drive:', e.message); }
       if (envio?.rp?.criadas || envio?.rd?.enviados) { this.atualizarGrid(); }
       if (!silencioso) {
         alert(r.novos || r.atualizados || excluidosFora

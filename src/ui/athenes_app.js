@@ -3,10 +3,13 @@
  * Athenes — Coordenador Principal da Aplicação Web e Roteamento de Telas.
  */
 
-import { lerConta, gravarConta, definirContaAtiva } from '../core/athenes_conta.js';
+import { definirContaAtiva } from '../core/athenes_conta.js';
+import * as repositorio from '../core/athenes_repositorio.js';
+import { sincronizarPerfil } from '../core/athenes_perfil_servidor.js';
+import { montarEstadoLocal } from '../core/athenes_perfil_local.js';
 import { DashboardView } from './athenes_dashboard.js';
 import { TelaLoginView } from './athenes_login_view.js';
-import { estaSessaoAtiva, encerrarSessao, obterPerfilColaborador } from '../core/athenes_colaboracao.js';
+import { estaSessaoAtiva, encerrarSessao, obterPerfilColaborador, salvarDocumentoNoSupabase, nuvemAutenticada } from '../core/athenes_colaboracao.js';
 import { criarDocumento } from '../core/athenes_documento.js';
 import { carregarDocumentoDoSupabase } from '../core/athenes_colaboracao.js';
 import { carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
@@ -18,7 +21,7 @@ import { PainelConexoes } from './athenes_painel_conexoes.js';
 import { PainelExportarModal } from './athenes_painel_exportar.js';
 import { ReguasController } from './athenes_reguas.js';
 
-import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
+import { mostrarAviso } from './athenes_aviso.js';
 import { driveConectado, enviarDocumentoAoDrive, marcarSessaoDriveExpirada, obterTokenDrive } from '../core/athenes_drive_sync.js';
 import { obterConfigGoogleDrive } from '../core/athenes_colaboracao.js';
 
@@ -30,7 +33,11 @@ export class AthenesApp {
     this._docPendente = null;
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') this.descarregarSalvamento(); });
     window.addEventListener('pagehide', () => this.descarregarSalvamento());
-    window.addEventListener('beforeunload', () => this.descarregarSalvamento());
+    window.addEventListener('beforeunload', (ev) => {
+      this.descarregarSalvamento();
+      // nada fica no navegador: se ainda há alteração a caminho do Drive/servidor, o navegador pergunta antes de fechar
+      if (this._docPendente || this._tDrive || this._tNuvem || this._enviando > 0) { ev.preventDefault(); ev.returnValue = ''; }
+    });
     this.documentoAtivo = null;
     this.tela = 'dashboard'; // 'dashboard' | 'editor'
 
@@ -84,18 +91,11 @@ export class AthenesApp {
   }
 
   carregarUltimoDocENavegarEditor() {
-    try {
-      const salvo = lerConta('athenes_docs_indice');
-      const lista = salvo ? JSON.parse(salvo) : [];
-      if (lista.length > 0) {
-        const docSalvo = localStorage.getItem(`athenes_doc_${lista[0].id}`);
-        if (docSalvo) this.documentoAtivo = JSON.parse(docSalvo);
-        else this.documentoAtivo = lista[0];
-      }
-    } catch (_) {}
-    if (!this.documentoAtivo) {
-      this.documentoAtivo = criarDocumento();
-    }
+    // não há mais cópia no navegador: abre o painel, que traz a lista do servidor, e o documento é aberto de lá
+    repositorio.carregarLegadoUmaVez();
+    const lista = repositorio.listar();
+    if (lista.length > 0 && !lista[0].precisaCarregarConteudo) this.documentoAtivo = lista[0];
+    if (!this.documentoAtivo) { this.navegarParaDashboard(); return; }
     this.navegarParaEditor();
   }
 
@@ -279,6 +279,8 @@ export class AthenesApp {
     if (!driveConectado() || !doc) return;
     clearTimeout(this._tDrive);
     this._tDrive = setTimeout(async () => {
+      this._tDrive = null;
+      this._enviando = (this._enviando || 0) + 1;
       try {
         const token = await obterTokenDrive();
         if (!token) {
@@ -287,12 +289,42 @@ export class AthenesApp {
         }
         this._avisouReconectar = false;
         await enviarDocumentoAoDrive(doc, token);
-        this.autoSalvar({ semDrive: true }); // grava driveFileId/driveFolderId sem reagendar nem mudar dataModificacao
+        this.autoSalvar({ semDrive: true });
+        this.avisarServidorDoPerfil(); // grava driveFileId/driveFolderId sem reagendar nem mudar dataModificacao
       } catch (e) {
         if (e.sessaoExpirada) marcarSessaoDriveExpirada();
         mostrarAviso(`Não foi possível enviar "${doc.titulo}" ao Google Drive: ${e.message}`);
+      } finally {
+        this._enviando = Math.max(0, (this._enviando || 1) - 1);
       }
-    }, 4000);
+    }, 2000);
+  }
+
+  /** O índice do perfil no servidor passa a conhecer o arquivo no Drive / a cópia na nuvem (a lista daqui só existe na memória). */
+  avisarServidorDoPerfil() {
+    if (!nuvemAutenticada()) return;
+    clearTimeout(this._tPerfil);
+    this._tPerfil = setTimeout(() => { sincronizarPerfil(montarEstadoLocal(repositorio.listar())).catch(e => console.warn('[Athenes] Índice do perfil:', e.message)); }, 600);
+  }
+
+  /** Cópia do documento na nuvem protegida (servidor) logo depois da última alteração; só o que a pessoa pode gravar. */
+  agendarEnvioNuvem(doc = this.documentoAtivo) {
+    if (!doc || !nuvemAutenticada()) return;
+    if ((doc.compartilhadoComigo || doc.proprietarioExterno) && doc.permissao === 'leitura') return;
+    clearTimeout(this._tNuvem);
+    this._tNuvem = setTimeout(async () => {
+      this._tNuvem = null;
+      this._enviando = (this._enviando || 0) + 1;
+      try {
+        await salvarDocumentoNoSupabase(doc, obterPerfilColaborador(), undefined, { preservarData: true });
+        doc.salvoNuvem = true;
+        this.avisarServidorDoPerfil();
+      } catch (e) {
+        console.warn('[Athenes] Cópia na nuvem:', e.message);
+      } finally {
+        this._enviando = Math.max(0, (this._enviando || 1) - 1);
+      }
+    }, 2000);
   }
 
   /**
@@ -323,24 +355,19 @@ export class AthenesApp {
     if (doc) this.gravarDocumento(doc, { semDrive: false });
   }
 
+  /**
+   * Guarda o documento na lista da sessão (memória) e o leva ao Drive e à nuvem protegida. NADA vai para o armazenamento do
+   * navegador. Sem Drive nem nuvem conectados o documento só existe na memória: a pessoa é avisada (uma vez por sessão).
+   */
   gravarDocumento(doc, { semDrive = false } = {}) {
     if (!doc) return;
-    try {
-      const salvo = lerConta('athenes_docs_indice');
-      let lista = salvo ? JSON.parse(salvo) : [];
-      const idx = lista.findIndex(d => d.id === doc.id);
-      if (idx >= 0) {
-        lista[idx] = doc;
-      } else {
-        lista.unshift(doc);
-      }
-      gravarConta('athenes_docs_indice', JSON.stringify(lista));
-      if (!semDrive) this.agendarEnvioDrive(doc);
-    } catch (e) {
-      // antes falhava em silêncio e o documento voltava sem as alterações ao reabrir
-      mostrarAviso(eErroDeCota(e)
-        ? 'Não foi possível salvar: o armazenamento do navegador está cheio (imagens grandes ocupam muito espaço). Faça um backup, exclua documentos antigos ou use imagens menores.'
-        : `Não foi possível salvar o documento neste navegador: ${e.message}`);
+    repositorio.gravarDocumento(doc);
+    if (semDrive) return;
+    this.agendarEnvioDrive(doc);
+    this.agendarEnvioNuvem(doc);
+    if (!driveConectado() && !nuvemAutenticada() && !this._avisouSemDestino) {
+      this._avisouSemDestino = true;
+      mostrarAviso('Este documento ainda não está sendo salvo em lugar nenhum: o Athenes não guarda nada no navegador. Conecte o Google Drive (engrenagem → Nuvem & Drive) ou confirme a conta Google para salvar.', { tipo: 'info' });
     }
   }
 }

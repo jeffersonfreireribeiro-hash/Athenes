@@ -26,7 +26,8 @@ export function entradaDoDocumento(d) {
     id: String(d.id), titulo: d.titulo || 'Documento', subtitulo: d.subtitulo || '', tipoDoc: d.tipoDoc || 'artigo', perfilId: d.perfilId || d.perfil || 'abnt',
     pastaId: d.pastaId || '', driveFileId: d.driveFileId || '', driveFolderId: d.driveFolderId || '',
     atualizadoEm: d.dataModificacao || d.dataCriacao || '',
-    conteudoEm: d.driveSincronizadoEm || ''
+    conteudoEm: d.driveSincronizadoEm || '',
+    salvoNuvem: Boolean(d.salvoNuvem)
   };
 }
 

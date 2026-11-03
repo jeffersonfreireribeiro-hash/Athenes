@@ -337,7 +337,7 @@ export function obterConfigSupabase() {
 /**
  * Salva (Upsert) o documento completo na tabela `documentos_athenes` do projeto Supabase.
  */
-export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = globalThis.fetch) {
+export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = globalThis.fetch, { preservarData = false } = {}) {
   if (!doc || !doc.id) throw new Error('Documento inválido para salvamento na nuvem.');
   if (typeof fetchImpl !== 'function') throw new Error('API fetch indisponível neste ambiente.');
 
@@ -347,7 +347,7 @@ export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = 
   const deOutro = Boolean(doc.compartilhadoComigo || doc.proprietarioExterno);
   if (deOutro && doc.permissao === 'leitura') return null;
   const agora = new Date().toISOString();
-  doc.dataModificacao = agora;
+  if (!preservarData) doc.dataModificacao = agora;
 
   // a nuvem guarda de quem é o documento: a listagem só devolve os da conta que está conectada
   const conta = obterContaAtiva();
