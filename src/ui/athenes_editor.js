@@ -4473,6 +4473,7 @@ export class EditorView {
 
           if (bloco && editable) {
             bloco.texto = editable.innerHTML;
+            try { this.onSelecionarBloco(bloco, null); } catch (_) {} // o painel passa a listar os estilos do texto
           }
         }
       } catch (err) {

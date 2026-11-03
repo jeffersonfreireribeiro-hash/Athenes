@@ -60,6 +60,30 @@ export class PainelPropriedades {
     this.renderizar();
   }
 
+  /**
+   * Estilos presentes no texto do bloco: o do bloco e os dos trechos com estilo próprio (`.ath-estilo-span`).
+   * Devolve [] quando só há um (nada a mostrar). Cada item: { id, nome, deBloco, trechos }.
+   */
+  estilosNoTexto(b) {
+    const trechos = new Map();
+    for (const m of String(b?.texto || '').matchAll(/data-estilo-id="([^"]+)"/g)) trechos.set(m[1], (trechos.get(m[1]) || 0) + 1);
+    const ids = [b?.estiloId, ...trechos.keys()].filter((id, i, a) => id && a.indexOf(id) === i);
+    if (ids.length < 2) return [];
+    return ids.map(id => ({ id, nome: (this.doc.estilos || []).find(e => e.id === id)?.nome || id, deBloco: id === b.estiloId, trechos: trechos.get(id) || 0 }));
+  }
+
+  /** "Estilos neste texto": aparece só quando o bloco mistura mais de um estilo de texto. */
+  htmlEstilosNoTexto(b) {
+    const lista = this.estilosNoTexto(b);
+    if (!lista.length) return '';
+    return `<div id="athEstilosNoTexto" style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:8px 10px; background:var(--ath-primary-soft, #EEF4FA); display:flex; flex-direction:column; gap:6px;">
+          <span style="font:800 10.5px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--ath-primary, #314F79);">Estilos neste texto (${lista.length})</span>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            ${lista.map(x => `<button type="button" class="glx-btn glx-btn-xs glx-btn-soft" data-estilo-no-texto="${escapeHtml(x.id)}" title="Abrir o estilo ${escapeHtml(x.nome)}" style="display:inline-flex; align-items:center; gap:5px; height:24px; padding:0 8px; font-weight:700; background:#fff; border:1px solid #CBD5E1;">${escapeHtml(x.nome)}<small style="font-weight:600; color:#64748B;">${x.deBloco ? 'bloco' : `${x.trechos} trecho${x.trechos > 1 ? 's' : ''}`}</small></button>`).join('')}
+          </div>
+        </div>`;
+  }
+
   setEstilo(estilo) {
     this.estiloSelecionado = estilo;
     this.blocoSelecionado = null;
@@ -609,6 +633,11 @@ export class PainelPropriedades {
         if (est) this.setEstilo(est);
       });
 
+      box.querySelectorAll('[data-estilo-no-texto]').forEach(btn => btn.addEventListener('click', () => {
+        const est = (this.doc.estilos || []).find(e => e.id === btn.dataset.estiloNoTexto);
+        if (est) this.setEstilo(est);
+      }));
+
       // Bordas em Título
       box.querySelectorAll('[data-borda]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -691,6 +720,7 @@ export class PainelPropriedades {
             ${this.doc.estilos.map(e => `<option value="${e.id}" ${e.id === b.estiloId ? 'selected' : ''}>${e.nome}</option>`).join('')}
           </select>
         </div>
+        ${this.htmlEstilosNoTexto(b)}
         <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:-6px; margin-bottom:2px;">
           <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnAplicarEstiloBloco" style="flex:1;" title="Aplicar este estilo a todo o texto do bloco">
             Aplicar ao bloco todo
