@@ -36,7 +36,8 @@ import { EstudoArtigosView, carregarArtigosEstudo } from './athenes_estudo_artig
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
-import { abrirNovoDocumentoModal } from './athenes_novo_documento_modal.js';
+import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
+import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
 import { driveConectado, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
@@ -272,6 +273,10 @@ export class DashboardView {
                   ${svgIcone('mais', 14)} Importar JSON
                   <input type="file" accept=".json,.athenes" id="athInputImportarJson" style="display:none;">
                 </label>
+                <label class="ath-btn" style="cursor:pointer;" title="Importar um modelo do Word (.docx): extrai e consolida os estilos, sem copiar o texto">
+                  ${svgIcone('mais', 14)} Importar template .docx
+                  <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" id="athInputImportarDocx" style="display:none;">
+                </label>
                 <button type="button" class="ath-btn ath-btn-primary" id="athBtnNovoDocModal">
                   ${svgIcone('mais', 14)} Novo Documento
                 </button>
@@ -337,6 +342,19 @@ export class DashboardView {
     selectTipo.addEventListener('change', () => {
       this.filtroTipo = selectTipo.value;
       this.atualizarGrid();
+    });
+
+    const inputDocx = root.querySelector('#athInputImportarDocx');
+    inputDocx?.addEventListener('change', async (e) => {
+      const arq = e.target.files?.[0];
+      e.target.value = ''; // permite importar o mesmo arquivo de novo
+      if (arq) await abrirImportadorDocxModal(arq, {
+        onSalvo: () => this.abrirModalNovoDoc({ pastaId: this.pastaAtivaId }),
+        onCriarDocumento: (template) => {
+          const novo = criarDocumentoDeTemplate(template, { titulo: template.titulo, modoConteudo: 'placeholder' });
+          this.registrarNovoDocumento(novo, this.pastaAtivaId !== 'todas' ? this.pastaAtivaId : 'pasta_rel_raiz');
+        }
+      });
     });
 
     const inputImportar = root.querySelector('#athInputImportarJson');
@@ -1196,25 +1214,28 @@ export class DashboardView {
 
     abrirNovoDocumentoModal({
       pastas, pastaAlvoId,
-      onCriar: ({ doc: novo, pastaId: pastaEscolhida }) => {
-        if (this.perfilUsuario?.nome && novo.metadados?.autores?.[0] && novo.metadados.autores[0].nome === 'Autor Principal') {
-          novo.metadados.autores[0].nome = this.perfilUsuario.nome;
-        }
-        novo.pastaId = pastaEscolhida;
-        novo.proprietario = novo.proprietario || { id: this.perfilUsuario?.id, nome: this.perfilUsuario?.nome };
-        this.documentos.unshift(novo);
-        this.salvarDocumentosLocais();
-        if (this.pastaAtivaId !== 'todas' && this.pastaAtivaId !== pastaEscolhida) {
-          this.selecionarPasta(pastaEscolhida);
-        } else {
-          this.renderizarPastasLateral();
-          this.renderizarBannerPasta();
-          this.atualizarGrid();
-        }
-        this.onAbrirDocumento(novo);
-        this.sincronizarComDrive({ aviso: false }); // sobe a pasta (se nova) e o documento, sem bloquear a abertura
-      }
+      onCriar: ({ doc: novo, pastaId }) => this.registrarNovoDocumento(novo, pastaId)
     });
+  }
+
+  /** Guarda o documento novo (autor, pasta, lista local), atualiza a tela, abre no editor e sobe ao Drive se conectado. */
+  registrarNovoDocumento(novo, pastaEscolhida) {
+    if (this.perfilUsuario?.nome && novo.metadados?.autores?.[0] && novo.metadados.autores[0].nome === 'Autor Principal') {
+      novo.metadados.autores[0].nome = this.perfilUsuario.nome;
+    }
+    novo.pastaId = pastaEscolhida;
+    novo.proprietario = novo.proprietario || { id: this.perfilUsuario?.id, nome: this.perfilUsuario?.nome };
+    this.documentos.unshift(novo);
+    this.salvarDocumentosLocais();
+    if (this.pastaAtivaId !== 'todas' && this.pastaAtivaId !== pastaEscolhida) {
+      this.selecionarPasta(pastaEscolhida);
+    } else {
+      this.renderizarPastasLateral();
+      this.renderizarBannerPasta();
+      this.atualizarGrid();
+    }
+    this.onAbrirDocumento(novo);
+    this.sincronizarComDrive({ aviso: false }); // sobe a pasta (se nova) e o documento, sem bloquear a abertura
   }
 
   importarDocumentoJson(arquivo) {

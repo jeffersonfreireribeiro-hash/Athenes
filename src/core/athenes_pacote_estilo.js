@@ -398,6 +398,7 @@ INSTRUÇÕES DE ANÁLISE:
    - Identifique os tamanhos em pontos (pt), pesos numéricos (300, 400, 600, 700, 800), cores hexadecimais (#1F2733, #314F79, etc.), itálico, sublinhado e caixa alta.
    - Identifique os alinhamentos ("esquerda", "centro", "direita", "justificado_esquerda", "justificado", "justificado_centro", "justificado_direita").
    - Identifique entrelinha (ex: 1.0 simples, 1.25, 1.5), espaçamento antes/depois do bloco em pt, e recuo da 1ª linha em mm (ex: 12.5mm ABNT, ou 0mm).
+   - REGRA DE CONSOLIDAÇÃO (obrigatória): NÃO crie um estilo para cada formatação vista. Agrupe parágrafos por assinatura tipográfica (fonte, tamanho, peso, itálico, caixa alta, alinhamento, recuos, espaçamentos) e consolide em 5 a 8 estilos canônicos: "corpo" (texto corrido), "titulo1"…"titulo3" (um por nível de seção), "citacao_direta" (recuo esquerdo ≥ 20 mm, fonte menor), "legenda" e "fonte_citada" (iguais entre si: uma única formatação para legendas e fontes), "nota_rodape" e "capa" (isolada: só a folha de rosto). Variações de poucos décimos de ponto, de recuo ou de espaçamento pertencem ao MESMO estilo. Negrito, itálico ou cor aplicados a trechos dentro do parágrafo NÃO são estilos. Use o estilo dominante (mais caracteres) como valor do estilo canônico.
    - Identifique também recuos persistentes do parágrafo: "recuo_esquerdo_mm", "recuo_direito_mm" (mm) e "recuo_deslocado_mm" (recuo francês/hanging).
    - ESTILOS DE PARÁGRAFO AVANÇADOS (opcional, só quando o documento realmente os usa): adicione ao estilo o objeto "avancado" com apenas os grupos presentes:
      "avancado": {
@@ -427,6 +428,7 @@ INSTRUÇÕES DE ANÁLISE:
    - Grade de colunas (1 coluna ampla para ABNT/monografia, ou 2 colunas com gap_mm: 5 para formato IEEE/Artigo internacional).
    - Cabeçalho e rodapé ("cabecalho" / "rodape"): "ativo"; "zonas" { "esquerda", "centro", "direita" } com texto livre e variáveis
      {documento.titulo}, {documento.autor_principal}, {documento.instituicao}, {documento.ano}, {secao}, {pagina}, {total}, {data};
+     "multilinha" (true = as quebras de linha dentro de cada zona viram linhas de verdade; ex.: número da página na 1ª linha à direita e o texto institucional na 2ª à esquerda: esquerda "\nTexto", direita "{pagina}"; false = quebras viram " · ");
      "pares_impares_diferentes" (true = páginas pares usam "zonas_par", ou espelham esquerda↔direita se vazio); "ocultar_primeira_pagina";
      tipografia: "fonte" (id: nunito, times, arial, georgia, garamond, cambria, calibri, consolas), "tamanho_pt" (6-24), "peso" (300-800), "cor" (#RRGGBB), "entrelinha" (1-2.5);
      "linha_divisoria", "linha_espessura_pt", "linha_cor"; "distancia_borda_mm" (da borda da folha) e "respiro_mm" (até o corpo do texto).

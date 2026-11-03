@@ -7,9 +7,11 @@ import { TIPOS_DOCUMENTO } from '../core/athenes_documento.js';
 import { PERFIS_FORMATACAO } from '../core/athenes_estilos.js';
 import {
   criarDocumentoEmBranco, criarDocumentoDeTemplate, listarTemplatesNativos, listarTemplatesUsuario,
-  removerTemplateUsuario, salvarComoTemplate, templateDeArquivoJson, miniaturaSvg, ROTULO_CATEGORIA
+  removerTemplateUsuario, salvarComoTemplate, salvarTemplatePronto, templateDeArquivoJson, miniaturaSvg, ROTULO_CATEGORIA
 } from '../core/athenes_templates.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
+import { importarTemplateDocx } from '../core/athenes_docx_importador.js';
+import { comprimirImagensDoPacote } from './athenes_imagem_util.js';
 import { svgIcone } from './athenes_icones.js';
 import { mostrarAviso } from './athenes_aviso.js';
 
@@ -110,8 +112,8 @@ export function abrirNovoDocumentoModal(opcoes) {
     else if (estado.aba === 'meus') itens = listarTemplatesUsuario(storage);
     else if (estado.importado) itens = [estado.importado];
     if (estado.aba === 'importar') {
-      el.innerHTML = `<div class="ath-prop-grupo"><label>Arquivo (.athenes, .json ou documento salvo) — só o esqueleto é aproveitado, sem texto</label>
-        <input type="file" class="ath-input" id="athNtplArquivo" accept=".athenes,.json,application/json"></div>
+      el.innerHTML = `<div class="ath-prop-grupo"><label>Arquivo (.athenes, .json, .docx ou documento salvo) — só o esqueleto é aproveitado, sem texto</label>
+        <input type="file" class="ath-input" id="athNtplArquivo" accept=".athenes,.json,.docx,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></div>
         <div class="ath-ntpl-grade">${itens.map(t => card(t)).join('')}</div>`;
       q('#athNtplArquivo').addEventListener('change', lerArquivo);
     } else if (!itens.length) {
@@ -147,8 +149,9 @@ export function abrirNovoDocumentoModal(opcoes) {
     const arq = e.target.files?.[0];
     if (!arq) return;
     try {
-      const obj = JSON.parse(await arq.text());
-      estado.importado = templateDeArquivoJson(obj, arq.name);
+      estado.importado = /\.docx$/i.test(arq.name)
+        ? await (async () => { const r = await importarTemplateDocx(await arq.arrayBuffer(), { nome: arq.name, incluirConteudo: true }); await comprimirImagensDoPacote({ mestras: r.template.config.mestras }); return r.template; })()
+        : templateDeArquivoJson(JSON.parse(await arq.text()), arq.name);
       estado.escolhido = estado.importado;
       if (!q('#athNovoDocTitulo').value) q('#athNovoDocTitulo').value = estado.importado.titulo;
       desenharLista(); atualizarDependentes();
@@ -236,4 +239,89 @@ export function abrirSalvarTemplateModal(doc, { storage, onSalvo } = {}) {
       mostrarAviso(cota ? 'Sem espaço no navegador para salvar o template. Salve só o layout ou exclua templates antigos.' : err.message);
     }
   });
+}
+
+/**
+ * Importa um .docx e mostra o que foi consolidado (estilos do arquivo → canônicos) antes de salvar.
+ * Por padrão traz também o conteúdo do arquivo (textos, capa, quebras de página); desmarcar deixa só o esqueleto.
+ * opcoes: { storage, onSalvo(template), onCriarDocumento(template) }
+ */
+export async function abrirImportadorDocxModal(arquivo, opcoes = {}) {
+  garantirCss();
+  const { storage, onSalvo, onCriarDocumento } = opcoes;
+  const dados = await arquivo.arrayBuffer();
+  const importar = async (incluirConteudo) => {
+    const r = await importarTemplateDocx(dados, { nome: arquivo.name, incluirConteudo });
+    await comprimirImagensDoPacote({ mestras: r.template.config.mestras }); // logos e faixas da capa: sem lotar o armazenamento
+    return r;
+  };
+  let r;
+  try { r = await importar(true); } catch (err) {
+    mostrarAviso(`Não foi possível importar "${arquivo.name}": ${err.message}`);
+    return null;
+  }
+  const modal = document.createElement('div');
+  modal.className = 'ath-modal-backdrop';
+  modal.innerHTML = `
+    <div class="ath-modal" style="max-width:700px;width:calc(100vw - 24px)">
+      <div class="ath-modal-head"><h2>Template importado do Word</h2>
+        <button type="button" class="ath-btn ath-btn-icon" data-fechar>${svgIcone('fechar', 16)}</button></div>
+      <div class="ath-modal-corpo" style="max-height:70vh;overflow:auto" id="athDocxCorpo"></div>
+      <div class="ath-modal-foot">
+        <button type="button" class="ath-btn" data-fechar>Cancelar</button>
+        <button type="button" class="ath-btn" id="athDocxSalvar">Salvar em Meus templates</button>
+        ${onCriarDocumento ? '<button type="button" class="ath-btn ath-btn-primary" id="athDocxCriar">Criar documento e abrir</button>' : ''}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const corpo = modal.querySelector('#athDocxCorpo');
+
+  const desenhar = () => {
+    const { template, relatorio } = r;
+    const linhas = relatorio.estilos.map(e => `<tr><td><b>${escapeHtml(e.nome)}</b><br><small>${escapeHtml(e.id)}</small></td><td style="text-align:center">${e.paragrafos}</td><td style="text-align:center">${e.variantesAbsorvidas}</td><td><small>${escapeHtml(e.origem.join(', '))}</small></td></tr>`).join('');
+    const blocos = template.secoes.reduce((n, s2) => n + s2.blocos.length, 0);
+    corpo.innerHTML = `
+      <div class="ath-ntpl-grade" style="grid-template-columns:130px 1fr;max-height:none;align-items:start">
+        <div class="ath-ntpl-mini" style="height:170px">${miniaturaSvg(template)}</div>
+        <div>
+          <div class="ath-prop-grupo"><label>Nome do template</label><input type="text" class="ath-input" id="athDocxNome" value="${escapeHtml(template.titulo)}"></div>
+          <label class="rm-chk" style="font-size:12.5px;font-weight:700;margin-top:8px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="athDocxConteudo" ${template.conteudoImportado ? 'checked' : ''}> Trazer também o conteúdo do arquivo (${template.conteudoImportado ? `${blocos} blocos` : 'só a estrutura'})</label>
+          <p style="font-size:12.5px;color:#334155;margin:8px 0 0"><b>${relatorio.estilosNoArquivo}</b> estilo(s) no arquivo e <b>${relatorio.assinaturasDistintas}</b> formatações distintas em ${relatorio.paragrafos} parágrafos
+            → consolidados em <b>${relatorio.estilosCanonicos}</b> estilos canônicos. Negrito e itálico dentro do texto não viram estilo.</p>
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:10px">
+        <thead><tr style="text-align:left;border-bottom:1px solid #E2E8F0"><th>Estilo no Athenes</th><th>Parágrafos</th><th>Variantes absorvidas</th><th>Veio de</th></tr></thead>
+        <tbody>${linhas}</tbody></table>
+      ${relatorio.avisos.length ? `<ul style="font-size:12px;color:#92400E;background:#FEF3C7;border-radius:8px;padding:8px 8px 8px 24px;margin:10px 0 0">${relatorio.avisos.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul>` : ''}`;
+    corpo.querySelector('#athDocxConteudo').addEventListener('change', async (e) => {
+      const nome = corpo.querySelector('#athDocxNome').value;
+      e.target.disabled = true;
+      try { r = await importar(e.target.checked); r.template.titulo = nome || r.template.titulo; } catch (err) { mostrarAviso(err.message); }
+      desenhar();
+    });
+  };
+  desenhar();
+
+  const fechar = () => modal.remove();
+  modal.querySelectorAll('[data-fechar]').forEach(b => b.addEventListener('click', fechar));
+  modal.addEventListener('click', (e) => { if (e.target === modal) fechar(); });
+  const nomeAtual = () => corpo.querySelector('#athDocxNome').value.trim().slice(0, 120) || r.template.titulo;
+  modal.querySelector('#athDocxSalvar').addEventListener('click', () => {
+    try {
+      r.template.titulo = nomeAtual();
+      const salvo = salvarTemplatePronto(r.template, storage);
+      fechar();
+      mostrarAviso(`Template "${salvo.titulo}" salvo em Meus templates.`, { tipo: 'sucesso' });
+      onSalvo?.(salvo);
+    } catch (err) {
+      mostrarAviso(/quota|exceeded/i.test(String(err?.name) + String(err?.message)) ? 'Sem espaço no navegador para salvar o template (as imagens do cabeçalho são grandes). Exclua templates antigos.' : err.message);
+    }
+  });
+  modal.querySelector('#athDocxCriar')?.addEventListener('click', () => {
+    r.template.titulo = nomeAtual();
+    fechar();
+    onCriarDocumento(r.template);
+  });
+  return r;
 }

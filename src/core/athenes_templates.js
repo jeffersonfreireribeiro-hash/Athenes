@@ -192,7 +192,7 @@ export function templateDeArquivoJson(obj, nomeArquivo = '') {
 export function miniaturaSvg(template, largura = 120) {
   const m = (template.config?.mestras || []).find(x => x.id === (template.secoes?.find(s => s.mestraId !== 'capa')?.mestraId)) || template.config?.mestras?.[0] || {};
   const A = { a4: [210, 297], a3: [297, 420], a5: [148, 210], carta: [216, 279], letter: [216, 279] };
-  let [w, h] = A[m.formato] || A.a4;
+  let [w, h] = A[String(m.formato || '').toLowerCase()] || (m.dimensoes_personalizadas ? [m.dimensoes_personalizadas.w_mm, m.dimensoes_personalizadas.h_mm] : A.a4);
   if (m.orientacao === 'paisagem') [w, h] = [h, w];
   const k = largura / w, alt = Math.round(h * k);
   const mg = m.margens_mm || { t: 25, r: 25, b: 25, l: 25 };
@@ -256,4 +256,13 @@ export function importarTemplatesDoPacote(lista, storage = globalThis.localStora
   if (!entram.length) return 0;
   gravar([...entram, ...atuais], storage);
   return entram.length;
+}
+
+/** Grava em "Meus templates" um template já pronto (ex.: importado de .docx). */
+export function salvarTemplatePronto(template, storage = globalThis.localStorage) {
+  const t = sanitizarTemplate(template);
+  if (!t) throw new Error('Template inválido.');
+  t.criadoEm = new Date().toISOString();
+  gravar([t, ...listarTemplatesUsuario(storage).filter(x => x.id !== t.id)], storage);
+  return t;
 }

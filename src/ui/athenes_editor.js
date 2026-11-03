@@ -2146,9 +2146,22 @@ export class EditorView {
       const match = node.dataset.blocoId === blocoId;
       node.classList.toggle('sel', match);
       if (match) {
-        try { this.rolarNoPalco(node, 'nearest'); } catch (_) {}
+        try { this.rolarNaLista(node); } catch (_) {}
       }
     });
+  }
+
+  /**
+   * Mostra o item na lista lateral rolando SÓ o contêiner rolável da própria lista.
+   * (Antes usava rolarNoPalco com a posição do item da lista, o que empurrava as páginas para o fim ao selecionar.)
+   */
+  rolarNaLista(item) {
+    let pai = item.parentElement;
+    while (pai && pai !== this.container && !(pai.scrollHeight > pai.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(pai).overflowY))) pai = pai.parentElement;
+    if (!pai || pai === this.container) return;
+    const p = pai.getBoundingClientRect(), r = item.getBoundingClientRect();
+    if (r.top < p.top) pai.scrollTop += r.top - p.top - 8;
+    else if (r.bottom > p.bottom) pai.scrollTop += r.bottom - p.bottom + 8;
   }
 
   /**

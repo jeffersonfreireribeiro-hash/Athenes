@@ -146,6 +146,7 @@ export function normalizarArea(area) {
     texto_legado: typeof a.texto === 'string' ? a.texto : '',
     alinhamento_legado: ['esquerda', 'centro', 'direita'].includes(a.alinhamento) ? a.alinhamento : 'direita',
     pares_impares_diferentes: !!a.pares_impares_diferentes,
+    multilinha: !!a.multilinha, // true = as quebras de linha das zonas viram linhas de verdade (ex.: número da página acima do texto)
     ocultar_primeira_pagina: !!a.ocultar_primeira_pagina,
     fonte: a.fonte in FONTES_SISTEMA ? a.fonte : base.fonte,
     tamanho_pt: NUM(a.tamanho_pt, 6, 24, base.tamanho_pt),
@@ -231,7 +232,7 @@ export function substituirVariaveis(texto, ctx = {}) {
   };
   return String(texto || '')
     .replace(/\{\{?\s*([\w.]+)\s*\}?\}/g, (m, k) => (k in mapa ? String(mapa[k]) : m))
-    .replace(/\r?\n/g, ' · ');
+    .replace(/\r?\n/g, ctx.preservarQuebras ? '\n' : ' · ');
 }
 
 const temVariavelPagina = (z) => /\{\{?\s*pagina\s*\}?\}/.test(`${z.esquerda}${z.centro}${z.direita}`);
@@ -357,7 +358,7 @@ export function resolverAreasPagina(doc, mestra, pag, numeroExibido, total, opco
       }
     }
 
-    const ctx = { doc, secaoNome: secao?.nome || '', pagina: rotuloNumero, total };
+    const ctx = { doc, secaoNome: secao?.nome || '', pagina: rotuloNumero, total, preservarQuebras: area.multilinha };
     const resolvidas = {
       esquerda: substituirVariaveis(zonas.esquerda, ctx),
       centro: substituirVariaveis(zonas.centro, ctx),
@@ -374,6 +375,7 @@ export function resolverAreasPagina(doc, mestra, pag, numeroExibido, total, opco
       css: cssTextoArea(area),
       linha: area.linha_divisoria ? { espessura_pt: area.linha_espessura_pt, cor: area.linha_cor } : null,
       distancia_borda_mm: area.distancia_borda_mm,
+      multilinha: area.multilinha,
       respiro_mm: area.respiro_mm,
       vazia: !resolvidas.esquerda && !resolvidas.centro && !resolvidas.direita
     };

@@ -10,7 +10,7 @@ import { FONTES_SISTEMA } from '../core/athenes_estilos.js';
 const CSS = `
 .ath-pg-area{position:absolute;z-index:3;display:flex;align-items:flex-start;gap:8px;box-sizing:border-box;pointer-events:none}
 .ath-pg-zona{flex:1 1 0;min-width:0;overflow-wrap:anywhere;white-space:pre-wrap}
-.ath-pg-zona.esq{text-align:left}.ath-pg-zona.cen{text-align:center}.ath-pg-zona.dir{text-align:right}
+.ath-pg-area.multilinha .ath-pg-zona.cen,.ath-pg-area.multilinha .ath-pg-zona.dir{flex:0 0 auto}.ath-pg-zona.esq{text-align:left}.ath-pg-zona.cen{text-align:center}.ath-pg-zona.dir{text-align:right}
 .ath-notas-rodape{margin-top:auto;position:relative;z-index:2}
 .ath-nota-sep{margin:0 0 4pt 0}
 .ath-nota{display:flex;gap:4px;align-items:baseline;margin:0 0 2pt 0}
@@ -53,7 +53,7 @@ const familia = (id) => (FONTES_SISTEMA[id]?.familia || FONTES_SISTEMA.nunito.fa
 export function construirAreaPaginaDom(area) {
   garantirCss();
   const el = document.createElement('div');
-  el.className = `ath-pg-area ath-pg-${area.tipo}`;
+  el.className = `ath-pg-area ath-pg-${area.tipo}${area.multilinha ? ' multilinha' : ''}`;
   Object.assign(el.style, area.css);
   const zona = (cls, texto) => {
     const z = document.createElement('div');
