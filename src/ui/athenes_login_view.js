@@ -11,7 +11,9 @@ import {
   ativarSessao,
   autenticarGoogleDrive,
   obterInfoUsuarioGoogle,
-  entrarNaNuvemComGoogle,
+  loginGoogleCompleto,
+  guardarTokenDrive,
+  abrirSessaoDaNuvem,
   obterOuCriarEstruturaPastasAthenes,
   obterConfigGoogleDrive
 } from '../core/athenes_colaboracao.js';
@@ -160,14 +162,12 @@ export class TelaLoginView {
     this.renderizar();
 
     try {
+      // UM login só: o mesmo popup do Google entrega o Drive e a conta da nuvem protegida
       const cfg = obterConfigGoogleDrive();
-      const token = await autenticarGoogleDrive(cfg.clientId);
+      const login = await loginGoogleCompleto(cfg.clientId, { forcarEscolha: true });
+      const token = login.accessToken;
+      const info = { name: login.claims.name, email: login.claims.email, picture: login.claims.picture };
 
-      if (!token) {
-        throw new Error('Autenticação Google cancelada.');
-      }
-
-      const info = await obterInfoUsuarioGoogle(token).catch(() => null);
       const chkLembrar = this.container.querySelector('#athChkContinuarConectado');
       const continuarConectado = chkLembrar ? chkLembrar.checked : true;
 
@@ -193,8 +193,9 @@ export class TelaLoginView {
         console.warn('[Athenes] Pasta do Drive será criada ou vinculada posteriormente:', errDrive);
       }
 
-      // sessão segura da nuvem (Supabase): sem ela o app segue só com o Drive; o aviso volta no painel inicial
-      try { await entrarNaNuvemComGoogle(); } catch (errNuvem) { console.warn('[Athenes] Nuvem segura adiada:', errNuvem.message); }
+      // tokens guardados já na conta recém-identificada (o Drive e a nuvem protegida usam o mesmo login)
+      guardarTokenDrive(login.accessToken, login.expiresIn, cfg.clientId);
+      try { await abrirSessaoDaNuvem(login); } catch (errNuvem) { console.warn('[Athenes] Nuvem protegida não aberta:', errNuvem.message); }
 
       this.mensagemStatus = `Bem-vindo(a), ${p.nome}! Entrando no Athenes...`;
       this.tipoMensagem = 'sucesso';

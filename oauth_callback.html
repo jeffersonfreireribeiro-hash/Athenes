@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Athenes — conectando</title></head>
+<body style="font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;color:#475569;">
+<p>Conectando… esta janela fecha sozinha.</p>
+<script>
+  // devolve o resultado do Google (no fragmento da URL) para a janela do Athenes e fecha; nada é guardado aqui
+  try { if (window.opener) window.opener.postMessage({ athenesOAuth: location.hash.slice(1) }, location.origin); } catch (e) {}
+  window.close();
+</script>
+</body>
+</html>

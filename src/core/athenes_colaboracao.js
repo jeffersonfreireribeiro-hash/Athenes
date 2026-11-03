@@ -4,7 +4,7 @@
  * Modos de Trabalho estilo Google Docs (Edição, Sugestão e Visualização) e Google Drive API.
  */
 
-import { cabecalhosSupabase, limparSessaoSupabase, temSessaoSupabase, entrarNoSupabaseComGoogle, obterIdTokenGoogle } from './athenes_supabase_auth.js';
+import { cabecalhosSupabase, limparSessaoSupabase, temSessaoSupabase, trocarIdTokenPorSessao, decodificarJwt } from './athenes_supabase_auth.js';
 import { lerConta, gravarConta, definirContaAtiva, limparContaAtiva, obterContaAtiva } from './athenes_conta.js';
 export const SUPABASE_CONFIG_PADRAO = Object.freeze({
   url: 'https://xizxdtaxgvouopkqdbie.supabase.co',
@@ -372,6 +372,7 @@ export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = 
   });
 
   if (!resp.ok) {
+    if ((resp.status === 401 || resp.status === 403) && !temSessaoSupabase()) { console.warn('[Athenes] Nuvem protegida não confirmada: documento salvo só aqui e no Drive.'); return null; }
     const erroTxt = await resp.text().catch(() => '');
     throw new Error(`Falha ao salvar no Supabase (${resp.status}): ${erroTxt}`);
   }
@@ -380,15 +381,70 @@ export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = 
   return Array.isArray(dados) ? dados[0] : dados;
 }
 
+/** Endereço (autorizado no Google Cloud) para onde o Google devolve o login; a página só repassa o resultado ao app. */
+export const uriCallbackGoogle = () => `${globalThis.location?.origin || ''}/oauth_callback.html`;
+
+const hex = (buf) => Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+const aleatorio = () => hex(globalThis.crypto.getRandomValues(new Uint8Array(24)));
+
 /**
- * Entra na nuvem (Supabase) com a conta Google: confirma a conta no botão oficial do Google e troca o ID token por uma sessão.
- * Sem isso as regras do banco não deixam ler nem gravar documentos. Rejeita se o usuário adiar ou o Google/Supabase recusar.
+ * UM ÚNICO login do Google que entrega tudo: o token de acesso (Drive) e o ID token (conta da nuvem protegida).
+ * A janela é aberta de imediato (precisa estar dentro do clique, senão o navegador bloqueia). Devolve
+ * { accessToken, idToken, expiresIn, nonce, claims }. Falhas voltam com a explicação (inclusive URI não autorizada).
+ */
+export function loginGoogleCompleto(clientId = DEFAULT_GOOGLE_CLIENT_ID, { hint = '', forcarEscolha = false, janela = globalThis.window } = {}) {
+  const state = aleatorio(); const nonce = aleatorio();
+  const redirect = uriCallbackGoogle();
+  const popup = janela?.open?.('about:blank', 'athenes_google', 'width=500,height=680');
+  if (!popup) return Promise.reject(new Error('O navegador bloqueou a janela de login do Google. Permita pop-ups para este site e tente de novo.'));
+  return (async () => {
+    const nonceHash = hex(await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(nonce)));
+    const q = new URLSearchParams({
+      client_id: clientId, redirect_uri: redirect, response_type: 'token id_token', scope: GOOGLE_AUTH_ESCOPOS,
+      state, nonce: nonceHash, include_granted_scopes: 'true'
+    });
+    if (hint) q.set('login_hint', hint);
+    if (forcarEscolha || !hint) q.set('prompt', 'select_account');
+    popup.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${q}`;
+    return new Promise((resolve, reject) => {
+      let fim = false; let vigia = null;
+      const encerrar = (fn, v) => { if (fim) return; fim = true; clearInterval(vigia); janela.removeEventListener('message', ouvir); try { popup.close(); } catch (_) {} fn(v); };
+      const ouvir = (ev) => {
+        if (ev.origin !== globalThis.location.origin || typeof ev.data?.athenesOAuth !== 'string') return;
+        const r = new URLSearchParams(ev.data.athenesOAuth);
+        if (r.get('error')) return encerrar(reject, new Error(`Login do Google recusado: ${r.get('error_description') || r.get('error')}`));
+        if (r.get('state') !== state) return encerrar(reject, new Error('Resposta do Google inválida (state diferente). Tente de novo.'));
+        const idToken = r.get('id_token'); const claims = decodificarJwt(idToken);
+        if (!r.get('access_token') || !idToken || !claims) return encerrar(reject, new Error('O Google não devolveu os tokens esperados.'));
+        if (claims.nonce !== nonceHash) return encerrar(reject, new Error('Resposta do Google inválida (nonce diferente). Tente de novo.'));
+        encerrar(resolve, { accessToken: r.get('access_token'), idToken, expiresIn: Number(r.get('expires_in')) || 3600, nonce, claims });
+      };
+      janela.addEventListener('message', ouvir);
+      vigia = setInterval(() => {
+        if (popup.closed) encerrar(reject, new Error(`Login do Google cancelado. Se a janela mostrou "redirect_uri_mismatch", autorize ${redirect} em Google Cloud → Credenciais → URIs de redirecionamento autorizados.`));
+      }, 500);
+    });
+  })();
+}
+
+/** Guarda o token do Drive (na conta ativa) com a validade, como fazia o fluxo anterior. */
+export function guardarTokenDrive(accessToken, expiresIn, clientId = DEFAULT_GOOGLE_CLIENT_ID) {
+  const expiraEm = Date.now() + Math.max(60, Number(expiresIn) || 3600) * 1000 - 120000;
+  salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), clientId, accessToken, accessTokenExpiraEm: expiraEm });
+}
+
+/** Troca o ID token do login por uma sessão da nuvem protegida (Supabase). */
+export const abrirSessaoDaNuvem = (login) => trocarIdTokenPorSessao(login.idToken, obterConfigSupabase(), globalThis.fetch, login.nonce);
+
+/**
+ * Confirmação avulsa para quem já estava conectado antes: um login do Google que renova o Drive e abre a sessão da nuvem.
+ * Deve ser chamada direto de um clique.
  */
 export async function entrarNaNuvemComGoogle() {
   const cid = obterConfigGoogleDrive().clientId || DEFAULT_GOOGLE_CLIENT_ID;
-  return entrarNoSupabaseComGoogle(obterConfigSupabase(), cid, {
-    obterIdToken: (id) => obterIdTokenGoogle(id, { carregarScript: carregarScriptExterno })
-  });
+  const login = await loginGoogleCompleto(cid, { hint: obterPerfilColaborador().email || '' });
+  guardarTokenDrive(login.accessToken, login.expiresIn, cid);
+  return abrirSessaoDaNuvem(login);
 }
 export const nuvemAutenticada = temSessaoSupabase;
 
@@ -408,6 +464,7 @@ export async function listarDocumentosDoSupabase(fetchImpl = globalThis.fetch, {
   });
 
   if (!resp.ok) {
+    if ((resp.status === 401 || resp.status === 403) && !temSessaoSupabase()) return [];
     throw new Error(`Falha ao listar documentos do Supabase (${resp.status}).`);
   }
   return await resp.json();
@@ -774,6 +831,7 @@ export async function autenticarGoogleDrive(clientId = DEFAULT_GOOGLE_CLIENT_ID,
       const tokenClient = window.google.accounts.oauth2.initTokenClient({
         client_id: cid,
         scope: scope || GOOGLE_AUTH_ESCOPOS,
+        hint: obterPerfilColaborador().email || undefined, // reconectar/renovar entra direto na conta, sem a tela de escolha
         callback: (resp) => {
           if (resp.error) {
             reject(new Error(resp.error_description || resp.error));
