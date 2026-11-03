@@ -26,6 +26,19 @@ const TAGS_FORMATACAO = 'b|strong|i|em|u|s|strike|del|ins|font|mark|big|small|ce
 const RE_ABRE_SPAN_ESTILO = /^<span\b[^>]*\bath-estilo-span\b[^>]*>$/i;
 
 /**
+ * Reescreve a abertura de um <ins>/<del> de sugestão só com os atributos que a revisão usa (id, autor, data, cor). O resto,
+ * como `onmouseover` ou `style` solto, é descartado: o texto pode vir de outro colaborador e ir direto para o innerHTML.
+ */
+function tagSugestaoSegura(t, attrs) {
+  const pega = (nome) => new RegExp(`\\b${nome}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i').exec(attrs);
+  const valor = (nome) => { const r = pega(nome); return r ? (r[1] ?? r[2] ?? '') : ''; };
+  const esc = (v) => String(v).replace(/&(?!(?:amp|lt|gt|quot|#39);)/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const id = valor('data-sugestao-id').replace(/[^\w-]/g, '').slice(0, 64);
+  const cor = /^#[0-9a-f]{3,8}$/i.test(valor('style').match(/--ath-sug-cor\s*:\s*(#[0-9a-f]{3,8})/i)?.[1] || '') ? valor('style').match(/--ath-sug-cor\s*:\s*(#[0-9a-f]{3,8})/i)[1] : '';
+  return `<${t} class="ath-sug-mark ath-sug-${t}" data-sugestao-id="${id}" data-autor="${esc(valor('data-autor'))}" data-autor-id="${esc(valor('data-autor-id'))}" data-criado="${esc(valor('data-criado'))}"${cor ? ` style="--ath-sug-cor:${cor}"` : ''}>`;
+}
+
+/**
  * Remove do HTML do texto toda formatação direta (negrito, itálico, sublinhado, tachado, cor, fonte, `style`, classes soltas).
  * Mantém: quebras de linha, links, índice/expoente (sup/sub, inclusive ref. de nota), citações automáticas e trechos de estilo cadastrado.
  * Os trechos `ath-estilo-span` ficam só com `data-estilo-id`; o CSS é resolvido pelo estilo na hora de desenhar.
@@ -39,7 +52,7 @@ export function sanearHtmlTexto(html) {
   h = h.replace(/<(\/?)([a-z][a-z0-9]*)\b([^>]*)>/gi, (m, fecha, tag, attrs) => {
     const t = tag.toLowerCase();
     if (t === 'ins' || t === 'del') {
-      if (!fecha) { const guarda = /\bdata-sugestao-id\s*=/i.test(attrs); marcasSugestao.push({ t, guarda }); return guarda ? m : ''; }
+      if (!fecha) { const guarda = /\bdata-sugestao-id\s*=/i.test(attrs); marcasSugestao.push({ t, guarda }); return guarda ? tagSugestaoSegura(t, attrs) : ''; }
       const topo = marcasSugestao.at(-1);
       if (topo?.t !== t) return '';
       marcasSugestao.pop();

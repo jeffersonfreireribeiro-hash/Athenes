@@ -138,11 +138,19 @@ test('sanearBlocoDeTexto ignora blocos que não são de texto', () => {
   assert.deepEqual(fig, { tipo: 'figura', fonte: 'Fonte: X', alinhamento: 'centro', cor: '#111111' });
 });
 
-test('achado Qodo 1: sugestões pendentes (ins/del com data-sugestao-id) sobrevivem à limpeza; ins/del soltos somem', async () => {
+test('achado Qodo 1: sugestões pendentes sobrevivem à limpeza, mas só com os atributos da revisão (sem handlers)', async () => {
   const { sanearHtmlTexto } = await import('../src/core/athenes_estilo_exclusivo.js');
-  const comSugestao = 'Texto <ins class="ath-sug-ins" data-sugestao-id="s1">novo</ins> e <del class="ath-sug-del" data-sugestao-id="s2">velho</del> fim';
-  assert.equal(sanearHtmlTexto(comSugestao), comSugestao);
+  const { gerarHtmlMarcacaoSugestao } = await import('../src/core/athenes_colaboracao.js');
+  const marca = gerarHtmlMarcacaoSugestao({ id: 's1', autor: 'Ana', autorId: 'u1', criadoEm: '2026-11-03', corAutor: '#10B981', textoOriginal: 'velho', textoNovo: 'novo' });
+  const limpo = sanearHtmlTexto(`Texto ${marca} fim`);
+  assert.match(limpo, /<del class="ath-sug-mark ath-sug-del" data-sugestao-id="s1" data-autor="Ana" data-autor-id="u1" data-criado="2026-11-03" style="--ath-sug-cor:#10B981">velho<\/del>/);
+  assert.match(limpo, /<ins class="ath-sug-mark ath-sug-ins" data-sugestao-id="s1"[^>]*>novo<\/ins>/);
   assert.equal(sanearHtmlTexto('a <ins>b</ins> <del>c</del> <b>d</b>'), 'a b c d');
+  // atributos perigosos de outro colaborador não passam
+  const ataque = sanearHtmlTexto('<ins data-sugestao-id="s9" onmouseover="alert(1)" style="position:fixed" data-autor="x&quot; onclick=&quot;y">t</ins>');
+  assert.doesNotMatch(ataque, /onmouseover|position:fixed/);
+  // o valor malicioso fica preso dentro do atributo (aspas escapadas): a tag só tem os cinco atributos da revisão
+  assert.match(ataque, /^<ins class="ath-sug-mark ath-sug-ins" data-sugestao-id="s9" data-autor="[^"]*" data-autor-id="[^"]*" data-criado="[^"]*">t<\/ins>$/);
   // o fechamento de um <ins> solto não rouba o de uma sugestão aberta antes
-  assert.equal(sanearHtmlTexto('<ins data-sugestao-id="s3">x<ins>y</ins>z</ins>'), '<ins data-sugestao-id="s3">xyz</ins>');
+  assert.match(sanearHtmlTexto('<ins data-sugestao-id="s3">x<ins>y</ins>z</ins>'), /^<ins [^>]*>xyz<\/ins>$/);
 });
