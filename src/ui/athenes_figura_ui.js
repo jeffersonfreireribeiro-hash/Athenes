@@ -389,7 +389,7 @@ export function montarPainelFiguraVisual(el, ctx) {
   /** Seção recolhível; `partes` são nós ou [subtítulo, nó]. */
   const secao = (titulo, ...partes) => {
     const d = document.createElement('details');
-    d.open = abertos.length ? abertos[el.querySelectorAll('details').length] !== false : true;
+    d.open = abertos[el.querySelectorAll('details').length] === true; // recolhidas por padrão; mantém só as que o usuário abriu
     const sm = document.createElement('summary');
     sm.textContent = titulo;
     d.appendChild(sm);
@@ -551,7 +551,7 @@ export function montarPainelTipografiaBloco(el, ctx) {
   el.innerHTML = '';
   ctx.papeis.forEach((papel, i) => {
     const d = document.createElement('details');
-    d.open = abertos.length ? abertos[i] !== false : i === 0;
+    d.open = abertos[i] === true; // recolhidas por padrão; mantém só as que o usuário abriu
     const sm = document.createElement('summary');
     sm.textContent = papel.rotulo;
     d.appendChild(sm);
