@@ -7,6 +7,8 @@ import { escapeHtml } from '../core/athenes_seguranca.js';
 import { PAPEIS, emailValido, normalizarEmail, lerCompartilhamento, salvarCompartilhamento, linkDoDocumento } from '../core/athenes_compartilhamento.js';
 import { salvarDocumentoNoSupabase, nuvemAutenticada, entrarNaNuvemComGoogle } from '../core/athenes_colaboracao.js';
 
+// campos de formulário da janela: altura única, texto sem corte e sem a aparência de pílula do tema
+const CAMPO = 'height:34px; box-sizing:border-box; padding:0 12px; border:1px solid #CBD5E1; border-radius:8px; background:#fff; font:500 13px var(--glx-font, system-ui); color:#1F2733; line-height:normal;';
 const opcoesPapel = (sel) => Object.entries(PAPEIS).map(([id, p]) => `<option value="${id}" ${id === sel ? 'selected' : ''}>${p.rotulo}</option>`).join('');
 
 export class ModalCompartilhar {
@@ -74,17 +76,19 @@ export class ModalCompartilhar {
     const linhas = Object.entries(this.pessoas).map(([email, papel]) => `
       <div style="display:flex; align-items:center; gap:6px;" data-pessoa="${escapeHtml(email)}">
         <span style="flex:1; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(email)}">${escapeHtml(email)}</span>
-        <select class="ath-select" data-papel style="width:120px; height:30px;" ${somenteLeitura ? 'disabled' : ''}>${opcoesPapel(papel)}</select>
-        <button type="button" class="ath-btn ath-btn-icon" data-remover title="Remover acesso" ${somenteLeitura ? 'disabled' : ''}>✕</button>
+        <select class="ath-select" data-papel aria-label="Papel de ${escapeHtml(email)}" style="${CAMPO} width:130px; flex:none;" ${somenteLeitura ? 'disabled' : ''}>${opcoesPapel(papel)}</select>
+        <button type="button" class="ath-btn ath-btn-icon" data-remover title="Remover acesso" aria-label="Remover acesso" style="flex:none;" ${somenteLeitura ? 'disabled' : ''}>✕</button>
       </div>`).join('') || '<p style="margin:0; font-size:12px; color:#64748B;">Ninguém além de você tem acesso.</p>';
     this.corpo.innerHTML = `
       ${somenteLeitura ? '<p style="margin:0; font-size:12px; color:#92400E; background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:6px 10px;">Só o dono do documento altera quem tem acesso.</p>' : ''}
       <div style="display:flex; flex-direction:column; gap:6px;" id="athCompLista">${linhas}</div>
       ${somenteLeitura ? '' : `
-      <div style="display:flex; gap:6px;">
-        <input type="email" class="ath-input" id="athCompEmail" placeholder="e-mail da pessoa (conta Google)" style="flex:1; height:30px;">
-        <select class="ath-select" id="athCompNovoPapel" style="width:120px; height:30px;">${opcoesPapel('leitura')}</select>
-        <button type="button" class="ath-btn" id="athCompAdd" style="height:30px;">Adicionar</button>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <input type="email" class="ath-input" id="athCompEmail" placeholder="E-mail da pessoa (conta Google)" autocomplete="off" style="${CAMPO} width:100%;">
+        <div style="display:flex; gap:6px;">
+          <select class="ath-select" id="athCompNovoPapel" aria-label="Papel" style="${CAMPO} flex:1; min-width:0;">${opcoesPapel('leitura')}</select>
+          <button type="button" class="ath-btn ath-btn-primary" id="athCompAdd" style="height:34px; padding:0 16px; white-space:nowrap;">Adicionar</button>
+        </div>
       </div>
       <small id="athCompMsg" style="min-height:14px; color:#B42318;"></small>`}
       <div style="font-size:11px; color:#64748B; line-height:1.4;">${Object.entries(PAPEIS).map(([, p]) => `<b>${p.rotulo}</b>: ${p.descricao}`).join(' · ')}</div>
@@ -93,8 +97,8 @@ export class ModalCompartilhar {
         <span>Qualquer pessoa com o link pode <b>ler</b> (precisa entrar com uma conta Google). Desligado por padrão.</span>
       </label>
       <div style="display:flex; gap:6px;">
-        <input type="text" class="ath-input" id="athCompLink" readonly value="${escapeHtml(linkDoDocumento(this.doc.id))}" style="flex:1; height:30px; font-size:11.5px;">
-        <button type="button" class="ath-btn" id="athCompCopiar" style="height:30px;">Copiar link</button>
+        <input type="text" class="ath-input" id="athCompLink" readonly value="${escapeHtml(linkDoDocumento(this.doc.id))}" style="${CAMPO} flex:1; min-width:0; font-size:11.5px; background:#F1F5F9;">
+        <button type="button" class="ath-btn" id="athCompCopiar" style="height:34px; padding:0 14px; white-space:nowrap; flex:none;">Copiar link</button>
       </div>
       <small style="color:#64748B;">O link só abre para quem você adicionou acima${this.publico ? ' (ou para qualquer pessoa, com a leitura pública ligada)' : ''}.</small>`;
     this.btnSalvar.disabled = somenteLeitura;
