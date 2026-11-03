@@ -775,7 +775,7 @@ export function extrairIdPastaDrive(urlOuId) {
 /** Ids da estrutura criada no Drive (antes eram descartados ao salvar a configuração e a estrutura se perdia). */
 function idsEstruturaDrive(o) {
   const r = {};
-  for (const k of ['pastaRaizId', 'pastaDocumentosId', 'pastaZoteroId', 'pastaRelatoriosId', 'accessTokenExpiraEm', 'ultimaSincronizacao', 'emailConectado']) if (o?.[k]) r[k] = o[k];
+  for (const k of ['pastaRaizId', 'raizFixa', 'pastaDocumentosId', 'pastaZoteroId', 'pastaRelatoriosId', 'accessTokenExpiraEm', 'ultimaSincronizacao', 'emailConectado']) if (o?.[k]) r[k] = o[k];
   return r;
 }
 
@@ -1203,6 +1203,7 @@ export function obterPastasDriveLocais() {
 
 export function salvarPastasDriveLocais(pastas) {
   _memoriaPastasDrive = JSON.parse(JSON.stringify(pastas));
+  try { if (typeof window !== 'undefined') window.dispatchEvent(new Event('athenes:pastas-alteradas')); } catch (_) {} // o painel envia a árvore ao servidor
   try {
     if (typeof localStorage !== 'undefined') {
       gravarConta(STORAGE_KEY_PASTAS_DRIVE, JSON.stringify(pastas));

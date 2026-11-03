@@ -37,13 +37,14 @@ import {
 } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { EstudoArtigosView, carregarArtigosEstudo } from './athenes_estudo_artigos.js';
+import { sincronizarPerfil } from '../core/athenes_perfil_servidor.js';
 import { listarCompartilhadosComigo, marcarComoCompartilhado, carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
-import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, docsRemovidosDoDrive, registrarExclusoes, idsExcluidos, processarExclusoesPendentes, obterPastaRaizDrive, repararPastaDosDocumentos, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
+import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, exclusoesRegistradas, docsRemovidosDoDrive, registrarExclusoes, idsExcluidos, processarExclusoesPendentes, obterPastaRaizDrive, repararPastaDosDocumentos, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -65,6 +66,14 @@ export class DashboardView {
     this.renderizar();
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
       setTimeout(() => this.sincronizarComSupabase(true), 1200);
+      // o servidor é a fonte da verdade: ao abrir, ao voltar para esta janela e depois de cada alteração local
+      setTimeout(() => this.sincronizarPerfilServidor(), 300);
+      let ultimaFoco = 0;
+      this._aoFocar = () => { if (!this.container?.isConnected || Date.now() - ultimaFoco < 15000) return; ultimaFoco = Date.now(); this.sincronizarPerfilServidor(); };
+      window.addEventListener('focus', this._aoFocar);
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this._aoFocar?.(); });
+      this._aoMudarPastas = () => this.agendarPerfil();
+      window.addEventListener('athenes:pastas-alteradas', this._aoMudarPastas);
     }
   }
 
@@ -105,6 +114,7 @@ export class DashboardView {
   }
 
   salvarDocumentosLocais() {
+    if (!this._aplicandoPerfil) this.agendarPerfil(); // mudou algo: o servidor precisa saber
     try {
       gravarConta('athenes_docs_indice', JSON.stringify(this.documentos));
     } catch (e) {
@@ -1335,12 +1345,86 @@ export class DashboardView {
    * (nome e data) dos documentos que o app criou lá; o conteúdo é baixado ao abrir. Sem Drive conectado, nada é listado.
    * (O nome do método é antigo: antes listava o Supabase, que mostrava os mesmos arquivos para todas as contas.)
    */
+  /** Agenda o envio do estado local ao servidor (junta várias alterações seguidas). */
+  agendarPerfil(atrasoMs = 1500) {
+    clearTimeout(this._tPerfil);
+    this._tPerfil = setTimeout(() => this.sincronizarPerfilServidor(), atrasoMs);
+  }
+
+  zoteroLocalParaPerfil() {
+    let cfg = {}; let marca = {};
+    try { cfg = JSON.parse(lerConta('athenes_zotero_cfg') || '{}') || {}; } catch (_) {}
+    try { marca = JSON.parse(lerConta('athenes_zotero_sync') || '{}') || {}; } catch (_) {}
+    const h = `${cfg.userId || ''}|${cfg.apiKey || ''}|${cfg.username || ''}|${cfg.isGroup ? 1 : 0}`;
+    return { cfg, mudou: !marca.hash || h !== marca.hash };
+  }
+
+  /**
+   * O SERVIDOR diz o que vale para este perfil: documentos (título, pasta, arquivo no Drive, o que foi excluído e o que mudou),
+   * árvore de pastas, ids das pastas do Drive e a conexão do Zotero. Aqui só se aplica o que ele manda e se envia o que mudou
+   * neste computador. Sem a nuvem protegida confirmada, cai no comportamento antigo (local + Drive). Devolve o resultado ou null.
+   */
+  async sincronizarPerfilServidor() {
+    if (!nuvemAutenticada() || this._perfilEmCurso) return null;
+    this._perfilEmCurso = true;
+    try {
+      const pastasAntes = obterPastasDriveLocais();
+      const d = obterConfigGoogleDrive();
+      const excluidos = {};
+      for (const x of exclusoesRegistradas()) excluidos[x.driveFileId ? `f:${x.driveFileId}` : `i:${x.id}`] = x.em;
+      const r = await sincronizarPerfil({
+        pastas: pastasAntes, documentos: this.documentos, excluidos,
+        drive: { pastaRaizId: d.pastaRaizId || '', pastaDocumentosId: d.pastaDocumentosId || '', pastaZoteroId: d.pastaZoteroId || '', pastaRelatoriosId: d.pastaRelatoriosId || '' },
+        zotero: this.zoteroLocalParaPerfil()
+      });
+      this._aplicandoPerfil = true;
+      let mudou = false;
+
+      if (r.aplicarDrive) { salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), ...r.aplicarDrive, raizFixa: true }); mudou = true; }
+      if (r.aplicarZotero) {
+        let atual = {}; try { atual = JSON.parse(lerConta('athenes_zotero_cfg') || '{}') || {}; } catch (_) {}
+        gravarConta('athenes_zotero_cfg', JSON.stringify({ ...atual, ...r.aplicarZotero }));
+      }
+      const cz = r.indice.zotero?.cfg;
+      if (cz) gravarConta('athenes_zotero_sync', JSON.stringify({ hash: `${cz.userId || ''}|${cz.apiKey || ''}|${cz.username || ''}|${cz.isGroup ? 1 : 0}`, em: new Date().toISOString() }));
+
+      if (r.remover.length) { const rm = new Set(r.remover); this.documentos = this.documentos.filter(x => !rm.has(String(x.id))); mudou = true; }
+      for (const e of r.adicionar) {
+        if (!e.driveFileId) continue; // ainda sem arquivo no Drive: aparece quando o computador de origem enviar
+        this.documentos.unshift({ id: e.id, titulo: e.titulo, subtitulo: e.subtitulo || 'Do seu Google Drive', tipoDoc: e.tipoDoc, perfilId: e.perfilId, pastaId: e.pastaId || undefined, driveFileId: e.driveFileId, driveFolderId: e.driveFolderId || undefined, dataModificacao: e.atualizadoEm, driveSincronizadoEm: e.conteudoEm || e.atualizadoEm, origemDrive: true, precisaCarregarConteudo: true });
+        mudou = true;
+      }
+      for (const { local, entrada: e } of r.atualizar) {
+        const doc = this.documentos.find(x => String(x.id) === local);
+        if (!doc) continue;
+        Object.assign(doc, { id: e.id, titulo: e.titulo, subtitulo: e.subtitulo || doc.subtitulo, pastaId: e.pastaId || undefined, driveFileId: e.driveFileId || doc.driveFileId, driveFolderId: e.driveFolderId || doc.driveFolderId, dataModificacao: e.atualizadoEm });
+        mudou = true;
+      }
+      for (const id of r.recarregar) {
+        const doc = this.documentos.find(x => String(x.id) === id);
+        if (doc?.driveFileId) { doc.origemDrive = true; doc.precisaCarregarConteudo = true; mudou = true; }
+      }
+      const arvoreMudou = JSON.stringify(r.pastas) !== JSON.stringify(pastasAntes);
+      if (arvoreMudou) { salvarPastasDriveLocais(r.pastas); this.pastasDrive = obterPastasDriveLocais(); mudou = true; }
+      if (mudou) { this.salvarDocumentosLocais(); this.atualizarGrid(); this.renderizarPastasLateral(); }
+      this._aplicandoPerfil = false;
+      return r;
+    } catch (e) {
+      console.warn('[Athenes] Índice do perfil no servidor:', e.message);
+      return null;
+    } finally {
+      this._aplicandoPerfil = false;
+      this._perfilEmCurso = false;
+    }
+  }
+
   /**
    * Depois de excluir da lista: lembra a exclusão (a sincronização não traz de volta), leva o arquivo do Drive para a lixeira
    * (recuperável) e apaga a cópia da nuvem. Documentos de outras pessoas só somem da MINHA lista.
    */
   async aposExcluir(docs) {
     registrarExclusoes(docs);
+    this.agendarPerfil(200); // o servidor passa a saber da exclusão já: os outros computadores deixam de mostrar o documento
     try {
       const token = driveConectado() ? await obterTokenDrive() : null;
       if (token) await processarExclusoesPendentes(token);
@@ -1378,6 +1462,8 @@ export class DashboardView {
 
   async sincronizarComSupabase(silencioso = false) {
     await this.sincronizarCompartilhados();
+    const perfilSrv = await this.sincronizarPerfilServidor(); // o que vale vem do servidor; o Drive entrega os arquivos
+    const permitidos = perfilSrv && !perfilSrv.criado ? new Set(perfilSrv.indice.documentos.map(e => e.driveFileId).filter(Boolean)) : null;
     const btn = this.container?.querySelector('#athBtnSincronizarNuvem');
     if (!driveConectado()) {
       if (!silencioso) alert('Conecte o Google Drive (engrenagem → Nuvem & Drive) para ver seus documentos na nuvem. Cada conta enxerga só o próprio Drive.');
@@ -1396,7 +1482,8 @@ export class DashboardView {
       try { await processarExclusoesPendentes(token); } catch (e) { console.warn('[Athenes] Lixeira do Drive:', e.message); }
       // Zotero conectado em outro computador desta conta aparece aqui (e o daqui vai para os outros)
       let zotero = 'nada';
-      try { zotero = await sincronizarZoteroComDrive(token); } catch (e) { console.warn('[Athenes] Zotero pelo Drive:', e.message); }
+      // com o servidor, o Zotero já foi sincronizado por ele; o arquivo no Drive é só o reserva
+      try { if (!perfilSrv) zotero = await sincronizarZoteroComDrive(token); } catch (e) { console.warn('[Athenes] Zotero pelo Drive:', e.message); }
       // 1) a estrutura de pastas do Drive (outro computador começa só com as padrão); 2) os documentos, já nas pastas certas
       let pastasNovas = { importadas: 0, vinculadas: 0, mapa: {} };
       try { pastasNovas = await importarPastasDoDrive(token); } catch (e) { console.warn('[Athenes] Pastas do Drive não importadas:', e.message); }
@@ -1414,7 +1501,7 @@ export class DashboardView {
           }
         } catch (e) { console.warn('[Athenes] Exclusões feitas em outro computador:', e.message); }
       }
-      const r = mesclarBibliotecaDrive(this.documentos, arquivos, pastasNovas.mapa, obterPastasDriveLocais());
+      const r = mesclarBibliotecaDrive(this.documentos, arquivos, pastasNovas.mapa, obterPastasDriveLocais(), undefined, permitidos);
       const religados = repararPastaDosDocumentos(this.documentos, obterPastasDriveLocais()); // documentos trazidos de outro PC voltam para a pasta certa
       if (religados) r.atualizados += religados;
       if (pastasNovas.importadas || religados) { this.pastasDrive = obterPastasDriveLocais(); this.salvarDocumentosLocais(); this.renderizar(); }

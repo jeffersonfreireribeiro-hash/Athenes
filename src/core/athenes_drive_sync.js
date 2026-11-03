@@ -97,6 +97,7 @@ export async function obterPastaRaizDrive(token, fetchImpl = globalThis.fetch, p
   if (cfg.pastaRaizId) {
     const chave = `${cfg.pastaRaizId}|${token}`;
     if (raizValidada.has(chave)) return cfg.pastaRaizId;
+    if (cfg.raizFixa && await pastaDriveExiste(token, cfg.pastaRaizId, fetchImpl)) { raizValidada.add(chave); return cfg.pastaRaizId; } // a pasta raiz definida pelo servidor vale para todos os computadores
     if (await pastaDriveExiste(token, cfg.pastaRaizId, fetchImpl)) {
       // existe, mas pode haver outra "Athenes" mais antiga criada por outro computador: a mais antiga é a de todos
       const mais = (await chamar(fetchImpl, `${API}?q=${encodeURIComponent(`trashed = false and mimeType = 'application/vnd.google-apps.folder' and name = '${aspas(NOME_RAIZ)}'`)}&fields=files(id)&orderBy=createdTime&pageSize=1`, {}, token).catch(() => null))?.files?.[0]?.id;
@@ -259,12 +260,13 @@ export async function listarBibliotecaDoDrive(token, { fetchImpl = globalThis.fe
  * Acrescenta ao índice local os documentos do Drive que ainda não existem aqui (como "só no Drive": conteúdo baixado ao abrir)
  * e marca os que já existem para baixar de novo quando o do Drive é mais novo. Devolve { novos, atualizados }.
  */
-export function mesclarBibliotecaDrive(documentos, arquivos, mapaPastas = {}, pastas = null, excluidos = excluidosDoDrive()) {
+export function mesclarBibliotecaDrive(documentos, arquivos, mapaPastas = {}, pastas = null, excluidos = excluidosDoDrive(), permitidos = null) {
   const r = { novos: 0, atualizados: 0 };
   for (const f of arquivos || []) {
     if (excluidos.has(f.driveFileId)) continue; // o usuário excluiu este documento: não volta na sincronização
     const local = documentos.find(d => d.driveFileId === f.driveFileId);
     if (!local) {
+      if (permitidos && !permitidos.has(f.driveFileId)) continue; // o servidor diz o que vale: arquivo do Drive que ele não lista não aparece
       documentos.unshift({
         id: `drive_${f.driveFileId}`, titulo: f.titulo, subtitulo: 'Do seu Google Drive', tipoDoc: 'artigo', perfilId: 'abnt',
         dataModificacao: f.modificadoEm, driveFileId: f.driveFileId, driveSincronizadoEm: f.modificadoEm, origemDrive: true, precisaCarregarConteudo: true,
@@ -413,6 +415,9 @@ export function repararPastaDosDocumentos(documentos, pastas) {
 
 const CHAVE_EXCLUIDOS = 'athenes_docs_excluidos';
 const lerExcluidos = () => { try { const v = JSON.parse(lerConta(CHAVE_EXCLUIDOS) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+
+/** Exclusões registradas neste computador: [{ id, driveFileId, em, … }]. */
+export const exclusoesRegistradas = () => lerExcluidos();
 
 /** driveFileIds de documentos excluídos neste computador (a sincronização os ignora). */
 export const excluidosDoDrive = () => new Set(lerExcluidos().map(x => x.driveFileId).filter(Boolean));
