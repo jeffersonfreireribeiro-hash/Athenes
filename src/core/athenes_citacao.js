@@ -160,7 +160,43 @@ export function referenciaDoArtigo(a) {
     temPdf: Boolean(a?.pdfUrl || a?.driveFileId || a?.driveArquivoId),
     fichamento: ficha ? a.fichamento : '',
     resumo: a?.resumoOriginal || a?.resumo || '',
-    citacoesMarcadas: a?.citacoesMarcadas || [],
+    totalPaginas: Number(a?.totalPaginas) || 0,
+    citacoesMarcadas: a?.fichamento?.citacoesMarcadas || a?.citacoesMarcadas || [],
     palavrasChave: Array.isArray(a?.palavrasChave) ? a.palavrasChave : (a?.tags || [])
   };
+}
+
+/**
+ * Intervalo de páginas que a obra permite citar: o das páginas da publicação (ex.: "114-138") ou, sem ele,
+ * o do PDF vinculado (1 a N). Devolve null quando não há como saber.
+ */
+export function intervaloDePaginas(ref) {
+  const m = /(\d+)\D+(\d+)/.exec(String(ref?.paginas || ''));
+  if (m && Number(m[1]) <= Number(m[2])) return { min: Number(m[1]), max: Number(m[2]), origem: 'publicacao', texto: `${m[1]}–${m[2]}` };
+  const n = Number(ref?.totalPaginas);
+  if (n >= 1) return { min: 1, max: n, origem: 'pdf', texto: n === 1 ? '1' : `1–${n}` };
+  return null;
+}
+
+/** Confere a página digitada ("15", "15-17" ou "15, 17") contra o intervalo da obra; vazio é válido (página opcional). */
+export function validarPaginas(valor, intervalo) {
+  const v = String(valor ?? '').trim();
+  if (!v) return { ok: true, valor: '' };
+  const partes = v.split(/\s*[,;]\s*/);
+  for (const p of partes) {
+    const m = /^(\d+)(?:\s*[-–]\s*(\d+))?$/.exec(p);
+    if (!m) return { ok: false, mensagem: 'Use só números: 15, 15-17 ou 15, 17' };
+    const a = Number(m[1]);
+    const b = m[2] === undefined ? a : Number(m[2]);
+    if (b < a) return { ok: false, mensagem: 'O intervalo está invertido' };
+    if (intervalo && (a < intervalo.min || b > intervalo.max)) return { ok: false, mensagem: `Fora do intervalo da obra (${intervalo.texto})` };
+  }
+  return { ok: true, valor: v.replace(/\s*[-–]\s*/g, '–').replace(/\s*[,;]\s*/g, ', ') };
+}
+
+/** Referência exibida depois de uma citação longa (bloco `citacao`): a do estilo escolhido, linkada se pedido; antiga em ABNT se não houver. */
+export function referenciaDoBlocoCitacao(b) {
+  const texto = b?.ref_texto || `(${b?.autor || 'AUTOR'}, ${b?.ano || 's.d.'}${b?.pagina_citada ? ', p. ' + b.pagina_citada : ''})`;
+  if (!b?.ref_texto || !b.ref_linkar || !b.ref_id) return { texto, html: escaparHtml(texto) };
+  return { texto, html: `<a class="ath-citacao-link" href="#${ancoraDaReferencia({ id: b.ref_id })}" data-ref-id="${escaparHtml(String(b.ref_id))}" style="color:inherit;text-decoration:none;">${escaparHtml(texto)}</a>` };
 }

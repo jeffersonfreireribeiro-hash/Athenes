@@ -54,7 +54,7 @@ import { svgIcone, svgLogo } from './athenes_icones.js';
 import { ModalCompartilhar } from './athenes_compartilhar_modal.js';
 import { modosPermitidos, modoInicialDoPapel } from '../core/athenes_compartilhamento.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
-import { montarCitacao, indiceNaLista } from '../core/athenes_citacao.js';
+import { montarCitacao, indiceNaLista, referenciaDoBlocoCitacao } from '../core/athenes_citacao.js';
 import { linhasEstimadas, porLinhaUsadoNoTexto, calibracaoDoTexto, definirCalibracaoTexto } from '../core/athenes_fragmentos.js';
 import { hifenizarHtml, removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais, removerPalavrasIniciais } from '../core/athenes_estilo_avancado.js';
@@ -3057,7 +3057,7 @@ export class EditorView {
         ref.className = 'ath-citacao-ref';
         ref.contentEditable = 'false';
         ref.style.userSelect = 'none';
-        ref.textContent = ` (${b.autor || 'AUTOR'}, ${b.ano || 's.d.'}${b.pagina_citada ? ', p. ' + b.pagina_citada : ''})`;
+        ref.innerHTML = ` ${referenciaDoBlocoCitacao(b).html}`;
         p.appendChild(ref);
       }
       this.aplicarConfigListaNoBloco(p, b);
@@ -3577,6 +3577,30 @@ export class EditorView {
 
     this.notificarMudanca();
     this.renderizarFolhasPaginas();
+  }
+
+  /** Insere uma citação direta longa (bloco recuado, fonte menor) depois do bloco selecionado. */
+  inserirCitacaoLonga(ref, { texto, pagina = '', refTexto, linkar = true } = {}) {
+    if (!ref || !String(texto || '').trim()) return null;
+    if (modoSomenteLeitura(this.modoTrabalho)) {
+      alert('O documento está em um modo somente leitura (Leitura ou Comparar). Mude para Edição ou Sugestão no topo para inserir blocos.');
+      return null;
+    }
+    const sec = this.obterSecaoAtiva();
+    if (!sec) return null;
+    if (!this.doc.referencias) this.doc.referencias = [];
+    if (!this.doc.referencias.some(r => (r.id && r.id === ref.id) || (r.chaveZotero && r.chaveZotero === ref.chaveZotero))) this.doc.referencias.push(ref);
+    const sobrenome = ref.autores?.[0]?.sobrenome || ref.autor || 'AUTOR';
+    const html = escapeHtml(String(texto).trim()).replace(/\s*[\r\n]+\s*/g, ' ');
+    const b = criarNovoBloco('citacao', { texto: html, autor: String(sobrenome).toUpperCase(), ano: ref.ano, pagina_citada: pagina, ref_texto: refTexto, ref_id: ref.id, ref_linkar: linkar });
+    const idxSel = this.blocoSelecionado ? (sec.blocos || []).findIndex(x => x.id === this.blocoSelecionado.id) : -1;
+    if (idxSel >= 0) { sec.blocos.splice(idxSel + 1, 0, b); repaginarDocumento(this.doc); }
+    else adicionarBlocoNaSecao(this.doc, sec.id, b);
+    this.blocoSelecionado = b;
+    this.notificarMudanca();
+    this.renderizar();
+    this.onSelecionarBloco(b, null);
+    return b;
   }
 
   notificarMudanca() {

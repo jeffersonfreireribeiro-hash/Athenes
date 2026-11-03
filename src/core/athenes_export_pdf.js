@@ -12,7 +12,7 @@ import { margensEfetivasMm } from './athenes_mestra_canvas.js';
 import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssTipografia, estiloParaCssNumeracao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
-import { ancoraDaReferencia } from './athenes_citacao.js';
+import { ancoraDaReferencia, referenciaDoBlocoCitacao } from './athenes_citacao.js';
 import { hifenizarHtml } from './athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais } from './athenes_estilo_avancado.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
@@ -159,7 +159,7 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
 
     case 'citacao': {
       const cssCitacao = estiloParaCss(est); // estilo da citação já com os ajustes do bloco (e do fragmento: o 2º pedaço não repete o espaço antes), igual ao editor
-      const ref = `(${bloco.autor || 'AUTOR'}, ${bloco.ano || 's.d.'}${bloco.pagina_citada ? ', p. ' + bloco.pagina_citada : ''})`;
+      const ref = referenciaDoBlocoCitacao(bloco).html;
       return `<blockquote class="ath-bloco ath-citacao" style="${cssCitacao}" data-id="${bloco.id}">
         ${bloco.texto || ''}
         <span class="ath-citacao-ref">${ref}</span>

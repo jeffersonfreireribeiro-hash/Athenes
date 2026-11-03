@@ -9,7 +9,7 @@ import { lerConta, gravarConta } from '../core/athenes_conta.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import * as bib from '../core/athenes_biblioteca_artigos.js';
 import { svgIcone } from './athenes_icones.js';
-import { ESTILOS_CITACAO, ESTILOS_CSL, eEstiloNumerico, estiloDoDocumento, referenciaDoArtigo, formatarCitacaoTexto, indiceNaLista } from '../core/athenes_citacao.js';
+import { ESTILOS_CITACAO, ESTILOS_CSL, eEstiloNumerico, estiloDoDocumento, referenciaDoArtigo, formatarCitacaoTexto, indiceNaLista, intervaloDePaginas, validarPaginas } from '../core/athenes_citacao.js';
 
 export function classificarTipoRef(ref) {
   if (!ref) return { id: 'outro', label: 'Outro', bg: '#F1F5F9', cor: '#475569' };
@@ -45,6 +45,7 @@ export class PainelZotero {
     this.filtroPeriodo = 'todos'; // todos | ultimos_5 | ultimos_10 | anteriores
     this.onInserirCitacao = opcoes.onInserirCitacao || (() => {});
     this.onAlterado = opcoes.onAlterado || (() => {});
+    this.onInserirCitacaoLonga = opcoes.onInserirCitacaoLonga || (() => {});
 
     // Carrega credenciais salvas do localStorage
     this.carregarCredenciais();
@@ -137,9 +138,6 @@ export class PainelZotero {
           <select id="athCitCsl" class="glx-select" style="height:26px; font-size:11px;">
             ${ESTILOS_CSL.map(e => `<option value="${e.id}" ${est.csl === e.id ? 'selected' : ''}>${e.rotulo}</option>`).join('')}
           </select>
-        </label>
-        <label style="display:flex; align-items:center; gap:4px;" title="Página ou intervalo (opcional), ex.: 15 ou 15-17">Pág.
-          <input type="text" id="athCitPagina" value="${escaparAttr(this.paginaCitacao || '')}" placeholder="—" style="width:56px; height:24px; font-size:11px; padding:0 6px; border:1px solid #CBD5E1; border-radius:6px;">
         </label>
         <label style="display:flex; align-items:center; gap:4px; cursor:pointer;" title="A citação leva ao item correspondente na lista de referências (no editor, no PDF e no Word)">
           <input type="checkbox" id="athCitLinkar" ${est.linkar ? 'checked' : ''}> Linkar à referência
@@ -248,17 +246,11 @@ export class PainelZotero {
         linkar: root.querySelector('#athCitLinkar').checked,
         csl: root.querySelector('#athCitCsl').value
       };
-      this.paginaCitacao = root.querySelector('#athCitPagina').value.trim();
       root.querySelector('#athCitCslBox').style.display = this.doc.estiloCitacao.estilo === 'zotero' ? 'flex' : 'none';
       this.onAlterado();
       this.atualizarListaItens();
     };
     ['#athCitEstilo', '#athCitCsl', '#athCitLinkar'].forEach(q => root.querySelector(q)?.addEventListener('change', guardarEstilo));
-    root.querySelector('#athCitPagina')?.addEventListener('input', () => {
-      this.paginaCitacao = root.querySelector('#athCitPagina').value.trim();
-      this.atualizarListaItens();
-    });
-
     const inputBib = root.querySelector('#athInputBibtex');
     inputBib?.addEventListener('change', e => this.processarArquivoBibtex(e.target.files[0]));
 
@@ -430,13 +422,34 @@ export class PainelZotero {
           <span style="font-size:10.5px; color:#64748B; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px;" title="${ref.publicacao || ref.editora || ''}">
             ${ref.publicacao || ref.editora || 'Biblioteca Geral'}
           </span>
-          <div style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
-            ${botoesCitar}
-          </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px;">
+          <label style="display:flex; align-items:center; gap:4px; font-size:10.5px; color:#475569; font-weight:700;" title="${escaparAttr(this.dicaPagina(ref))}">Pág.
+            <input type="text" class="ath-cit-pag" value="${escaparAttr(this.paginas[ref.id] || '')}" placeholder="${escaparAttr(intervaloDePaginas(ref)?.texto || '—')}" style="width:64px; height:22px; font-size:11px; padding:0 6px; border:1px solid #CBD5E1; border-radius:6px;">
+            <small class="ath-cit-pag-dica" style="font-weight:600; color:#64748B;">${escaparAttr(this.dicaCurta(ref))}</small>
+          </label>
+          <div class="ath-cit-botoes" style="display:flex; gap:4px; align-items:center; flex-shrink:0;">${botoesCitar}</div>
         </div>
       `;
 
+      const campoPag = card.querySelector('.ath-cit-pag');
+      campoPag.addEventListener('input', () => {
+        this.paginas[ref.id] = campoPag.value;
+        const v = validarPaginas(campoPag.value, intervaloDePaginas(ref));
+        campoPag.style.borderColor = v.ok ? '#CBD5E1' : '#DC2626';
+        card.querySelector('.ath-cit-pag-dica').textContent = v.ok ? this.dicaCurta(ref) : v.mensagem;
+        card.querySelector('.ath-cit-pag-dica').style.color = v.ok ? '#64748B' : '#DC2626';
+        card.querySelector('.ath-cit-botoes').innerHTML = this.botoesDeCitacao(ref);
+      });
+
       card.addEventListener('click', ev => {
+        if (ev.target.closest('.ath-cit-pag')) { ev.stopPropagation(); return; }
+        if (ev.target.closest('.ath-btn-longa')) {
+          ev.stopPropagation();
+          this.selecionarItem(ref);
+          this.container.querySelector('#athZoteroLongaBox')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          return;
+        }
         const btnCitar = ev.target.closest('.ath-btn-citar');
         if (btnCitar) {
           ev.stopPropagation();
@@ -451,14 +464,47 @@ export class PainelZotero {
     }
   }
 
+  get paginas() { return (this._paginas ||= {}); }
+
+  /** Página digitada para a obra, já conferida contra o intervalo dela ({ ok, valor, mensagem }). */
+  paginaDaObra(ref) { return validarPaginas(this.paginas[ref.id], intervaloDePaginas(ref)); }
+
+  dicaCurta(ref) {
+    const iv = intervaloDePaginas(ref);
+    return iv ? `${iv.origem === 'pdf' ? 'PDF: ' : 'disp.: '}${iv.texto}` : '';
+  }
+
+  dicaPagina(ref) {
+    const iv = intervaloDePaginas(ref);
+    if (!iv) return 'Página ou intervalo (opcional), ex.: 15 ou 15-17';
+    return iv.origem === 'pdf'
+      ? `Opcional. O PDF vinculado tem ${iv.texto} página(s); informe a página da publicação, se souber.`
+      : `Opcional. Páginas da publicação: ${iv.texto}.`;
+  }
+
   /** Botões de inserir, com o texto exato que será colocado no documento (conforme estilo e página). */
   botoesDeCitacao(ref) {
     const est = estiloDoDocumento(this.doc);
-    const base = { estilo: est.estilo, pagina: this.paginaCitacao, indice: indiceNaLista(this.doc, ref) };
+    const pag = this.paginaDaObra(ref);
+    const base = { estilo: est.estilo, pagina: pag.ok ? pag.valor : '', indice: indiceNaLista(this.doc, ref) };
     const rotulo = (formato) => escaparAttr(est.estilo === 'zotero' ? (formato === 'narrativa' ? 'Narrativa' : 'Citar') : formatarCitacaoTexto(ref, { ...base, formato }));
-    const botao = (formato, classe, extra) => `<button type="button" class="glx-btn glx-btn-xs ${classe} ath-btn-citar" data-formato="${formato}" style="padding:2px 8px; font-weight:700; border-radius:6px; font-size:10.5px; ${extra}" title="Inserir no texto: ${rotulo(formato)}">${rotulo(formato)}</button>`;
+    const lim = pag.ok ? '' : ' disabled';
+    const botao = (formato, classe, extra) => `<button type="button" class="glx-btn glx-btn-xs ${classe} ath-btn-citar" data-formato="${formato}"${lim} style="padding:2px 8px; font-weight:700; border-radius:6px; font-size:10.5px; ${pag.ok ? '' : 'opacity:.45; cursor:not-allowed;'}${extra}" title="${pag.ok ? 'Inserir no texto: ' + rotulo(formato) : escaparAttr(pag.mensagem)}">${rotulo(formato)}</button>`;
     const unico = eEstiloNumerico(est.estilo) || est.estilo === 'zotero';
-    return botao('parentese', 'glx-btn-primary', '') + (unico ? '' : botao('narrativa', 'glx-btn-soft', 'border:1px solid #CBD5E1;'));
+    const longa = `<button type="button" class="glx-btn glx-btn-xs glx-btn-soft ath-btn-longa" style="padding:2px 8px; font-weight:700; border-radius:6px; font-size:10.5px; border:1px solid #CBD5E1;" title="Citação direta longa (mais de 3 linhas): bloco recuado com a referência">Longa</button>`;
+    return botao('parentese', 'glx-btn-primary', '') + (unico ? '' : botao('narrativa', 'glx-btn-soft', 'border:1px solid #CBD5E1;')) + longa;
+  }
+
+  /** Texto da citação no estilo do documento; no modo Zotero pede ao serviço e, sem resposta, cai no ABNT local. */
+  async textoDaCitacao(ref, pagina, formato = 'parentese') {
+    const est = estiloDoDocumento(this.doc);
+    const base = { estilo: est.estilo, pagina, formato, indice: indiceNaLista(this.doc, ref) };
+    if (est.estilo === 'zotero') {
+      const t = await this.client.obterCitacaoFormatada(ref.chaveZotero, est.csl);
+      if (t) return pagina ? t.replace(/\)$/, `, p. ${pagina})`) : t;
+      base.estilo = 'abnt';
+    }
+    return formatarCitacaoTexto(ref, base);
   }
 
   selecionarItem(ref) {
@@ -489,10 +535,69 @@ export class PainelZotero {
       </div>
     `;
 
+    this.montarCitacaoLonga(detalhesBox, ref);
+
     const txtArea = detalhesBox.querySelector('#athFichamentoTxt');
     txtArea?.addEventListener('input', () => {
       nota.texto = txtArea.value;
       this.onAlterado();
+    });
+  }
+
+  /** Seção "Citação direta longa": trecho (de um destaque do fichamento ou colado) vira bloco recuado com a referência. */
+  montarCitacaoLonga(detalhesBox, ref) {
+    const iv = intervaloDePaginas(ref);
+    const marcadas = (ref.citacoesMarcadas || []).filter(c => c?.texto);
+    const caixa = document.createElement('div');
+    caixa.id = 'athZoteroLongaBox';
+    caixa.style.cssText = 'margin-top:10px; padding-top:10px; border-top:1px dashed #CBD5E1;';
+    caixa.innerHTML = `
+      <strong style="display:block; font-size:11.5px; margin-bottom:4px; color:#314F79;">Citação direta longa (mais de 3 linhas)</strong>
+      ${marcadas.length ? `<select id="athLongaFonte" class="glx-select" style="width:100%; height:28px; font-size:11px; margin-bottom:6px;">
+        <option value="">Escrever ou colar o trecho…</option>
+        ${marcadas.map((c, i) => `<option value="${i}">${escaparAttr(`${c.paginaCitacao || c.pagina ? 'p. ' + (c.paginaCitacao || c.pagina) + ' — ' : ''}${String(c.texto).slice(0, 80)}${String(c.texto).length > 80 ? '…' : ''}`)}</option>`).join('')}
+      </select>` : ''}
+      <textarea id="athLongaTexto" placeholder="Trecho copiado da obra, sem aspas: entra como bloco recuado, em fonte menor, com a referência no fim." style="width:100%; box-sizing:border-box; height:70px; font-size:11.5px; border-radius:6px; padding:6px 8px; border:1px solid #CBD5E1;"></textarea>
+      <div style="display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap;">
+        <label style="display:flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#475569;">Pág.
+          <input type="text" id="athLongaPag" placeholder="${escaparAttr(iv?.texto || '—')}" style="width:72px; height:24px; font-size:11px; padding:0 6px; border:1px solid #CBD5E1; border-radius:6px;">
+        </label>
+        <small id="athLongaDica" style="font-size:10.5px; color:#64748B; flex:1;">${escaparAttr(this.dicaPagina(ref))}</small>
+        <button type="button" class="glx-btn glx-btn-xs glx-btn-primary" id="athBtnInserirLonga" style="padding:3px 10px; font-weight:700; border-radius:6px;">Inserir citação longa</button>
+      </div>`;
+    detalhesBox.appendChild(caixa);
+
+    const txt = caixa.querySelector('#athLongaTexto');
+    const pag = caixa.querySelector('#athLongaPag');
+    const dica = caixa.querySelector('#athLongaDica');
+    const btn = caixa.querySelector('#athBtnInserirLonga');
+    const conferir = () => {
+      const v = validarPaginas(pag.value, iv);
+      pag.style.borderColor = v.ok ? '#CBD5E1' : '#DC2626';
+      dica.textContent = v.ok ? this.dicaPagina(ref) : v.mensagem;
+      dica.style.color = v.ok ? '#64748B' : '#DC2626';
+      btn.disabled = !v.ok || !txt.value.trim();
+      btn.style.opacity = btn.disabled ? '.5' : '1';
+      return v;
+    };
+    caixa.querySelector('#athLongaFonte')?.addEventListener('change', e => {
+      const c = marcadas[Number(e.target.value)];
+      if (!c) return;
+      txt.value = c.texto;
+      pag.value = c.paginaCitacao || (iv?.origem === 'pdf' ? (c.pagina || '') : '');
+      conferir();
+    });
+    txt.addEventListener('input', conferir);
+    pag.addEventListener('input', conferir);
+    conferir();
+
+    btn.addEventListener('click', async () => {
+      const v = conferir();
+      if (!v.ok || !txt.value.trim()) return;
+      if (!this.doc.referencias) this.doc.referencias = [];
+      const est = estiloDoDocumento(this.doc);
+      const refTexto = await this.textoDaCitacao(ref, v.valor);
+      this.onInserirCitacaoLonga(ref, { texto: txt.value, pagina: v.valor, refTexto, linkar: est.linkar });
     });
   }
 
@@ -503,11 +608,13 @@ export class PainelZotero {
       this.onAlterado();
     }
     const est = estiloDoDocumento(this.doc);
-    const opcoes = { estilo: est.estilo, linkar: est.linkar, pagina: this.paginaCitacao };
+    const pag = this.paginaDaObra(ref);
+    if (!pag.ok) return;
+    const opcoes = { estilo: est.estilo, linkar: est.linkar, pagina: pag.valor };
     if (est.estilo === 'zotero') {
       // O Zotero formata (CSL); sem conexão ou sem a obra lá, cai no formato ABNT local
       const texto = await this.client.obterCitacaoFormatada(ref.chaveZotero, est.csl);
-      if (texto) opcoes.textoPronto = this.paginaCitacao ? texto.replace(/\)$/, `, p. ${this.paginaCitacao})`) : texto;
+      if (texto) opcoes.textoPronto = pag.valor ? texto.replace(/\)$/, `, p. ${pag.valor})`) : texto;
       else opcoes.estilo = 'abnt';
     }
     this.onInserirCitacao(ref, formato, opcoes);

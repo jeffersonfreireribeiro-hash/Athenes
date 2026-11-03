@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatarCitacaoTexto, montarCitacao, referenciaDoArtigo, estiloDoDocumento, ancoraDaReferencia, nomeMarcadorWord, indiceNaLista, ESTILOS_CITACAO } from '../src/core/athenes_citacao.js';
+import { formatarCitacaoTexto, montarCitacao, referenciaDoArtigo, estiloDoDocumento, ancoraDaReferencia, nomeMarcadorWord, indiceNaLista, ESTILOS_CITACAO, intervaloDePaginas, validarPaginas, referenciaDoBlocoCitacao } from '../src/core/athenes_citacao.js';
 import { ZoteroClient } from '../src/core/athenes_zotero.js';
 
 const dois = { id: 'a1', ano: '2025', autores: [{ sobrenome: 'Santos', prenome: 'Milton' }, { sobrenome: 'Ribeiro', prenome: 'Ana' }] };
@@ -76,4 +76,46 @@ test('Zotero: pede a citação ao serviço e limpa o HTML; sem chave devolve vaz
   assert.equal(await c.obterCitacaoFormatada('', 'apa', { fetchImpl }), '');
   assert.equal(await c.obterCitacaoFormatada('X', 'apa', { fetchImpl: async () => ({ ok: false }) }), '');
   assert.equal(await new ZoteroClient().obterCitacaoFormatada('X', 'apa', { fetchImpl }), '');
+});
+
+test('intervalo de páginas: publicação, PDF ou desconhecido', () => {
+  assert.deepEqual(intervaloDePaginas({ paginas: '114-138', totalPaginas: 3 }), { min: 114, max: 138, origem: 'publicacao', texto: '114–138' });
+  assert.equal(intervaloDePaginas({ paginas: '114–138' }).max, 138);
+  assert.deepEqual(intervaloDePaginas({ totalPaginas: 20 }), { min: 1, max: 20, origem: 'pdf', texto: '1–20' });
+  assert.equal(intervaloDePaginas({}), null);
+});
+
+test('validação da página contra o intervalo da obra', () => {
+  const iv = intervaloDePaginas({ paginas: '114-138' });
+  assert.equal(validarPaginas('', iv).ok, true);
+  assert.equal(validarPaginas('120', iv).valor, '120');
+  assert.equal(validarPaginas('120 - 122', iv).valor, '120–122');
+  assert.equal(validarPaginas('120;125', iv).valor, '120, 125');
+  assert.match(validarPaginas('139', iv).mensagem, /114–138/);
+  assert.match(validarPaginas('100-120', iv).mensagem, /Fora do intervalo/);
+  assert.match(validarPaginas('130-120', iv).mensagem, /invertido/);
+  assert.equal(validarPaginas('abc', iv).ok, false);
+  assert.equal(validarPaginas('999', null).ok, true);
+});
+
+test('referência da citação longa: estilo escolhido, link opcional e ABNT antigo como padrão', () => {
+  assert.equal(referenciaDoBlocoCitacao({ autor: 'SILVA', ano: '2020', pagina_citada: '5' }).texto, '(SILVA, 2020, p. 5)');
+  const l = referenciaDoBlocoCitacao({ ref_texto: '(Silva, 2020, p. 5)', ref_id: 'a1', ref_linkar: true });
+  assert.match(l.html, /href="#ref-a1"/);
+  assert.equal(referenciaDoBlocoCitacao({ ref_texto: '[3]', ref_id: 'a1', ref_linkar: false }).html, '[3]');
+});
+
+test('artigo traz os destaques do fichamento e o total de páginas', () => {
+  const r = referenciaDoArtigo({ id: 'x', totalPaginas: 3, fichamento: { citacoesMarcadas: [{ id: 'c', texto: 'T', paginaCitacao: '120' }] } });
+  assert.equal(r.citacoesMarcadas[0].paginaCitacao, '120');
+  assert.equal(r.totalPaginas, 3);
+});
+
+test('bloco de citação longa guarda a referência escolhida e a exportação para PDF a usa', async () => {
+  const { criarNovoBloco } = await import('../src/core/athenes_documento.js');
+  const b = criarNovoBloco('citacao', { texto: 'Trecho', autor: 'SANTOS', ano: '2025', pagina_citada: '120', ref_texto: '(Santos & Ribeiro, 2025, p. 120)', ref_id: 'a1', ref_linkar: true });
+  assert.equal(b.ref_texto, '(Santos & Ribeiro, 2025, p. 120)');
+  assert.equal(b.ref_id, 'a1');
+  assert.equal(criarNovoBloco('citacao', { texto: 'x' }).ref_texto, undefined);
+  assert.match(referenciaDoBlocoCitacao(b).html, /href="#ref-a1"/);
 });

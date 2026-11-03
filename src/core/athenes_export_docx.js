@@ -8,7 +8,7 @@ import { normalizarAvancado, aplicarPalavrasIniciais, separarPrimeiraLetra } fro
 import { ZipBuilder } from './zip_builder.js';
 import { MM_PARA_DXA, dimensoesPapelMm } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
-import { ancoraDaReferencia, nomeMarcadorWord } from './athenes_citacao.js';
+import { ancoraDaReferencia, nomeMarcadorWord, referenciaDoBlocoCitacao } from './athenes_citacao.js';
 import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
 import { resolverAreasPagina, normalizarNumeracao, normalizarArea, estiloEfetivoNumeracao } from './athenes_paginacao.js';
@@ -759,7 +759,7 @@ export async function exportarParaDocx(documento) {
         if (capitularXml) bodyXmlParts.push(capitularXml);
         bodyXmlParts.push(`<w:p><w:pPr>${decoXml}${indXml}<w:jc w:val="${jcVal}"/>${spacingXml}</w:pPr>${runs.join('')}</w:p>`);
       } else if (b.tipo === 'citacao') {
-        const refTexto = ` (${b.autor || 'AUTOR'}, ${b.ano || 's.d.'}${b.pagina_citada ? ', p. ' + b.pagina_citada : ''})`;
+        const refTexto = ` ${referenciaDoBlocoCitacao(b).html}`;
         const textoCompleto = `${b.texto || ''}${refTexto}`;
         const runs = htmlParaRunsDocx(textoCompleto, { tamanhoPt: 10, cor: '#334155' });
         bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="CitacaoLonga"/></w:pPr>${runs.join('')}</w:p>`);

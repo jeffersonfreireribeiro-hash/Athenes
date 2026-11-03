@@ -318,6 +318,7 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.autor = dados.autor || 'SOBRENOME, P.';
       b.ano = dados.ano || new Date().getFullYear().toString();
       b.pagina_citada = dados.pagina_citada || '';
+      if (dados.ref_texto) { b.ref_texto = dados.ref_texto; b.ref_id = dados.ref_id || ''; b.ref_linkar = !!dados.ref_linkar; } // referência no estilo escolhido (ver athenes_citacao.js)
       b.estiloId = 'citacao_direta';
       break;
 

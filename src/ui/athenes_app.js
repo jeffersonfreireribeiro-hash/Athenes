@@ -245,6 +245,10 @@ export class AthenesApp {
         fechar();
         this.editorView.inserirCitacaoNoCursor(ref, formato, opcoes);
       },
+      onInserirCitacaoLonga: (ref, dados) => {
+        fechar();
+        this.editorView.inserirCitacaoLonga(ref, dados);
+      },
       onAlterado: () => {
         this.autoSalvar();
       }
