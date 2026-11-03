@@ -4030,6 +4030,26 @@ export class EditorView {
     };
     const estaVisivel = (rect) => { const a = areaVisivel(); return rect.bottom > a.top + 4 && rect.top < a.bottom - 4; };
 
+    // Posiciona a barra junto da seleção: acima dela; sem espaço em cima (início da área), abaixo. Devolve false se a seleção saiu da área visível.
+    const posicionarBarra = (rect) => {
+      if (!estaVisivel(rect)) { barra.style.display = 'none'; return false; }
+      const area = areaVisivel();
+      barra.style.display = 'flex';
+      const larg = barra.offsetWidth || 420;
+      const centro = rect.left + rect.width / 2;
+      barra.style.left = `${Math.max(area.left + larg / 2 + 8, Math.min(area.right - larg / 2 - 8, centro))}px`;
+      if (rect.top - (barra.offsetHeight || 40) - 12 < area.top) {
+        barra.style.top = `${Math.min(rect.bottom, area.bottom - 50)}px`;
+        barra.style.transform = 'translate(-50%, 0)';
+        barra.style.marginTop = '8px';
+      } else {
+        barra.style.top = `${rect.top}px`;
+        barra.style.transform = 'translate(-50%, -100%)';
+        barra.style.marginTop = '-8px';
+      }
+      return true;
+    };
+
     // Monitora seleção de texto e posição do cursor
     const atualizarPosicaoBarra = () => {
       // Se houver qualquer modal aberto na tela, oculta barra contextual e pill flutuante
@@ -4039,8 +4059,11 @@ export class EditorView {
         if (pillCaret) pillCaret.style.display = 'none';
         return;
       }
-      // Se algum menu dropdown da barra flutuante estiver aberto, não esconde nem reposiciona a barra
+      // Com um menu da barra aberto ela não some, mas continua junto do texto (rolagem, redimensionamento, repaginação)
       if (menuEstilo && !menuEstilo.hidden) {
+        const r = this._ultimaSelecaoAtiva?.range;
+        const rectSel = r && r.commonAncestorContainer?.isConnected ? r.getBoundingClientRect() : null;
+        if (rectSel && rectSel.height > 0 && !posicionarBarra(rectSel)) fecharDropdownsCtx(); // saiu da área visível: fecha o menu junto
         return;
       }
 
@@ -4074,22 +4097,7 @@ export class EditorView {
         if (pillCaret) pillCaret.style.display = 'none';
         const rect = range.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
-          if (!estaVisivel(rect)) { barra.style.display = 'none'; return; } // seleção rolada para fora da área do texto
-          const area = areaVisivel();
-          barra.style.display = 'flex';
-          // acompanha o texto: acima da seleção; sem espaço em cima (início da área), vai para baixo dela
-          const larg = barra.offsetWidth || 420;
-          const centro = rect.left + rect.width / 2;
-          barra.style.left = `${Math.max(area.left + larg / 2 + 8, Math.min(area.right - larg / 2 - 8, centro))}px`;
-          if (rect.top - (barra.offsetHeight || 40) - 12 < area.top) {
-            barra.style.top = `${Math.min(rect.bottom, area.bottom - 50)}px`;
-            barra.style.transform = 'translate(-50%, 0)';
-            barra.style.marginTop = '8px';
-          } else {
-            barra.style.top = `${rect.top}px`;
-            barra.style.transform = 'translate(-50%, -100%)';
-            barra.style.marginTop = '-8px';
-          }
+          if (!posicionarBarra(rect)) return; // seleção rolada para fora da área do texto
 
           // Salva última seleção ativa para aplicar estilos pontuais mesmo com perda temporária de foco
           const blocoEl = editable?.closest('[data-bloco-id]');
