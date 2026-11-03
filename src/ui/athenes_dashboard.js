@@ -17,6 +17,7 @@ import {
   obterConfigGoogleDrive,
   salvarConfigGoogleDrive,
   listarDocumentosDoSupabase,
+  excluirDocumentoDoSupabase,
   entrarNaNuvemComGoogle,
   nuvemAutenticada,
   carregarDocumentoDoSupabase,
@@ -42,7 +43,7 @@ import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
-import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, obterPastaRaizDrive, repararPastaDosDocumentos, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
+import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, registrarExclusoes, idsExcluidos, processarExclusoesPendentes, obterPastaRaizDrive, repararPastaDosDocumentos, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -1254,10 +1255,7 @@ export class DashboardView {
         if (this.arquivos.aoClicarCard(ev, doc)) return; // seleção (Ctrl/Shift/checkbox) e menu "···"
         if (ev.target.closest('.ath-btn-excluir')) {
           ev.stopPropagation();
-          this.documentos = this.documentos.filter(d => d.id !== doc.id);
-          this.salvarDocumentosLocais();
-          this.atualizarGrid();
-          this.renderizarPastasLateral();
+          await this.arquivos.excluir([doc]); // mesmo caminho do menu: confirma, remove, e o documento não volta ao sincronizar
           return;
         }
         await this.abrirDocumento(doc, card);
@@ -1337,13 +1335,28 @@ export class DashboardView {
    * (nome e data) dos documentos que o app criou lá; o conteúdo é baixado ao abrir. Sem Drive conectado, nada é listado.
    * (O nome do método é antigo: antes listava o Supabase, que mostrava os mesmos arquivos para todas as contas.)
    */
+  /**
+   * Depois de excluir da lista: lembra a exclusão (a sincronização não traz de volta), leva o arquivo do Drive para a lixeira
+   * (recuperável) e apaga a cópia da nuvem. Documentos de outras pessoas só somem da MINHA lista.
+   */
+  async aposExcluir(docs) {
+    registrarExclusoes(docs);
+    try {
+      const token = driveConectado() ? await obterTokenDrive() : null;
+      if (token) await processarExclusoesPendentes(token);
+    } catch (e) { console.warn('[Athenes] Lixeira do Drive:', e.message); }
+    for (const d of docs) if (d.salvoNuvem && !d.proprietarioExterno && !d.compartilhadoComigo) await excluirDocumentoDoSupabase(d.id);
+  }
+
   /** Documentos que outras pessoas compartilharam com o meu e-mail (o banco só devolve os que posso ver); não depende do Drive. */
   async sincronizarCompartilhados() {
     let novos = 0;
     try {
       const compartilhados = await listarCompartilhadosComigo();
       const ids = new Set(compartilhados.map(c => String(c.id)));
+      const excluidos = idsExcluidos();
       for (const c of compartilhados) {
+        if (excluidos.has(String(c.id))) continue;
         const existente = this.documentos.find(d => String(d.id) === String(c.id));
         const marca = { compartilhadoComigo: true, proprietarioExterno: true, permissao: c.papel, salvoNuvem: true, proprietario: { id: `ext_${c.user_id}`, nome: c.dono || 'Outra pessoa' } };
         if (!existente) {
@@ -1357,7 +1370,7 @@ export class DashboardView {
       }
       // acesso retirado pelo dono: o documento some da lista
       const antes = this.documentos.length;
-      this.documentos = this.documentos.filter(d => !d.compartilhadoComigo || ids.has(String(d.id)));
+      this.documentos = this.documentos.filter(d => !d.compartilhadoComigo || (ids.has(String(d.id)) && !excluidos.has(String(d.id))));
       if (this.documentos.length !== antes || novos) { this.salvarDocumentosLocais(); this.atualizarGrid(); this.renderizarPastasLateral(); }
     } catch (e) { console.warn('[Athenes] Compartilhados comigo:', e.message); }
     return novos;
@@ -1380,6 +1393,7 @@ export class DashboardView {
       try { await obterPastaRaizDrive(token); } catch (e) { console.warn('[Athenes] Raiz do Drive:', e.message); } // adota a pasta Athenes mais antiga (a de todos os computadores)
       // outro computador: sem a estrutura gravada, descobre/cria as pastas do Athenes e fixa a pasta de documentos desta conta
       try { const c = obterConfigGoogleDrive(); if (!c.pastaDocumentosId || !c.pastaRaizId) await obterOuCriarEstruturaPastasAthenes(token); } catch (e) { console.warn('[Athenes] Estrutura do Drive:', e.message); }
+      try { await processarExclusoesPendentes(token); } catch (e) { console.warn('[Athenes] Lixeira do Drive:', e.message); }
       // Zotero conectado em outro computador desta conta aparece aqui (e o daqui vai para os outros)
       let zotero = 'nada';
       try { zotero = await sincronizarZoteroComDrive(token); } catch (e) { console.warn('[Athenes] Zotero pelo Drive:', e.message); }

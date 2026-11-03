@@ -175,3 +175,28 @@ test('o Drive mostra o arquivo solto na raiz mas o registro diz que está na pas
   mesclarBibliotecaDrive(docs, [{ driveFileId: 'x', titulo: 'A', modificadoEm: '2026-11-03T00:00:00Z', driveFolderId: 'RAIZ' }], {}, pastas);
   assert.equal(docs[0].driveFolderId, 'RAIZ', 'o lugar real passa a constar; precisaEnviarAoDrive vê a diferença e move');
 });
+
+test('documento excluído não volta ao sincronizar e o arquivo vai para a lixeira do Drive (nunca o de outra pessoa)', async () => {
+  const m = new Map();
+  globalThis.localStorage = { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), key: i => [...m.keys()][i], get length() { return m.size; } };
+  const { registrarExclusoes, excluidosDoDrive, idsExcluidos, processarExclusoesPendentes } = await import('../src/core/athenes_drive_sync.js');
+  registrarExclusoes([
+    { id: 'a', driveFileId: 'FA', salvoNuvem: true },
+    { id: 'b', driveFileId: 'FB', proprietarioExterno: true, compartilhadoComigo: true },
+    { id: 'c' }
+  ]);
+  assert.deepEqual([...excluidosDoDrive()].sort(), ['FA', 'FB']);
+  assert.ok(idsExcluidos().has('b') && idsExcluidos().has('c'));
+  // a sincronização da biblioteca ignora o arquivo excluído
+  const docs = [];
+  const r = mesclarBibliotecaDrive(docs, [{ driveFileId: 'FA', titulo: 'A', modificadoEm: 'x', driveFolderId: '' }, { driveFileId: 'FN', titulo: 'Novo', modificadoEm: 'x', driveFolderId: '' }], {}, null);
+  assert.deepEqual([r.novos, docs.map(d => d.driveFileId)], [1, ['FN']]);
+  // lixeira: só o arquivo do próprio usuário
+  const chamadas = [];
+  const f = async (url, op) => { chamadas.push({ url, corpo: JSON.parse(op.body), metodo: op.method }); return resp({ id: 'FA' }); };
+  assert.equal(await processarExclusoesPendentes('T', { fetchImpl: f }), 1);
+  assert.match(chamadas[0].url, /\/files\/FA\?/);
+  assert.deepEqual([chamadas[0].metodo, chamadas[0].corpo], ['PATCH', { trashed: true }]);
+  assert.equal(await processarExclusoesPendentes('T', { fetchImpl: f }), 0, 'já está na lixeira: não repete');
+  assert.equal(chamadas.length, 1);
+});

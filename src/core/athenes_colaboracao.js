@@ -451,6 +451,16 @@ export async function entrarNaNuvemComGoogle() {
 }
 export const nuvemAutenticada = temSessaoSupabase;
 
+/** Apaga da nuvem a linha do documento (o banco só deixa o dono). Silencioso: a exclusão local já aconteceu. */
+export async function excluirDocumentoDoSupabase(docId, fetchImpl = globalThis.fetch) {
+  const cfg = obterConfigSupabase();
+  if (!docId || !temSessaoSupabase()) return false;
+  try {
+    const resp = await fetchImpl(`${cfg.url}/rest/v1/${cfg.tabela}?id=eq.${encodeURIComponent(docId)}`, { method: 'DELETE', headers: await cabecalhosSupabase(cfg, { fetchImpl }) });
+    return resp.ok;
+  } catch (_) { return false; }
+}
+
 /**
  * Lista os documentos salvos na nuvem Supabase.
  */

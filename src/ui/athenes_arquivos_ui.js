@@ -242,12 +242,13 @@ export class GerenciadorArquivosUI {
   fecharMenu() { this.menu?.remove(); this.menu = null; }
 
   async excluir(docs) {
-    const ok = await this.confirmar({ titulo: docs.length > 1 ? `Excluir ${docs.length} arquivos?` : 'Excluir arquivo?', texto: docs.length > 1 ? 'Os arquivos selecionados serão removidos desta lista.' : `"${docs[0].titulo}" será removido desta lista.`, ok: 'Excluir' });
+    const ok = await this.confirmar({ titulo: docs.length > 1 ? `Excluir ${docs.length} arquivos?` : 'Excluir arquivo?', texto: docs.length > 1 ? 'Os arquivos selecionados serão removidos e levados para a lixeira do Google Drive (recuperável por 30 dias).' : `"${docs[0].titulo}" será removido e levado para a lixeira do Google Drive (recuperável por 30 dias).`, ok: 'Excluir' });
     if (!ok) return;
     const ids = new Set(docs.map(x => String(x.id)));
     const antes = [...this.d.documentos];
     this.d.documentos = this.d.documentos.filter(x => !ids.has(String(x.id)));
     this.afterMudanca();
+    this.d.aposExcluir?.(docs); // não volta ao sincronizar; arquivo do Drive vai para a lixeira
     try { await this.persistir([]); } catch (e) { this.d.documentos = antes; this.afterMudanca(); this.toast(`Não foi possível excluir: ${e.message}`, { tipo: 'erro' }); }
   }
 

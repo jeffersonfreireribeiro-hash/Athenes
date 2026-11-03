@@ -259,9 +259,10 @@ export async function listarBibliotecaDoDrive(token, { fetchImpl = globalThis.fe
  * Acrescenta ao índice local os documentos do Drive que ainda não existem aqui (como "só no Drive": conteúdo baixado ao abrir)
  * e marca os que já existem para baixar de novo quando o do Drive é mais novo. Devolve { novos, atualizados }.
  */
-export function mesclarBibliotecaDrive(documentos, arquivos, mapaPastas = {}, pastas = null) {
+export function mesclarBibliotecaDrive(documentos, arquivos, mapaPastas = {}, pastas = null, excluidos = excluidosDoDrive()) {
   const r = { novos: 0, atualizados: 0 };
   for (const f of arquivos || []) {
+    if (excluidos.has(f.driveFileId)) continue; // o usuário excluiu este documento: não volta na sincronização
     const local = documentos.find(d => d.driveFileId === f.driveFileId);
     if (!local) {
       documentos.unshift({
@@ -405,5 +406,47 @@ export function repararPastaDosDocumentos(documentos, pastas) {
     const alvo = d.driveFolderId && todas.find(p => p.driveId === d.driveFolderId);
     if (alvo && d.pastaId !== alvo.id) { d.pastaId = alvo.id; n++; }
   }
+  return n;
+}
+
+// ───────────────────────────── Exclusão: o que foi excluído não volta ─────────────────────────────
+
+const CHAVE_EXCLUIDOS = 'athenes_docs_excluidos';
+const lerExcluidos = () => { try { const v = JSON.parse(lerConta(CHAVE_EXCLUIDOS) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+
+/** driveFileIds de documentos excluídos neste computador (a sincronização os ignora). */
+export const excluidosDoDrive = () => new Set(lerExcluidos().map(x => x.driveFileId).filter(Boolean));
+/** ids de documentos excluídos (inclusive os compartilhados comigo, que só somem da lista). */
+export const idsExcluidos = () => new Set(lerExcluidos().map(x => String(x.id)));
+
+/** Registra a exclusão: o documento não é mais importado, e o arquivo vai para a lixeira do Drive assim que possível. */
+export function registrarExclusoes(docs) {
+  const lista = lerExcluidos();
+  for (const d of docs || []) {
+    if (!d?.id || lista.some(x => String(x.id) === String(d.id))) continue;
+    lista.push({ id: String(d.id), driveFileId: d.driveFileId || '', lixeira: !d.driveFileId || Boolean(d.proprietarioExterno), nuvem: !(d.salvoNuvem && !d.proprietarioExterno), em: new Date().toISOString() });
+  }
+  gravarConta(CHAVE_EXCLUIDOS, JSON.stringify(lista.slice(-500)));
+  return lista;
+}
+
+/**
+ * Leva para a lixeira do Drive (recuperável por 30 dias) os arquivos dos documentos excluídos que ainda estão lá; tenta de novo
+ * na próxima sincronização se falhar. Documentos de outras pessoas nunca são mexidos. Devolve quantos foram para a lixeira.
+ */
+export async function processarExclusoesPendentes(token, { fetchImpl = globalThis.fetch } = {}) {
+  const lista = lerExcluidos();
+  let n = 0;
+  for (const x of lista) {
+    if (x.lixeira || !x.driveFileId) continue;
+    try {
+      await chamar(fetchImpl, `${API}/${encodeURIComponent(x.driveFileId)}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) }, token);
+      x.lixeira = true; n++;
+    } catch (e) {
+      if (e.status === 404) x.lixeira = true; // já não existe
+      else if (e.sessaoExpirada) break;
+    }
+  }
+  gravarConta(CHAVE_EXCLUIDOS, JSON.stringify(lista));
   return n;
 }
