@@ -15,6 +15,7 @@ import { latexParaTexto } from './athenes_formula.js';
 import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
 import { resolverAreasPagina, normalizarNumeracao, normalizarArea, estiloEfetivoNumeracao } from './athenes_paginacao.js';
+import { FONTES_SISTEMA } from './athenes_estilos.js';
 import { obterConfigNotas, obterNota, sanitizarHtmlNota, idsNotasDoBloco } from './athenes_notas_rodape.js';
 import { nomeFonteDocx } from './athenes_tabela_estilo.js';
 import { calcularNumeracaoSecoes, extrairItensSumario, configEfetivaSumario, removerNumeroManual, aplicarTransformacao, nivelDe, NIVEL_MAX } from './athenes_sumario.js';
@@ -89,6 +90,12 @@ function idFootnoteWord(idNota) {
   return ctxDocx.notas.get(idNota);
 }
 
+/** Propriedades do marcador de nota no Word: fonte, cor, negrito e sobrescrito (o número em si é do Word). */
+function rPrMarcadorNota(m = {}) {
+  const f = m.fonte ? (FONTES_SISTEMA[m.fonte]?.familia || '').split(',')[0].replace(/["']/g, '').trim() : '';
+  return `${f ? `<w:rFonts w:ascii="${f}" w:hAnsi="${f}"/>` : ''}${m.negrito ? '<w:b/>' : ''}${m.cor ? `<w:color w:val="${m.cor.replace('#', '').slice(0, 6)}"/>` : ''}${m.sobrescrito === false ? '' : '<w:vertAlign w:val="superscript"/>'}`;
+}
+
 function htmlParaRunsDocx(htmlTexto, estiloPadrao = {}) {
   const runs = [];
   if (!htmlTexto) return runs;
@@ -117,7 +124,7 @@ function htmlParaRunsDocx(htmlTexto, estiloPadrao = {}) {
         // marcador de nota de rodapé → referência nativa do Word (o Word numera e posiciona a nota na página)
         const idNota = /data-nota="([\w-]+)"/.exec(token)?.[1];
         const idWord = idNota ? idFootnoteWord(idNota) : null;
-        if (idWord) runs.push(`<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="${idWord}"/></w:r>`);
+        if (idWord) runs.push(`<w:r><w:rPr>${rPrMarcadorNota(obterConfigNotas(ctxDocx?.documento || {}).marcador_texto)}</w:rPr><w:footnoteReference w:id="${idWord}"/></w:r>`);
         pulandoMarcador = true;
       } else if (lower.startsWith('</sup')) {
         pulandoMarcador = false;
@@ -971,7 +978,7 @@ export async function exportarParaDocx(documento) {
   const notasXml = [...ctxDocx.notas.entries()].map(([idNota, idWord]) => {
     const nota = obterNota(documento, idNota);
     const runs = htmlParaRunsDocx(sanitizarHtmlNota(nota?.html || ''), { tamanhoPt: cfgNotasDoc.tamanho_pt, cor: cfgNotasDoc.cor });
-    return `<w:footnote w:id="${idWord}"><w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> </w:t></w:r>${runs.join('')}</w:p></w:footnote>`;
+    return `<w:footnote w:id="${idWord}"><w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r><w:rPr>${rPrMarcadorNota(cfgNotasDoc.marcador_nota)}</w:rPr><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> </w:t></w:r>${runs.join('')}</w:p></w:footnote>`;
   }).join('\n');
   zip.add('word/footnotes.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">

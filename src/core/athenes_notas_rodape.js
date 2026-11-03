@@ -18,8 +18,20 @@ import { tokenizarHtml } from './athenes_diff.js';
 
 export const SIMBOLOS_NOTA = Object.freeze(['*', '†', '‡', '§', '‖', '¶']);
 
+/** Como o marcador aparece, no texto e no rodapé: 1 | [1] | (1) | 1) | 1. */
+export const FORMATOS_MARCADOR_NOTA = Object.freeze([
+  { id: 'simples', rotulo: 'Só o número', exemplo: '1' },
+  { id: 'colchetes', rotulo: 'Entre colchetes', exemplo: '[1]' },
+  { id: 'parenteses', rotulo: 'Entre parênteses', exemplo: '(1)' },
+  { id: 'parentese_direito', rotulo: 'Com parêntese', exemplo: '1)' },
+  { id: 'ponto', rotulo: 'Com ponto', exemplo: '1.' }
+]);
+
 export const NOTAS_CONFIG_PADRAO = Object.freeze({
   marcador: 'numerico',          // 'numerico' | 'alfabetico' | 'simbolos'
+  formato: 'simples',            // ver FORMATOS_MARCADOR_NOTA
+  marcador_texto: Object.freeze({ fonte: '', cor: '', negrito: true }),   // marcador dentro do texto ('' = herda do texto)
+  marcador_nota: Object.freeze({ fonte: '', cor: '', negrito: true }),    // marcador no rodapé ('' = herda da nota)
   reiniciar: 'documento',        // 'documento' | 'secao' | 'pagina'
   separador: Object.freeze({ comprimento_pct: 33, espessura_pt: 0.75, cor: '#64748B' }),
   fonte: 'nunito',
@@ -33,6 +45,17 @@ const NUM = (v, min, max, padrao) => {
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : padrao;
 };
 
+/** Estilo de um marcador (fonte, cor, negrito, sobrescrito). Entre colchetes/parênteses o padrão é na linha do texto, não sobrescrito. */
+function marcadorEstilo(m, padrao, formatado) {
+  const x = m && typeof m === 'object' ? m : {};
+  return {
+    fonte: typeof x.fonte === 'string' && /^[\w-]{0,32}$/.test(x.fonte) ? x.fonte : padrao.fonte,
+    cor: /^#[0-9a-f]{3,8}$/i.test(x.cor || '') ? x.cor : padrao.cor,
+    negrito: typeof x.negrito === 'boolean' ? x.negrito : padrao.negrito,
+    sobrescrito: typeof x.sobrescrito === 'boolean' ? x.sobrescrito : !formatado
+  };
+}
+
 /** Configuração efetiva das notas (sem mutar o documento). */
 export function obterConfigNotas(doc) {
   const c = doc?.notas_config && typeof doc.notas_config === 'object' ? doc.notas_config : {};
@@ -41,6 +64,9 @@ export function obterConfigNotas(doc) {
   return {
     marcador: ['numerico', 'alfabetico', 'simbolos'].includes(c.marcador) ? c.marcador : d.marcador,
     reiniciar: ['documento', 'secao', 'pagina'].includes(c.reiniciar) ? c.reiniciar : d.reiniciar,
+    formato: FORMATOS_MARCADOR_NOTA.some(f => f.id === c.formato) ? c.formato : d.formato,
+    marcador_texto: marcadorEstilo(c.marcador_texto, d.marcador_texto, FORMATOS_MARCADOR_NOTA.some(f => f.id === c.formato) && c.formato !== 'simples'),
+    marcador_nota: marcadorEstilo(c.marcador_nota, d.marcador_nota, FORMATOS_MARCADOR_NOTA.some(f => f.id === c.formato) && c.formato !== 'simples'),
     separador: {
       comprimento_pct: NUM(s.comprimento_pct, 5, 100, d.separador.comprimento_pct),
       espessura_pt: NUM(s.espessura_pt, 0.25, 4, d.separador.espessura_pt),
@@ -54,7 +80,18 @@ export function obterConfigNotas(doc) {
 }
 
 /** Texto do marcador: 1, 2, 3 | a, b … z, aa | *, †, ‡, §, ‖, ¶, **, †† … (índice 1-based). */
-export function textoMarcadorNota(indice, estilo = 'numerico') {
+export function textoMarcadorNota(indice, estilo = 'numerico', formato = 'simples') {
+  const base = textoBaseMarcador(indice, estilo);
+  switch (formato) {
+    case 'colchetes': return `[${base}]`;
+    case 'parenteses': return `(${base})`;
+    case 'parentese_direito': return `${base})`;
+    case 'ponto': return `${base}.`;
+    default: return base;
+  }
+}
+
+function textoBaseMarcador(indice, estilo) {
   const n = Math.max(1, parseInt(indice, 10) || 1);
   if (estilo === 'alfabetico') {
     let k = n; let s = '';
@@ -241,7 +278,7 @@ export function rotularNotas(doc, paginas) {
     for (const seg of pag.notas || []) {
       if (seg.continuaDaAnterior || seg.id in rotulos) continue;
       contador++;
-      rotulos[seg.id] = textoMarcadorNota(contador, cfg.marcador);
+      rotulos[seg.id] = textoMarcadorNota(contador, cfg.marcador, cfg.formato);
     }
     pag.rotulosNotas = rotulos;
   }
@@ -302,4 +339,24 @@ export function removerNota(doc, id) {
   }
   doc.notasRodape = (doc.notasRodape || []).filter(n => n.id !== id);
   return removidos;
+}
+
+/**
+ * CSS dos marcadores das notas: o do texto (`sup.ath-nota-ref`) e o do rodapé (`.ath-nota-num`), com fonte, cor, negrito e
+ * sobrescrito vindos de `notas_config`. `escopo` (ex.: '#rmPrevPalco ') aumenta a especificidade no editor.
+ */
+export function cssMarcadoresNota(cfg, escopo = '', familiaDe = () => '') {
+  const regra = (seletor, m, base) => {
+    const p = [];
+    if (m.fonte) { const f = familiaDe(m.fonte); if (f) p.push(`font-family:${f}`); }
+    if (m.cor) p.push(`color:${m.cor}`);
+    p.push(`font-weight:${m.negrito ? 700 : 400}`);
+    if (!m.sobrescrito) p.push(...base.linha);
+    else p.push(...base.sobre);
+    return `${escopo}${seletor}{${p.join(';')}}`;
+  };
+  return [
+    regra('sup.ath-nota-ref', cfg.marcador_texto, { linha: ['vertical-align:baseline', 'font-size:1em', 'line-height:inherit'], sobre: ['vertical-align:super', 'font-size:.75em', 'line-height:0'] }),
+    regra('.ath-nota-num', cfg.marcador_nota, { linha: ['font-size:1em', 'position:static', 'top:0', 'vertical-align:baseline', 'min-width:0'], sobre: ['font-size:.75em', 'position:relative', 'top:-.35em', 'vertical-align:super'] })
+  ].join('\n');
 }

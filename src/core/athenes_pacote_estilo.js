@@ -458,6 +458,7 @@ INSTRUÇÕES DE ANÁLISE:
    - Atribuição de mestras por página ("configuracaoGlobal.atribuicoes_mestra"): [{ "mestraId", "de", "ate" }] (páginas 1-based; "ate" omitido = até o fim; vence o intervalo mais específico).
 
    - Separador da legenda numerada ("configuracaoGlobal.separador_legenda"): "travessao" (Tabela 1 — Título) | "meio_traco" (–) | "hifen" (-) | "dois_pontos" (Tabela 1: Título) | "ponto" (Tabela 1. Título) | "espaco" (Tabela 1 Título). Vale para figuras, tabelas, quadros e mapas.
+   - Notas de rodapé ("configuracaoGlobal.notas_rodape"): "marcador" ("numerico" | "alfabetico" | "simbolos"), "formato" ("simples" 1 | "colchetes" [1] | "parenteses" (1) | "parentese_direito" 1) | "ponto" 1.), "reiniciar", "fonte", "tamanho_pt", "entrelinha", "cor" (texto da nota) e o estilo do número em "marcador_texto" (no corpo do texto) e "marcador_nota" (no rodapé): { "fonte" (id, "" = a do texto), "cor" (#RRGGBB, "" = a do texto), "negrito", "sobrescrito" }.
    - Número automático das fórmulas ("configuracaoGlobal.formato_numero_formula"): "parenteses" (1) | "capitulo" (2.1, reinicia a cada título de nível 1) | "colchetes" [1] | "simples" 1 | "eq" Eq. (1). O número nunca é digitado: o Athenes o calcula.
    - Títulos em N níveis ("nivel" 1 a 9; estilos "titulo1" a "titulo6", os níveis 7+ usam "titulo6") e numeração decimal progressiva
      ("configuracaoGlobal.numeracao_secoes": { "ativa", "separador": "." | "-" | "", "ate_nivel" (1-9), "iniciar_em" }), ex.: 1, 1.1, 1.1.1, 1.1.1.1.

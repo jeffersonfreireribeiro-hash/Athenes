@@ -20,7 +20,7 @@ import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
 import { ajusteDeFragmento, aplicarEstilosDeTrecho } from './athenes_estilo_exclusivo.js';
 import { geometriaCorpoMm, resolverAreasPagina } from './athenes_paginacao.js';
-import { obterConfigNotas, aplicarRotulosNotasHtml, sanitizarHtmlNota } from './athenes_notas_rodape.js';
+import { obterConfigNotas, aplicarRotulosNotasHtml, sanitizarHtmlNota, cssMarcadoresNota } from './athenes_notas_rodape.js';
 import { descreverFigura, cssObjParaString, PLACEHOLDER_IMG } from './athenes_figura_layout.js';
 import { obterEstiloTabela, dimensoesTabela, resolverCelula, celulaParaCss, tabelaParaCss } from './athenes_tabela_estilo.js';
 import { rotuloDaFigura, gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento, colapsoEntreBlocosPt, margensTextoPt, obterTituloCompletoComNumeracao, obterPrefixoNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
@@ -63,7 +63,7 @@ function notasPaginaHtml(pag, documento) {
   const fam = (FONTES_SISTEMA[cfg.fonte]?.familia || FONTES_SISTEMA.nunito.familia).replace(/"/g, "'");
   const itens = pag.notas.map(seg => {
     const num = seg.continuaDaAnterior ? '' : escaparHtml(pag.rotulosNotas?.[seg.id] ?? '');
-    return `<div class="ath-nota" style="display:flex;gap:1.2mm;align-items:baseline;margin:0 0 2pt 0;"><span style="flex:none;min-width:1.1em;font-size:.75em;position:relative;top:-.35em;font-weight:700;">${num}</span><div style="flex:1;min-width:0;overflow-wrap:anywhere;">${sanitizarHtmlNota(seg.html)}</div></div>`;
+    return `<div class="ath-nota" style="display:flex;gap:1.2mm;align-items:baseline;margin:0 0 2pt 0;"><span class="ath-nota-num" style="flex:none;min-width:1.1em;">${num}</span><div style="flex:1;min-width:0;overflow-wrap:anywhere;">${sanitizarHtmlNota(seg.html)}</div></div>`;
   }).join('');
   return `<div class="ath-notas-rodape" style="margin-top:auto;font-family:${fam};font-size:${cfg.tamanho_pt}pt;line-height:${cfg.entrelinha};color:${cfg.cor};"><div style="height:${cfg.separador.espessura_pt}pt;width:${cfg.separador.comprimento_pct}%;background:${cfg.separador.cor};margin:0 0 4pt 0;"></div>${itens}</div>`;
 }
@@ -544,7 +544,7 @@ return `<section class="ath-pagina" style="position:relative; width:${largura_mm
     .ath-toc-item { break-inside: avoid; }
     .ath-toc-link { color: inherit; text-decoration: none; }
 
-    sup.ath-nota-ref { font-weight: 700; }
+    ${cssMarcadoresNota(obterConfigNotas(documento), '', id => (FONTES_SISTEMA[id]?.familia || '').replace(/"/g, "'"))}
     ${cssFontesImportadas(documento)}
     ${cssAvancadoDosEstilos(documento.estilos)}
     ${opcoes.cssExtra || ''}

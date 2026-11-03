@@ -68,7 +68,7 @@ import { instalarZoomCanvas } from './athenes_zoom_canvas.js';
 import { montarLeituraFiel, montarComparacao } from './athenes_visoes_revisao.js';
 import { instalarSugestaoInline, abrirCardSugestao, fecharCardSugestao, SEL_MARCA } from './athenes_sugestoes_ui.js';
 import { geometriaCorpoMm, resolverAreasPagina } from '../core/athenes_paginacao.js';
-import { criarNotaRodape, htmlMarcadorNota, aplicarRotulosNotasHtml, sanitizarHtmlNota, obterNota, removerNota, podarNotasOrfas } from '../core/athenes_notas_rodape.js';
+import { cssMarcadoresNota, obterConfigNotas, criarNotaRodape, htmlMarcadorNota, aplicarRotulosNotasHtml, sanitizarHtmlNota, obterNota, removerNota, podarNotasOrfas } from '../core/athenes_notas_rodape.js';
 import { construirAreaPaginaDom, construirNotasDom, abrirEditorNota, fecharEditorNota } from './athenes_pagina_ui.js';
 import { ModalConfigPagina } from './athenes_config_pagina_modal.js';
 import { construirGradeFiguraDom, criarBarraItemFigura, criarBotaoLayoutFigura } from './athenes_figura_ui.js';
@@ -2469,6 +2469,11 @@ export class EditorView {
     if (!stAv) { stAv = document.createElement('style'); stAv.id = 'athEstiloAvancado'; document.head.appendChild(stAv); }
     const cssAv = cssAvancadoDosEstilos(this.doc.estilos);
     if (stAv.textContent !== cssAv) stAv.textContent = cssAv;
+    // marcadores das notas (no texto e no rodapé): fonte, cor, negrito e sobrescrito do documento
+    let stNotas = document.getElementById('athNotasCss');
+    if (!stNotas) { stNotas = document.createElement('style'); stNotas.id = 'athNotasCss'; document.head.appendChild(stNotas); }
+    const cssNotas = cssMarcadoresNota(obterConfigNotas(this.doc), '#rmPrevPalco ', id => FONTES_SISTEMA[id]?.familia || '');
+    if (stNotas.textContent !== cssNotas) stNotas.textContent = cssNotas;
 
     repaginarDocumento(this.doc);
     recalcularNumeracaoAutomatica(this.doc);

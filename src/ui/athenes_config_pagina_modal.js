@@ -12,7 +12,7 @@ import {
   normalizarArea, normalizarNumeracao, resolverAreasPagina, geometriaCorpoMm, ESTILOS_NUMERICOS,
   FORMATOS_NUMERO, textoNumeroPagina, zonasIniciais
 } from '../core/athenes_paginacao.js';
-import { obterConfigNotas, textoMarcadorNota } from '../core/athenes_notas_rodape.js';
+import { obterConfigNotas, textoMarcadorNota, cssMarcadoresNota, FORMATOS_MARCADOR_NOTA } from '../core/athenes_notas_rodape.js';
 import { FONTES_SISTEMA } from '../core/athenes_estilos.js';
 
 const CSS = `
@@ -380,6 +380,12 @@ export class ModalConfigPagina {
       { valor: 'alfabetico', rotulo: 'Letras', detalhe: 'ᵃ ᵇ ᶜ' },
       { valor: 'simbolos', rotulo: 'Símbolos tradicionais', detalhe: '* † ‡' }
     ], c.marcador, v => { c.marcador = v; }));
+    d.appendChild(this.rotulo('Formato do marcador'));
+    d.appendChild(this.lista(FORMATOS_MARCADOR_NOTA.map(f => ({ valor: f.id, rotulo: f.rotulo, detalhe: f.exemplo })), c.formato, v => {
+      c.formato = v;
+      // [1] e (1) ficam na linha do texto; os demais seguem sobrescritos, salvo escolha do usuário
+      for (const m of [c.marcador_texto, c.marcador_nota]) if (!m.sobrescritoEscolhido) m.sobrescrito = v === 'simples';
+    }));
     d.appendChild(this.rotulo('Numeração'));
     d.appendChild(this.lista([
       { valor: 'documento', rotulo: 'Contínua no documento', detalhe: '1…n' },
@@ -392,6 +398,32 @@ export class ModalConfigPagina {
       this.campoTexto(c.separador, 'espessura_pt', { tipo: 'number', min: 0.25, max: 4, step: 0.25, rotulo: 'Espessura (pt)' }),
       this.cor(c.separador, 'cor', 'Cor')
     ));
+    // Número da nota: um estilo para o marcador no texto e outro para o marcador no rodapé
+    const estiloMarcador = (titulo, m, corHerdada) => {
+      d.appendChild(this.rotulo(titulo));
+      const fonte = document.createElement('select');
+      fonte.innerHTML = '<option value="">Fonte do texto</option>' + Object.values(FONTES_SISTEMA).map(f => `<option value="${f.id}">${f.rotulo}</option>`).join('');
+      fonte.value = m.fonte || '';
+      fonte.addEventListener('change', () => { m.fonte = fonte.value; this.atualizarPrevia(); });
+      d.appendChild(this.linha(fonte));
+      const cor = document.createElement('input');
+      cor.type = 'color';
+      cor.value = m.cor || corHerdada;
+      const herda = document.createElement('input');
+      herda.type = 'checkbox';
+      herda.checked = !m.cor;
+      cor.disabled = herda.checked;
+      cor.addEventListener('input', () => { m.cor = cor.value; this.atualizarPrevia(); });
+      herda.addEventListener('change', () => { cor.disabled = herda.checked; m.cor = herda.checked ? '' : cor.value; this.atualizarPrevia(); });
+      const rotCor = document.createElement('label'); rotCor.className = 'campo';
+      rotCor.append(Object.assign(document.createElement('span'), { className: 'rot', textContent: 'Cor', style: 'margin:0' }), cor);
+      const rotHerda = document.createElement('label'); rotHerda.className = 'chk'; rotHerda.append(herda, document.createTextNode('Cor do texto'));
+      d.appendChild(this.linha(rotCor, rotHerda));
+      const sobre = this.checkbox(m, 'sobrescrito', 'Sobrescrito (elevado)', () => { m.sobrescritoEscolhido = true; });
+      d.appendChild(this.linha(this.checkbox(m, 'negrito', 'Negrito'), sobre));
+    };
+    estiloMarcador('Número dentro do texto', c.marcador_texto, '#1F2733');
+    estiloMarcador('Número no rodapé', c.marcador_nota, c.cor);
     d.appendChild(this.rotulo('Tipografia das notas'));
     const fonteSel = document.createElement('select');
     fonteSel.innerHTML = Object.values(FONTES_SISTEMA).map(f => `<option value="${f.id}">${f.rotulo}</option>`).join('');
@@ -426,7 +458,7 @@ export class ModalConfigPagina {
       const pag = {
         numero, numeroNaSecao: naSecao, secaoId,
         notas: i === 2 ? [{ id: 'ex', html: 'Exemplo de nota de rodapé com <b>formatação</b> e um <a href="#">link</a>.' }] : [],
-        rotulosNotas: { ex: textoMarcadorNota(1, cfgNotas.marcador) }
+        rotulosNotas: { ex: textoMarcadorNota(1, cfgNotas.marcador, cfgNotas.formato) }
       };
       const areas = resolverAreasPagina(docPrev, mestraPrev, pag, inicio + i, 12);
 
@@ -463,6 +495,9 @@ export class ModalConfigPagina {
       wrap.append(caixa, document.createTextNode(titulo));
       folhas.appendChild(wrap);
     });
+    const stMarc = document.createElement('style');
+    stMarc.textContent = cssMarcadoresNota(cfgNotas, '#athCfgPgPrev ', id => FONTES_SISTEMA[id]?.familia || '');
+    alvo.appendChild(stMarc);
     alvo.appendChild(folhas);
 
     const exemplo = document.createElement('div');
@@ -484,6 +519,8 @@ export class ModalConfigPagina {
       for (const m of this.doc.mestras || []) if (m !== this.mestra && m.tipo !== 'capa') copiarPara(m);
     }
     this.doc.notas_config = clone(this.notas);
+    delete this.doc.notas_config.marcador_texto.sobrescritoEscolhido; // só controla o assistente do modal
+    delete this.doc.notas_config.marcador_nota.sobrescritoEscolhido;
     this.onSalvar();
     this.fechar();
   }
