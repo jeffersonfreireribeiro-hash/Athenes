@@ -343,12 +343,15 @@ export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = 
 
   const cfg = obterConfigSupabase();
   const colab = perfil || obterPerfilColaborador();
+  // documento compartilhado comigo: só quem tem papel de comentário/edição grava (o banco confere); leitura nunca grava
+  const deOutro = Boolean(doc.compartilhadoComigo || doc.proprietarioExterno);
+  if (deOutro && doc.permissao === 'leitura') return null;
   const agora = new Date().toISOString();
   doc.dataModificacao = agora;
 
   // a nuvem guarda de quem é o documento: a listagem só devolve os da conta que está conectada
   const conta = obterContaAtiva();
-  if (conta) doc.proprietario = { ...(doc.proprietario || {}), conta };
+  if (conta && !deOutro) doc.proprietario = { ...(doc.proprietario || {}), conta };
   const payload = {
     id: String(doc.id),
     titulo: String(doc.titulo || 'Documento sem título'),

@@ -9,6 +9,7 @@ import { TelaLoginView } from './athenes_login_view.js';
 import { estaSessaoAtiva, encerrarSessao, obterPerfilColaborador } from '../core/athenes_colaboracao.js';
 import { criarDocumento } from '../core/athenes_documento.js';
 import { carregarDocumentoDoSupabase } from '../core/athenes_colaboracao.js';
+import { carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
 import { sanitizarDocumentoImportado } from '../core/athenes_seguranca.js';
 import { EditorView } from './athenes_editor.js';
 import { PainelPropriedades } from './athenes_painel_propriedades.js';
@@ -70,9 +71,10 @@ export class AthenesApp {
 
   abrirDocumentoCompartilhado(docIdLink) {
     this.container.innerHTML = '<p style="padding:32px; font:600 14px Nunito, sans-serif; color:#314F79;">Abrindo documento compartilhado...</p>';
-    carregarDocumentoDoSupabase(docIdLink).then(remoto => {
-      if (!remoto) throw new Error('Documento não encontrado na nuvem.');
-      this.documentoAtivo = sanitizarDocumentoImportado(remoto);
+    carregarDocumentoCompartilhado(docIdLink).then(res => {
+      if (!res) throw new Error('Você não tem acesso a este documento (ou ele não existe). Peça ao dono para compartilhá-lo com o e-mail da sua conta Google.');
+      this.documentoAtivo = sanitizarDocumentoImportado(res.doc);
+      Object.assign(this.documentoAtivo, { compartilhadoComigo: res.doc.compartilhadoComigo, proprietarioExterno: res.doc.proprietarioExterno, permissao: res.doc.permissao, proprietario: res.doc.proprietario, salvoNuvem: true });
       this.autoSalvar();
       this.navegarParaEditor();
     }).catch(err => {

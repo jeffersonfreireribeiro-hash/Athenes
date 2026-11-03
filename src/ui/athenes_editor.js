@@ -51,6 +51,8 @@ import {
   obterTituloCompletoComNumeracao
 } from '../core/athenes_documento.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
+import { ModalCompartilhar } from './athenes_compartilhar_modal.js';
+import { modosPermitidos, modoInicialDoPapel } from '../core/athenes_compartilhamento.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { linhasEstimadas, porLinhaUsadoNoTexto, calibracaoDoTexto, definirCalibracaoTexto } from '../core/athenes_fragmentos.js';
 import { hifenizarHtml, removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
@@ -172,7 +174,7 @@ export class EditorView {
     this.onEditarEstilo = opcoes.onEditarEstilo || (() => {});
     this.onLogout = opcoes.onLogout || (() => {});
     this.menuTopoAberto = null;
-    this.modoTrabalho = MODOS_TRABALHO.EDICAO; // 'edicao' | 'sugestao' | 'leitura'
+    this.modoTrabalho = modoInicialDoPapel(this.doc); // 'edicao' | 'sugestao' | 'leitura' (documento compartilhado já abre no modo do papel)
     this.perfilColaborador = obterPerfilColaborador();
     this.colaboradoresOnline = [this.perfilColaborador];
     this.statusNuvem = 'Local + Supabase';
@@ -357,6 +359,11 @@ export class EditorView {
     this.atalhos = null;
   }
 
+  /** O papel do usuário neste documento permite este modo de trabalho? (compartilhado como leitura/comentário não edita) */
+  modoPermitido(modo) {
+    return modosPermitidos(this.doc).includes(modo);
+  }
+
   setDocumento(doc) {
     this.doc = doc;
     repaginarDocumento(this.doc);
@@ -470,17 +477,17 @@ export class EditorView {
 
         <!-- Seletor dos 4 modos: Edição / Sugestão / Comparar lado a lado / Leitura fiel (impressão) -->
         <div class="ath-seletor-modo-trabalho" id="athSeletorModoTrabalho" role="group" aria-label="Modo de Trabalho">
-          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.EDICAO ? 'on' : ''}" data-modo="edicao" title="Modo Edição: edita o documento diretamente">
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.EDICAO ? 'on' : ''}" data-modo="edicao" ${this.modoPermitido('edicao') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Modo Edição: edita o documento diretamente">
             ${svgIcone('lapis', 13)} <span>Edição</span>
           </button>
-          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.SUGESTAO ? 'on' : ''}" data-modo="sugestao" title="Modo Sugestão: alterações ficam marcadas para Aceitar (✓) ou Rejeitar (✗)">
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.SUGESTAO ? 'on' : ''}" data-modo="sugestao" ${this.modoPermitido('sugestao') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Modo Sugestão: alterações ficam marcadas para Aceitar (✓) ou Rejeitar (✗)">
             ${svgIcone('sugestao', 13)} <span>Sugestão</span>
             ${(this.doc.sugestoes?.length > 0) ? `<span style="background:#FFFFFF; color:#059669; border-radius:999px; padding:0 5px; font-size:10px; font-weight:800;">${this.doc.sugestoes.length}</span>` : ''}
           </button>
-          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.COMPARAR ? 'on' : ''}" data-modo="comparar" title="Comparar lado a lado: original × proposta, com diff e rolagem sincronizada">
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.COMPARAR ? 'on' : ''}" data-modo="comparar" ${this.modoPermitido('comparar') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Comparar lado a lado: original × proposta, com diff e rolagem sincronizada">
             ${svgIcone('grade', 13)} <span>Comparar</span>
           </button>
-          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.VISUALIZACAO ? 'on' : ''}" data-modo="leitura" title="Leitura fiel: réplica exata da exportação/impressão, somente leitura">
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.VISUALIZACAO ? 'on' : ''}" data-modo="leitura" ${this.modoPermitido('leitura') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Leitura fiel: réplica exata da exportação/impressão, somente leitura">
             ${svgIcone('olho', 13)} <span>Leitura</span>
           </button>
         </div>
@@ -719,7 +726,7 @@ export class EditorView {
     root.querySelectorAll('.ath-btn-modo-trab').forEach(btn => {
       btn.addEventListener('click', () => {
         const novoModo = btn.dataset.modo;
-        if (!novoModo || this.modoTrabalho === novoModo) return;
+        if (!novoModo || this.modoTrabalho === novoModo || !this.modoPermitido(novoModo)) return;
         this.modoTrabalho = novoModo;
         this.renderizar();
       });
@@ -1271,8 +1278,8 @@ export class EditorView {
               ${svgIcone('documento', 13)} Abrir da Nuvem
             </button>
           </div>
-          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnCopiarLinkColab" title="Salva na nuvem e copia o link para o professor entrar neste texto em tempo real" style="height:30px; display:flex; align-items:center; justify-content:center; gap:5px; font-weight:700; background:#fff;">
-            ${svgIcone('usuarios', 13)} Copiar link para colaborar
+          <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnCopiarLinkColab" title="Escolha quem pode ler, comentar ou editar este documento e copie o link" style="height:30px; display:flex; align-items:center; justify-content:center; gap:5px; font-weight:700; background:#fff;">
+            ${svgIcone('usuarios', 13)} Compartilhar…
           </button>
           <div id="athListaArquivosSupabase" hidden style="max-height:130px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; margin-top:4px;"></div>
         </div>
@@ -1362,21 +1369,9 @@ export class EditorView {
         }
       });
 
-      popNuvem.querySelector('#athBtnCopiarLinkColab')?.addEventListener('click', async (ev) => {
-        const btn = ev.currentTarget;
-        const rotuloOriginal = btn.innerHTML;
-        try {
-          btn.textContent = 'Salvando na nuvem...';
-          await salvarDocumentoNoSupabase(this.doc, this.perfilColaborador);
-          this.sessaoRealtime?.transmitirDocumento(this.doc);
-          const link = `${window.location.origin}${window.location.pathname}?doc=${encodeURIComponent(this.doc.id)}`;
-          try { await navigator.clipboard.writeText(link); } catch (_) { window.prompt('Copie o link:', link); }
-          btn.textContent = 'Link copiado ✓';
-        } catch (err) {
-          btn.textContent = 'Erro ao gerar link';
-          alert(err.message);
-        }
-        setTimeout(() => { btn.innerHTML = rotuloOriginal; }, 2200);
+      popNuvem.querySelector('#athBtnCopiarLinkColab')?.addEventListener('click', () => {
+        if (this.doc.compartilhadoComigo && this.doc.permissao !== 'edicao') { alert('Só o dono do documento (ou quem tem permissão de edição) abre o compartilhamento.'); }
+        new ModalCompartilhar(this.doc, this.perfilColaborador, { aoSalvar: () => this.sessaoRealtime?.transmitirDocumento(this.doc) });
       });
 
       popNuvem.querySelector('#athBtnAbrirSupabase')?.addEventListener('click', async () => {

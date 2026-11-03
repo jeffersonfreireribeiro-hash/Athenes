@@ -36,6 +36,7 @@ import {
 } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { EstudoArtigosView, carregarArtigosEstudo } from './athenes_estudo_artigos.js';
+import { listarCompartilhadosComigo, marcarComoCompartilhado, carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
@@ -133,6 +134,10 @@ export class DashboardView {
           const token = await obterTokenDrive();
           if (!token) throw new Error('A sessão do Google Drive expirou. Reconecte o Drive.');
           remoto = await baixarDocumentoDoDrive(doc, token); // conteúdo do SEU Drive, só quando você abre
+        } else if (doc.compartilhadoComigo) {
+          const res = await carregarDocumentoCompartilhado(doc.id); // traz o papel (leitura, comentário ou edição) para abrir no modo certo
+          if (!res) throw new Error('Você não tem mais acesso a este documento.');
+          remoto = res.doc; remoto.precisaCarregarConteudo = false;
         } else {
           remoto = await carregarDocumentoDoSupabase(doc.id);
           if (remoto) { remoto.salvoNuvem = true; remoto.precisaCarregarConteudo = false; }
@@ -758,6 +763,15 @@ export class DashboardView {
     tituloComp.textContent = 'Compartilhadas Comigo';
     listaEl.appendChild(tituloComp);
 
+    if (!ehAbaBib) {
+      const qtd = this.documentos.filter(d => d.compartilhadoComigo).length;
+      const itemComigo = document.createElement('div');
+      itemComigo.className = `ath-pasta-item ${this.pastaAtivaId === 'compartilhados_comigo' ? 'active' : ''}`;
+      itemComigo.innerHTML = `<div style="display:flex; align-items:center; gap:7px;">${svgIcone('usuarios', 15)}<span>Documentos de outras pessoas</span></div><span class="ath-pasta-badge">${qtd}</span>`;
+      itemComigo.addEventListener('click', () => this.selecionarPasta('compartilhados_comigo'));
+      listaEl.appendChild(itemComigo);
+    }
+
     if (compartilhadas.length === 0) {
       const avisoVazio = document.createElement('div');
       avisoVazio.style.cssText = 'font-size:11px; color:#94A3B8; padding:6px 8px; font-style:italic;';
@@ -1158,6 +1172,7 @@ export class DashboardView {
 
   /** Pasta do documento nesta árvore; se o id vem de outro computador (não existe aqui), vale a pasta padrão, para os totais fecharem. */
   pastaEfetivaDoDoc(d) {
+    if (d.compartilhadoComigo) return 'compartilhados_comigo';
     if (d.pastaId && buscarPastaNaArvore(this.pastasDrive, d.pastaId)) return d.pastaId;
     return d.tipoDoc === 'artigo' || d.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz';
   }
@@ -1324,7 +1339,34 @@ export class DashboardView {
    * (nome e data) dos documentos que o app criou lá; o conteúdo é baixado ao abrir. Sem Drive conectado, nada é listado.
    * (O nome do método é antigo: antes listava o Supabase, que mostrava os mesmos arquivos para todas as contas.)
    */
+  /** Documentos que outras pessoas compartilharam com o meu e-mail (o banco só devolve os que posso ver); não depende do Drive. */
+  async sincronizarCompartilhados() {
+    let novos = 0;
+    try {
+      const compartilhados = await listarCompartilhadosComigo();
+      const ids = new Set(compartilhados.map(c => String(c.id)));
+      for (const c of compartilhados) {
+        const existente = this.documentos.find(d => String(d.id) === String(c.id));
+        const marca = { compartilhadoComigo: true, proprietarioExterno: true, permissao: c.papel, salvoNuvem: true, proprietario: { id: `ext_${c.user_id}`, nome: c.dono || 'Outra pessoa' } };
+        if (!existente) {
+          const papelTxt = c.papel === 'edicao' ? 'edição' : c.papel === 'comentario' ? 'comentário' : 'leitura';
+          this.documentos.unshift({ id: c.id, titulo: c.titulo || 'Documento compartilhado', subtitulo: `De ${c.dono || 'outra pessoa'} · ${papelTxt}`, tipoDoc: 'artigo', perfilId: c.norma || 'abnt', dataModificacao: c.atualizado_em, precisaCarregarConteudo: true, ...marca });
+          novos++;
+        } else if (existente.compartilhadoComigo) {
+          Object.assign(existente, marca);
+          if (c.atualizado_em && (!existente.dataModificacao || new Date(c.atualizado_em) > new Date(existente.dataModificacao))) { existente.precisaCarregarConteudo = true; existente.dataModificacao = c.atualizado_em; }
+        }
+      }
+      // acesso retirado pelo dono: o documento some da lista
+      const antes = this.documentos.length;
+      this.documentos = this.documentos.filter(d => !d.compartilhadoComigo || ids.has(String(d.id)));
+      if (this.documentos.length !== antes || novos) { this.salvarDocumentosLocais(); this.atualizarGrid(); this.renderizarPastasLateral(); }
+    } catch (e) { console.warn('[Athenes] Compartilhados comigo:', e.message); }
+    return novos;
+  }
+
   async sincronizarComSupabase(silencioso = false) {
+    await this.sincronizarCompartilhados();
     const btn = this.container?.querySelector('#athBtnSincronizarNuvem');
     if (!driveConectado()) {
       if (!silencioso) alert('Conecte o Google Drive (engrenagem → Nuvem & Drive) para ver seus documentos na nuvem. Cada conta enxerga só o próprio Drive.');
