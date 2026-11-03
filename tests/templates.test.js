@@ -97,3 +97,19 @@ test('tema: Meus templates viajam no pacote athenes-tema-v1 e voltam saneados', 
   assert.equal(aplicarPacoteEstilo(criarDocumento({ titulo: 'Sem storage' }), v.pacote).templatesImportados, 0);
   void t;
 });
+
+test('tema (athenes-tema-v1) vira template: estilos, mestras e exemplo por estilo', async () => {
+  const { exportarPacoteEstilo } = await import('../src/core/athenes_pacote_estilo.js');
+  const { ehPacoteDeTema, templateDeTema } = await import('../src/core/athenes_template_de_tema.js');
+  const d = criarDocumento({ titulo: 'Origem' });
+  const pacote = JSON.parse(JSON.stringify(exportarPacoteEstilo(d)));
+  assert.ok(ehPacoteDeTema(pacote));
+  assert.equal(ehPacoteDeTema(d), false, 'um documento comum não é tema');
+  const t = templateDeTema(pacote, 'meu.athenes-tema.json');
+  assert.equal(t.config.estilos.length, d.estilos.length);
+  assert.ok(t.secoes.length >= 1 && t.secoes.every(s => t.config.mestras.some(m => m.id === s.mestraId)));
+  const doc = criarDocumentoDeTemplate(t, { titulo: 'Do tema', modoConteudo: 'placeholder' });
+  repaginarDocumento(doc);
+  assert.ok(doc.paginas.length >= 1);
+  assert.throws(() => templateDeTema({ formato: 'athenes-tema-v1', estilos: [] }), /estilos/i);
+});

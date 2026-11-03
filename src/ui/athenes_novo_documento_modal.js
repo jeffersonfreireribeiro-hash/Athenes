@@ -11,6 +11,7 @@ import {
 } from '../core/athenes_templates.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { importarTemplateDocx } from '../core/athenes_docx_importador.js';
+import { ehPacoteDeTema, templateDeTema } from '../core/athenes_template_de_tema.js';
 import { comprimirImagensDoPacote } from './athenes_imagem_util.js';
 import { svgIcone } from './athenes_icones.js';
 import { mostrarAviso } from './athenes_aviso.js';
@@ -112,7 +113,7 @@ export function abrirNovoDocumentoModal(opcoes) {
     else if (estado.aba === 'meus') itens = listarTemplatesUsuario(storage);
     else if (estado.importado) itens = [estado.importado];
     if (estado.aba === 'importar') {
-      el.innerHTML = `<div class="ath-prop-grupo"><label>Arquivo (.athenes, .json, .docx ou documento salvo) — só o esqueleto é aproveitado, sem texto</label>
+      el.innerHTML = `<div class="ath-prop-grupo"><label>Arquivo (.athenes, .json, .docx, tema .athenes-tema.json ou documento salvo) — só o esqueleto é aproveitado, sem texto</label>
         <input type="file" class="ath-input" id="athNtplArquivo" accept=".athenes,.json,.docx,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></div>
         <div class="ath-ntpl-grade">${itens.map(t => card(t)).join('')}</div>`;
       q('#athNtplArquivo').addEventListener('change', lerArquivo);
@@ -151,7 +152,13 @@ export function abrirNovoDocumentoModal(opcoes) {
     try {
       estado.importado = /\.docx$/i.test(arq.name)
         ? await (async () => { const r = await importarTemplateDocx(await arq.arrayBuffer(), { nome: arq.name, incluirConteudo: true }); await comprimirImagensDoPacote({ mestras: r.template.config.mestras }); return r.template; })()
-        : templateDeArquivoJson(JSON.parse(await arq.text()), arq.name);
+        : await (async () => {
+          const obj = JSON.parse(await arq.text());
+          if (!ehPacoteDeTema(obj)) return templateDeArquivoJson(obj, arq.name);
+          const t = templateDeTema(obj, arq.name); // tema (athenes-tema-v1) vira template: estilos + páginas mestras do tema
+          await comprimirImagensDoPacote({ mestras: t.config.mestras });
+          return t;
+        })();
       estado.escolhido = estado.importado;
       if (!q('#athNovoDocTitulo').value) q('#athNovoDocTitulo').value = estado.importado.titulo;
       desenharLista(); atualizarDependentes();
