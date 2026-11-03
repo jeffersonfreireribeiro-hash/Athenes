@@ -15,8 +15,9 @@
  *   }
  * Tudo puro (sem DOM): serve ao editor, ao PDF, ao DOCX e ao pacote de tema.
  */
+import { sanearCamposMarcador } from './athenes_marcadores.js';
 
-const HEX = /^#[0-9a-fA-F]{6}$/;
+const HEX =/^#[0-9a-fA-F]{6}$/;
 const cor = (v, pad) => (typeof v === 'string' && HEX.test(v) ? v : pad);
 const num = (v, min, max, pad) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : pad; };
 const enumDe = (v, lista, pad) => (lista.includes(v) ? v : pad);
@@ -68,7 +69,7 @@ export function normalizarAvancado(av) {
 /** Sanitiza todo estilo de uma lista (preserva o resto do objeto). */
 export function sanitizarEstiloAvancado(estilo) {
   if (!estilo || typeof estilo !== 'object') return estilo;
-  const novo = { ...estilo };
+  const novo = sanearCamposMarcador({ ...estilo });
   if (novo.recuo_direito_mm !== undefined) novo.recuo_direito_mm = num(novo.recuo_direito_mm, 0, 200, 0);
   if (novo.entrelinha_tipo === 'pelo_menos' || novo.entrelinha_tipo === 'exatamente') novo.entrelinha_pt = num(novo.entrelinha_pt, 1, 400, 14);
   else { delete novo.entrelinha_tipo; delete novo.entrelinha_pt; }

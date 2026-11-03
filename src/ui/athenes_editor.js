@@ -55,6 +55,7 @@ import { ModalCompartilhar } from './athenes_compartilhar_modal.js';
 import { modosPermitidos, modoInicialDoPapel } from '../core/athenes_compartilhamento.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { montarCitacao, indiceNaLista, referenciaDoBlocoCitacao } from '../core/athenes_citacao.js';
+import { mapaMarcadores, marcadorEfetivo, chaveMarcador } from '../core/athenes_marcadores.js';
 import { linhasEstimadas, porLinhaUsadoNoTexto, calibracaoDoTexto, definirCalibracaoTexto } from '../core/athenes_fragmentos.js';
 import { hifenizarHtml, removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais, removerPalavrasIniciais } from '../core/athenes_estilo_avancado.js';
@@ -342,6 +343,7 @@ export class EditorView {
     clearTimeout(this._tSumario);
     this._tSumario = setTimeout(() => {
       this.mapaNumSecoes = calcularNumeracaoSecoes(this.doc);
+    this.mapaMarc = mapaMarcadores(this.doc);
       this.container.querySelectorAll('.ath-sumario-vivo').forEach(box => {
         const b = this.buscarBlocoPorId(box.dataset.sumarioBloco);
         if (b) box.innerHTML = this.htmlSumario(b);
@@ -2469,6 +2471,7 @@ export class EditorView {
     repaginarDocumento(this.doc);
     recalcularNumeracaoAutomatica(this.doc);
     this.mapaNumSecoes = calcularNumeracaoSecoes(this.doc);
+    this.mapaMarc = mapaMarcadores(this.doc);
 
     const paginas = this.doc.paginas || [];
     this._sigPaginas = this.assinaturaPaginacao();
@@ -3018,6 +3021,17 @@ export class EditorView {
       const hifAtivoTit = Boolean(estiloMesclado.hifenizacao);
       heading.style.cssText = `${cssEstilo}; margin:0; outline:none;`;
       heading.innerHTML = aplicarRotulosNotasHtml(hifAtivoTit ? hifenizarHtml(b.texto || 'Título da Seção') : removerHifensCondicionais(b.texto || 'Título da Seção'), pag?.rotulosNotas);
+      const marcT = this.mapaMarc?.get(chaveMarcador(b));
+      if (marcT) {
+        // marcadores e numeração do título: o rótulo é CSS (data-marc), como o número de seção, e fica fora do texto
+        const ind = (marcT.cfg.nivel - 1) * 6;
+        heading.classList.add('ath-titulo-marcado');
+        heading.style.paddingLeft = `${ind + marcT.cfg.tabMm}mm`;
+        heading.style.setProperty('--ath-marc-esq', `${ind}mm`);
+        heading.style.setProperty('--ath-marc-larg', `${marcT.cfg.tabMm - 1.5}mm`);
+        heading.style.setProperty('--ath-marc-alin', marcT.cfg.alinhamento);
+        if (!b._frag?.continuaDaAnterior) heading.dataset.marc = marcT.rotulo;
+      }
 
       heading.addEventListener('input', () => {
         b.texto = removerHifensCondicionais(heading.innerHTML);
@@ -3041,8 +3055,9 @@ export class EditorView {
       p.style.cssText = `${cssEstilo}; outline:none;`;
 
       let conteudoHtml = b.texto || 'Escreva diretamente neste bloco...';
-      if (b.marcador_tipo && b.marcador_tipo !== 'nenhum' && !conteudoHtml.includes('<ul') && !conteudoHtml.includes('<ol')) {
-        if (b.marcador_tipo === 'numero') {
+      const marcP = this.mapaMarc?.get(chaveMarcador(b));
+      if (marcP && !b._frag?.continuaDaAnterior && !conteudoHtml.includes('<ul') && !conteudoHtml.includes('<ol')) {
+        if (marcP.cfg.tipo === 'numero') {
           conteudoHtml = `<ol><li>${conteudoHtml}</li></ol>`;
         } else {
           conteudoHtml = `<ul><li>${conteudoHtml}</li></ul>`;
@@ -3060,7 +3075,7 @@ export class EditorView {
         ref.innerHTML = ` ${referenciaDoBlocoCitacao(b).html}`;
         p.appendChild(ref);
       }
-      this.aplicarConfigListaNoBloco(p, b);
+      this.aplicarConfigListaNoBloco(p, b, marcP);
 
       // Modo Sugestão (estilo Google Docs): digitar/colar vira inserção, apagar vira exclusão tachada (sem alterar a base)
       this.instalarSugestaoNoBloco(p, b);
@@ -3579,6 +3594,12 @@ export class EditorView {
     this.renderizarFolhasPaginas();
   }
 
+  /** Estilo de texto do bloco (título: o do nível). */
+  estiloDoBloco(b) {
+    const porId = Object.fromEntries((this.doc.estilos || []).map(e => [e.id, e]));
+    return (b?.tipo === 'titulo' ? porId[estiloIdDoTitulo(porId, b)] : porId[b?.estiloId]) || {};
+  }
+
   /** Insere uma citação direta longa (bloco recuado, fonte menor) depois do bloco selecionado. */
   inserirCitacaoLonga(ref, { texto, pagina = '', refTexto, linkar = true } = {}) {
     if (!ref || !String(texto || '').trim()) return null;
@@ -3798,16 +3819,18 @@ export class EditorView {
       this.agendarSnapshot();
     }
   }
-  aplicarConfigListaNoBloco(containerEditable, b) {
+  /** `marc` ({ cfg, numero }, de mapaMarcadores) traz a configuração efetiva (estilo + bloco) e o número da numeração corrida. */
+  aplicarConfigListaNoBloco(containerEditable, b, marc = null) {
     if (!containerEditable || !b) return;
     const listas = containerEditable.querySelectorAll('ul, ol');
     if (!listas.length) return;
 
-    const nivel = Math.max(1, parseInt(b.marcador_nivel, 10) || 1);
-    const tabMm = Math.max(3, parseFloat(b.marcador_tab_mm) || 7);
+    const cfg = marc?.cfg;
+    const nivel = cfg?.nivel ?? Math.max(1, parseInt(b.marcador_nivel, 10) || 1);
+    const tabMm = cfg?.tabMm ?? Math.max(3, parseFloat(b.marcador_tab_mm) || 7);
     const indentMm = (nivel - 1) * 6;
-    const align = b.marcador_alinhamento || 'left';
-    const inicio = Math.max(1, parseInt(b.marcador_inicio, 10) || 1);
+    const align = cfg?.alinhamento ?? (b.marcador_alinhamento || 'left');
+    const inicio = marc?.numero ?? Math.max(1, parseInt(b.marcador_inicio, 10) || 1);
 
     listas.forEach(lista => {
       lista.classList.add('ath-lista-config');
@@ -3817,10 +3840,11 @@ export class EditorView {
       lista.style.setProperty('--ath-list-counter-start', String(inicio - 1));
 
       if (lista.tagName.toLowerCase() === 'ol') {
-        lista.dataset.numEstilo = b.marcador_estilo_num || 'decimal';
-        lista.dataset.numSep = b.marcador_separador || 'ponto';
+        lista.dataset.numEstilo = cfg?.estiloNum ?? (b.marcador_estilo_num || 'decimal');
+        lista.dataset.numSep = cfg?.separador ?? (b.marcador_separador || 'ponto');
       } else {
-        const tipoMarc = (b.marcador_tipo && b.marcador_tipo !== 'numero') ? b.marcador_tipo
+        const tipoMarc = (cfg && cfg.tipo !== 'numero') ? cfg.tipo
+          : (b.marcador_tipo && b.marcador_tipo !== 'numero' && b.marcador_tipo !== 'nenhum') ? b.marcador_tipo
           : lista.classList.contains('ath-lista-alinea') ? 'traco'
           : lista.classList.contains('ath-lista-ponto-traco') ? 'ponto_traco'
           : lista.classList.contains('ath-lista-quadrado') ? 'quadrado'
@@ -4089,7 +4113,8 @@ export class EditorView {
       const b = this.blocoSelecionado;
       if (!b) return;
       if (tipo === 'nenhum') {
-        delete b.marcador_tipo;
+        if (marcadorEfetivo({}, this.estiloDoBloco(b))) b.marcador_tipo = 'nenhum'; // o estilo tem marcador: este bloco o desliga
+        else delete b.marcador_tipo;
         const txt = String(b.texto || '').trim();
         if (txt.startsWith('<ul') || txt.startsWith('<ol')) {
           const tmp = document.createElement('div');
@@ -4340,7 +4365,8 @@ export class EditorView {
           }
 
           // Reflete estado do menu de Lista / Marcadores e Numeração
-          const marcAtivo = this.blocoSelecionado?.marcador_tipo || 'nenhum';
+          const marcCfg = this.blocoSelecionado ? marcadorEfetivo(this.blocoSelecionado, this.estiloDoBloco(this.blocoSelecionado)) : null;
+          const marcAtivo = marcCfg?.tipo || 'nenhum';
           barra.querySelectorAll('[data-ctx-marcador]').forEach(bt => {
             bt.classList.toggle('on', bt.dataset.ctxMarcador === marcAtivo);
           });

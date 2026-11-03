@@ -19,6 +19,8 @@ import {
   calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
+import { htmlMarcadoresBloco, ligarMarcadoresBloco } from './athenes_marcadores_ui.js';
+import { estiloIdDoTitulo } from '../core/athenes_sumario.js';
 import { montarPainelSumario } from './athenes_sumario_painel.js';
 import { NIVEL_MAX, nivelDe, blocoNumerado, normalizarNumeracaoSecoes, REGEX_NUMERO_MANUAL } from '../core/athenes_sumario.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
@@ -415,6 +417,7 @@ export class PainelPropriedades {
 
     // 1. TÍTULO / SUBTÍTULO
     if (b.tipo === 'titulo' || b.tipo === 'subtitulo') {
+      const estiloDoTitulo = (b.tipo === 'titulo' ? estilos.find(e => e.id === estiloIdDoTitulo(Object.fromEntries(estilos.map(x => [x.id, x])), b)) : null) || estiloAtivo;
       const alinAtivo = b.alinhamento || estiloAtivo.alinhamento || 'esquerda';
       const corAtiva = b.cor || estiloAtivo.cor || '#1F2733';
       const fonteAtiva = b.fonte || '';
@@ -555,6 +558,7 @@ export class PainelPropriedades {
           <input type="checkbox" id="rmCampoManter" ${b.manterComProximo ? 'checked' : ''}>
           Manter título com o parágrafo seguinte (evitar órfão)
         </label>
+        ${htmlMarcadoresBloco(b, estiloDoTitulo, estilos)}
         ${b.tipo === 'titulo' ? `
         <div style="display:flex; flex-direction:column; gap:8px; padding:10px; border:1px solid #E2E8F0; border-radius:10px; background:#F8FAFC;">
           <strong style="font:800 10.5px var(--glx-font); letter-spacing:.06em; text-transform:uppercase; color:var(--ath-primary,#314F79);">Numeração e sumário</strong>
@@ -571,6 +575,7 @@ export class PainelPropriedades {
         </div>` : ''}
       `;
 
+      ligarMarcadoresBloco(box, b, estiloDoTitulo, { aoMudar: (estrutural) => this.notificarMudanca(estrutural) });
       box.querySelector('#rmCampoTexto').addEventListener('input', e => { b.texto = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmCampoNivel').addEventListener('change', e => {
         b.nivel = parseInt(e.target.value, 10);
@@ -818,96 +823,9 @@ export class PainelPropriedades {
           </div>
         </div>
 
-        <!-- MARCADORES E NUMERAÇÃO (Estilo Affinity Publisher) -->
-        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:4px; background:#fff;">
-          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
-            <span>Marcadores e Numeração</span>
-            <span style="font-size:10px; color:var(--glx-muted); text-transform:none; font-weight:600;">Listas & Alíneas</span>
-          </div>
+        <!-- MARCADORES E NUMERAÇÃO: o estilo de texto traz o padrão; o bloco sobrescreve -->
+        ${htmlMarcadoresBloco(b, estiloAtivo, estilos)}
 
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Tipo
-              <select id="rmMarcadorTipo" class="glx-select">
-                <option value="nenhum" ${!b.marcador_tipo || b.marcador_tipo === 'nenhum' ? 'selected' : ''}>Nenhuma lista</option>
-                <option value="circulo" ${b.marcador_tipo === 'circulo' ? 'selected' : ''}>•  Marcador — Ponto (Círculo)</option>
-                <option value="traco" ${b.marcador_tipo === 'traco' ? 'selected' : ''}>–  Marcador — Travessão / Alínea</option>
-                <option value="quadrado" ${b.marcador_tipo === 'quadrado' ? 'selected' : ''}>▪  Marcador — Quadrado</option>
-                <option value="ponto_traco" ${b.marcador_tipo === 'ponto_traco' ? 'selected' : ''}>·– Marcador — Ponto-traço</option>
-                <option value="numero" ${b.marcador_tipo === 'numero' ? 'selected' : ''}>1, 2, 3…  Numérico (Configurável)</option>
-              </select>
-            </label>
-
-            <div id="rmBoxMarcadorConfig" style="display:${b.marcador_tipo && b.marcador_tipo !== 'nenhum' ? 'flex' : 'none'}; flex-direction:column; gap:8px; padding-top:6px; border-top:1px dashed var(--ath-primary-line, #C8D7E6);">
-              <div id="rmBoxMarcadorNumerico" style="display:${b.marcador_tipo === 'numero' ? 'flex' : 'none'}; flex-direction:column; gap:8px;">
-                <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Estilo Numérico
-                  <select id="rmMarcadorEstiloNum" class="glx-select">
-                    <option value="decimal" ${(!b.marcador_estilo_num || b.marcador_estilo_num === 'decimal') ? 'selected' : ''}>1, 2, 3, 4… (Número arábico)</option>
-                    <option value="decimal_zero" ${b.marcador_estilo_num === 'decimal_zero' ? 'selected' : ''}>01, 02, 03… (Zero à esquerda)</option>
-                    <option value="lower_alpha" ${b.marcador_estilo_num === 'lower_alpha' ? 'selected' : ''}>a, b, c, d… (Letra minúscula)</option>
-                    <option value="upper_alpha" ${b.marcador_estilo_num === 'upper_alpha' ? 'selected' : ''}>A, B, C, D… (Letra maiúscula)</option>
-                    <option value="lower_roman" ${b.marcador_estilo_num === 'lower_roman' ? 'selected' : ''}>i, ii, iii, iv… (Romano minúsculo)</option>
-                    <option value="upper_roman" ${b.marcador_estilo_num === 'upper_roman' ? 'selected' : ''}>I, II, III, IV… (Romano maiúsculo)</option>
-                  </select>
-                </label>
-
-                <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end;">
-                  <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Texto / Formato
-                    <select id="rmMarcadorSeparador" class="glx-select" title="Formato de pontuação do número (ex: 1. ou a) ou (1))">
-                      <option value="ponto" ${(!b.marcador_separador || b.marcador_separador === 'ponto') ? 'selected' : ''}>\#.  (1. / a.)</option>
-                      <option value="parentese" ${b.marcador_separador === 'parentese' ? 'selected' : ''}>\#)  (1) / a))</option>
-                      <option value="entre_parenteses" ${b.marcador_separador === 'entre_parenteses' ? 'selected' : ''}>(\#)  ((1) / (a))</option>
-                      <option value="travessao" ${b.marcador_separador === 'travessao' ? 'selected' : ''}>\# –  (1 – / a –)</option>
-                    </select>
-                  </label>
-                  <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Iniciar em
-                    <input type="number" id="rmMarcadorInicio" class="glx-input" min="1" max="999" value="${b.marcador_inicio ?? 1}">
-                  </label>
-                </div>
-              </div>
-
-              <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end;">
-                <label style="font-size:11px; color:var(--glx-muted);">Nível
-                  <input type="number" id="rmMarcadorNivel" class="glx-input" min="1" max="5" value="${b.marcador_nivel ?? 1}">
-                </label>
-                <label style="font-size:11px; color:var(--glx-muted);">Tabulação (mm)
-                  <input type="number" id="rmMarcadorTabMm" class="glx-input" min="3" max="30" step="0.5" value="${b.marcador_tab_mm ?? 7}">
-                </label>
-              </div>
-
-              <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end;">
-                <label style="font-size:11px; color:var(--glx-muted);">Alinhamento
-                  <select id="rmMarcadorAlinhamento" class="glx-select">
-                    <option value="left" ${(!b.marcador_alinhamento || b.marcador_alinhamento === 'left') ? 'selected' : ''}>Esquerda</option>
-                    <option value="center" ${b.marcador_alinhamento === 'center' ? 'selected' : ''}>Centro</option>
-                    <option value="right" ${b.marcador_alinhamento === 'right' ? 'selected' : ''}>Direita</option>
-                  </select>
-                </label>
-                <label style="font-size:11px; color:var(--glx-muted);">Estilo Caractere
-                  <select id="rmMarcadorEstiloId" class="glx-select">
-                    <option value="" ${!b.marcador_estilo_id ? 'selected' : ''}>[Sem Estilo]</option>
-                    ${estilos.map(e => `<option value="${e.id}" ${b.marcador_estilo_id === e.id ? 'selected' : ''}>${e.nome}</option>`).join('')}
-                  </select>
-                </label>
-              </div>
-
-              <div id="rmBoxMarcadorReiniciar" style="display:${b.marcador_tipo === 'numero' ? 'flex' : 'none'}; flex-direction:column; gap:6px;">
-                <label style="font-size:11px; color:var(--glx-muted);">Reiniciar numeração
-                  <select id="rmMarcadorReiniciarModo" class="glx-select">
-                    <option value="qualquer_nao_lista" ${(!b.marcador_reiniciar || b.marcador_reiniciar === 'qualquer_nao_lista') ? 'selected' : ''}>Qualquer não lista</option>
-                    <option value="abaixo_nivel" ${b.marcador_reiniciar === 'abaixo_nivel' ? 'selected' : ''}>Abaixo do nível atual</option>
-                    <option value="manual" ${b.marcador_reiniciar === 'manual' ? 'selected' : ''}>Manualmente</option>
-                  </select>
-                </label>
-                <label class="rm-chk" style="font-size:11.5px; font-weight:600; color:var(--ath-text, #1F2733); cursor:pointer;">
-                  <input type="checkbox" id="rmMarcadorReiniciarAgora" ${b.marcador_reiniciar_agora !== false ? 'checked' : ''} style="accent-color:var(--ath-primary, #314F79);">
-                  <span>Reiniciar numeração agora</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        
         <!-- Divisão do Bloco de Texto -->
         <div style="margin-top:6px;">
           <button type="button" class="glx-btn glx-btn-sm glx-btn-secondary" id="athBtnDividirBlocoProps" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:700;" title="Dividir este bloco de texto em dois na posição atual do cursor ou ao meio">
@@ -1097,66 +1015,9 @@ export class PainelPropriedades {
         }
       };
 
-      box.querySelector('#rmMarcadorTipo')?.addEventListener('change', e => {
-        const val = e.target.value;
-        if (val === 'nenhum') {
-          delete b.marcador_tipo;
-        } else {
-          b.marcador_tipo = val;
-          if (val === 'numero') {
-            if (!b.marcador_estilo_num) b.marcador_estilo_num = 'decimal';
-            if (!b.marcador_separador) b.marcador_separador = 'ponto';
-            if (!b.marcador_inicio) b.marcador_inicio = 1;
-          }
-        }
-        normalizarHtmlListaDoBloco();
-        this.notificarMudanca();
-        this.renderizar();
-      });
-
-      box.querySelector('#rmMarcadorEstiloNum')?.addEventListener('change', e => {
-        b.marcador_estilo_num = e.target.value;
-        this.notificarMudanca();
-      });
-
-      box.querySelector('#rmMarcadorSeparador')?.addEventListener('change', e => {
-        b.marcador_separador = e.target.value;
-        this.notificarMudanca();
-      });
-
-      box.querySelector('#rmMarcadorInicio')?.addEventListener('input', e => {
-        b.marcador_inicio = Math.max(1, parseInt(e.target.value, 10) || 1);
-        this.notificarMudanca();
-      });
-
-      box.querySelector('#rmMarcadorNivel')?.addEventListener('input', e => {
-        b.marcador_nivel = Math.min(5, Math.max(1, parseInt(e.target.value, 10) || 1));
-        this.notificarMudanca();
-      });
-
-      box.querySelector('#rmMarcadorTabMm')?.addEventListener('input', e => {
-        b.marcador_tab_mm = Math.max(3, parseFloat(e.target.value) || 7);
-        this.notificarMudanca();
-      });
-
-      box.querySelector('#rmMarcadorAlinhamento')?.addEventListener('change', e => {
-        b.marcador_alinhamento = e.target.value;
-        this.notificarMudanca();
-      });
-
-      box.querySelector('#rmMarcadorEstiloId')?.addEventListener('change', e => {
-        b.marcador_estilo_id = e.target.value || null;
-        this.notificarMudanca();
-      });
-
-      box.querySelector('#rmMarcadorReiniciarModo')?.addEventListener('change', e => {
-        b.marcador_reiniciar = e.target.value;
-        this.notificarMudanca();
-      });
-
-      box.querySelector('#rmMarcadorReiniciarAgora')?.addEventListener('change', e => {
-        b.marcador_reiniciar_agora = e.target.checked;
-        this.notificarMudanca();
+      ligarMarcadoresBloco(box, b, estiloAtivo, {
+        aoTrocarTipo: normalizarHtmlListaDoBloco,
+        aoMudar: (estrutural) => this.notificarMudanca(estrutural)
       });
 
       box.querySelector('#rmCampoEspacoDepois')?.addEventListener('input', e => {

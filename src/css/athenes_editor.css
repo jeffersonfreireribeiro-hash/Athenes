@@ -2630,3 +2630,12 @@ ins.ath-sug-ins:hover, del.ath-sug-del:hover { outline: 1.5px solid var(--ath-su
 .ath-folha-area-util .ath-bloco-folha { padding: 0; border: 0; }
 .ath-folha-area-util .ath-bloco-folha:hover { box-shadow: 0 0 0 1.5px #CBD5E1; }
 .ath-folha-area-util .ath-bloco-folha.sel { box-shadow: 0 0 0 1.5px #314F79, 0 0 0 4.5px rgba(49, 79, 121, 0.16); }
+
+/* Marcadores e numeração em títulos: o rótulo (data-marc) fica à esquerda, em recuo suspenso, e não entra no texto */
+.ath-titulo-marcado { position: relative; }
+.ath-titulo-marcado[data-marc]::after {
+  content: attr(data-marc);
+  position: absolute; left: var(--ath-marc-esq, 0); top: 0;
+  width: var(--ath-marc-larg, 5.5mm); text-align: var(--ath-marc-alin, left);
+  white-space: nowrap; user-select: none; pointer-events: none;
+}

@@ -9,6 +9,10 @@
 import { svgIcone } from './athenes_icones.js';
 import { ptParaMm, mmParaPt, FONTES_SISTEMA, PESOS_FONTE, estiloParaCss, TIPOS_ENTRELINHA, tipoEntrelinhaDoEstilo, aplicarTipoEntrelinha } from '../core/athenes_estilos.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
+import { htmlMarcadoresEstilo, ligarMarcadoresEstilo } from './athenes_marcadores_ui.js';
+import { CAMPOS_MARCADOR } from '../core/athenes_marcadores.js';
+
+const limparMarcadoresRemovidos = (estilo, rascunho) => CAMPOS_MARCADOR.forEach(k => { if (!(k in rascunho)) delete estilo[k]; });
 import { AVANCADO_PADRAO, cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais, normalizarAvancado } from '../core/athenes_estilo_avancado.js';
 
 const LBL = 'font:700 11.5px var(--glx-font); color:#334155; display:flex; flex-direction:column; gap:3px;';
@@ -119,6 +123,7 @@ export function secaoAvancadaHtml() {
       #athModalAvancado legend label { display:inline-flex; flex-direction:row !important; align-items:center; }
     </style>
     ${secaoParagrafoWordHtml()}
+    ${htmlMarcadoresEstilo()}
     <span style="font:800 11.5px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569;">Decorações do parágrafo</span>
     ${grupo('Barra lateral', 'avancado.barra_lateral.ativa',
       `<label style="${LBL}">Lado<select class="ath-select" data-av="avancado.barra_lateral.lado" style="height:34px; line-height:normal;"><option value="esquerda">Esquerda</option><option value="direita">Direita</option></select></label>
@@ -154,6 +159,7 @@ function gravarCaminho(o, path, valor) {
 /** Liga os campos data-av="caminho" de `raiz` ao rascunho do estilo (valores iniciais e alterações ao vivo). */
 export function ligarCamposAvancados(raiz, rascunho, aoMudar) {
   ligarParagrafoWord(raiz, rascunho, aoMudar);
+  ligarMarcadoresEstilo(raiz, rascunho, aoMudar);
   raiz.querySelectorAll('[data-av]').forEach(inp => {
     const path = inp.dataset.av;
     const atual = lerCaminho(rascunho, path) ?? lerCaminho({ avancado: AVANCADO_PADRAO }, path); // vazio mostra o valor padrão
@@ -188,6 +194,7 @@ export function gravarRascunhoNoEstilo(estilo, rascunho) {
   if (av) rascunho.avancado = av; else delete rascunho.avancado;
   if (!rascunho.recuo_direito_mm) delete rascunho.recuo_direito_mm;
   if (!av) delete estilo.avancado;
+  limparMarcadoresRemovidos(estilo, rascunho);
   if (!rascunho.recuo_direito_mm) delete estilo.recuo_direito_mm;
   Object.assign(estilo, rascunho);
 }
@@ -421,6 +428,7 @@ export class ModalEditorEstilo {
       if (!this.rascunho.recuo_direito_mm) delete this.rascunho.recuo_direito_mm;
       if (this.estiloOriginal) {
         if (!av) delete this.estiloOriginal.avancado;
+        limparMarcadoresRemovidos(this.estiloOriginal, this.rascunho);
         if (!this.rascunho.recuo_direito_mm) delete this.estiloOriginal.recuo_direito_mm;
         Object.assign(this.estiloOriginal, this.rascunho);
       }

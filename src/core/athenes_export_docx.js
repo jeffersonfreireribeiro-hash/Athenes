@@ -9,6 +9,7 @@ import { ZipBuilder } from './zip_builder.js';
 import { MM_PARA_DXA, dimensoesPapelMm } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
 import { ancoraDaReferencia, nomeMarcadorWord, referenciaDoBlocoCitacao } from './athenes_citacao.js';
+import { mapaMarcadores, chaveMarcador } from './athenes_marcadores.js';
 import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
 import { resolverAreasPagina, normalizarNumeracao, normalizarArea, estiloEfetivoNumeracao } from './athenes_paginacao.js';
@@ -674,6 +675,15 @@ export async function exportarParaDocx(documento) {
 
   const mestrasMap = new Map((documento.mestras || documento.modelosPagina || []).map(m => [m.id, m]));
   const prefixosSecoes = calcularNumeracaoSecoes(documento);
+  const marcadores = mapaMarcadores(documento);
+  const TWIP_MM = 56.7;
+  /** Recuo suspenso do marcador (rótulo + tabulação) e a corrida de texto do rótulo, só no 1º fragmento do bloco. */
+  const marcadorDocx = (b) => {
+    const m = marcadores.get(chaveMarcador(b));
+    if (!m) return null;
+    const ind = Math.round((m.cfg.nivel - 1) * 6 * TWIP_MM), tab = Math.round(m.cfg.tabMm * TWIP_MM);
+    return { left: ind + tab, hanging: tab, run: b._frag?.continuaDaAnterior ? '' : `<w:r><w:t xml:space="preserve">${escaparXml(m.rotulo)}</w:t></w:r><w:r><w:tab/></w:r>` };
+  };
   let contadorMarcadores = 0;
 
   for (let sIdx = 0; sIdx < secoes.length; sIdx++) {
@@ -701,9 +711,10 @@ export async function exportarParaDocx(documento) {
         const num = prefixosSecoes.get(b.id);
         const runs = htmlParaRunsDocx(num ? (removerNumeroManual(b.texto) || b.texto) : b.texto);
         const runsNum = num ? `<w:r><w:t xml:space="preserve">${escaparXml(num.prefixo)} </w:t></w:r>` : '';
+        const mkT = marcadorDocx(b);
         const idMarca = ++contadorMarcadores;
         // marcador _Toc_<id>: destino dos links do sumário
-        bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="${estiloId}"/><w:keepNext/></w:pPr><w:bookmarkStart w:id="${idMarca}" w:name="_Toc_${escaparXml(b.id)}"/>${runsNum}${runs.join('')}<w:bookmarkEnd w:id="${idMarca}"/></w:p>`);
+        bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="${estiloId}"/><w:keepNext/>${mkT ? `<w:ind w:left="${mkT.left}" w:hanging="${mkT.hanging}"/>` : ''}</w:pPr><w:bookmarkStart w:id="${idMarca}" w:name="_Toc_${escaparXml(b.id)}"/>${mkT?.run || ''}${runsNum}${runs.join('')}<w:bookmarkEnd w:id="${idMarca}"/></w:p>`);
       } else if (b.tipo === 'subtitulo') {
         const runs = htmlParaRunsDocx(b.texto, { cor: '#64748B', tamanhoPt: 13 });
         bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr>${runs.join('')}</w:p>`);
@@ -746,7 +757,10 @@ export async function exportarParaDocx(documento) {
         const recuoEsq = b.recuo_esquerdo_mm !== undefined ? ` w:left="${Math.round(b.recuo_esquerdo_mm * 56.7)}"` : '';
         const dirMm = b.recuo_direito_mm !== undefined ? b.recuo_direito_mm : estAv?.recuo_direito_mm;
         const recuoDir = dirMm !== undefined ? ` w:right="${Math.round(dirMm * 56.7)}"` : '';
-        const indXml = `<w:ind w:firstLine="${recuo1}"${recuoEsq}${recuoDir}/>`;
+        const mkP = /<(ul|ol)[\s>]/i.test(String(b.texto)) ? null : marcadorDocx(b);
+        const indXml = mkP
+          ? `<w:ind w:left="${mkP.left + (b.recuo_esquerdo_mm !== undefined ? Math.round(b.recuo_esquerdo_mm * TWIP_MM) : 0)}" w:hanging="${mkP.hanging}"${recuoDir}/>`
+          : `<w:ind w:firstLine="${recuo1}"${recuoEsq}${recuoDir}/>`;
 
         const antes = b.espaco_antes_pt !== undefined ? Math.round(b.espaco_antes_pt * 20) : 0;
         const depois = b.espaco_depois_pt !== undefined ? Math.round(b.espaco_depois_pt * 20) : 0;
@@ -757,7 +771,7 @@ export async function exportarParaDocx(documento) {
         const spacingXml = `<w:spacing w:line="${linha}" w:lineRule="${regraLinha ? (tipoLinha === 'exatamente' ? 'exact' : 'atLeast') : 'auto'}" w:before="${antes}" w:after="${depois}"/>`;
 
         if (capitularXml) bodyXmlParts.push(capitularXml);
-        bodyXmlParts.push(`<w:p><w:pPr>${decoXml}${indXml}<w:jc w:val="${jcVal}"/>${spacingXml}</w:pPr>${runs.join('')}</w:p>`);
+        bodyXmlParts.push(`<w:p><w:pPr>${decoXml}${indXml}<w:jc w:val="${jcVal}"/>${spacingXml}</w:pPr>${mkP?.run || ''}${runs.join('')}</w:p>`);
       } else if (b.tipo === 'citacao') {
         const refTexto = ` ${referenciaDoBlocoCitacao(b).html}`;
         const textoCompleto = `${b.texto || ''}${refTexto}`;

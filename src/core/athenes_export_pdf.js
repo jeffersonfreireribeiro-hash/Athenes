@@ -13,6 +13,7 @@ import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssTipografia, estiloParaCssNumeracao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
 import { ancoraDaReferencia, referenciaDoBlocoCitacao } from './athenes_citacao.js';
+import { mapaMarcadores, chaveMarcador } from './athenes_marcadores.js';
 import { hifenizarHtml } from './athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais } from './athenes_estilo_avancado.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
@@ -116,6 +117,17 @@ function gerarTabelaHtmlEstilizada(bloco, classe, estilosMap = {}) {
   return '<table class="' + classe + '" style="' + tabelaParaCss('9.5pt') + ';' + dados + '">' + colgroup + cab + '<tbody>' + corpo + '</tbody></table>';
 }
 
+/** Marcador/numeração do bloco para o PDF: estilo do bloco em recuo suspenso + o rótulo posicionado à esquerda (só no 1º fragmento). */
+function marcadorDoBlocoPdf(bloco, opcoes) {
+  const m = opcoes.marcadores?.get(chaveMarcador(bloco));
+  if (!m || bloco._frag?.continuaDaAnterior) return { estilo: m ? `padding-left:${(m.cfg.nivel - 1) * 6 + m.cfg.tabMm}mm;position:relative;` : '', html: '' };
+  const ind = (m.cfg.nivel - 1) * 6;
+  return {
+    estilo: `padding-left:${ind + m.cfg.tabMm}mm;position:relative;`,
+    html: `<span class="ath-marc" style="position:absolute;left:${ind}mm;width:${m.cfg.tabMm - 1.5}mm;text-align:${m.cfg.alinhamento};white-space:nowrap;text-indent:0;">${escaparHtml(m.rotulo)}</span>`
+  };
+}
+
 export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
   const estBase = estilosMap[bloco.tipo === 'titulo' ? estiloIdDoTitulo(estilosMap, bloco) : (bloco.estiloId || (bloco.tipo === 'citacao' ? 'citacao_direta' : undefined))] || estilosMap.corpo || {};
   const est = {
@@ -145,7 +157,8 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       const num = opcoes.prefixosSecoes?.get(bloco.id);
       const corpoTitulo = num ? removerNumeroManual(textoFormatado) || textoFormatado : textoFormatado;
       const prefixo = num ? `<span class="ath-num-secao">${num.prefixo}</span> ` : '';
-      return `<${tag} id="ath-b-${bloco.id}" class="ath-bloco ath-titulo ath-nivel-${nivel}" ${nivel > 6 ? `role="heading" aria-level="${nivel}" ` : ''}style="${estiloCss}" data-id="${bloco.id}">${prefixo}${corpoTitulo}</${tag}>`;
+      const mk = marcadorDoBlocoPdf(bloco, opcoes);
+      return `<${tag} id="ath-b-${bloco.id}" class="ath-bloco ath-titulo ath-nivel-${nivel}" ${nivel > 6 ? `role="heading" aria-level="${nivel}" ` : ''}style="${estiloCss}${mk.estilo}" data-id="${bloco.id}">${mk.html}${prefixo}${corpoTitulo}</${tag}>`;
     }
 
     case 'subtitulo':
@@ -154,7 +167,8 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
     case 'paragrafo': {
       const av = classesAvancadasDoBloco(est, bloco._frag);
       const texto = av && !bloco._frag?.continuaDaAnterior ? aplicarPalavrasIniciais(textoFormatado, est) : textoFormatado;
-      return `<p class="ath-bloco ath-paragrafo${av ? ' ' + av : ''}" style="${estiloCss}" data-id="${bloco.id}">${texto}</p>`;
+      const mk = /<(ul|ol)[\s>]/i.test(texto) ? { estilo: '', html: '' } : marcadorDoBlocoPdf(bloco, opcoes); // lista escrita à mão já tem o seu marcador
+      return `<p class="ath-bloco ath-paragrafo${av ? ' ' + av : ''}" style="${estiloCss}${mk.estilo}" data-id="${bloco.id}">${mk.html}${texto}</p>`;
     }
 
     case 'citacao': {
@@ -369,6 +383,7 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
   }
 
   const prefixosSecoes = calcularNumeracaoSecoes(documento);
+  const marcadores = mapaMarcadores(documento);
   const paginasHtml = (documento.paginas || []).map((pag, index) => {
     const modelo = modeloDaPagina(documento, pag);
     const dimFolha = dimensoesPapelMm(modelo.formato, modelo.orientacao);
@@ -381,7 +396,7 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
     const cabHtml = areaPaginaHtml(areas.cabecalho, m);
 
     // Blocos da página
-    const opcoesPag = { ...opcoes, margens_mm: m, rotulosNotas: pag.rotulosNotas, prefixosSecoes };
+    const opcoesPag = { ...opcoes, margens_mm: m, rotulosNotas: pag.rotulosNotas, prefixosSecoes, marcadores };
     const blocosPag = pag.blocos || [];
     const partes = [];
     for (let i = 0; i < blocosPag.length; i++) {
