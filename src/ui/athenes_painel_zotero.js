@@ -90,6 +90,7 @@ export class PainelZotero {
     root.style.height = '100%';
     root.style.boxSizing = 'border-box';
     root.style.padding = '12px 16px';
+    root.style.overflowY = 'auto';
     root.style.gap = '8px';
 
     // Calcula contagens para as badges das abas
@@ -193,7 +194,7 @@ export class PainelZotero {
       </div>
 
       <!-- Lista de Referências Filtradas e Ordenadas -->
-      <div class="ath-zotero-lista" id="athZoteroLista" style="flex:1; overflow-y:auto; min-height:160px; display:flex; flex-direction:column; gap:8px;">
+      <div class="ath-zotero-lista" id="athZoteroLista" style="flex:none; overflow-y:auto; min-height:120px; max-height:min(300px, 38vh); display:flex; flex-direction:column; gap:8px;">
         <!-- Itens da biblioteca injetados dinamicamente -->
       </div>
 
@@ -254,6 +255,7 @@ export class PainelZotero {
     const inputBib = root.querySelector('#athInputBibtex');
     inputBib?.addEventListener('change', e => this.processarArquivoBibtex(e.target.files[0]));
 
+    [...root.children].forEach(c => { c.style.flexShrink = '0'; });
     this.container.appendChild(root);
 
     // Carrega dados iniciais e integra artigos com fichamento do estúdio
@@ -553,11 +555,18 @@ export class PainelZotero {
     caixa.style.cssText = 'margin-top:10px; padding-top:10px; border-top:1px dashed #CBD5E1;';
     caixa.innerHTML = `
       <strong style="display:block; font-size:11.5px; margin-bottom:4px; color:#314F79;">Citação direta longa (mais de 3 linhas)</strong>
-      ${marcadas.length ? `<select id="athLongaFonte" class="glx-select" style="width:100%; height:28px; font-size:11px; margin-bottom:6px;">
-        <option value="">Escrever ou colar o trecho…</option>
-        ${marcadas.map((c, i) => `<option value="${i}">${escaparAttr(`${c.paginaCitacao || c.pagina ? 'p. ' + (c.paginaCitacao || c.pagina) + ' — ' : ''}${String(c.texto).slice(0, 80)}${String(c.texto).length > 80 ? '…' : ''}`)}</option>`).join('')}
-      </select>` : ''}
-      <textarea id="athLongaTexto" placeholder="Trecho copiado da obra, sem aspas: entra como bloco recuado, em fonte menor, com a referência no fim." style="width:100%; box-sizing:border-box; height:70px; font-size:11.5px; border-radius:6px; padding:6px 8px; border:1px solid #CBD5E1;"></textarea>
+      ${marcadas.length ? `<div style="font-size:10.5px; color:#64748B; margin-bottom:4px;">Destaques marcados na leitura deste artigo (${marcadas.length}):</div>
+      <div id="athLongaLista" style="max-height:170px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-bottom:8px;">
+        ${marcadas.map((c, i) => `<div class="ath-longa-item" data-i="${i}" style="border:1px solid #E2E8F0; border-left:4px solid ${escaparAttr(c.cor || '#314F79')}; border-radius:6px; padding:6px 8px; background:#fff;">
+          <div style="font-size:11px; line-height:1.35; color:#334155; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">${escaparAttr(c.texto)}</div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+            <span style="font-size:10px; font-weight:700; color:#64748B; flex:1;">${c.paginaCitacao ? 'p. ' + escaparAttr(c.paginaCitacao) : (c.pagina ? 'PDF p. ' + escaparAttr(c.pagina) : 'sem página')}</span>
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" data-longa-editar style="padding:1px 8px; font-size:10.5px;">Editar antes</button>
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-primary" data-longa-inserir style="padding:1px 8px; font-size:10.5px; font-weight:700;">Inserir como citação longa</button>
+          </div>
+        </div>`).join('')}
+      </div>` : ''}
+      <textarea id="athLongaTexto" placeholder="Ou cole aqui outro trecho da obra, sem aspas: entra como bloco recuado, em fonte menor, com a referência no fim." style="width:100%; box-sizing:border-box; height:70px; font-size:11.5px; border-radius:6px; padding:6px 8px; border:1px solid #CBD5E1;"></textarea>
       <div style="display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap;">
         <label style="display:flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#475569;">Pág.
           <input type="text" id="athLongaPag" placeholder="${escaparAttr(iv?.texto || '—')}" style="width:72px; height:24px; font-size:11px; padding:0 6px; border:1px solid #CBD5E1; border-radius:6px;">
@@ -580,12 +589,28 @@ export class PainelZotero {
       btn.style.opacity = btn.disabled ? '.5' : '1';
       return v;
     };
-    caixa.querySelector('#athLongaFonte')?.addEventListener('change', e => {
-      const c = marcadas[Number(e.target.value)];
-      if (!c) return;
-      txt.value = c.texto;
-      pag.value = c.paginaCitacao || (iv?.origem === 'pdf' ? (c.pagina || '') : '');
-      conferir();
+    const paginaDoDestaque = (c) => c.paginaCitacao || (iv?.origem === 'pdf' ? (c.pagina || '') : '');
+    const inserir = async (texto, pagina) => {
+      const v = validarPaginas(pagina, iv);
+      if (!v.ok) { dica.textContent = v.mensagem; dica.style.color = '#DC2626'; return; }
+      if (!String(texto).trim()) return;
+      const est = estiloDoDocumento(this.doc);
+      const refTexto = await this.textoDaCitacao(ref, v.valor);
+      this.onInserirCitacaoLonga(ref, { texto, pagina: v.valor, refTexto, linkar: est.linkar });
+    };
+    caixa.querySelectorAll('.ath-longa-item').forEach(item => {
+      const c = marcadas[Number(item.dataset.i)];
+      const bruto = paginaDoDestaque(c);
+      const ok = validarPaginas(bruto, iv).ok;
+      const botao = item.querySelector('[data-longa-inserir]');
+      if (!ok) { botao.disabled = true; botao.style.opacity = '.5'; botao.title = `A página ${bruto} está fora do intervalo da obra (${iv?.texto}). Use "Editar antes" para corrigir.`; }
+      botao.addEventListener('click', () => inserir(c.texto, bruto));
+      item.querySelector('[data-longa-editar]').addEventListener('click', () => {
+        txt.value = c.texto;
+        pag.value = bruto;
+        conferir();
+        txt.focus();
+      });
     });
     txt.addEventListener('input', conferir);
     pag.addEventListener('input', conferir);

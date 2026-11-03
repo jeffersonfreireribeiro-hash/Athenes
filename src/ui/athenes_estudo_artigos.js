@@ -3230,6 +3230,7 @@ export class EstudoArtigosView {
             <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnNovaCitacaoPainel">+ Nova Citação</button>
           </div>
 
+          <div style="font-size:10.5px; color:#64748B; margin:-2px 0 8px;">Para usar no texto: no editor, abra <b>Zotero</b>, escolha a obra e clique em <b>Longa</b>. Estes destaques aparecem lá, prontos para inserir como citação direta longa.</div>
           <div class="ath-lista-citacoes-pdf">
             ${citacoes.length === 0 ? `
               <div style="padding:20px 12px; text-align:center; color:#64748B; font-size:12px; background:#F8FAFC; border-radius:10px; border:1px dashed #CBD5E1;">
