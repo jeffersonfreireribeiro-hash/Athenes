@@ -291,9 +291,20 @@
 
 .ath-doc-card-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  flex-wrap: wrap; /* os selos (tipo, situação, nuvem, compartilhado) quebram de linha em vez de passar do cartão */
+  justify-content: flex-start;
+  align-items: center;
+  gap: 4px 6px;
   margin-bottom: 8px;
+  min-width: 0;
+}
+
+.ath-doc-card-header .ath-badge {
+  font-size: 9.5px;
+  padding: 1px 7px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .ath-doc-card-titulo {
