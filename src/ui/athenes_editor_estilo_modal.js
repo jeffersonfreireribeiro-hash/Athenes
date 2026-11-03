@@ -13,7 +13,7 @@ import { AVANCADO_PADRAO, cssAvancadoDosEstilos, classesAvancadasDoBloco, aplica
 
 const LBL = 'font:700 11.5px var(--glx-font); color:#334155; display:flex; flex-direction:column; gap:3px;';
 const CHK = 'font-size:12px; font-weight:700; color:#334155;';
-const campo = (rot, path, tipo, extra = '') => `<label style="${LBL}">${rot}<input type="${tipo}" class="ath-input" data-av="${path}" ${extra} style="height:30px;${tipo === 'color' ? 'padding:1px;' : ''}"></label>`;
+const campo = (rot, path, tipo, extra = '') => `<label style="${LBL}">${rot}<input type="${tipo}" class="ath-input" data-av="${path}" ${extra} style="height:34px; line-height:normal;${tipo === 'color' ? 'padding:1px;' : ''}"></label>`;
 const marca = (rot, path) => `<label class="rm-chk" style="${CHK}"><input type="checkbox" data-av="${path}"> ${rot}</label>`;
 const grupo = (titulo, ativaPath, corpo) => `<fieldset style="border:1px solid #E2E8F0; border-radius:8px; padding:8px 10px; margin:0; display:flex; flex-direction:column; gap:8px;">
   <legend style="font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569; padding:0 4px;"><label style="cursor:pointer;"><input type="checkbox" data-av="${ativaPath}"> ${titulo}</label></legend>
@@ -30,11 +30,11 @@ function secaoAvancadaHtml() {
       ${campo('Deslocado (mm)', 'recuo_deslocado_mm', 'number', 'step="0.5" min="0" max="100"')}
     </div>
     ${grupo('Barra lateral', 'avancado.barra_lateral.ativa',
-      `<label style="${LBL}">Lado<select class="ath-select" data-av="avancado.barra_lateral.lado" style="height:30px;"><option value="esquerda">Esquerda</option><option value="direita">Direita</option></select></label>
+      `<label style="${LBL}">Lado<select class="ath-select" data-av="avancado.barra_lateral.lado" style="height:34px; line-height:normal;"><option value="esquerda">Esquerda</option><option value="direita">Direita</option></select></label>
        ${campo('Largura (pt)', 'avancado.barra_lateral.largura_pt', 'number', 'step="0.5" min="0.5" max="24"')}
        ${campo('Distância (mm)', 'avancado.barra_lateral.distancia_mm', 'number', 'step="0.5" min="0" max="20"')}
        ${campo('Cor', 'avancado.barra_lateral.cor', 'color')}
-       <label style="${LBL}">Traço<select class="ath-select" data-av="avancado.barra_lateral.estilo" style="height:30px;"><option value="solida">Sólido</option><option value="tracejada">Tracejado</option><option value="pontilhada">Pontilhado</option></select></label>`)}
+       <label style="${LBL}">Traço<select class="ath-select" data-av="avancado.barra_lateral.estilo" style="height:34px; line-height:normal;"><option value="solida">Sólido</option><option value="tracejada">Tracejado</option><option value="pontilhada">Pontilhado</option></select></label>`)}
     ${grupo('Fundo do bloco', 'avancado.fundo_bloco.ativo',
       `${campo('Cor', 'avancado.fundo_bloco.cor', 'color')}${campo('Preenchimento (mm)', 'avancado.fundo_bloco.preenchimento_mm', 'number', 'step="0.5" min="0" max="15"')}`)}
     ${grupo('Capitular (drop cap)', 'avancado.capitular.ativa',

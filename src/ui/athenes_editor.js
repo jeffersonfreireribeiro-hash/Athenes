@@ -644,6 +644,12 @@ export class EditorView {
 
     const palcoNovo = root.querySelector('#rmPrevPalco');
     if (palcoNovo) {
+      // clicar fora de qualquer bloco (fundo do palco, margem ou espaço vazio da folha) tira a seleção do bloco e do texto
+      palcoNovo.addEventListener('mousedown', (ev) => {
+        if (ev.button !== 0 || modoSomenteLeitura(this.modoTrabalho) || !this.blocoSelecionado) return;
+        if (ev.target.closest('.ath-bloco-folha, .ath-barra-contextual, .ath-pill-cursor-acoes, .ath-popover, [contenteditable="true"], button, input, select, textarea, a, .ath-pg-area, .ath-nota')) return;
+        this.limparSelecaoDeBloco();
+      });
       const ind = root.querySelector('#athZoomIndicador');
       const definir = (z) => {
         this.zoomCanvas = z;
@@ -2132,6 +2138,17 @@ export class EditorView {
     li.addEventListener('dragend', () => this.encerrarArrasto());
     this.ligarAlvoDeSolta(li, b);
     return li;
+  }
+
+  /** Nenhum bloco selecionado: limpa o destaque, o cursor de texto e avisa o painel de propriedades. */
+  limparSelecaoDeBloco() {
+    if (this._itemFigura) { this._itemFigura = null; this.marcarItemFigura?.(); }
+    this.blocoSelecionado = null;
+    this.atualizarSelecaoVisualBloco(null);
+    const ativo = document.activeElement;
+    if (ativo && this.container?.contains(ativo) && ativo.isContentEditable) ativo.blur();
+    window.getSelection?.()?.removeAllRanges();
+    this.onSelecionarBloco(null, null);
   }
 
   atualizarSelecaoVisualBloco(blocoId) {
