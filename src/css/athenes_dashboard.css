@@ -1913,3 +1913,29 @@ mark.ath-pdf-grifo-texto {
   stroke: #314F79;
   flex: none;
 }
+
+/* Botões do topo (Pasta no Drive): mesma altura do perfil, sem sublinhado */
+.ath-dash-btn-topo {
+  display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px;
+  border: 1px solid var(--ath-primary-line, #C8D7E6); border-radius: 12px; background: #FFFFFF; color: var(--ath-primary, #314F79);
+  font: 700 12.5px var(--glx-font, inherit); text-decoration: none; white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.ath-dash-btn-topo:hover { background: #EEF4FA; border-color: var(--ath-primary, #314F79); box-shadow: 0 1px 4px rgba(49, 79, 121, .15); }
+.ath-dash-btn-topo:focus-visible { outline: 2px solid var(--ath-primary, #314F79); outline-offset: 2px; }
+.ath-dash-btn-topo-seta { font-size: 11px; opacity: .65; }
+
+/* Rodapé da janela de perfil: três botões da mesma altura; "Sair" discreto à esquerda, ação principal à direita */
+.ath-modal-foot-perfil { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.ath-modal-foot-perfil > div { display: flex; gap: 8px; margin-left: auto; }
+.ath-btn-rodape {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 16px;
+  border: 1px solid #CBD5E1; border-radius: 10px; background: #FFFFFF; color: #334155; cursor: pointer;
+  font: 700 12.5px var(--glx-font, inherit); white-space: nowrap; transition: background .15s ease, border-color .15s ease;
+}
+.ath-btn-rodape:hover { background: #F1F5F9; border-color: #94A3B8; }
+.ath-btn-rodape-primario { background: var(--ath-primary, #314F79); border-color: var(--ath-primary, #314F79); color: #FFFFFF; }
+.ath-btn-rodape-primario:hover { background: #263F63; border-color: #263F63; }
+.ath-btn-rodape-sair { color: #B42318; border-color: #F5C2C0; background: #FFFFFF; }
+.ath-btn-rodape-sair:hover { background: #FEF2F2; border-color: #E8908B; }
+.ath-btn-rodape:focus-visible { outline: 2px solid var(--ath-primary, #314F79); outline-offset: 2px; }

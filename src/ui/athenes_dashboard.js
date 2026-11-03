@@ -215,12 +215,9 @@ export class DashboardView {
 
         <!-- Identificação de Quem Está Mexendo / Login -->
         <div class="ath-dash-user-box" style="display:flex; align-items:center; gap:8px;">
-          <a href="/api/v1/app/download" class="ath-btn ath-btn-sm" id="athBtnBaixarAppWeb" style="height:32px; font-size:11.5px; display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#314F79; background:#fff; border:1px solid #C8D7E6;" title="Baixar Aplicativo Android Tablet Athenes (.apk)">
-            ${svgIcone('android', 15)} <span>Baixar App (APK)</span>
-          </a>
           ${driveCfg.pastaUrl ? `
-            <a href="${driveCfg.pastaUrl}" target="_blank" rel="noopener noreferrer" class="ath-btn ath-btn-sm" style="height:32px; font-size:11.5px; display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#314F79; background:#fff; border:1px solid #C8D7E6;" title="Abrir sua pasta de PDFs e artigos no Google Drive Web">
-              ${svgIcone('drive', 14)} Pasta Drive ↗
+            <a href="${driveCfg.pastaUrl}" target="_blank" rel="noopener noreferrer" class="ath-dash-btn-topo" title="Abrir a pasta do Athenes no seu Google Drive">
+              ${svgIcone('drive', 15)}<span>Pasta no Drive</span><span class="ath-dash-btn-topo-seta" aria-hidden="true">↗</span>
             </a>
           ` : ''}
           <button type="button" class="ath-dash-user-pill" id="athBtnPerfilLoginDash" title="Clique para identificar quem está usando, trocar perfil ou conectar Google Drive e Zotero">
@@ -546,13 +543,14 @@ export class DashboardView {
             <a href="/athenes.apk" download="athenes.apk" class="ath-btn ath-btn-sm" id="athBtnModalDownloadAndroid" style="height:24px; font-size:11px; font-weight:700; color:#047857; background:#ECFDF5; border:1px solid #A7F3D0; text-decoration:none; padding:0 10px; border-radius:6px; display:inline-flex; align-items:center;" title="Baixar pacote de instalação para Android (.apk)">Baixar .APK</a>
           </div>
         </div>
-        <div class="ath-modal-foot" style="display:flex; justify-content:space-between; align-items:center;">
-          <button type="button" class="glx-btn glx-btn-soft" id="athBtnModalSairConta" style="color:#DC2626; font-weight:750; font-size:12px; height:34px; padding:0 12px; display:inline-flex; align-items:center; gap:6px; border:1px solid #FCA5A5; background:#FEF2F2; cursor:pointer;" title="Encerrar sessão e trocar de conta">
-            ⏻ Sair da conta
+        <div class="ath-modal-foot ath-modal-foot-perfil">
+          <button type="button" class="ath-btn-rodape ath-btn-rodape-sair" id="athBtnModalSairConta" title="Encerrar a sessão e trocar de conta">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Sair da conta
           </button>
           <div style="display:flex; gap:8px;">
-            <button type="button" class="ath-btn" id="athBtnCancelarLogin">Cancelar</button>
-            <button type="button" class="ath-btn ath-btn-primary" id="athBtnSalvarLogin">Salvar Identificação & Chaves</button>
+            <button type="button" class="ath-btn-rodape" id="athBtnCancelarLogin">Cancelar</button>
+            <button type="button" class="ath-btn-rodape ath-btn-rodape-primario" id="athBtnSalvarLogin" title="Salvar nome, papel, cores e as chaves do Zotero">Salvar</button>
           </div>
         </div>
       </div>
