@@ -134,3 +134,20 @@ test('estilos tipograficamente idênticos se fundem (a capa fica isolada e os t�
   assert.ok(todos.every(b => b.tipo === 'quebra_pagina' || template.config.estilos.some(e => e.id === b.estiloId)), 'nenhum bloco aponta para estilo removido');
   assert.equal(new Set(template.config.estilos.map(e => e.id)).size, template.config.estilos.length);
 });
+
+test('logo do cabeçalho: afastamento do topo = parágrafos vazios acima dele; alinhado à margem direita', async () => {
+  const z = new ZipBuilder();
+  z.add('word/document.xml', `<w:document ${W}><w:body>${Array.from({ length: 6 }, () => p(lorem)).join('')}<w:sectPr><w:headerReference w:type="default" r:id="rId9"/><w:pgSz w:w="11900" w:h="16840"/><w:pgMar w:top="2268" w:right="851" w:bottom="1418" w:left="1418" w:header="0" w:footer="454"/></w:sectPr></w:body></w:document>`);
+  z.add('word/styles.xml', `<w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:sz w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`);
+  z.add('word/_rels/document.xml.rels', '<Relationships><Relationship Id="rId9" Target="header1.xml"/></Relationships>');
+  const vazio = '<w:p><w:pPr><w:rPr><w:sz w:val="22"/></w:rPr></w:pPr></w:p>';
+  z.add('word/header1.xml', `<w:hdr ${W} xmlns:wp="x" xmlns:a="y">${vazio}${vazio}<w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:drawing><wp:inline><wp:extent cx="2160000" cy="1150560"/><a:graphic><a:graphicData><a:blip r:embed="rId1"/></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p></w:hdr>`);
+  z.add('word/_rels/header1.xml.rels', '<Relationships><Relationship Id="rId1" Target="media/image1.png"/></Relationships>');
+  z.add('word/media/image1.png', PNG_1PX);
+  const { template } = await importarTemplateDocx(z.build(), { incluirConteudo: true });
+  const m = template.config.mestras.find(x => x.id === 'corpo');
+  const el = m.elementos_recorrentes[0];
+  assert.ok(el.y_mm > 8 && el.y_mm < 11, `2 linhas de 11 pt acima ≈ 9,5 mm (veio ${el.y_mm})`);
+  assert.ok(Math.abs(el.x_mm - (210 - 15 - 60)) < 0.5, `direita: termina na margem direita de 15 mm (x = ${el.x_mm})`);
+  assert.ok(m.margens_mm.t >= el.y_mm + el.altura_mm, 'o texto começa abaixo do logo, como no Word');
+});
