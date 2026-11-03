@@ -5,6 +5,7 @@
  */
 
 import { extrairItensSumario } from './athenes_sumario.js';
+import { parametrosTextoPt, linhasEstimadas, alturaTabelaPt, dividirParaPagina, podeDividir } from './athenes_fragmentos.js';
 import { garantirEstilosDeTitulos } from './athenes_estilos.js';
 import { aplicarRegrasMestraNasPaginas, vincularOverridesAsPaginas } from './athenes_mestra_canvas.js';
 import { criarEstilosPadrao, PERFIS_FORMATACAO } from './athenes_estilos.js';
@@ -519,23 +520,14 @@ let TITULOS_NO_DOC = 8;
  * texto que cabia (um modelo de 11 pt com entrelinha simples ocupava quase o dobro do real).
  */
 function alturaTextoPorEstilo(bloco, ctx) {
-  const est = ctx.estilos[bloco.estiloId] || (bloco.tipo === 'titulo' ? ctx.estilos[`titulo${Math.min(6, bloco.nivel || 1)}`] : null) || ctx.estilos.corpo;
-  if (!est) return null;
-  const tam = bloco.tamanho_pt ?? est.tamanho_pt ?? 12;
-  const ent = bloco.entrelinha ?? est.entrelinha ?? 1.4;
-  const antes = bloco.espaco_antes_pt ?? est.espaco_antes_pt ?? 0;
-  const depois = bloco.espaco_depois_pt ?? est.espaco_depois_pt ?? 0;
-  const recuoMm = bloco.recuo_esquerdo_mm ?? est.recuo_esquerdo_mm ?? 0;
-  const larg = Math.max(40, ctx.larguraPt * Math.min(12, Math.max(1, bloco.span || 12)) / 12 - recuoMm * PT_POR_MM);
-  const largChar = tam * (est.caixa_alta ? 0.64 : 0.52) * ((est.peso || 400) >= 700 ? 1.06 : 1); // largura média do caractere
-  const porLinha = Math.max(6, Math.floor(larg / largChar));
-  const partes = String(bloco.texto || '').replace(/<sup[^>]*>.*?<\/sup>/g, '*').split(/<br\s*\/?>|<\/p>|<\/div>|<\/li>/i).map(t => t.replace(/<[^>]+>/g, ''));
-  const linhas = partes.reduce((t, x) => t + Math.max(1, Math.ceil(x.length / porLinha)), 0);
-  return linhas * tam * ent + antes + depois;
+  const P = parametrosTextoPt(bloco, ctx);
+  if (!P) return null;
+  return linhasEstimadas(bloco.texto, P.porLinha) * P.tam * P.ent + P.antes + P.depois;
 }
 
 export function estimarAlturaBlocoPt(bloco, ctx = null) {
   if (!bloco) return 20;
+  if (ctx?.larguraPt && (bloco.tipo === 'tabela' || bloco.tipo === 'quadro')) return alturaTabelaPt(bloco, ctx.larguraPt);
   if (ctx?.estilos && (bloco.tipo === 'paragrafo' || bloco.tipo === 'titulo' || bloco.tipo === 'citacao')) {
     const h = alturaTextoPorEstilo(bloco, ctx);
     if (h !== null) return h;
@@ -719,9 +711,12 @@ export function repaginarDocumento(doc) {
     };
 
     const eFixa = mestra.modo_aplicacao === MODOS_APLICACAO_MESTRA.FIXA;
+    // fila de trabalho: um parágrafo/tabela que não cabe vira fragmento e o restante volta para a fila
+    const fila = [...blocosDaSecao];
+    const ctxAltura = { estilos: estilosPorId, larguraPt };
 
-    for (let bIdx = 0; bIdx < blocosDaSecao.length; bIdx++) {
-      const b = blocosDaSecao[bIdx];
+    for (let bIdx = 0; bIdx < fila.length; bIdx++) {
+      const b = fila[bIdx];
 
       if (b.tipo === 'quebra_pagina') {
         if (blocosPag.length > 0 || (!eFixa && notasPag.length > 0)) fecharPagina(eFixa);
@@ -737,13 +732,13 @@ export function repaginarDocumento(doc) {
 
       // PÁGINA PROGRESSIVA: flui blocos automaticamente
       // Blocos da mesma linha (grupo) ficam juntos: só o primeiro decide a quebra
-      const anterior = bIdx > 0 ? blocosDaSecao[bIdx - 1] : null;
+      const anterior = bIdx > 0 ? fila[bIdx - 1] : null;
       if (b.grupo && anterior && anterior.grupo === b.grupo && blocosPag[blocosPag.length - 1] === anterior) {
         blocosPag.push(b);
         continue;
       }
-      const altPt = alturaDaLinha(blocosDaSecao, bIdx, { estilos: estilosPorId, larguraPt });
-      const novas = idsDaLinha(blocosDaSecao, bIdx).filter(id => !notasPag.some(x => x.id === id)).map(segmentoDe);
+      const altPt = alturaDaLinha(fila, bIdx, ctxAltura);
+      const novas = idsDaLinha(fila, bIdx).filter(id => !notasPag.some(x => x.id === id)).map(segmentoDe);
       const alturaNovasPt = novas.reduce((t, x) => t + alturaSegmentoPt(x.html, cfgNotas, larguraPt), 0)
         + (notasPag.length === 0 && novas.length ? alturaSeparadorPt(cfgNotas) : 0);
       // espaço antes é ignorado no topo da página (como no Word); entre parágrafos vale o maior dos dois espaços
@@ -751,11 +746,33 @@ export function repaginarDocumento(doc) {
       const altEf = altPt - (blocosPag.length ? colapsoEntreBlocosPt(blocosPag[blocosPag.length - 1], b, estilosPorId) : antesTopo);
       const totalPt = alturaAcumuladaPt + altEf + alturaNotasPag() + alturaNovasPt;
 
+      // não cabe: divide o parágrafo/tabela entre esta página e a seguinte (cabeçalho da tabela se repete)
+      if (totalPt > alturaUtilPt && podeDividir(b)) {
+        const livrePt = alturaUtilPt - alturaAcumuladaPt - alturaNotasPag();
+        const dv = dividirParaPagina(b, livrePt, ctxAltura, blocosPag.length === 0);
+        if (dv) {
+          const novasPrimeiro = idsNotasDoBloco(dv.primeiro).filter(id => registroNotas.has(id) && !notasPag.some(x => x.id === id)).map(segmentoDe);
+          const alturaPrimeiro = estimarAlturaBlocoPt(dv.primeiro, ctxAltura)
+            - (blocosPag.length ? colapsoEntreBlocosPt(blocosPag[blocosPag.length - 1], dv.primeiro, estilosPorId) : antesTopo);
+          blocosPag.push(dv.primeiro);
+          alturaAcumuladaPt += alturaPrimeiro;
+          notasPag.push(...novasPrimeiro);
+          fecharPagina();
+          fila.splice(bIdx + 1, 0, dv.resto);
+          continue;
+        }
+      }
+
       // manterComProximo: título não fica no fim da folha sem espaço para o próximo bloco
       const exigeNovaPagina = blocosPag.length > 0
         && ((b.manterComProximo && totalPt + 60 > alturaUtilPt) || totalPt > alturaUtilPt);
 
       if (exigeNovaPagina) {
+        if (podeDividir(b) && altPt > alturaUtilPt) { // maior que uma página inteira: fecha esta e divide na página nova
+          fecharPagina();
+          bIdx--;
+          continue;
+        }
         fecharPagina();
         blocosPag = [b];
         alturaAcumuladaPt = altPt - antesTopo;
@@ -1120,9 +1137,10 @@ export function calcularEstatisticas(doc) {
           totalPalavras += palavras.length;
         }
       }
-      if (b.tipo === 'tabela') totalTabelas++;
+      const continuacao = !!b._frag?.continuaDaAnterior; // fragmento de bloco dividido não conta de novo
+      if (b.tipo === 'tabela' && !continuacao) totalTabelas++;
       if (b.tipo === 'imagem') totalImagens++;
-      if (b.tipo === 'citacao') totalCitacoes++;
+      if (b.tipo === 'citacao' && !continuacao) totalCitacoes++;
     }
   }
 

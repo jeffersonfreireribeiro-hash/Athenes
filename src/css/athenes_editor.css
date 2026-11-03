@@ -2606,3 +2606,10 @@ ins.ath-sug-ins:hover, del.ath-sug-del:hover { outline: 1.5px solid var(--ath-su
 .ath-bloco-destaque-salto { outline: 2px solid #2F7BD0; outline-offset: 4px; border-radius: 4px; transition: outline-color .3s; }
 .ath-sumario-vivo .ath-toc-link { cursor: pointer; }
 .ath-sumario-vivo .ath-toc-link:hover .ath-toc-txt { text-decoration: underline; }
+
+/* Painel da página inicial: o cartão branco (Escrita ou Leitura) ocupa toda a altura útil, em todas as abas,
+   e cresce com o conteúdo (a área rola quando passa da tela). Antes o cartão terminava no último documento. */
+.ath-dash-main-area { display: flex; flex-direction: column; }
+.ath-dash-main-area > .ath-dash-pasta-banner { flex: 0 0 auto; }
+.ath-dash-main-area > #athSecaoDashEscrita:not([hidden]),
+.ath-dash-main-area > #athSecaoDashArtigosZotero:not([hidden]) { flex: 1 0 auto; }

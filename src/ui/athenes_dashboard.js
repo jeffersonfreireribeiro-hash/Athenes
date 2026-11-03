@@ -36,6 +36,7 @@ import { EstudoArtigosView, carregarArtigosEstudo } from './athenes_estudo_artig
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
+import { abrirNovoDocumentoModal } from './athenes_novo_documento_modal.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -323,7 +324,7 @@ export class DashboardView {
       this.abrirModalIdentificacaoLogin();
     });
 
-    root.querySelector('#athBtnNovoDocModal').addEventListener('click', () => this.abrirModalNovoDoc());
+    root.querySelector('#athBtnNovoDocModal').addEventListener('click', () => this.abrirModalNovoDoc({ pastaId: this.pastaAtivaId })); // na pasta selecionada, cria nela
 
     const inputBusca = root.querySelector('#athDashBusca');
     inputBusca.addEventListener('input', () => {
@@ -825,15 +826,7 @@ export class DashboardView {
               <small style="font-size:11px; color:#64748B;">Exibindo todos os documentos locais e sincronizados (${this.documentos.length} no total)</small>
             </div>
           </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoDocBanner">
-              ${svgIcone('mais', 13)} Novo Documento
-            </button>
-          </div>
         `;
-        bannerEl.querySelector('#athBtnNovoDocBanner')?.addEventListener('click', () => {
-          this.abrirModalNovoDoc();
-        });
       } else {
         const totalArtigos = (this.estudoView?.artigos || carregarArtigosEstudo()).length;
         bannerEl.innerHTML = `
@@ -844,15 +837,7 @@ export class DashboardView {
               <small style="font-size:11px; color:#64748B;">Exibindo todos os artigos, fichamentos e PDFs vinculados (${totalArtigos} no total)</small>
             </div>
           </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoArtigoBanner">
-              ${svgIcone('mais', 13)} Vincular Artigo & PDF
-            </button>
-          </div>
         `;
-        bannerEl.querySelector('#athBtnNovoArtigoBanner')?.addEventListener('click', () => {
-          this.estudoView?.abrirModalVincularArtigo?.();
-        });
       }
     } else {
       const pastaInfo = buscarPastaNaArvore(this.pastasDrive, this.pastaAtivaId) || {
@@ -880,16 +865,7 @@ export class DashboardView {
               </small>
             </div>
           </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoDocBanner">
-              ${svgIcone('mais', 13)} Novo nesta Pasta
-            </button>
-          </div>
         `;
-
-        bannerEl.querySelector('#athBtnNovoDocBanner')?.addEventListener('click', () => {
-          this.abrirModalNovoDoc({ pastaId: this.pastaAtivaId });
-        });
       } else {
         const artigos = this.estudoView?.artigos || carregarArtigosEstudo();
         const artigosNaPasta = artigos.filter(a => {
@@ -911,16 +887,7 @@ export class DashboardView {
               </small>
             </div>
           </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnNovoArtigoBanner">
-              ${svgIcone('mais', 13)} Vincular Artigo nesta Pasta
-            </button>
-          </div>
         `;
-
-        bannerEl.querySelector('#athBtnNovoArtigoBanner')?.addEventListener('click', () => {
-          this.estudoView?.abrirModalVincularArtigo?.({ pastaId: this.pastaAtivaId });
-        });
       }
     }
   }
@@ -1132,7 +1099,7 @@ export class DashboardView {
             ${pastaInfo ? `Nenhum documento na pasta "${pastaInfo.nome}"` : 'Nenhum documento encontrado'}
           </p>
           <p style="font-size: 13px; margin: 0;">
-            ${pastaInfo ? 'Clique em "+ Novo nesta Pasta" acima para criar um documento diretamente aqui.' : 'Clique em "+ Novo Documento" para iniciar um artigo ou relatório.'}
+            ${pastaInfo ? 'Clique em "+ Novo Documento" acima para criar um documento diretamente aqui.' : 'Clique em "+ Novo Documento" para iniciar um artigo ou relatório.'}
           </p>
         </div>
       `;
@@ -1197,106 +1164,40 @@ export class DashboardView {
   }
 
   abrirModalNovoDoc(opcoes = {}) {
-    const modal = document.createElement('div');
-    modal.className = 'ath-modal-backdrop';
-
     const pastaAlvoId = (opcoes.pastaId && opcoes.pastaId !== 'todas')
       ? opcoes.pastaId
       : (this.pastaAtivaId !== 'todas' ? this.pastaAtivaId : 'pasta_rel_raiz');
-    const opcoesPastas = [];
-    function coletarPastas(lista, prefixo = '') {
+    const pastas = [];
+    const coletar = (lista, prefixo = '') => {
       for (const p of lista) {
         if (p.tipo === 'relatorios' || p.id === 'pasta_rel_raiz' || p.tipo === 'compartilhada') {
-          opcoesPastas.push({ id: p.id, nome: `${prefixo}${p.nome}` });
-          if (p.subpastas && p.subpastas.length > 0) {
-            coletarPastas(p.subpastas, `${prefixo}  ↳ `);
-          }
+          pastas.push({ id: p.id, nome: `${prefixo}${p.nome}` });
+          if (p.subpastas?.length) coletar(p.subpastas, `${prefixo}  ↳ `);
         }
       }
-    }
-    coletarPastas(this.pastasDrive);
-    if (opcoesPastas.length === 0) {
-      opcoesPastas.push({ id: 'pasta_rel_raiz', nome: 'Relatórios & Artigos' });
-    }
+    };
+    coletar(this.pastasDrive);
+    if (!pastas.length) pastas.push({ id: 'pasta_rel_raiz', nome: 'Relatórios & Artigos' });
 
-    modal.innerHTML = `
-      <div class="ath-modal">
-        <div class="ath-modal-head">
-          <h2>Criar Novo Documento</h2>
-          <button type="button" class="ath-btn ath-btn-icon" id="athModalNovoFechar">${svgIcone('fechar', 16)}</button>
-        </div>
-        <div class="ath-modal-corpo">
-          <div class="ath-prop-grupo">
-            <label>Título do Documento</label>
-            <input type="text" class="ath-input" id="athNovoDocTitulo" placeholder="Ex.: Análise de Desempenho e Validação Experimental" autofocus>
-          </div>
-
-          <div class="ath-prop-grupo">
-            <label>Subtítulo ou Delimitação Temática (Opcional)</label>
-            <input type="text" class="ath-input" id="athNovoDocSubtitulo" placeholder="Ex.: Estudo comparativo e proposições normativas">
-          </div>
-
-          <div class="ath-linha2">
-            <div class="ath-prop-grupo">
-              <label>Tipo de Documento</label>
-              <select class="ath-select" id="athNovoDocTipo">
-                ${TIPOS_DOCUMENTO.map(t => `<option value="${t.id}">${t.rotulo}</option>`).join('')}
-              </select>
-            </div>
-            <div class="ath-prop-grupo">
-              <label>Perfil de Formatação</label>
-              <select class="ath-select" id="athNovoDocPerfil">
-                ${Object.values(PERFIS_FORMATACAO).map(p => `<option value="${p.id}">${p.nome}</option>`).join('')}
-              </select>
-            </div>
-          </div>
-
-          <div class="ath-prop-grupo">
-            <label>Pasta de Destino (Google Drive)</label>
-            <select class="ath-select" id="athNovoDocPasta">
-              ${opcoesPastas.map(p => `<option value="${p.id}" ${p.id === pastaAlvoId ? 'selected' : ''}>${p.nome}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div class="ath-modal-foot">
-          <button type="button" class="ath-btn" id="athBtnCancelarNovo">Cancelar</button>
-          <button type="button" class="ath-btn ath-btn-primary" id="athBtnCriarDoc">Criar e Abrir</button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    const fechar = () => modal.remove();
-    modal.querySelector('#athModalNovoFechar').addEventListener('click', fechar);
-    modal.querySelector('#athBtnCancelarNovo').addEventListener('click', fechar);
-    modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
-
-    modal.querySelector('#athBtnCriarDoc').addEventListener('click', () => {
-      const titulo = modal.querySelector('#athNovoDocTitulo').value.trim() || 'Novo Documento';
-      const subtitulo = modal.querySelector('#athNovoDocSubtitulo').value.trim();
-      const tipoDoc = modal.querySelector('#athNovoDocTipo').value;
-      const perfilId = modal.querySelector('#athNovoDocPerfil').value;
-      const pastaEscolhida = modal.querySelector('#athNovoDocPasta')?.value || pastaAlvoId;
-
-      const novo = criarDocumento({ titulo, subtitulo, tipoDoc, perfilId });
-      if (this.perfilUsuario?.nome && novo.metadados?.autores?.[0]) {
-        novo.metadados.autores[0].nome = this.perfilUsuario.nome;
+    abrirNovoDocumentoModal({
+      pastas, pastaAlvoId,
+      onCriar: ({ doc: novo, pastaId: pastaEscolhida }) => {
+        if (this.perfilUsuario?.nome && novo.metadados?.autores?.[0] && novo.metadados.autores[0].nome === 'Autor Principal') {
+          novo.metadados.autores[0].nome = this.perfilUsuario.nome;
+        }
+        novo.pastaId = pastaEscolhida;
+        novo.proprietario = novo.proprietario || { id: this.perfilUsuario?.id, nome: this.perfilUsuario?.nome };
+        this.documentos.unshift(novo);
+        this.salvarDocumentosLocais();
+        if (this.pastaAtivaId !== 'todas' && this.pastaAtivaId !== pastaEscolhida) {
+          this.selecionarPasta(pastaEscolhida);
+        } else {
+          this.renderizarPastasLateral();
+          this.renderizarBannerPasta();
+          this.atualizarGrid();
+        }
+        this.onAbrirDocumento(novo);
       }
-      novo.pastaId = pastaEscolhida;
-      novo.proprietario = novo.proprietario || { id: this.perfilUsuario?.id, nome: this.perfilUsuario?.nome };
-      this.documentos.unshift(novo);
-      this.salvarDocumentosLocais();
-      fechar();
-
-      if (this.pastaAtivaId !== 'todas' && this.pastaAtivaId !== pastaEscolhida) {
-        this.selecionarPasta(pastaEscolhida);
-      } else {
-        this.renderizarPastasLateral();
-        this.renderizarBannerPasta();
-        this.atualizarGrid();
-      }
-      this.onAbrirDocumento(novo);
     });
   }
 

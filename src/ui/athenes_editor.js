@@ -66,6 +66,7 @@ import { descreverFigura } from '../core/athenes_figura_layout.js';
 import { ModalEditorEstilo } from './athenes_editor_estilo_modal.js';
 import { ModalCentralEstilos } from './athenes_central_estilos_modal.js';
 import { AtalhosDoEditor } from './athenes_atalhos_editor.js';
+import { abrirSalvarTemplateModal } from './athenes_novo_documento_modal.js';
 import { calcularNumeracaoSecoes, extrairItensSumario, sumarioHtml, configEfetivaSumario, tagDoNivel, nivelDe, estiloIdDoTitulo } from '../core/athenes_sumario.js';
 import {
   MODOS_TRABALHO,
@@ -273,6 +274,23 @@ export class EditorView {
     else if (r.top < p.top) delta = r.top - p.top - 12;
     else if (r.bottom > p.bottom) delta = r.bottom - p.bottom + 12;
     if (Math.abs(delta) > 1) palco.scrollBy({ top: delta, behavior: suave ? 'smooth' : 'auto' });
+  }
+
+  /** Tabela dividida: a continuação mostra "Tabela 1 (continuação)" em vez do título editável. */
+  ajustarLegendaDeContinuacao(tit, b) {
+    if (!b._frag?.continuaDaAnterior) return;
+    const rot = obterPrefixoNumeracao(b).trimEnd().replace(/[-—–:.]+$/, '').trimEnd();
+    tit.contentEditable = 'false';
+    tit.innerHTML = `<span class="ath-tab-continuacao" style="font-weight:800;color:var(--ath-primary,#314F79);">${rot} (continuação)</span>`;
+  }
+
+  anexarRotuloContinua(caixa, b) {
+    if (!b._frag?.continuaNaProxima) return;
+    const r = document.createElement('div');
+    r.className = 'ath-tab-continua'; r.contentEditable = 'false';
+    r.style.cssText = 'text-align:right;font:italic 600 11px var(--glx-font,inherit);color:#64748B;margin-top:3px;user-select:none;';
+    r.textContent = 'Continua';
+    caixa.appendChild(r);
   }
 
   /** HTML do sumário vivo de um bloco: itens atuais do documento, links que rolam até o título. */
@@ -880,7 +898,13 @@ export class EditorView {
         </button>
       </div>
       <span class="rm-dica">Dentro das margens a folha tem 12 colunas: cada bloco escolhe onde começa e quantas ocupa.</span>
+      <button type="button" class="glx-btn" id="rmSalvarTemplate" style="margin-top:8px;width:100%;">Salvar como Template…</button>
     `;
+
+    popArquivo.querySelector('#rmSalvarTemplate').addEventListener('click', () => {
+      popArquivo.querySelector('[data-fechar-popover]')?.click();
+      abrirSalvarTemplateModal(this.doc);
+    });
 
     popArquivo.querySelector('#rmNome').addEventListener('input', e => {
       this.doc.titulo = e.target.value;
@@ -2261,6 +2285,7 @@ export class EditorView {
       this._itemFigura = null;
       this.marcarItemFigura();
     }
+    if (b?._frag) b = this.buscarBlocoPorId(b.id) || b; // um fragmento seleciona o bloco inteiro (o painel edita o original)
     this.blocoSelecionado = b;
     let mudouSecao = false;
     if (b) {
@@ -2851,6 +2876,7 @@ export class EditorView {
     const el = document.createElement('div');
     el.className = `ath-bloco-folha ${b.id === this.blocoSelecionado?.id ? 'sel' : ''}`;
     el.dataset.blocoId = b.id;
+    if (b._frag) { el.dataset.fragmento = String(b._frag.indice); el.classList.toggle('ath-frag-cont', !!b._frag.continuaDaAnterior); }
     el.style.gridColumn = `${b.col || 1} / span ${b.span || 12}`;
 
     // Crachá do Bloco
@@ -3210,12 +3236,14 @@ export class EditorView {
         this.notificarMudancaRapida();
       });
       tabBox.appendChild(tit);
+      this.ajustarLegendaDeContinuacao(tit, b);
 
       const table = construirTabelaDom(b, 'ath-tabela-abnt', () => this.notificarMudancaRapida(), this.doc.estilos);
       this._selTabelas.set(b.id, instalarSelecaoCelulas(table));
       tabBox.appendChild(table);
+      this.anexarRotuloContinua(tabBox, b);
 
-      if (b.notas && b.mostrar_legenda !== false) {
+      if (b.notas && b.mostrar_legenda !== false && !b._frag?.continuaNaProxima) {
         const notas = document.createElement('div');
         notas.contentEditable = 'true';
         notas.style.fontSize = '11px';
@@ -3224,7 +3252,7 @@ export class EditorView {
         tabBox.appendChild(notas);
       }
 
-      if (b.mostrar_fonte !== false) {
+      if (b.mostrar_fonte !== false && !b._frag?.continuaNaProxima) {
         const fonte = document.createElement('div');
         fonte.contentEditable = 'true';
         fonte.className = 'ath-bloco-fonte';
@@ -3256,12 +3284,14 @@ export class EditorView {
         this.notificarMudancaRapida();
       });
       qBox.appendChild(tit);
+      this.ajustarLegendaDeContinuacao(tit, b);
 
       const table = construirTabelaDom(b, 'ath-quadro-abnt', () => this.notificarMudancaRapida(), this.doc.estilos);
       this._selTabelas.set(b.id, instalarSelecaoCelulas(table));
       qBox.appendChild(table);
+      this.anexarRotuloContinua(qBox, b);
 
-      if (b.mostrar_fonte !== false) {
+      if (b.mostrar_fonte !== false && !b._frag?.continuaNaProxima) {
         const fonte = document.createElement('div');
         fonte.contentEditable = 'true';
         fonte.className = 'ath-bloco-fonte';

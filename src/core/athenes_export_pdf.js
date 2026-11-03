@@ -72,6 +72,13 @@ function cssTextoPapel(bloco, papel, estilosMap, estPadrao, extraPadrao = '') {
   return `${estPadrao ? estiloParaCss(estPadrao) : ''} ${extraPadrao} ${estiloParaCssComAlinhamento(null, alin)}`.trim();
 }
 
+/** Tabela dividida entre páginas: a continuação traz só "Tabela 1 (continuação)"; o "Continua" fecha os fragmentos não finais. */
+function legendaContinuacaoHtml(bloco, css) {
+  return `<div class="ath-legenda" style="${css}">${escaparHtml(obterPrefixoNumeracao(bloco).trimEnd().replace(/[-—–:.]+$/, '').trimEnd())} (continuação)</div>`;
+}
+const rodapeContinuaHtml = (bloco) => (bloco._frag?.continuaNaProxima ? '<div class="ath-continua" style="text-align:right;font-size:8.5pt;font-style:italic;color:#64748B;margin-top:3px;">Continua</div>' : '');
+const fonteVisivel = (bloco) => !!bloco.fonte && !bloco._frag?.continuaNaProxima;
+
 /** Título numerado ("Tabela 1 — …") com o prefixo no estilo de numeração escolhido (se houver). */
 function tituloComNumeracaoHtml(bloco, estilosMap) {
   const completo = obterTituloCompletoComNumeracao(bloco) || '';
@@ -182,9 +189,10 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       const estLegenda = estilosMap.legenda || estilosMap.corpo;
       const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
       return '<div class="ath-bloco ath-quadro-wrap" style="margin:12px 0; break-inside:avoid;" data-id="' + bloco.id + '">' +
-        (bloco.titulo ? '<div class="ath-legenda" style="' + cssTextoPapel(bloco, 'titulo', estilosMap, estLegenda, 'font-weight:800; text-align:left; margin-bottom:4px;') + '">' + tituloComNumeracaoHtml(bloco, estilosMap) + '</div>' : '') +
-        gerarTabelaHtmlEstilizada(bloco, 'ath-quadro', estilosMap) +
-        (bloco.fonte ? '<div class="ath-fonte" style="' + cssTextoPapel(bloco, 'fonte', estilosMap, estFonte, 'text-align:left; margin-top:4px;') + '">' + bloco.fonte + '</div>' : '') +
+        (bloco._frag?.continuaDaAnterior ? legendaContinuacaoHtml(bloco, cssTextoPapel(bloco, 'titulo', estilosMap, estLegenda, 'font-weight:800; text-align:left; margin-bottom:4px;'))
+          : (bloco.titulo ? '<div class="ath-legenda" style="' + cssTextoPapel(bloco, 'titulo', estilosMap, estLegenda, 'font-weight:800; text-align:left; margin-bottom:4px;') + '">' + tituloComNumeracaoHtml(bloco, estilosMap) + '</div>' : '')) +
+        gerarTabelaHtmlEstilizada(bloco, 'ath-quadro', estilosMap) + rodapeContinuaHtml(bloco) +
+        (fonteVisivel(bloco) ? '<div class="ath-fonte" style="' + cssTextoPapel(bloco, 'fonte', estilosMap, estFonte, 'text-align:left; margin-top:4px;') + '">' + bloco.fonte + '</div>' : '') +
       '</div>';
     }
 
@@ -248,9 +256,10 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       const estLegenda = estilosMap.legenda || estilosMap.corpo;
       const estFonte = estilosMap.fonte_citada || estilosMap.corpo;
       return `<div class="ath-bloco ath-tabela-wrap" style="margin:12px 0; break-inside:avoid;" data-id="${bloco.id}">
-        ${obterTituloCompletoComNumeracao(bloco) ? `<div class="ath-legenda" style="${cssTextoPapel(bloco, 'titulo', estilosMap, estLegenda, 'text-align:left; margin-bottom:4px;')}">${tituloComNumeracaoHtml(bloco, estilosMap)}</div>` : ''}
-        ${gerarTabelaHtmlEstilizada(bloco, 'ath-tabela', estilosMap)}
-        ${bloco.fonte ? `<div class="ath-fonte" style="${cssTextoPapel(bloco, 'fonte', estilosMap, estFonte, 'text-align:left; margin-top:4px;')}">${bloco.fonte}</div>` : ''}
+        ${bloco._frag?.continuaDaAnterior ? legendaContinuacaoHtml(bloco, cssTextoPapel(bloco, 'titulo', estilosMap, estLegenda, 'text-align:left; margin-bottom:4px;'))
+          : (obterTituloCompletoComNumeracao(bloco) ? `<div class="ath-legenda" style="${cssTextoPapel(bloco, 'titulo', estilosMap, estLegenda, 'text-align:left; margin-bottom:4px;')}">${tituloComNumeracaoHtml(bloco, estilosMap)}</div>` : '')}
+        ${gerarTabelaHtmlEstilizada(bloco, 'ath-tabela', estilosMap)}${rodapeContinuaHtml(bloco)}
+        ${fonteVisivel(bloco) ? `<div class="ath-fonte" style="${cssTextoPapel(bloco, 'fonte', estilosMap, estFonte, 'text-align:left; margin-top:4px;')}">${bloco.fonte}</div>` : ''}
       </div>`;
     }
 

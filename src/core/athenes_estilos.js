@@ -694,8 +694,9 @@ export function garantirEstilosDeTitulos(doc) {
   if (!doc || !Array.isArray(doc.estilos)) return doc;
   const ids = new Set(doc.estilos.map(e => e.id));
   const padrao = criarEstilosPadrao(doc.perfil || 'abnt');
+  const maiorNivel = Math.max(0, ...(doc.secoes || []).flatMap(s => s.blocos || []).filter(b => b.tipo === 'titulo').map(b => Number(b.nivel) || 0));
   for (const n of [4, 5, 6]) {
-    if (!ids.has(`titulo${n}`)) {
+    if ((!doc.estilos_minimos || n <= maiorNivel) && !ids.has(`titulo${n}`)) {
       const e = padrao.find(x => x.id === `titulo${n}`);
       if (e) doc.estilos.push(JSON.parse(JSON.stringify(e)));
     }
