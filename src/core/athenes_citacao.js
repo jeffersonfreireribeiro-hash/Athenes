@@ -117,9 +117,12 @@ export function montarCitacao(ref, opcoes = {}) {
 
 /** Posição (1-based) da obra na lista de referências do documento (estilos numéricos). */
 export function indiceNaLista(doc, ref) {
-  const i = (doc?.referencias || []).findIndex(r => (r.id && r.id === ref.id) || (r.chaveZotero && r.chaveZotero === ref.chaveZotero));
+  const i = (doc?.referencias || []).findIndex(r => (r.id && r.id === ref.id) || (chaveDoZoteroDe(r) && chaveDoZoteroDe(r) === chaveDoZoteroDe(ref)));
   return i >= 0 ? i + 1 : (doc?.referencias?.length || 0) + 1;
 }
+
+/** Chave do item no Zotero, venha ele da API (`chave`), do documento (`chaveZotero`) ou da biblioteca (`zoteroKey`). */
+export const chaveDoZoteroDe = (ref) => String(ref?.chaveZotero || ref?.chave || ref?.zoteroKey || '');
 
 const ESTILO_PADRAO = Object.freeze({ estilo: 'abnt', linkar: true, csl: 'associacao-brasileira-de-normas-tecnicas' });
 
@@ -150,7 +153,7 @@ export function referenciaDoArtigo(a) {
     : Boolean(a?.fichamento);
   return {
     id: String(a?.id || a?.zoteroKey || ''),
-    chaveZotero: a?.zoteroKey || '',
+    chaveZotero: chaveDoZoteroDe(a),
     titulo: a?.titulo || 'Artigo sem título',
     autores: autores.length ? autores : [{ sobrenome: 'Autor', prenome: '' }],
     ano: String(a?.ano || ''),

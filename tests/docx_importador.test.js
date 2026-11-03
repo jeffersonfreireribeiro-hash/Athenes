@@ -157,8 +157,13 @@ test('conteúdo: traz o texto do arquivo, capa em seção própria, quebras de p
   assert.equal(estCapa.alinhamento, 'centro', 'o alinhamento da capa mora no estilo');
   const textos = corpo.map(b => b.texto || '').join('\n');
   assert.match(textos, /Introdução Formal/);
-  assert.match(textos, /Texto normal com trecho forte/, 'o texto fica, sem tags de negrito/itálico');
-  assert.doesNotMatch(textos, /<em>|<strong>|<u>/);
+  const textoPuro = textos.replace(/<[^>]+>/g, '');
+  assert.match(textoPuro, /Texto normal com trecho forte/, 'o texto fica inteiro');
+  assert.doesNotMatch(textos, /<em>|<strong>|<u>|style=/, 'nenhuma tag de formatação direta');
+  // a ênfase do trecho vira um trecho de ESTILO cadastrado (negrito = peso 700), nunca uma tag solta
+  const idEnfase = /<span class="ath-estilo-span" data-estilo-id="([\w-]+)">trecho forte<\/span>/.exec(textos)?.[1];
+  assert.ok(idEnfase, 'o trecho em negrito ficou num trecho de estilo');
+  assert.ok(template.config.estilos.find(e => e.id === idEnfase)?.peso >= 700, 'o estilo do trecho tem peso de negrito');
   for (const b of [...capa, ...corpo]) for (const k of ['alinhamento', 'fonte', 'cor', 'entrelinha', 'espaco_antes_pt', 'espaco_depois_pt', 'recuo_esquerdo_mm', 'recuo_primeira_linha_mm']) assert.equal(k in b, false, `${k} em ${b.tipo}`);
   assert.ok(corpo.some(b => b.tipo === 'titulo' && /Introdução/.test(b.texto)));
   assert.ok(relatorio.avisos.some(a => /tabela/.test(a)));

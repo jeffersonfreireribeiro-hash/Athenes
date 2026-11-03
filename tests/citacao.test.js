@@ -119,3 +119,12 @@ test('bloco de citação longa guarda a referência escolhida e a exportação p
   assert.equal(criarNovoBloco('citacao', { texto: 'x' }).ref_texto, undefined);
   assert.match(referenciaDoBlocoCitacao(b).html, /href="#ref-a1"/);
 });
+
+test('achado Qodo 2: a chave do Zotero vem de chave (API), chaveZotero (documento) ou zoteroKey (biblioteca)', async () => {
+  const { chaveDoZoteroDe } = await import('../src/core/athenes_citacao.js');
+  assert.equal(chaveDoZoteroDe({ chave: 'ABC123', id: 'ABC123' }), 'ABC123');
+  assert.equal(chaveDoZoteroDe({ chaveZotero: 'DOC1' }), 'DOC1');
+  assert.equal(chaveDoZoteroDe({ zoteroKey: 'LIB1' }), 'LIB1');
+  assert.equal(chaveDoZoteroDe({}), '');
+  assert.equal(referenciaDoArtigo({ id: 'x', zoteroKey: 'LIB1' }).chaveZotero, 'LIB1');
+});

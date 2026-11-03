@@ -35,8 +35,16 @@ export function sanearHtmlTexto(html) {
   let h = html;
   // listas HTML antigas (<ul>/<ol>/<li>) viram linhas; o marcador passa a ser do estilo
   h = h.replace(/<\/li>\s*<li\b[^>]*>/gi, '<br>').replace(/<\/?(ul|ol|li)\b[^>]*>/gi, '');
+  const marcasSugestao = []; // <ins>/<del> de sugestões pendentes (data-sugestao-id) são revisão, não formatação: ficam
   h = h.replace(/<(\/?)([a-z][a-z0-9]*)\b([^>]*)>/gi, (m, fecha, tag, attrs) => {
     const t = tag.toLowerCase();
+    if (t === 'ins' || t === 'del') {
+      if (!fecha) { const guarda = /\bdata-sugestao-id\s*=/i.test(attrs); marcasSugestao.push({ t, guarda }); return guarda ? m : ''; }
+      const topo = marcasSugestao.at(-1);
+      if (topo?.t !== t) return '';
+      marcasSugestao.pop();
+      return topo.guarda ? m : '';
+    }
     if (t === 'span') {
       if (fecha) return '</span>';
       if (/\bath-estilo-span\b/i.test(attrs)) {

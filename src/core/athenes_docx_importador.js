@@ -535,8 +535,11 @@ async function lerCabecalhoRodape(zip, sec, modoRef = 'default', est = null) {
 
 const escHtml = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** HTML do parágrafo: negrito/itálico/sublinhado só quando o trecho difere do parágrafo (o resto vem do estilo). */
-function htmlDoParagrafo(p) {
+/**
+ * HTML do parágrafo. Trechos com negrito/itálico/sublinhado que o parágrafo não tem viram um trecho de ESTILO cadastrado
+ * (`idEnfase(f)` devolve o id do estilo), nunca tags de formatação.
+ */
+function htmlDoParagrafo(p, idEnfase = () => null) {
   const e = p.efetivo;
   const pedacos = [];
   for (const r of p.runs) {
@@ -551,8 +554,9 @@ function htmlDoParagrafo(p) {
   }
   const html = pedacos.map(x => {
     if (x.br) return '<br>';
-    let t = escHtml(x.s).replace(/\t/g, '&emsp;');
-    return t; // negrito, itálico e sublinhado de trechos não entram no texto: o visual é só dos Estilos de Texto
+    const t = escHtml(x.s).replace(/\t/g, '&emsp;');
+    const estiloId = (x.b || x.i || x.u) ? idEnfase(x) : null;
+    return estiloId ? `<span class="ath-estilo-span" data-estilo-id="${estiloId}">${t}</span>` : t;
   }).join('');
   return html.replace(/^(<br>)+|(<br>)+$/g, '').trim();
 }
@@ -566,12 +570,12 @@ function montarConteudo(paragrafos, papeis, cons, temCapa) {
   let alvo = temCapa ? capa : corpo;
   let noInicio = true;
   const derivados = new Map();
-  const estiloDerivado = (base, ajustes) => {
+  const estiloDerivado = (base, ajustes, rotulo = 'variação') => {
     if (!Object.keys(ajustes).length) return base.id;
     const chave = base.id + JSON.stringify(ajustes);
     if (!derivados.has(chave)) {
       const id = `${base.id}__v${derivados.size + 1}`;
-      cons.estilos.push({ ...base, ...ajustes, id, nome: `${base.nome} (variação ${derivados.size + 1})` });
+      cons.estilos.push({ ...base, ...ajustes, id, nome: `${base.nome} (${rotulo} ${derivados.size + 1})` });
       estilosPorId.set(id, cons.estilos.at(-1));
       derivados.set(chave, id);
     }
@@ -588,7 +592,8 @@ function montarConteudo(paragrafos, papeis, cons, temCapa) {
     noInicio = false;
     const est = estilosPorId.get(id);
     const e = p.efetivo;
-    const dados = { estiloId: id, texto: htmlDoParagrafo(p) };
+    const enfase = (f) => estiloDerivado(est, { ...(f.b ? { peso: 700 } : {}), ...(f.i ? { italico: true } : {}), ...(f.u ? { sublinhado: true } : {}) }, 'ênfase');
+    const dados = { estiloId: id, texto: htmlDoParagrafo(p, enfase) };
     const rotulo = papeis.get(p);
     const mmv = (tw) => mm(tw || 0);
     // diferenças em relação ao estilo canônico viram um ESTILO derivado (nunca sobrescrita no bloco): fidelidade sem formatação direta

@@ -9,7 +9,7 @@ import { lerConta, gravarConta } from '../core/athenes_conta.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import * as bib from '../core/athenes_biblioteca_artigos.js';
 import { svgIcone } from './athenes_icones.js';
-import { ESTILOS_CITACAO, ESTILOS_CSL, eEstiloNumerico, estiloDoDocumento, referenciaDoArtigo, formatarCitacaoTexto, indiceNaLista, intervaloDePaginas, validarPaginas } from '../core/athenes_citacao.js';
+import { ESTILOS_CITACAO, ESTILOS_CSL, eEstiloNumerico, estiloDoDocumento, referenciaDoArtigo, chaveDoZoteroDe, formatarCitacaoTexto, indiceNaLista, intervaloDePaginas, validarPaginas } from '../core/athenes_citacao.js';
 
 export function classificarTipoRef(ref) {
   if (!ref) return { id: 'outro', label: 'Outro', bg: '#F1F5F9', cor: '#475569' };
@@ -502,7 +502,7 @@ export class PainelZotero {
     const est = estiloDoDocumento(this.doc);
     const base = { estilo: est.estilo, pagina, formato, indice: indiceNaLista(this.doc, ref) };
     if (est.estilo === 'zotero') {
-      const t = await this.client.obterCitacaoFormatada(ref.chaveZotero, est.csl);
+      const t = await this.client.obterCitacaoFormatada(chaveDoZoteroDe(ref), est.csl);
       if (t) return pagina ? t.replace(/\)$/, `, p. ${pagina})`) : t;
       base.estilo = 'abnt';
     }
@@ -638,7 +638,7 @@ export class PainelZotero {
     const opcoes = { estilo: est.estilo, linkar: est.linkar, pagina: pag.valor };
     if (est.estilo === 'zotero') {
       // O Zotero formata (CSL); sem conexão ou sem a obra lá, cai no formato ABNT local
-      const texto = await this.client.obterCitacaoFormatada(ref.chaveZotero, est.csl);
+      const texto = await this.client.obterCitacaoFormatada(chaveDoZoteroDe(ref), est.csl);
       if (texto) opcoes.textoPronto = pag.valor ? texto.replace(/\)$/, `, p. ${pag.valor})`) : texto;
       else opcoes.estilo = 'abnt';
     }

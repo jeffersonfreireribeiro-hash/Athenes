@@ -137,3 +137,12 @@ test('sanearBlocoDeTexto ignora blocos que não são de texto', () => {
   sanearBlocoDeTexto(fig, []);
   assert.deepEqual(fig, { tipo: 'figura', fonte: 'Fonte: X', alinhamento: 'centro', cor: '#111111' });
 });
+
+test('achado Qodo 1: sugestões pendentes (ins/del com data-sugestao-id) sobrevivem à limpeza; ins/del soltos somem', async () => {
+  const { sanearHtmlTexto } = await import('../src/core/athenes_estilo_exclusivo.js');
+  const comSugestao = 'Texto <ins class="ath-sug-ins" data-sugestao-id="s1">novo</ins> e <del class="ath-sug-del" data-sugestao-id="s2">velho</del> fim';
+  assert.equal(sanearHtmlTexto(comSugestao), comSugestao);
+  assert.equal(sanearHtmlTexto('a <ins>b</ins> <del>c</del> <b>d</b>'), 'a b c d');
+  // o fechamento de um <ins> solto não rouba o de uma sugestão aberta antes
+  assert.equal(sanearHtmlTexto('<ins data-sugestao-id="s3">x<ins>y</ins>z</ins>'), '<ins data-sugestao-id="s3">xyz</ins>');
+});
