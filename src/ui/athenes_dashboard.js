@@ -440,34 +440,33 @@ export class DashboardView {
       document.querySelectorAll('.ath-modal-backdrop').forEach(m => m.remove());
     };
     modal.innerHTML = `
-      <div class="ath-modal" style="max-width:540px;">
+      <div class="ath-modal" style="max-width:460px;">
         <div class="ath-modal-head">
           <h2>Identificação do Usuário & Contas Conectadas</h2>
           <button type="button" class="ath-btn ath-btn-icon" id="athModalLoginFechar">${svgIcone('fechar', 16)}</button>
         </div>
         <div class="ath-modal-corpo">
-          <p style="font-size:12.5px; color:var(--ath-text-secondary); margin-top:0; margin-bottom:12px;">
-            Defina quem está editando ou revisando neste dispositivo. Seu nome e cor aparecerão nos cursores em tempo real, nos balões de sugestão e nos fichamentos de PDF.
+          <p style="font-size:11.5px; color:var(--ath-text-secondary); margin:0 0 8px;">
+            Quem edita neste dispositivo: nome e cor aparecem nos cursores, sugestões e fichamentos.
           </p>
 
           <!-- Login Oficial com Conta Google / Gmail -->
           ${p.autenticadoGoogle ? `
-            <div class="ath-google-user-badge" style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-radius:10px; background:#F0FDF4; border:1px solid #BBF7D0; margin-bottom:14px;">
+            <div class="ath-google-user-badge" style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-radius:10px; background:#F0FDF4; border:1px solid #BBF7D0; margin-bottom:8px;">
               <div style="display:flex; align-items:center; gap:10px;">
-                <img src="${p.foto || 'https://lh3.googleusercontent.com/avatar_exemplo.png'}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; border:1px solid #86EFAC;" alt="Foto">
+                <img src="${p.foto || 'https://lh3.googleusercontent.com/avatar_exemplo.png'}" style="width:28px; height:28px; border-radius:50%; object-fit:cover; border:1px solid #86EFAC;" alt="Foto">
                 <div>
                   <strong style="display:block; font-size:12.5px; color:#166534;">${p.nome}</strong>
                   <span style="font-size:11px; color:#15803D;">${p.email} · Conta Google Conectada</span>
                 </div>
               </div>
-              <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnModalDesconectarGoogle" style="font-size:11px; padding:3px 10px; color:#DC2626; font-weight:750; border:1px solid #FCA5A5; background:#FFF1F2; cursor:pointer;" title="Desconectar e voltar ao login">Desconectar / Sair</button>
             </div>
-            <div id="athBoxNuvemSegura" style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-radius:10px; margin:-6px 0 14px; border:1px solid ${nuvemAutenticada() ? '#BBF7D0' : '#FDE68A'}; background:${nuvemAutenticada() ? '#F0FDF4' : '#FFFBEB'};">
+            <div id="athBoxNuvemSegura" style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:5px 10px; border-radius:10px; margin:0 0 8px; border:1px solid ${nuvemAutenticada() ? '#BBF7D0' : '#FDE68A'}; background:${nuvemAutenticada() ? '#F0FDF4' : '#FFFBEB'};">
               <span style="font-size:11.5px; color:${nuvemAutenticada() ? '#166534' : '#92400E'}; line-height:1.35;"><strong>Nuvem protegida:</strong> <span id="athTxtNuvemSegura">${nuvemAutenticada() ? 'conta confirmada, só você acessa seus documentos.' : 'ainda não confirmada. Confirme a conta Google para salvar na nuvem.'}</span></span>
               ${nuvemAutenticada() ? '' : '<button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnConfirmarNuvem" style="font-size:11px; padding:3px 10px; font-weight:750; white-space:nowrap; cursor:pointer;">Confirmar agora</button>'}
             </div>
           ` : `
-            <button type="button" class="glx-btn glx-btn-primary" id="athBtnModalLoginGoogle" style="width:100%; height:38px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:700; margin-bottom:14px; background:#FFFFFF; color:#1F2937; border:1px solid #CBD5E1; box-shadow:0 1px 3px rgba(0,0,0,0.08); font-size:12.5px; border-radius:8px; cursor:pointer;">
+            <button type="button" class="glx-btn glx-btn-primary" id="athBtnModalLoginGoogle" style="width:100%; height:38px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:700; margin-bottom:8px; background:#FFFFFF; color:#1F2937; border:1px solid #CBD5E1; box-shadow:0 1px 3px rgba(0,0,0,0.08); font-size:12.5px; border-radius:8px; cursor:pointer;">
               ${svgIcone('google', 16)} Entrar com a Conta Google (Gmail)
             </button>
           `}
@@ -529,7 +528,7 @@ export class DashboardView {
                 ${driveCfg.pastaUrl ? `<a href="${driveCfg.pastaUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px; color:#2563EB; font-weight:700; text-decoration:underline;">Abrir Pasta ↗</a>` : ''}
               </div>
               <input type="text" class="ath-input" id="athLoginDrivePastaUrl" value="${driveCfg.pastaUrl || ''}" placeholder="Ex.: https://drive.google.com/drive/folders/1ABCxyz... ou ID da pasta" style="height:30px; font-size:11.5px;">
-              <small style="font-size:10.5px; color:#64748B; margin-top:2px; display:block;">Cole aqui o link da pasta do Google Drive onde você guarda PDFs e backups. Não depende de letra de unidade (G:, C:) e abre em qualquer PC.</small>
+              <small style="font-size:10.5px; color:#64748B; margin-top:2px; display:block;">Pasta do Drive usada para PDFs e backups (preenchida sozinha a partir da sua conta).</small>
             </div>
             <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnModalSincronizarHub" style="width:100%; height:30px; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:700; background:#FFFFFF; border:1px solid #CBD5E1; margin-top:6px;" title="Cria ou localiza automaticamente a pasta Hub 'Athenes' no Google Drive">
               ${svgIcone('pasta', 13)} Sincronizar / Criar Pasta Hub Athenes no Drive
@@ -537,22 +536,14 @@ export class DashboardView {
           </div>
 
           <!-- Opção discreta para download do App Android (.apk) no perfil -->
-          <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; margin-top:8px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px;">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="color:#047857; display:flex;">${svgIcone('android', 16)}</span>
-              <div>
-                <span style="font-size:11.5px; font-weight:700; color:#334155; display:block;">Athenes para Android (.apk)</span>
-                <span style="font-size:10.5px; color:#64748B;">Versão para tablets e smartphones com leitura e fichamento offline</span>
-              </div>
-            </div>
-            <a href="/athenes.apk" download="athenes.apk" class="ath-btn ath-btn-sm" id="athBtnModalDownloadAndroid" style="height:26px; font-size:11px; font-weight:700; color:#047857; background:#ECFDF5; border:1px solid #A7F3D0; text-decoration:none; padding:0 10px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;" title="Baixar pacote de instalação para Android (.apk)">
-              Baixar .APK
-            </a>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 10px; margin-top:6px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px;">
+            <span style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:#334155;"><span style="color:#047857; display:flex;">${svgIcone('android', 14)}</span>Athenes para Android (.apk)</span>
+            <a href="/athenes.apk" download="athenes.apk" class="ath-btn ath-btn-sm" id="athBtnModalDownloadAndroid" style="height:24px; font-size:11px; font-weight:700; color:#047857; background:#ECFDF5; border:1px solid #A7F3D0; text-decoration:none; padding:0 10px; border-radius:6px; display:inline-flex; align-items:center;" title="Baixar pacote de instalação para Android (.apk)">Baixar .APK</a>
           </div>
         </div>
         <div class="ath-modal-foot" style="display:flex; justify-content:space-between; align-items:center;">
           <button type="button" class="glx-btn glx-btn-soft" id="athBtnModalSairConta" style="color:#DC2626; font-weight:750; font-size:12px; height:34px; padding:0 12px; display:inline-flex; align-items:center; gap:6px; border:1px solid #FCA5A5; background:#FEF2F2; cursor:pointer;" title="Encerrar sessão e trocar de conta">
-            ⏻ Sair da Conta / Mudar Usuário
+            ⏻ Sair da conta
           </button>
           <div style="display:flex; gap:8px;">
             <button type="button" class="ath-btn" id="athBtnCancelarLogin">Cancelar</button>
@@ -631,14 +622,6 @@ export class DashboardView {
       }
     });
 
-    modal.querySelector('#athBtnModalDesconectarGoogle')?.addEventListener('click', (e) => {
-      e?.preventDefault?.();
-      fechar();
-      encerrarSessao();
-      if (typeof this.onLogout === 'function') {
-        this.onLogout();
-      }
-    });
 
     modal.querySelector('#athBtnModalSincronizarHub')?.addEventListener('click', async () => {
       try {
@@ -1351,6 +1334,8 @@ export class DashboardView {
     try {
       const token = await obterTokenDrive();
       if (!token) { if (!silencioso) alert('A sessão do Google Drive expirou. Reconecte o Drive.'); return; }
+      // outro computador: sem a estrutura gravada, descobre/cria as pastas do Athenes e fixa a pasta de documentos desta conta
+      try { const c = obterConfigGoogleDrive(); if (!c.pastaDocumentosId || !c.pastaRaizId) await obterOuCriarEstruturaPastasAthenes(token); } catch (e) { console.warn('[Athenes] Estrutura do Drive:', e.message); }
       // 1) a estrutura de pastas do Drive (outro computador começa só com as padrão); 2) os documentos, já nas pastas certas
       let pastasNovas = { importadas: 0, vinculadas: 0, mapa: {} };
       try { pastasNovas = await importarPastasDoDrive(token); } catch (e) { console.warn('[Athenes] Pastas do Drive não importadas:', e.message); }

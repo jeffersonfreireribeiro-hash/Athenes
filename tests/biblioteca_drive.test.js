@@ -75,3 +75,16 @@ test('outro computador: as pastas do Drive voltam para a árvore local e os docu
   mesclarBibliotecaDrive(docs, [{ driveFileId: 'a1', titulo: 'Cap 1', modificadoEm: '2026-11-03T00:00:00Z', driveFolderId: 'F11' }], r.mapa);
   assert.deepEqual([docs[0].pastaId, docs[0].driveFolderId], [idCap, 'F11']);
 });
+
+test('a pasta padrão antiga (de outra conta) é descartada e o link mostrado vem do ID da pasta realmente usada', async () => {
+  const m = new Map();
+  globalThis.localStorage = { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), key: i => [...m.keys()][i], get length() { return m.size; } };
+  const { obterConfigGoogleDrive, salvarConfigGoogleDrive } = await import('../src/core/athenes_colaboracao.js');
+  const LEGADO = '1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv';
+  salvarConfigGoogleDrive({ pastaUrl: `https://drive.google.com/drive/folders/${LEGADO}?usp=drive_link`, pastaId: LEGADO });
+  let cfg = obterConfigGoogleDrive();
+  assert.deepEqual([cfg.pastaId, cfg.pastaUrl], ['', ''], 'o ID antigo nunca vale');
+  salvarConfigGoogleDrive({ ...cfg, pastaId: 'PASTA_DESTA_CONTA' });
+  cfg = obterConfigGoogleDrive();
+  assert.equal(cfg.pastaUrl, 'https://drive.google.com/drive/folders/PASTA_DESTA_CONTA');
+});

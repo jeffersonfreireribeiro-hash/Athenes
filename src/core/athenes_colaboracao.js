@@ -766,6 +766,11 @@ function idsEstruturaDrive(o) {
   return r;
 }
 
+/** ID da pasta que ficava como padrão no código (de uma única conta): nunca vale como pasta de ninguém. */
+const PASTA_LEGADA_ID = '1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv';
+const eLegada = (v) => String(v || '').includes(PASTA_LEGADA_ID);
+const linkDaPasta = (id) => (id ? `https://drive.google.com/drive/folders/${id}` : '');
+
 export function obterConfigGoogleDrive() {
   // sem pasta padrão: o ID que ficava aqui era de UMA conta e apontava para fora do Drive de qualquer outra pessoa
   const pastaUrlPadrao = '';
@@ -775,13 +780,16 @@ export function obterConfigGoogleDrive() {
       const salvo = lerConta('athenes_gdrive_config');
       if (salvo) {
         const parsed = JSON.parse(salvo);
-        const pastaUrl = parsed.pastaUrl || pastaUrlPadrao;
+        const urlSalva = eLegada(parsed.pastaUrl) ? '' : (parsed.pastaUrl || '');
+        const idSalvo = eLegada(parsed.pastaId) ? '' : (parsed.pastaId || '');
+        const pastaId = idSalvo || extrairIdPastaDrive(urlSalva) || pastaIdPadrao;
+        const pastaUrl = urlSalva || linkDaPasta(pastaId) || pastaUrlPadrao; // o link mostrado é sempre o da pasta realmente usada
         return {
           clientId: parsed.clientId || DEFAULT_GOOGLE_CLIENT_ID,
           apiKey: parsed.apiKey || '',
           accessToken: parsed.accessToken || '',
           pastaUrl,
-          pastaId: parsed.pastaId || extrairIdPastaDrive(pastaUrl) || pastaIdPadrao,
+          pastaId,
           ...idsEstruturaDrive(parsed)
         };
       }
@@ -797,13 +805,14 @@ export function obterConfigGoogleDrive() {
 }
 
 export function salvarConfigGoogleDrive(cfg) {
-  const pastaUrl = (cfg?.pastaUrl || '').trim();
+  const pastaUrl = eLegada(cfg?.pastaUrl) ? '' : (cfg?.pastaUrl || '').trim();
+  const pastaId = eLegada(cfg?.pastaId) ? '' : (cfg?.pastaId || extrairIdPastaDrive(pastaUrl));
   const normalizado = {
     clientId: (cfg?.clientId || DEFAULT_GOOGLE_CLIENT_ID).trim(),
     apiKey: cfg?.apiKey || '',
     accessToken: cfg?.accessToken || '',
-    pastaUrl,
-    pastaId: cfg?.pastaId || extrairIdPastaDrive(pastaUrl),
+    pastaUrl: pastaUrl || linkDaPasta(pastaId),
+    pastaId,
     ...idsEstruturaDrive(cfg)
   };
   try {
@@ -1074,7 +1083,7 @@ export async function obterOuCriarEstruturaPastasAthenes(accessToken, pastaRaizI
   };
 
   const cfgAtual = obterConfigGoogleDrive();
-  salvarConfigGoogleDrive({ ...cfgAtual, ...estrutura, pastaId: documentosId });
+  salvarConfigGoogleDrive({ ...cfgAtual, ...estrutura, pastaId: documentosId, pastaUrl: documentosId ? linkDaPasta(documentosId) : cfgAtual.pastaUrl });
 
   return estrutura;
 }
