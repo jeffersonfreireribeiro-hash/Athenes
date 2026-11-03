@@ -71,3 +71,12 @@ test('pacote de tema leva o formato do número da fórmula e o prompt de IA o de
   assert.equal(validarPacoteEstilo(JSON.stringify(ruim)).pacote.configuracaoGlobal.formato_numero_formula, undefined);
   assert.match(obterPromptIaParaExtracaoDeLayout(), /formato_numero_formula/);
 });
+
+test('LaTeX colado do artigo: $…$, equation, \label e \tag não aparecem e o número segue automático', () => {
+  const colado = `${BS}begin{equation} E = mc^{2} ${BS}label{eq:einstein} ${BS}tag{9} ${BS}end{equation}`;
+  const html = latexParaHtml(colado);
+  assert.ok(!/label|tag|begin|equation/.test(html), html);
+  assert.match(html, /E = mc<sup[^>]*>2<\/sup>/);
+  assert.equal(latexParaTexto('$$x^{2}$$'), 'x^(2)');
+  assert.ok(latexParaHtml(`${BS}hat{x} + ${BS}overline{y}`).includes('x\u0302'));
+});

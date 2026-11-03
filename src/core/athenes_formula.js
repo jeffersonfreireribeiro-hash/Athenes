@@ -128,6 +128,20 @@ function argumento(s, i) {
   return [s[i] ?? '', i + 1];
 }
 
+/** Tira o que o LaTeX usa em volta da expressão ($…$, \[…\], equation, \label, \tag): o número da fórmula é automático. */
+export function limparEnvoltorioLatex(latex) {
+  return String(latex ?? '')
+    .replace(/\\(?:begin|end)\{(?:equation|align|gather|displaymath|math)\*?\}/g, '')
+    .replace(/\\(?:label|tag|nonumber|notag|displaystyle|textstyle)(?:\{[^}]*\})?/g, '')
+    .replace(/\\[\[\]()]/g, '')
+    .replace(/\$\$|\$/g, '')
+    .replace(/&/g, ' ')
+    .replace(/\\\\/g, ' ; ')
+    .trim();
+}
+
+const ACENTOS = { hat: '\u0302', bar: '\u0304', vec: '\u20D7', dot: '\u0307', ddot: '\u0308', tilde: '\u0303', overline: '\u0305' };
+
 function compor(s, modo) {
   let out = '';
   for (let i = 0; i < s.length;) {
@@ -154,6 +168,15 @@ function compor(s, modo) {
         } else if (nome === 'mathrm' || nome === 'text' || nome === 'mathbf' || nome === 'operatorname') {
           const [a, ia] = argumento(s, i); i = ia;
           out += nome === 'mathbf' && modo === 'html' ? `<b>${esc(a)}</b>` : esc(a);
+        } else if (ACENTOS[nome]) {
+          const [a, ia] = argumento(s, i); i = ia;
+          const base = compor(a, modo);
+          out += nome === 'overline' && modo === 'html' ? `<span style="border-top:1px solid currentColor;">${base}</span>` : (modo === 'html' ? `${base}${ACENTOS[nome]}` : `${a}${ACENTOS[nome]}`);
+        } else if (nome === 'binom') {
+          const [a, ia] = argumento(s, i); const [b, ib] = argumento(s, ia); i = ib;
+          out += `(${compor(a, modo)} ${compor(b, modo)})`;
+        } else if (nome === 'quad' || nome === 'qquad') {
+          out += '  ';
         } else if (FUNCOES.has(nome)) {
           out += `${nome}`;
         } else {
@@ -179,13 +202,13 @@ function compor(s, modo) {
 }
 
 /** LaTeX → HTML composto (frações, raízes, expoentes, índices e símbolos); texto sem LaTeX passa como está. */
-export const latexParaHtml = (latex) => compor(String(latex ?? ''), 'html');
+export const latexParaHtml = (latex) => compor(limparEnvoltorioLatex(latex), 'html');
 
 /** LaTeX → texto simples com Unicode (para o Word): frações como (a)/(b), expoentes como ^(x). */
-export const latexParaTexto = (latex) => compor(String(latex ?? ''), 'texto').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+export const latexParaTexto = (latex) => compor(limparEnvoltorioLatex(latex), 'texto').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 
 /** Converte a entrada do bloco (LaTeX ou MATLAB) em LaTeX; em caso de erro devolve { erro } e mantém o último LaTeX válido. */
 export function latexDaEntrada(fonte, sintaxe = 'latex') {
-  if (sintaxe !== 'matlab') return { latex: String(fonte ?? '') };
+  if (sintaxe !== 'matlab') return { latex: String(fonte ?? '') }; // a fonte fica como foi escrita; a limpeza ($, equation, label) é feita ao compor
   try { return { latex: matlabParaLatex(fonte) }; } catch (e) { return { erro: e.message }; }
 }
