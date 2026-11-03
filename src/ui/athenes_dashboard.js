@@ -38,13 +38,14 @@ import {
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { EstudoArtigosView, carregarArtigosEstudo } from './athenes_estudo_artigos.js';
 import { sincronizarPerfil } from '../core/athenes_perfil_servidor.js';
+import { caminhoDaPasta } from '../core/athenes_arquivos.js';
 import { listarCompartilhadosComigo, marcarComoCompartilhado, carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
-import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, exclusoesRegistradas, docsRemovidosDoDrive, registrarExclusoes, idsExcluidos, processarExclusoesPendentes, obterPastaRaizDrive, repararPastaDosDocumentos, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
+import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, pastasExcluidasRegistradas, registrarPastasExcluidas, processarPastasExcluidas, exclusoesRegistradas, docsRemovidosDoDrive, registrarExclusoes, idsExcluidos, processarExclusoesPendentes, obterPastaRaizDrive, repararPastaDosDocumentos, sincronizarZoteroComDrive, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -244,6 +245,12 @@ export class DashboardView {
         </div>
       </div>
 
+      ${this.perfilUsuario.autenticadoGoogle && !nuvemAutenticada() ? `
+      <div id="athAvisoSincronizacao" role="status" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0 0 10px; padding:8px 14px; border-radius:12px; background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; font-size:12.5px;">
+        <span><strong>Sincronização do perfil desativada neste computador.</strong> Confirme a conta Google para ver os mesmos documentos, pastas, exclusões, compartilhados e o Zotero dos seus outros computadores.</span>
+        <button type="button" class="ath-btn-rodape ath-btn-rodape-primario" id="athBtnAtivarSincronizacao" style="height:32px;">Ativar sincronização</button>
+      </div>` : ''}
+
       <!-- Layout Principal com Barra Lateral de Pastas do Google Drive e Conteúdo Filtrado -->
       <div class="ath-dash-layout">
         <!-- Barra Lateral de Pastas do Google Drive -->
@@ -349,6 +356,18 @@ export class DashboardView {
           this.renderizar();
         }
       });
+    });
+
+    root.querySelector('#athBtnAtivarSincronizacao')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Confirmando…';
+      try {
+        await entrarNaNuvemComGoogle();
+        root.querySelector('#athAvisoSincronizacao')?.remove();
+        await this.sincronizarComSupabase(true);
+      } catch (err) {
+        btn.disabled = false; btn.textContent = 'Ativar sincronização';
+        mostrarAviso(`Não foi possível ativar a sincronização: ${err.message}`);
+      }
     });
 
     root.querySelector('#athBtnPerfilLoginDash')?.addEventListener('click', () => {
@@ -829,11 +848,20 @@ export class DashboardView {
           <button type="button" class="ath-btn ath-btn-xs ath-btn-remover-comp" title="Desvincular pasta compartilhada" style="padding:0 3px; height:18px; color:#DC2626; border:none; background:transparent;">
             ✕
           </button>
-        ` : ''}
+        ` : (this.pastaPodeSerExcluida(pasta) ? `
+          <button type="button" class="ath-btn ath-btn-xs ath-btn-excluir-pasta" title="Excluir pasta (os documentos dela vão para a pasta de cima)" aria-label="Excluir pasta ${escapeHtml(pasta.nome)}" style="padding:0 3px; height:18px; color:#94A3B8; border:none; background:transparent;">
+            ${svgIcone('lixeira', 12)}
+          </button>
+        ` : '')}
       </div>
     `;
 
     item.addEventListener('click', (ev) => {
+      if (ev.target.closest('.ath-btn-excluir-pasta')) {
+        ev.stopPropagation();
+        this.excluirPasta(pasta);
+        return;
+      }
       if (ev.target.closest('.ath-btn-remover-comp')) {
         ev.stopPropagation();
         if (confirm(`Deseja desvincular a pasta compartilhada "${pasta.nome}"?`)) {
@@ -858,6 +886,42 @@ export class DashboardView {
         this.montarItemPastaComSubpastas(container, sub, nivel + 1, ehCompartilhada);
       }
     }
+  }
+
+  /** Pastas-base do app e pastas compartilhadas não são excluídas por aqui. */
+  pastaPodeSerExcluida(pasta) {
+    return Boolean(pasta) && pasta.origem !== 'compartilhada' && !['pasta_rel_raiz', 'pasta_bib_raiz'].includes(pasta.id);
+  }
+
+  /**
+   * Exclui a pasta (e as subpastas): documentos de dentro vão para a pasta de cima, nada é apagado. O servidor passa a saber,
+   * então ela some em todos os computadores; a pasta do Drive vai para a lixeira quando estiver vazia.
+   */
+  async excluirPasta(pasta) {
+    const caminho = caminhoDaPasta(this.pastasDrive, pasta.id);
+    const pai = caminho.length > 1 ? caminho[caminho.length - 2] : null;
+    const todas = [];
+    const coletar = (p) => { todas.push(p); (p.subpastas || []).forEach(coletar); };
+    coletar(pasta);
+    const ids = new Set(todas.map(p => p.id));
+    const afetados = this.documentos.filter(d => ids.has(d.pastaId));
+    const ok = await this.arquivos.confirmar({
+      titulo: `Excluir a pasta "${pasta.nome}"?`,
+      texto: `${afetados.length ? `${afetados.length} documento(s) dentro dela irão para ${pai ? `a pasta "${pai.nome}"` : 'a pasta principal'}. ` : ''}Nenhum documento é apagado. A pasta também sai dos outros computadores e, no Google Drive, vai para a lixeira quando estiver vazia.`,
+      ok: 'Excluir pasta'
+    });
+    if (!ok) return;
+    const destino = pai ? pai.id : undefined;
+    for (const d of afetados) d.pastaId = destino;
+    const remover = (lista) => lista.filter(p => { if (p.id === pasta.id) return false; p.subpastas = remover(p.subpastas || []); return true; });
+    salvarPastasDriveLocais(remover(obterPastasDriveLocais()));
+    registrarPastasExcluidas(todas);
+    this.pastasDrive = obterPastasDriveLocais();
+    if (ids.has(this.pastaAtivaId)) this.pastaAtivaId = pai ? pai.id : 'todas';
+    this.salvarDocumentosLocais();
+    this.renderizarPastasLateral(); this.renderizarBannerPasta(); this.atualizarGrid();
+    this.agendarPerfil(200);
+    try { const t = driveConectado() ? await obterTokenDrive() : null; if (t) await this.sincronizarComDrive({ aviso: false }); if (t) await processarPastasExcluidas(t); } catch (e) { console.warn('[Athenes] Pasta no Drive:', e.message); }
   }
 
   renderizarBannerPasta() {
@@ -1373,7 +1437,7 @@ export class DashboardView {
       const excluidos = {};
       for (const x of exclusoesRegistradas()) excluidos[x.driveFileId ? `f:${x.driveFileId}` : `i:${x.id}`] = x.em;
       const r = await sincronizarPerfil({
-        pastas: pastasAntes, documentos: this.documentos, excluidos,
+        pastas: pastasAntes, documentos: this.documentos, excluidos, pastasExcluidas: pastasExcluidasRegistradas(),
         drive: { pastaRaizId: d.pastaRaizId || '', pastaDocumentosId: d.pastaDocumentosId || '', pastaZoteroId: d.pastaZoteroId || '', pastaRelatoriosId: d.pastaRelatoriosId || '' },
         zotero: this.zoteroLocalParaPerfil()
       });
@@ -1403,6 +1467,11 @@ export class DashboardView {
       for (const id of r.recarregar) {
         const doc = this.documentos.find(x => String(x.id) === id);
         if (doc?.driveFileId) { doc.origemDrive = true; doc.precisaCarregarConteudo = true; mudou = true; }
+      }
+      // pasta duplicada que foi unificada ou pasta excluída em outro computador: os documentos seguem para a pasta que ficou
+      for (const doc of this.documentos) {
+        if (r.mapaIds[doc.pastaId]) { doc.pastaId = r.mapaIds[doc.pastaId]; mudou = true; }
+        else if (doc.pastaId && r.pastasExcluidas[doc.pastaId]) { doc.pastaId = undefined; mudou = true; }
       }
       const arvoreMudou = JSON.stringify(r.pastas) !== JSON.stringify(pastasAntes);
       if (arvoreMudou) { salvarPastasDriveLocais(r.pastas); this.pastasDrive = obterPastasDriveLocais(); mudou = true; }
@@ -1486,7 +1555,8 @@ export class DashboardView {
       try { if (!perfilSrv) zotero = await sincronizarZoteroComDrive(token); } catch (e) { console.warn('[Athenes] Zotero pelo Drive:', e.message); }
       // 1) a estrutura de pastas do Drive (outro computador começa só com as padrão); 2) os documentos, já nas pastas certas
       let pastasNovas = { importadas: 0, vinculadas: 0, mapa: {} };
-      try { pastasNovas = await importarPastasDoDrive(token); } catch (e) { console.warn('[Athenes] Pastas do Drive não importadas:', e.message); }
+      // só no começo: depois a árvore de pastas vem do servidor (e pasta excluída não renasce)
+      try { if (!permitidos) pastasNovas = await importarPastasDoDrive(token); } catch (e) { console.warn('[Athenes] Pastas do Drive não importadas:', e.message); }
       if (pastasNovas.importadas || pastasNovas.vinculadas) this.pastasDrive = obterPastasDriveLocais();
       const arquivos = await listarBibliotecaDoDrive(token);
       // excluído em outro computador: o arquivo já está na lixeira do Drive, então sai da lista daqui também
@@ -1512,7 +1582,7 @@ export class DashboardView {
       // por fim, o caminho de volta: cria no Drive (dentro da raiz Athenes) as pastas que só existem aqui e envia/move os documentos,
       // para a estrutura ficar guardada no Drive e igual nos outros computadores
       let envio = null;
-      try { envio = await this.sincronizarComDrive({ aviso: false }); } catch (e) { console.warn('[Athenes] Envio ao Drive:', e.message); }
+      try { envio = await this.sincronizarComDrive({ aviso: false }); await processarPastasExcluidas(token); } catch (e) { console.warn('[Athenes] Envio ao Drive:', e.message); }
       if (envio?.rp?.criadas || envio?.rd?.enviados) { this.atualizarGrid(); }
       if (!silencioso) {
         alert(r.novos || r.atualizados || excluidosFora

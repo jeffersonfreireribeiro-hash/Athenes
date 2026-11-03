@@ -223,3 +223,19 @@ test('excluído em outro computador: sai da lista só se o Drive confirma (lixei
   const r = await docsRemovidosDoDrive(docs, [{ driveFileId: 'F6' }], 'T', { fetchImpl: f });
   assert.deepEqual(r.sort(), ['apagado', 'lixeira']);
 });
+
+test('pasta excluída vai para a lixeira do Drive só quando está vazia', async () => {
+  const m = new Map();
+  globalThis.localStorage = { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), key: i => [...m.keys()][i], get length() { return m.size; } };
+  const { registrarPastasExcluidas, processarPastasExcluidas, pastasExcluidasRegistradas } = await import('../src/core/athenes_drive_sync.js');
+  registrarPastasExcluidas([{ id: 'p_cheia', driveId: 'D1' }, { id: 'p_vazia', driveId: 'D2' }, { id: 'p_local' }]);
+  assert.deepEqual(Object.keys(pastasExcluidasRegistradas()).sort(), ['p_cheia', 'p_local', 'p_vazia']);
+  const chamadas = [];
+  const f = async (url, op = {}) => {
+    const u = new URL(url);
+    if (u.pathname === '/drive/v3/files') { const pai = /'([^']+)' in parents/.exec(u.searchParams.get('q'))[1]; return resp({ files: pai === 'D1' ? [{ id: 'arq' }] : [] }); }
+    chamadas.push(`${op.method} ${u.pathname}`); return resp({ id: 'ok' });
+  };
+  assert.equal(await processarPastasExcluidas('T', { fetchImpl: f }), 1);
+  assert.deepEqual(chamadas, ['PATCH /drive/v3/files/D2'], 'a pasta com arquivo dentro espera');
+});

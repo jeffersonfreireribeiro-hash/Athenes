@@ -33,15 +33,30 @@ export function entradaDoDocumento(d) {
 /** O documento tem alteração ainda não enviada ao Drive? (nesse caso uma exclusão feita em outro lugar não o apaga) */
 export const temAlteracaoPendente = (d) => !d.driveFileId || !d.driveSincronizadoEm || (d.dataModificacao || '') > d.driveSincronizadoEm;
 
-function mesclarArvore(base = [], extra = []) {
-  const saida = base.map(clone);
-  const porId = new Map(saida.map(p => [p.id, p]));
-  for (const p of extra) {
-    const igual = porId.get(p.id);
-    if (!igual) { const novo = clone(p); saida.push(novo); porId.set(novo.id, novo); continue; }
+const nomeNorm = (n) => String(n || '').trim().toLowerCase();
+
+/**
+ * Soma duas árvores de pastas. Pastas "iguais" = mesmo id, mesmo id no Drive ou mesmo nome entre irmãs (um computador pode ter
+ * criado/importado a mesma pasta com outro id: isso duplicava ARTIGOS e ARQ.CON). Fica o id de quem veio primeiro (servidor) e
+ * `mapa` anota { idDescartado: idMantido } para religar documentos. Pastas excluídas (e o que há dentro delas) ficam de fora.
+ */
+function mesclarArvore(base = [], extra = [], mapa = {}, excluidas = {}) {
+  const saida = [];
+  const juntar = (p) => {
+    if (excluidas[p.id]) return;
+    const igual = saida.find(q => q.id === p.id || (p.driveId && q.driveId && p.driveId === q.driveId) || nomeNorm(q.nome) === nomeNorm(p.nome));
+    if (!igual) {
+      const novo = { ...clone(p), subpastas: [] };
+      saida.push(novo);
+      novo.subpastas = mesclarArvore([], p.subpastas || [], mapa, excluidas);
+      return;
+    }
+    if (igual.id !== p.id) mapa[p.id] = igual.id;
     if (!igual.driveId && p.driveId) igual.driveId = p.driveId; // o servidor ainda não sabia o id da pasta no Drive
-    igual.subpastas = mesclarArvore(igual.subpastas || [], p.subpastas || []);
-  }
+    igual.subpastas = mesclarArvore(igual.subpastas || [], p.subpastas || [], mapa, excluidas);
+  };
+  for (const p of base) juntar(p);
+  for (const p of extra) juntar(p);
   return saida;
 }
 
@@ -99,7 +114,14 @@ export function mesclarPerfil(servidor, local) {
     else if (String(l.id).startsWith('drive_') && !String(e.id).startsWith('drive_')) atualizar.push({ local: String(l.id), entrada: e });
   }
 
-  const pastas = mesclarArvore(srv.pastas || [], local.pastas || []);
+  const pastasExcluidas = { ...(srv.pastasExcluidas || {}), ...(local.pastasExcluidas || {}) };
+  const mapaIds = {};
+  const pastas = mesclarArvore(srv.pastas || [], local.pastas || [], mapaIds, pastasExcluidas);
+  // documentos: pasta duplicada descartada → a mantida; pasta excluída → volta à pasta padrão
+  for (const e of documentos) {
+    if (mapaIds[e.pastaId]) e.pastaId = mapaIds[e.pastaId];
+    if (pastasExcluidas[e.pastaId]) e.pastaId = '';
+  }
 
   // ids das pastas do Drive: o primeiro computador a gravar define; os demais usam os mesmos (acaba com "cada PC com a sua pasta")
   const driveLocal = local.drive || {};
@@ -114,11 +136,11 @@ export function mesclarPerfil(servidor, local) {
   if (temLocal && (!zotero || local.zotero.mudou) && (!zotero || canonZ(zotero.cfg) !== canonZ(cfgLocal))) zotero = { cfg: cfgLocal, atualizadoEm: new Date().toISOString() };
   else if (zotero?.cfg?.apiKey && canonZ(zotero.cfg) !== canonZ(cfgLocal)) aplicarZotero = zotero.cfg;
 
-  const indice = { versao: (srv.versao || 0) + 1, pastas, documentos, excluidos, drive, ...(zotero ? { zotero } : {}) };
+  const indice = { versao: (srv.versao || 0) + 1, pastas, documentos, excluidos, pastasExcluidas, drive, ...(zotero ? { zotero } : {}) };
   const canon = (o) => JSON.stringify(o, (_, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v));
-  const resumo = (x) => canon({ p: x.pastas || [], d: [...(x.documentos || [])].sort((m, n) => String(m.id).localeCompare(String(n.id))), e: Object.keys(x.excluidos || {}).sort(), dr: x.drive || {}, z: x.zotero?.cfg || null }); // o banco reordena as chaves do JSON
+  const resumo = (x) => canon({ p: x.pastas || [], d: [...(x.documentos || [])].sort((m, n) => String(m.id).localeCompare(String(n.id))), e: Object.keys(x.excluidos || {}).sort(), pe: Object.keys(x.pastasExcluidas || {}).sort(), dr: x.drive || {}, z: x.zotero?.cfg || null }); // o banco reordena as chaves do JSON
   const igual = (a, b) => resumo(a) === resumo(b);
-  return { indice, remover, adicionar, atualizar, recarregar, pastas, aplicarDrive, aplicarZotero, mudouServidor: !servidor || !igual(servidor, indice) };
+  return { indice, remover, adicionar, atualizar, recarregar, pastas, mapaIds, pastasExcluidas, aplicarDrive, aplicarZotero, mudouServidor: !servidor || !igual(servidor, indice) };
 }
 
 // ───────────────────────────── Rede ─────────────────────────────

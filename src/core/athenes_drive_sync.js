@@ -478,3 +478,42 @@ export async function docsRemovidosDoDrive(documentos, arquivos, token, { fetchI
   }
   return removidos;
 }
+
+// ───────────────────────────── Pastas excluídas ─────────────────────────────
+
+const CHAVE_PASTAS_EXCLUIDAS = 'athenes_pastas_excluidas';
+const lerPastasExcluidas = () => { try { const v = JSON.parse(lerConta(CHAVE_PASTAS_EXCLUIDAS) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+
+/** { idDaPasta: quando } das pastas excluídas neste computador (vai para o servidor, para valer em todos). */
+export const pastasExcluidasRegistradas = () => Object.fromEntries(lerPastasExcluidas().map(x => [x.id, x.em]));
+
+/** Registra a exclusão de pastas (a do Drive vai para a lixeira quando estiver vazia). */
+export function registrarPastasExcluidas(pastas) {
+  const lista = lerPastasExcluidas();
+  for (const p of pastas || []) if (p?.id && !lista.some(x => x.id === p.id)) lista.push({ id: p.id, driveId: p.driveId || '', lixeira: !p.driveId, em: new Date().toISOString() });
+  gravarConta(CHAVE_PASTAS_EXCLUIDAS, JSON.stringify(lista.slice(-300)));
+}
+
+/**
+ * Leva para a lixeira do Drive as pastas excluídas que já estão VAZIAS (os documentos de dentro foram movidos para outra pasta
+ * antes). Pasta com arquivo dentro espera a próxima sincronização: nada é perdido. Devolve quantas foram para a lixeira.
+ */
+export async function processarPastasExcluidas(token, { fetchImpl = globalThis.fetch } = {}) {
+  const lista = lerPastasExcluidas();
+  let n = 0;
+  for (const x of lista) {
+    if (x.lixeira || !x.driveId) continue;
+    try {
+      const q = `trashed = false and '${aspas(x.driveId)}' in parents`;
+      const dentro = await chamar(fetchImpl, `${API}?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=1`, {}, token);
+      if (dentro.files?.length) continue; // ainda tem coisa dentro: espera
+      await chamar(fetchImpl, `${API}/${encodeURIComponent(x.driveId)}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) }, token);
+      x.lixeira = true; n++;
+    } catch (e) {
+      if (e.status === 404) x.lixeira = true;
+      else if (e.sessaoExpirada) break;
+    }
+  }
+  gravarConta(CHAVE_PASTAS_EXCLUIDAS, JSON.stringify(lista));
+  return n;
+}

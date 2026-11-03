@@ -78,3 +78,24 @@ test('rede: lê com o JWT, grava só se ninguém gravou antes e tenta de novo no
   assert.deepEqual(r2.indice.documentos.map(d => d.id).sort(), ['a', 'novo', 'outro'], 'depois do conflito, mescla com o que o outro computador gravou');
   assert.ok(chamadas.some(c => /atualizado_em=eq\.T1/.test(c)), 'a gravação confere a versão lida');
 });
+
+test('pasta duplicada (mesmo nome em outro id) vira uma só e os documentos seguem para a que ficou', () => {
+  const servidor = { pastas: [pasta('pasta_rel_raiz', [pasta('arquivos_srv'), pasta('arq_srv')])], documentos: [], excluidos: {} };
+  servidor.pastas[0].subpastas[0].nome = 'ARTIGOS'; servidor.pastas[0].subpastas[1].nome = 'ARQ.CON';
+  const local = { pastas: [pasta('pasta_rel_raiz', [{ ...pasta('drive_X1'), nome: 'ARTIGOS' }, { ...pasta('sub_9'), nome: 'arq.con' }])], documentos: [doc('a', { pastaId: 'sub_9' })], excluidos: {} };
+  const r = mesclarPerfil(servidor, local);
+  assert.deepEqual(r.pastas[0].subpastas.map(p => p.id), ['arquivos_srv', 'arq_srv'], 'sem duplicar');
+  assert.deepEqual(r.mapaIds, { drive_X1: 'arquivos_srv', sub_9: 'arq_srv' });
+  assert.equal(r.indice.documentos[0].pastaId, 'arq_srv');
+  // o próprio servidor já tinha duplicadas: a mesclagem as unifica
+  const sujo = { pastas: [pasta('pasta_rel_raiz', [{ ...pasta('a1'), nome: 'ARTIGOS' }, { ...pasta('a2'), nome: 'ARTIGOS' }])], documentos: [], excluidos: {} };
+  assert.equal(mesclarPerfil(sujo, { pastas: [], documentos: [], excluidos: {} }).pastas[0].subpastas.length, 1);
+});
+
+test('pasta excluída some em todos (com o que há dentro) e os documentos voltam à pasta padrão', () => {
+  const servidor = { pastas: [pasta('pasta_rel_raiz', [pasta('arq', [pasta('filha')])])], documentos: [entradaDoDocumento(doc('x', { pastaId: 'arq' }))], excluidos: {} };
+  const r = mesclarPerfil(servidor, { pastas: servidor.pastas, documentos: [], excluidos: {}, pastasExcluidas: { arq: '2026-11-03T12:00:00Z' } });
+  assert.deepEqual(r.pastas[0].subpastas, []);
+  assert.equal(r.indice.documentos[0].pastaId, '');
+  assert.ok('arq' in r.indice.pastasExcluidas, 'a exclusão vai para o servidor e vale nos outros computadores');
+});
