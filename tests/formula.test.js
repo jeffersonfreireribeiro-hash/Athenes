@@ -1,26 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matlabParaLatex, latexParaHtml, latexParaTexto, latexDaEntrada } from '../src/core/athenes_formula.js';
+import { latexParaHtml, latexParaTexto } from '../src/core/athenes_formula.js';
 import { criarDocumento, criarNovoBloco, recalcularNumeracaoAutomatica, formatarNumeroFormula, idFormatoNumeroFormula } from '../src/core/athenes_documento.js';
 import { validarPacoteEstilo, exportarPacoteEstilo, obterPromptIaParaExtracaoDeLayout } from '../src/core/athenes_pacote_estilo.js';
 
 const BS = '\\'; // barra invertida do LaTeX
-
-test('MATLAB → LaTeX: potências, raízes, frações, funções e símbolos', () => {
-  assert.equal(matlabParaLatex('x.^2 + y^2'), 'x^{2} + y^{2}');
-  assert.equal(matlabParaLatex('sqrt(x^2 + 1)'), `${BS}sqrt{x^{2} + 1}`);
-  assert.equal(matlabParaLatex('(a + b) / (c - d)'), `${BS}frac{a + b}{c - d}`);
-  assert.equal(matlabParaLatex('x = (-b + sqrt(b^2 - 4*a*c)) / (2*a)'), `x = ${BS}frac{-b + ${BS}sqrt{b^{2} - 4 ${BS}cdot a ${BS}cdot c}}{2 ${BS}cdot a}`);
-  assert.equal(matlabParaLatex('exp(-x.^2)'), 'e^{-x^{2}}');
-  assert.equal(matlabParaLatex('sin(2*pi*f*t)'), `${BS}sin${BS}left(2 ${BS}cdot ${BS}pi ${BS}cdot f ${BS}cdot t${BS}right)`);
-  assert.equal(matlabParaLatex('a <= b'), `a ${BS}leq b`);
-  assert.equal(matlabParaLatex('abs(x1)'), `${BS}left|x_{1}${BS}right|`);
-  assert.equal(matlabParaLatex("A'"), 'A^{T}');
-  assert.throws(() => matlabParaLatex('x + (y'), /parêntese/);
-  assert.ok(latexDaEntrada('x +* (', 'matlab').erro);
-  assert.equal(latexDaEntrada('E = m c^2', 'latex').latex, 'E = m c^2');
-});
 
 test('LaTeX composto em HTML e em texto', () => {
   const html = latexParaHtml(`${BS}frac{a}{b} + x^{2} + ${BS}alpha_1 ${BS}cdot ${BS}sqrt{y}`);

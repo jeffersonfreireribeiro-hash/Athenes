@@ -20,7 +20,7 @@ import {
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
 import { htmlMarcadoresBloco, ligarMarcadoresBloco } from './athenes_marcadores_ui.js';
-import { latexDaEntrada, latexParaHtml } from '../core/athenes_formula.js';
+import { latexParaHtml } from '../core/athenes_formula.js';
 import { FORMATOS_NUMERO_FORMULA, idFormatoNumeroFormula } from '../core/athenes_documento.js';
 import { estiloIdDoTitulo } from '../core/athenes_sumario.js';
 import { montarPainelSumario } from './athenes_sumario_painel.js';
@@ -1443,19 +1443,15 @@ export class PainelPropriedades {
         </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; gap:8px;">
-          <label style="font-weight:700; margin:0;">Expressão matemática</label>
-          <select id="rmFormulaSintaxe" class="glx-select" style="width:auto; height:26px; font-size:11px;" title="Como a expressão é escrita">
-            <option value="latex" ${b.formula_sintaxe !== 'matlab' ? 'selected' : ''}>Escrever em LaTeX</option>
-            <option value="matlab" ${b.formula_sintaxe === 'matlab' ? 'selected' : ''}>Escrever em MATLAB</option>
-          </select>
+          <label style="font-weight:700; margin:0;">Expressão matemática (LaTeX)</label>
+          <span style="font-size:10.5px; color:var(--glx-muted);">Aceita $…$, equation e \label</span>
         </div>
 
         <!-- Seletor Rico de Símbolos Especiais Matemáticos e Lógicos -->
         <div id="athBoxPaletaSimbolosMat"></div>
 
-        <textarea id="rmFormulaLatex" rows="3" style="font-family:var(--glx-font-mono); font-size:12px;" placeholder="${b.formula_sintaxe === 'matlab' ? 'Ex: x = (-b + sqrt(b^2 - 4*a*c)) / (2*a)' : 'Ex: E = m \\cdot c^2'}">${escapeHtml(b.formula_sintaxe === 'matlab' ? (b.formula_matlab || '') : (b.latex || b.formula || ''))}</textarea>
+        <textarea id="rmFormulaLatex" rows="3" style="font-family:var(--glx-font-mono); font-size:12px;" placeholder="Ex: E = m \\cdot c^2">${escapeHtml(b.latex || b.formula || '')}</textarea>
         <div id="rmFormulaPrevia" style="margin-top:4px; padding:6px 8px; border:1px dashed #CBD5E1; border-radius:6px; font-family:'Cambria Math','Times New Roman',serif; font-size:14px; min-height:20px;">${latexParaHtml(b.latex || b.formula || '')}</div>
-        <small id="rmFormulaErro" style="display:block; color:#DC2626; min-height:14px;"></small>
 
         <div class="rm-linha2" style="margin-top:8px;">
           <label>Número (automático: ${escapeHtml(b.numero_equacao || '(1)')})
@@ -1505,23 +1501,12 @@ export class PainelPropriedades {
         });
       });
       const previa = box.querySelector('#rmFormulaPrevia');
-      const erro = box.querySelector('#rmFormulaErro');
-      const atualizarEntrada = () => {
-        const sintaxe = b.formula_sintaxe === 'matlab' ? 'matlab' : 'latex';
-        const r = latexDaEntrada(txtLatex.value, sintaxe);
-        if (sintaxe === 'matlab') b.formula_matlab = txtLatex.value;
-        erro.textContent = r.erro || '';
-        if (r.latex !== undefined) { b.latex = r.latex; b.formula = r.latex; previa.innerHTML = latexParaHtml(r.latex); }
+      txtLatex.addEventListener('input', () => {
+        b.latex = txtLatex.value;
+        b.formula = b.latex;
+        previa.innerHTML = latexParaHtml(b.latex);
         this.notificarMudanca();
-      };
-      txtLatex.addEventListener('input', atualizarEntrada);
-      box.querySelector('#rmFormulaSintaxe').addEventListener('change', e => {
-        if (e.target.value === 'matlab') { b.formula_sintaxe = 'matlab'; b.formula_matlab = b.formula_matlab || ''; }
-        else delete b.formula_sintaxe; // o LaTeX gerado fica e passa a ser editável
-        this.notificarMudanca(true);
-        this.renderizar();
       });
-      if (b.formula_sintaxe === 'matlab' && boxPaleta) boxPaleta.style.display = 'none'; // a paleta insere LaTeX
       box.querySelector('#rmFormulaFormato').addEventListener('change', e => {
         if (e.target.value) b.formato_numero = e.target.value; else delete b.formato_numero;
         this.notificarMudanca(true);

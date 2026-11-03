@@ -1,111 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
- * Athenes — Fórmulas: entrada em estilo MATLAB (convertida para LaTeX) e composição do LaTeX em HTML/texto.
+ * Athenes — Fórmulas: composição do LaTeX em HTML/texto (frações, raízes, expoentes, símbolos).
  * Puro (sem DOM): serve ao editor, ao PDF e ao Word.
  */
 
-const GREGAS = { alpha: 'alpha', beta: 'beta', gamma: 'gamma', delta: 'delta', epsilon: 'epsilon', zeta: 'zeta', eta: 'eta', theta: 'theta', lambda: 'lambda', mu: 'mu', nu: 'nu', xi: 'xi', pi: 'pi', rho: 'rho', sigma: 'sigma', tau: 'tau', phi: 'phi', chi: 'chi', psi: 'psi', omega: 'omega', Gamma: 'Gamma', Delta: 'Delta', Theta: 'Theta', Lambda: 'Lambda', Sigma: 'Sigma', Phi: 'Phi', Psi: 'Psi', Omega: 'Omega' };
 const FUNCOES = new Set(['sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'sinh', 'cosh', 'tanh', 'log', 'ln', 'min', 'max', 'det', 'lim']);
-const RELACOES = { '==': '=', '=': '=', '~=': '\\neq', '!=': '\\neq', '<=': '\\leq', '>=': '\\geq', '<': '<', '>': '>' };
-
-function tokenizar(src) {
-  const toks = [];
-  const re = /\s*(\d+\.?\d*(?:[eE][+-]?\d+)?|\.\d+|[A-Za-z_][A-Za-z0-9_]*|\.\^|\.\*|\.\/|==|~=|!=|<=|>=|[-+*/^()<>=,;'\[\]])/y;
-  let m;
-  while (re.lastIndex < src.length && (m = re.exec(src))) toks.push(m[1]);
-  if (re.lastIndex < src.trimEnd().length) throw new Error('Trecho não reconhecido na expressão.');
-  return toks;
-}
-
-/** Converte uma expressão em sintaxe MATLAB (x.^2, sqrt(x), a/b, pi, ...) em LaTeX. */
-export function matlabParaLatex(fonte) {
-  const toks = tokenizar(String(fonte ?? ''));
-  let i = 0;
-  const ver = () => toks[i];
-  const pega = () => toks[i++];
-
-  const semParenteses = (n) => n.grupo ? n.tex.replace(/^\\left\(([\s\S]*)\\right\)$/, '$1') : n.tex;
-
-  function primario() {
-    const t = pega();
-    if (t === undefined) throw new Error('Expressão incompleta.');
-    if (/^[\d.]/.test(t)) return { tex: t };
-    if (t === '(') {
-      const e = expr();
-      if (pega() !== ')') throw new Error('Falta fechar um parêntese.');
-      return { tex: `\\left(${e.tex}\\right)`, grupo: true };
-    }
-    if (/^[A-Za-z_]/.test(t)) {
-      if (ver() === '(') {
-        pega();
-        const args = [];
-        if (ver() !== ')') { do { args.push(expr()); } while (ver() === ',' && pega()); }
-        if (pega() !== ')') throw new Error('Falta fechar um parêntese.');
-        const a = args.map(x => x.tex);
-        const um = args[0] ? semParenteses(args[0]) : '';
-        if (t === 'sqrt') return { tex: `\\sqrt{${um}}` };
-        if (t === 'exp') return { tex: `e^{${um}}` };
-        if (t === 'abs') return { tex: `\\left|${um}\\right|` };
-        if (t === 'nthroot' && args.length === 2) return { tex: `\\sqrt[${semParenteses(args[1])}]{${um}}` };
-        if (FUNCOES.has(t)) return { tex: `\\${t}\\left(${a.join(', ')}\\right)` };
-        return { tex: `${nomeSimbolo(t)}\\left(${a.join(', ')}\\right)` };
-      }
-      return { tex: nomeSimbolo(t) };
-    }
-    throw new Error(`Símbolo inesperado: ${t}`);
-  }
-  function nomeSimbolo(t) {
-    if (t === 'inf' || t === 'Inf') return '\\infty';
-    if (GREGAS[t]) return `\\${GREGAS[t]}`;
-    const m = /^([A-Za-z])_?(\d+)$/.exec(t);
-    if (m) return `${m[1]}_{${m[2]}}`; // x1, x_1 → x₁
-    return t.length > 1 ? `\\mathrm{${t.replace(/_/g, '\\_')}}` : t;
-  }
-  function pos() {
-    let n = primario();
-    while (ver() === "'") { pega(); n = { tex: `${n.tex}^{T}` }; }
-    return n;
-  }
-  function potencia() {
-    const base = pos();
-    if (ver() === '^' || ver() === '.^') {
-      pega();
-      const neg = ver() === '-' ? (pega(), '-') : '';
-      const e = potencia();
-      return { tex: `${base.tex}^{${neg}${semParenteses(e)}}` };
-    }
-    return base;
-  }
-  function unario() {
-    if (ver() === '-') { pega(); const n = unario(); return { tex: `-${n.tex}` }; }
-    if (ver() === '+') { pega(); return unario(); }
-    return potencia();
-  }
-  function termo() {
-    let n = unario();
-    while (['*', '.*', '/', './'].includes(ver())) {
-      const op = pega();
-      const d = unario();
-      n = op === '*' || op === '.*' ? { tex: `${n.tex} \\cdot ${d.tex}` } : { tex: `\\frac{${semParenteses(n)}}{${semParenteses(d)}}` };
-    }
-    return n;
-  }
-  function expr() {
-    let n = termo();
-    while (ver() === '+' || ver() === '-') { const op = pega(); const d = termo(); n = { tex: `${n.tex} ${op} ${d.tex}` }; }
-    return n;
-  }
-
-  const partes = [];
-  partes.push(expr().tex);
-  while (i < toks.length) {
-    const t = pega();
-    if (RELACOES[t]) partes.push(RELACOES[t], expr().tex);
-    else if (t === ';' || t === ',') partes.push(t === ',' ? ',\\;' : ';\\;', expr().tex);
-    else throw new Error(`Símbolo inesperado: ${t}`);
-  }
-  return partes.join(' ');
-}
 
 const SIMBOLOS = {
   alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', pi: 'π', rho: 'ρ', sigma: 'σ', tau: 'τ', phi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω',
@@ -206,9 +105,3 @@ export const latexParaHtml = (latex) => compor(limparEnvoltorioLatex(latex), 'ht
 
 /** LaTeX → texto simples com Unicode (para o Word): frações como (a)/(b), expoentes como ^(x). */
 export const latexParaTexto = (latex) => compor(limparEnvoltorioLatex(latex), 'texto').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-
-/** Converte a entrada do bloco (LaTeX ou MATLAB) em LaTeX; em caso de erro devolve { erro } e mantém o último LaTeX válido. */
-export function latexDaEntrada(fonte, sintaxe = 'latex') {
-  if (sintaxe !== 'matlab') return { latex: String(fonte ?? '') }; // a fonte fica como foi escrita; a limpeza ($, equation, label) é feita ao compor
-  try { return { latex: matlabParaLatex(fonte) }; } catch (e) { return { erro: e.message }; }
-}
