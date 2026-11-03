@@ -4,6 +4,7 @@
  * Modos de Trabalho estilo Google Docs (Edição, Sugestão e Visualização) e Google Drive API.
  */
 
+import { cabecalhosSupabase, limparSessaoSupabase, temSessaoSupabase, entrarNoSupabaseComGoogle, obterIdTokenGoogle } from './athenes_supabase_auth.js';
 import { lerConta, gravarConta, definirContaAtiva, limparContaAtiva, obterContaAtiva } from './athenes_conta.js';
 export const SUPABASE_CONFIG_PADRAO = Object.freeze({
   url: 'https://xizxdtaxgvouopkqdbie.supabase.co',
@@ -122,6 +123,7 @@ export function encerrarSessao() {
 
     const cfg = obterConfigGoogleDrive(); // ainda na conta que está saindo: apaga o token dela
     salvarConfigGoogleDrive({ ...cfg, accessToken: '', accessTokenExpiraEm: 0 });
+    limparSessaoSupabase(); // a sessão da nuvem também sai com a conta
     limparContaAtiva();
   } catch (_) {}
 }
@@ -363,8 +365,7 @@ export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = 
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'apikey': cfg.anonKey,
-      'Authorization': `Bearer ${cfg.anonKey}`,
+      ...(await cabecalhosSupabase(cfg, { fetchImpl })), // JWT do usuário (as regras do banco só aceitam o dono)
       'Prefer': 'resolution=merge-duplicates,return=representation'
     },
     body: JSON.stringify(payload)
@@ -380,6 +381,18 @@ export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = 
 }
 
 /**
+ * Entra na nuvem (Supabase) com a conta Google: confirma a conta no botão oficial do Google e troca o ID token por uma sessão.
+ * Sem isso as regras do banco não deixam ler nem gravar documentos. Rejeita se o usuário adiar ou o Google/Supabase recusar.
+ */
+export async function entrarNaNuvemComGoogle() {
+  const cid = obterConfigGoogleDrive().clientId || DEFAULT_GOOGLE_CLIENT_ID;
+  return entrarNoSupabaseComGoogle(obterConfigSupabase(), cid, {
+    obterIdToken: (id) => obterIdTokenGoogle(id, { carregarScript: carregarScriptExterno })
+  });
+}
+export const nuvemAutenticada = temSessaoSupabase;
+
+/**
  * Lista os documentos salvos na nuvem Supabase.
  */
 export async function listarDocumentosDoSupabase(fetchImpl = globalThis.fetch, { conta = obterContaAtiva() } = {}) {
@@ -391,10 +404,7 @@ export async function listarDocumentosDoSupabase(fetchImpl = globalThis.fetch, {
 
   const resp = await fetchImpl(endpoint, {
     method: 'GET',
-    headers: {
-      'apikey': cfg.anonKey,
-      'Authorization': `Bearer ${cfg.anonKey}`
-    }
+    headers: await cabecalhosSupabase(cfg, { fetchImpl })
   });
 
   if (!resp.ok) {
@@ -413,10 +423,7 @@ export async function carregarDocumentoDoSupabase(docId, fetchImpl = globalThis.
 
   const resp = await fetchImpl(endpoint, {
     method: 'GET',
-    headers: {
-      'apikey': cfg.anonKey,
-      'Authorization': `Bearer ${cfg.anonKey}`
-    }
+    headers: await cabecalhosSupabase(cfg, { fetchImpl })
   });
 
   if (!resp.ok) {

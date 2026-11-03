@@ -11,6 +11,7 @@ import {
   ativarSessao,
   autenticarGoogleDrive,
   obterInfoUsuarioGoogle,
+  entrarNaNuvemComGoogle,
   obterOuCriarEstruturaPastasAthenes,
   obterConfigGoogleDrive
 } from '../core/athenes_colaboracao.js';
@@ -191,6 +192,9 @@ export class TelaLoginView {
       } catch (errDrive) {
         console.warn('[Athenes] Pasta do Drive será criada ou vinculada posteriormente:', errDrive);
       }
+
+      // sessão segura da nuvem (Supabase): sem ela o app segue só com o Drive; o aviso volta no painel inicial
+      try { await entrarNaNuvemComGoogle(); } catch (errNuvem) { console.warn('[Athenes] Nuvem segura adiada:', errNuvem.message); }
 
       this.mensagemStatus = `Bem-vindo(a), ${p.nome}! Entrando no Athenes...`;
       this.tipoMensagem = 'sucesso';

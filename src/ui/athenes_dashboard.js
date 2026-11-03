@@ -17,6 +17,8 @@ import {
   obterConfigGoogleDrive,
   salvarConfigGoogleDrive,
   listarDocumentosDoSupabase,
+  entrarNaNuvemComGoogle,
+  nuvemAutenticada,
   carregarDocumentoDoSupabase,
   salvarDocumentoNoSupabase,
   autenticarGoogleDrive,
@@ -61,6 +63,17 @@ export class DashboardView {
     this.renderizar();
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
       setTimeout(() => this.sincronizarComSupabase(true), 1200);
+      setTimeout(() => this.confirmarContaDaNuvem(), 1800);
+    }
+  }
+
+  /** Quem já estava conectado antes do login seguro da nuvem confirma a conta Google uma vez (a cada visita só se ainda não confirmou e não adiou). */
+  async confirmarContaDaNuvem() {
+    try {
+      if (!this.perfilUsuario?.autenticadoGoogle || nuvemAutenticada() || sessionStorage.getItem('athenes_nuvem_adiada')) return;
+      await entrarNaNuvemComGoogle();
+    } catch (_) {
+      try { sessionStorage.setItem('athenes_nuvem_adiada', '1'); } catch (__) {}
     }
   }
 
