@@ -38,6 +38,10 @@ function driveFalso({ falharCriacaoDe = null, status401 = false } = {}) {
       if (!it) return json({ error: { message: 'nf' } }, 404);
       it.parents = it.parents.filter(p => p !== u.searchParams.get('removeParents')).concat(u.searchParams.get('addParents')); return json({ id: it.id });
     }
+    if (metodo === 'GET' && u.pathname.startsWith('/drive/v3/files/')) { // consulta de um arquivo/pasta (pais e lixeira)
+      const it = itens.find(i => i.id === decodeURIComponent(u.pathname.split('/').pop()));
+      return it ? json({ id: it.id, parents: it.parents, trashed: false }) : json({ error: { message: 'nf' } }, 404);
+    }
     return json({}, 400);
   };
   return { fetchImpl, itens };
@@ -144,4 +148,21 @@ test('token: vale até a data gravada; vencido é renovado em silêncio (uma ren
   const [a, b] = await Promise.all([obterTokenDrive({ cfg: vencido, agora, renovar }), obterTokenDrive({ cfg: vencido, agora, renovar })]);
   assert.deepEqual([a, b, chamadas], ['novo', 'novo', 1]);
   assert.equal(await obterTokenDrive({ cfg: vencido, agora, renovar: async () => { throw new Error('popup bloqueado'); } }), null, 'falha na renovação = pedir reconexão, sem lançar');
+});
+
+test('arquivo que o registro local diz estar na pasta, mas está solto na raiz do Drive, é movido para a pasta certa', async () => {
+  storageFalso();
+  const d = driveFalso(); const pastas = arvore();
+  const doc = criarDocumento({ titulo: 'Teste' }); doc.pastaId = 'sub_1';
+  await enviarDocumentoAoDrive(doc, 'tk', { fetchImpl: d.fetchImpl, pastas });
+  const arq = d.itens.find(i => i.mime === 'arquivo');
+  const raiz = d.itens.find(i => i.name === 'Athenes');
+  const destino = d.itens.find(i => i.name === "Tese d'Água");
+  assert.ok(arq.parents.includes(destino.id));
+  // estado "mentiroso": o app acha que está na pasta, mas o arquivo está na raiz
+  arq.parents = [raiz.id];
+  assert.equal(doc.driveFolderId, destino.id);
+  doc.dataModificacao = new Date(Date.now() + 5000).toISOString(); // alteração pendente força um envio
+  await enviarDocumentoAoDrive(doc, 'tk', { fetchImpl: d.fetchImpl, pastas });
+  assert.deepEqual(arq.parents, [destino.id], 'o envio confere o pai real e move o arquivo');
 });

@@ -1348,7 +1348,7 @@ export class DashboardView {
       try { pastasNovas = await importarPastasDoDrive(token); } catch (e) { console.warn('[Athenes] Pastas do Drive não importadas:', e.message); }
       if (pastasNovas.importadas || pastasNovas.vinculadas) this.pastasDrive = obterPastasDriveLocais();
       const arquivos = await listarBibliotecaDoDrive(token);
-      const r = mesclarBibliotecaDrive(this.documentos, arquivos, pastasNovas.mapa);
+      const r = mesclarBibliotecaDrive(this.documentos, arquivos, pastasNovas.mapa, obterPastasDriveLocais());
       const religados = repararPastaDosDocumentos(this.documentos, obterPastasDriveLocais()); // documentos trazidos de outro PC voltam para a pasta certa
       if (religados) r.atualizados += religados;
       if (pastasNovas.importadas || religados) { this.pastasDrive = obterPastasDriveLocais(); this.salvarDocumentosLocais(); this.renderizar(); }

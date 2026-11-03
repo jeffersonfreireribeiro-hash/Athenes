@@ -183,9 +183,15 @@ async function enviarDocumentoAoDriveInterno(doc, token, { fetchImpl = globalThi
   const conteudo = JSON.stringify(doc, (k, v) => (k === 'paginas' ? undefined : v));
 
   let id = doc.driveFileId || null;
-  if (id && doc.driveFolderId && doc.driveFolderId !== alvo) {
+  if (id) {
+    // confere ONDE o arquivo está de verdade no Drive (o registro local podia dizer "na pasta X" sem o arquivo ter sido movido) e leva para a pasta certa
     try {
-      await chamar(fetchImpl, `${API}/${encodeURIComponent(id)}?addParents=${encodeURIComponent(alvo)}&removeParents=${encodeURIComponent(doc.driveFolderId)}&fields=id`, { method: 'PATCH' }, token);
+      const atual = await chamar(fetchImpl, `${API}/${encodeURIComponent(id)}?fields=parents,trashed`, {}, token);
+      if (atual.trashed) id = null;
+      else if (!(atual.parents || []).includes(alvo)) {
+        const remover = (atual.parents || []).length ? `&removeParents=${encodeURIComponent(atual.parents.join(','))}` : '';
+        await chamar(fetchImpl, `${API}/${encodeURIComponent(id)}?addParents=${encodeURIComponent(alvo)}${remover}&fields=id`, { method: 'PATCH' }, token);
+      }
     } catch (e) { if (e.status === 404) id = null; else throw e; }
   }
   const enviar = (fileId) => salvarArquivoNoGoogleDrive({
@@ -253,7 +259,7 @@ export async function listarBibliotecaDoDrive(token, { fetchImpl = globalThis.fe
  * Acrescenta ao índice local os documentos do Drive que ainda não existem aqui (como "só no Drive": conteúdo baixado ao abrir)
  * e marca os que já existem para baixar de novo quando o do Drive é mais novo. Devolve { novos, atualizados }.
  */
-export function mesclarBibliotecaDrive(documentos, arquivos, mapaPastas = {}) {
+export function mesclarBibliotecaDrive(documentos, arquivos, mapaPastas = {}, pastas = null) {
   const r = { novos: 0, atualizados: 0 };
   for (const f of arquivos || []) {
     const local = documentos.find(d => d.driveFileId === f.driveFileId);
@@ -273,6 +279,11 @@ export function mesclarBibliotecaDrive(documentos, arquivos, mapaPastas = {}) {
     } else if (!local.pastaId && mapaPastas[f.driveFolderId]) {
       local.pastaId = mapaPastas[f.driveFolderId]; // documento já importado antes, agora na pasta certa
       r.atualizados++;
+    } else if (pastas && f.driveFolderId && local.pastaId && !local.precisaCarregarConteudo
+      && acharPasta(pastas, local.pastaId)?.driveId && acharPasta(pastas, local.pastaId).driveId !== f.driveFolderId && !mapaPastas[f.driveFolderId]) {
+      // o Drive mostra o arquivo FORA da pasta dele (ex.: solto na raiz) embora o registro diga que está lá: registra o lugar real; o envio o leva para a pasta certa
+      local.driveFolderId = f.driveFolderId;
+      r.corrigidos = (r.corrigidos || 0) + 1;
     } else if (f.modificadoEm && local.driveSincronizadoEm && f.modificadoEm > local.driveSincronizadoEm && !local.precisaCarregarConteudo && (local.dataModificacao || '') <= local.driveSincronizadoEm) {
       local.precisaCarregarConteudo = true; // o do Drive é mais novo e não há edição local pendente
       local.origemDrive = true;

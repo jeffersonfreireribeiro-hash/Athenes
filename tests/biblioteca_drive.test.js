@@ -168,3 +168,10 @@ test('documento movido de pasta em outro computador segue o Drive, mas mudança 
   mesclarBibliotecaDrive(b, [{ driveFileId: 'y', titulo: 'B', modificadoEm: '2026-11-01T00:00:00Z', driveFolderId: 'F11' }], mapa);
   assert.equal(b[0].pastaId, 'minha_outra_pasta');
 });
+
+test('o Drive mostra o arquivo solto na raiz mas o registro diz que está na pasta: o registro é corrigido para o envio mover', () => {
+  const pastas = [{ id: 'sub_arq', nome: 'ARQ.CON', driveId: 'F_ARQ', subpastas: [] }];
+  const docs = [{ id: 'a', driveFileId: 'x', pastaId: 'sub_arq', driveFolderId: 'F_ARQ', driveSincronizadoEm: '2026-11-03T00:00:00Z', dataModificacao: '2026-11-01T00:00:00Z' }];
+  mesclarBibliotecaDrive(docs, [{ driveFileId: 'x', titulo: 'A', modificadoEm: '2026-11-03T00:00:00Z', driveFolderId: 'RAIZ' }], {}, pastas);
+  assert.equal(docs[0].driveFolderId, 'RAIZ', 'o lugar real passa a constar; precisaEnviarAoDrive vê a diferença e move');
+});
