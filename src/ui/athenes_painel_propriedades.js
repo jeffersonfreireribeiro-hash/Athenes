@@ -969,7 +969,7 @@ export class PainelPropriedades {
           const cssInline = `font-family:${FONTES_SISTEMA[est.fonte]?.familia || 'inherit'}; font-size:${est.tamanho_pt || 12}pt; font-weight:${est.peso || 400}; color:${est.cor || '#1F2733'};`;
           document.execCommand('insertHTML', false, `<span style="${cssInline}">${escapeHtml(selInfo.texto)}</span>`);
           const elBlocoEditable = document.querySelector(`.ath-bloco-folha[data-bloco-id="${b.id}"] .ath-texto-editable`);
-          if (elBlocoEditable) b.texto = elBlocoEditable.innerHTML;
+          if (elBlocoEditable) b.texto = elBlocoEditable.innerHTML.replace(/<span class="ath-citacao-ref"[^>]*>.*?<\/span>/g, '');
           this.notificarMudanca();
         } else if (selId) {
           b.estiloId = selId;

@@ -116,7 +116,7 @@ function gerarTabelaHtmlEstilizada(bloco, classe, estilosMap = {}) {
 }
 
 export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
-  const estBase = estilosMap[bloco.tipo === 'titulo' ? estiloIdDoTitulo(estilosMap, bloco) : bloco.estiloId] || estilosMap.corpo || {};
+  const estBase = estilosMap[bloco.tipo === 'titulo' ? estiloIdDoTitulo(estilosMap, bloco) : (bloco.estiloId || (bloco.tipo === 'citacao' ? 'citacao_direta' : undefined))] || estilosMap.corpo || {};
   const est = {
     ...estBase,
     ...(bloco.fonte ? { fonte: bloco.fonte } : {}),
@@ -157,8 +157,7 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
     }
 
     case 'citacao': {
-      const estCitacao = estilosMap.citacao_direta || est;
-      const cssCitacao = estiloParaCss(estCitacao);
+      const cssCitacao = estiloParaCss(est); // estilo da citação já com os ajustes do bloco (e do fragmento: o 2º pedaço não repete o espaço antes), igual ao editor
       const ref = `(${bloco.autor || 'AUTOR'}, ${bloco.ano || 's.d.'}${bloco.pagina_citada ? ', p. ' + bloco.pagina_citada : ''})`;
       return `<blockquote class="ath-bloco ath-citacao" style="${cssCitacao}" data-id="${bloco.id}">
         ${bloco.texto || ''}
@@ -233,13 +232,15 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
 
       const titFig = obterTituloCompletoComNumeracao(bloco);
 
-      return '<figure class="ath-bloco ath-figura-composta" style="margin:12px 0; break-inside:avoid; ' + cssObjParaString(d.bloco) + '" data-id="' + bloco.id + '">' +
-        (titFig ? '<div class="ath-legenda" style="' + cssTextoPapel(bloco, 'titulo', estilosMap, estLegenda, 'font-weight:800; margin-bottom:6px;') + '">' + tituloComNumeracaoHtml(bloco, estilosMap) + '</div>' : '') +
+      // mesmo visual do editor: sem estilo escolhido, título 13px/negrito, legenda 12px cinza e fonte 11px itálico; blocos separados por 6px
+      const estLegFig = estilosMap.legenda || null; const estFonteFig = estilosMap.fonte_citada || null;
+      return '<figure class="ath-bloco ath-figura-composta" style="margin:12px 0; break-inside:avoid; display:flex; flex-direction:column; gap:6px; ' + Object.entries(gerarCssMolduraBloco(bloco)).map(([k, v]) => `${k.replace(/([A-Z])/g, '-$1').toLowerCase()}:${v};`).join(' ') + ' ' + cssObjParaString(d.bloco) + '; margin-bottom:12px;" data-id="' + bloco.id + '">' + // o editor limpa a margem inferior da moldura e fica a da classe da figura (12px)
+        (titFig ? '<div class="ath-legenda" style="' + cssTextoPapel(bloco, 'titulo', estilosMap, estLegFig, 'font-size:9.75pt; line-height:1.5; font-weight:800; color:#1F2733;') + '">' + tituloComNumeracaoHtml(bloco, estilosMap) + '</div>' : '') +
         '<div style="' + cssObjParaString(d.grade) + '; padding:6px; background:#F8FAFC; border-radius:6px;">' +
           itensHtml +
         '</div>' +
-        (bloco.legenda_geral ? '<div style="' + cssTextoPapel(bloco, 'legenda', estilosMap, null, 'font-size:9.5pt; color:#475569; margin-top:4px;') + '">' + bloco.legenda_geral + '</div>' : '') +
-        (bloco.fonte ? '<div class="ath-fonte" style="' + cssTextoPapel(bloco, 'fonte', estilosMap, estFonte, 'margin-top:3px;') + '">' + bloco.fonte + '</div>' : '') +
+        (bloco.legenda_geral ? '<div style="' + cssTextoPapel(bloco, 'legenda', estilosMap, null, 'font-size:9pt; color:#475569; line-height:1.35;') + '">' + bloco.legenda_geral + '</div>' : '') +
+        (bloco.fonte ? '<div class="ath-fonte" style="' + cssTextoPapel(bloco, 'fonte', estilosMap, estFonteFig, 'font-size:8.25pt; line-height:1.5; color:#6B7585; font-style:italic;') + '">' + bloco.fonte + '</div>' : '') +
       '</figure>';
     }
 
@@ -396,7 +397,11 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
       }
       // margens colapsadas (maior de "depois" e "antes"), como no Word: sem isso o espaço entre parágrafos dobrava
       const colapso = cols === 1 ? (i > 0 ? colapsoEntreBlocosPt(blocosPag[i - 1], b, estilosMap) : (margensTextoPt(b, estilosMap)?.antes || 0)) : 0; // topo da página: sem espaço antes
-      partes.push(`<div class="ath-bloco-grid" style="${gridCol}${colapso ? ` margin-top:-${colapso}pt;` : ''}">${renderizarBlocoHtml(b, estilosMap, documento, opcoesPag)}</div>`);
+      // figuras, tabelas, fórmulas… também ganham o espaço antes/depois do estilo do bloco, como na folha do editor (texto já leva o seu na própria margem)
+      const ehTextoB = ['paragrafo', 'texto', 'titulo', 'subtitulo', 'citacao'].includes(b.tipo);
+      const estB = estilosMap[b.estiloId] || estilosMap.corpo || {};
+      const margemBloco = ehTextoB ? '' : ` margin-top:${b.espaco_antes_pt ?? estB.espaco_antes_pt ?? 0}pt; margin-bottom:${b.espaco_depois_pt ?? estB.espaco_depois_pt ?? 8}pt;`;
+      partes.push(`<div class="ath-bloco-grid" style="${gridCol}${colapso ? ` margin-top:-${colapso}pt;` : ''}${margemBloco}">${renderizarBlocoHtml(b, estilosMap, documento, opcoesPag)}</div>`);
     }
     const blocosHtml = partes.join('\n');
 
@@ -520,6 +525,7 @@ return `<section class="ath-pagina" style="position:relative; width:${largura_mm
     .ath-sumario-num { flex-shrink: 0; }
     /* sem isso, estilo com espaço 0 recebia a margem padrão de <p>/<h1> (1em) e os parágrafos ficavam muito afastados */
     .ath-bloco { margin-top: 0; margin-bottom: 0; }
+    blockquote.ath-bloco { margin-left: 0; margin-right: 0; } /* o recuo vem do estilo; sem a margem padrão do navegador (40px) o texto fica na mesma largura do editor */
     .ath-num-secao { margin-right: .4em; }
     .ath-toc-item { break-inside: avoid; }
     .ath-toc-link { color: inherit; text-decoration: none; }

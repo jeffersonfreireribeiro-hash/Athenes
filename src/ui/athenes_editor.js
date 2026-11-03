@@ -3033,8 +3033,8 @@ export class EditorView {
       el.appendChild(heading);
     }
 
-    // 2. PARÁGRAFO
-    else if (b.tipo === 'paragrafo') {
+    // 2. PARÁGRAFO (e CITAÇÃO: mesmo desenho, com o estilo e o recuo do estilo "Citação"; a referência (AUTOR, ano) vai ao fim, como no PDF)
+    else if (b.tipo === 'paragrafo' || b.tipo === 'citacao') {
       const p = document.createElement('div');
       p.contentEditable = ehSomenteLeitura ? 'false' : 'true';
       p.className = 'ath-texto-editable';
@@ -3056,13 +3056,21 @@ export class EditorView {
       let htmlP = aplicarRotulosNotasHtml(resolverReferenciasCruzadas(hifAtivoP ? hifenizarHtml(conteudoHtml) : removerHifensCondicionais(conteudoHtml), this.doc), pag?.rotulosNotas);
       if (classesAv && !b._frag?.continuaDaAnterior && b.texto) htmlP = aplicarPalavrasIniciais(htmlP, estiloMesclado);
       p.innerHTML = htmlP;
+      if (b.tipo === 'citacao' && !b._frag?.continuaNaProxima) {
+        const ref = document.createElement('span');
+        ref.className = 'ath-citacao-ref';
+        ref.contentEditable = 'false';
+        ref.style.userSelect = 'none';
+        ref.textContent = ` (${b.autor || 'AUTOR'}, ${b.ano || 's.d.'}${b.pagina_citada ? ', p. ' + b.pagina_citada : ''})`;
+        p.appendChild(ref);
+      }
       this.aplicarConfigListaNoBloco(p, b);
 
       // Modo Sugestão (estilo Google Docs): digitar/colar vira inserção, apagar vira exclusão tachada (sem alterar a base)
       this.instalarSugestaoNoBloco(p, b);
 
       p.addEventListener('input', () => {
-        b.texto = removerPalavrasIniciais(p.innerHTML); // o destaque de palavras iniciais é só de exibição
+        b.texto = removerPalavrasIniciais(p.innerHTML).replace(/<span class="ath-citacao-ref"[^>]*>.*?<\/span>/g, ''); // destaque de palavras iniciais e referência da citação são só de exibição
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida(); // agenda gravação/histórico (adiados): fechar a aba com o cursor no campo não perde mais o texto
         this.agendarRepaginacao(); // o texto que cresce passa para a página seguinte na hora, sem precisar reabrir o arquivo
