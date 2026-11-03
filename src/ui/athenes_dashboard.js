@@ -523,12 +523,12 @@ export class DashboardView {
             <div class="ath-prop-grupo" style="margin-bottom:8px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
                 <label style="font-size:11px; font-weight:700; color:#314F79; margin:0;">
-                  Link ou ID da Pasta no Google Drive (Web)
+                  Pasta do Athenes no Google Drive (fixa)
                 </label>
                 ${driveCfg.pastaUrl ? `<a href="${driveCfg.pastaUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px; color:#2563EB; font-weight:700; text-decoration:underline;">Abrir Pasta ↗</a>` : ''}
               </div>
-              <input type="text" class="ath-input" id="athLoginDrivePastaUrl" value="${driveCfg.pastaUrl || ''}" placeholder="Ex.: https://drive.google.com/drive/folders/1ABCxyz... ou ID da pasta" style="height:30px; font-size:11.5px;">
-              <small style="font-size:10.5px; color:#64748B; margin-top:2px; display:block;">Pasta do Drive usada para PDFs e backups (preenchida sozinha a partir da sua conta).</small>
+              <input type="text" class="ath-input" id="athLoginDrivePastaUrl" value="${driveCfg.pastaUrl || ''}" placeholder="Aparece depois de conectar o Google Drive" readonly title="Pasta fixa da sua conta: a mesma em todos os computadores" style="height:30px; font-size:11.5px; background:#F1F5F9; color:#475569; cursor:default;">
+              <small style="font-size:10.5px; color:#64748B; margin-top:2px; display:block;">É a pasta "Athenes" do Drive desta conta: a mesma em todos os computadores e não pode ser trocada.</small>
             </div>
             <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnModalSincronizarHub" style="width:100%; height:30px; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:700; background:#FFFFFF; border:1px solid #CBD5E1; margin-top:6px;" title="Cria ou localiza automaticamente a pasta Hub 'Athenes' no Google Drive">
               ${svgIcone('pasta', 13)} Sincronizar / Criar Pasta Hub Athenes no Drive
@@ -655,11 +655,6 @@ export class DashboardView {
       };
       salvarPerfilColaborador(novoPerfil);
 
-      const pastaUrlDrive = modal.querySelector('#athLoginDrivePastaUrl')?.value.trim() || '';
-      salvarConfigGoogleDrive({
-        ...driveCfg,
-        pastaUrl: pastaUrlDrive
-      });
 
       const zId = modal.querySelector('#athLoginZoteroId').value.trim();
       const zKey = modal.querySelector('#athLoginZoteroKey').value.trim();
@@ -792,7 +787,7 @@ export class DashboardView {
       }).length;
     } else {
       count = this.documentos.filter(d => {
-        const pId = d.pastaId || (d.tipoDoc === 'artigo' || d.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz');
+        const pId = this.pastaEfetivaDoDoc(d);
         return pId === pasta.id;
       }).length;
     }
@@ -879,7 +874,7 @@ export class DashboardView {
 
       if (!ehAbaBib) {
         const docsNaPasta = this.documentos.filter(d => {
-          const pId = d.pastaId || (d.tipoDoc === 'artigo' || d.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz');
+          const pId = this.pastaEfetivaDoDoc(d);
           return pId === this.pastaAtivaId;
         });
 
@@ -1161,6 +1156,12 @@ export class DashboardView {
     });
   }
 
+  /** Pasta do documento nesta árvore; se o id vem de outro computador (não existe aqui), vale a pasta padrão, para os totais fecharem. */
+  pastaEfetivaDoDoc(d) {
+    if (d.pastaId && buscarPastaNaArvore(this.pastasDrive, d.pastaId)) return d.pastaId;
+    return d.tipoDoc === 'artigo' || d.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz';
+  }
+
   atualizarGrid() {
     const gridEl = this.container.querySelector('#athDocsGrid');
     if (!gridEl) return;
@@ -1173,7 +1174,7 @@ export class DashboardView {
 
       let matchPasta = true;
       if (this.pastaAtivaId && this.pastaAtivaId !== 'todas') {
-        const docPastaId = doc.pastaId || (doc.tipoDoc === 'artigo' || doc.tipoDoc === 'relatorio' ? 'pasta_rel_raiz' : 'pasta_bib_raiz');
+        const docPastaId = this.pastaEfetivaDoDoc(doc);
         matchPasta = (docPastaId === this.pastaAtivaId);
       }
 

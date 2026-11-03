@@ -134,7 +134,9 @@ test('dois computadores com pastas "Athenes" duplicadas passam a usar a mais ant
   assert.equal(await obterPastaRaizDrive('TK', fetchFalso, pastas), 'RAIZ_ANTIGA');
   const cfg = obterConfigGoogleDrive();
   assert.equal(cfg.pastaRaizId, 'RAIZ_ANTIGA');
-  assert.ok(!cfg.pastaDocumentosId && !cfg.pastaId, 'a estrutura da pasta nova é descartada');
+  assert.ok(!cfg.pastaDocumentosId, 'a estrutura da pasta nova é descartada');
+  assert.equal(cfg.pastaId, 'RAIZ_ANTIGA', 'a pasta do Athenes da conta é a raiz, igual em todos os computadores');
+  assert.equal(cfg.pastaUrl, 'https://drive.google.com/drive/folders/RAIZ_ANTIGA');
   assert.equal(pastas[0].driveId, undefined, 'pastas locais esquecem os ids da raiz antiga para revincular');
 });
 
@@ -144,4 +146,13 @@ test('documento vindo de outro computador volta para a pasta certa pelo vínculo
   const docs = [{ id: 'a', pastaId: 'sub_do_outro_pc', driveFolderId: 'F11' }, { id: 'b', pastaId: 'pasta_rel_raiz', driveFolderId: 'F1' }, { id: 'c', pastaId: 'inexistente' }];
   assert.equal(repararPastaDosDocumentos(docs, pastas), 1);
   assert.deepEqual(docs.map(d => d.pastaId), ['drive_F11', 'pasta_rel_raiz', 'inexistente']);
+});
+
+test('a pasta do Athenes no Drive é fixa: sempre a raiz, mesmo que alguém tente gravar outra', async () => {
+  const m = new Map();
+  globalThis.localStorage = { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), key: i => [...m.keys()][i], get length() { return m.size; } };
+  const { salvarConfigGoogleDrive, obterConfigGoogleDrive } = await import('../src/core/athenes_colaboracao.js');
+  salvarConfigGoogleDrive({ pastaRaizId: 'RAIZ', pastaDocumentosId: 'DOCS', pastaId: 'DOCS', pastaUrl: 'https://drive.google.com/drive/folders/OUTRA' });
+  const cfg = obterConfigGoogleDrive();
+  assert.deepEqual([cfg.pastaId, cfg.pastaUrl], ['RAIZ', 'https://drive.google.com/drive/folders/RAIZ']);
 });

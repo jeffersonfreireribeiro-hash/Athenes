@@ -782,8 +782,9 @@ export function obterConfigGoogleDrive() {
         const parsed = JSON.parse(salvo);
         const urlSalva = eLegada(parsed.pastaUrl) ? '' : (parsed.pastaUrl || '');
         const idSalvo = eLegada(parsed.pastaId) ? '' : (parsed.pastaId || '');
-        const pastaId = idSalvo || extrairIdPastaDrive(urlSalva) || pastaIdPadrao;
-        const pastaUrl = urlSalva || linkDaPasta(pastaId) || pastaUrlPadrao; // o link mostrado é sempre o da pasta realmente usada
+        // a pasta do Athenes no Drive é UMA por conta, a mesma em todos os computadores: a raiz "Athenes" (não é escolha do usuário)
+        const pastaId = parsed.pastaRaizId || idSalvo || extrairIdPastaDrive(urlSalva) || pastaIdPadrao;
+        const pastaUrl = parsed.pastaRaizId ? linkDaPasta(parsed.pastaRaizId) : (urlSalva || linkDaPasta(pastaId) || pastaUrlPadrao); // o link mostrado é sempre o da pasta realmente usada
         return {
           clientId: parsed.clientId || DEFAULT_GOOGLE_CLIENT_ID,
           apiKey: parsed.apiKey || '',
@@ -805,8 +806,9 @@ export function obterConfigGoogleDrive() {
 }
 
 export function salvarConfigGoogleDrive(cfg) {
-  const pastaUrl = eLegada(cfg?.pastaUrl) ? '' : (cfg?.pastaUrl || '').trim();
-  const pastaId = eLegada(cfg?.pastaId) ? '' : (cfg?.pastaId || extrairIdPastaDrive(pastaUrl));
+  const urlInformada = eLegada(cfg?.pastaUrl) ? '' : (cfg?.pastaUrl || '').trim();
+  const pastaId = cfg?.pastaRaizId || (eLegada(cfg?.pastaId) ? '' : (cfg?.pastaId || extrairIdPastaDrive(urlInformada)));
+  const pastaUrl = cfg?.pastaRaizId ? linkDaPasta(cfg.pastaRaizId) : urlInformada; // com a raiz conhecida, o destino é ela (fixo)
   const normalizado = {
     clientId: (cfg?.clientId || DEFAULT_GOOGLE_CLIENT_ID).trim(),
     apiKey: cfg?.apiKey || '',
@@ -1083,7 +1085,7 @@ export async function obterOuCriarEstruturaPastasAthenes(accessToken, pastaRaizI
   };
 
   const cfgAtual = obterConfigGoogleDrive();
-  salvarConfigGoogleDrive({ ...cfgAtual, ...estrutura, pastaId: documentosId, pastaUrl: documentosId ? linkDaPasta(documentosId) : cfgAtual.pastaUrl });
+  salvarConfigGoogleDrive({ ...cfgAtual, ...estrutura, pastaId: raizId, pastaUrl: raizId ? linkDaPasta(raizId) : cfgAtual.pastaUrl });
 
   return estrutura;
 }
