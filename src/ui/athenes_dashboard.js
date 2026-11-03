@@ -38,6 +38,7 @@ import {
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { EstudoArtigosView, carregarArtigosEstudo, salvarArtigosEstudo } from './athenes_estudo_artigos.js';
 import { sincronizarBiblioteca } from '../core/athenes_biblioteca_artigos.js';
+import { sincronizarTemplatesUsuario } from '../core/athenes_templates.js';
 import { sincronizarPerfil } from '../core/athenes_perfil_servidor.js';
 import * as repositorio from '../core/athenes_repositorio.js';
 import { montarEstadoLocal, zoteroLocalParaPerfil, chaveDoZotero } from '../core/athenes_perfil_local.js';
@@ -1431,6 +1432,7 @@ export class DashboardView {
     try {
       const pastasAntes = obterPastasDriveLocais();
       const r = await sincronizarPerfil(montarEstadoLocal(this.documentos));
+      sincronizarTemplatesUsuario().catch(e => console.warn('[Athenes] Modelos no servidor:', e.message));
       sincronizarBiblioteca().then(res => { if (res?.mudou) { this.renderizarPastasLateral(); this.renderizarBannerPasta(); } }).catch(e => console.warn('[Athenes] Biblioteca no servidor:', e.message));
       this._aplicandoPerfil = true;
       let mudou = false;

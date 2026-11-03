@@ -62,7 +62,7 @@ test('sincronizar: envia ao servidor, traz o que veio de outro computador e só 
   const r = await bib.sincronizarBiblioteca({ fetchImpl: srv.fetch });
   assert.equal(r.mudou, true); assert.equal(avisos, 1);
   assert.deepEqual(bib.obterArtigos().map(a => a.id).sort(), ['antigo', 'de_outro_pc']);
-  assert.deepEqual(srv.linha.valor.artigos.map(a => a.id).sort(), ['antigo', 'de_outro_pc'], 'o servidor passa a ter os dois');
+  assert.deepEqual(srv.linha.valor.itens.map(a => a.id).sort(), ['antigo', 'de_outro_pc'], 'o servidor passa a ter os dois');
   assert.equal(lerConta('athenes_estudo_artigos_v1'), null, 'a cópia antiga saiu do navegador depois de enviada');
   const gravacoes = srv.gravacoes;
   await bib.sincronizarBiblioteca({ fetchImpl: srv.fetch });

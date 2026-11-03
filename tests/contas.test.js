@@ -89,7 +89,7 @@ test('modelos do usuário também são por conta', () => {
   assert.equal(listarTemplatesUsuario(globalThis.localStorage).length, 1);
   definirContaAtiva({ nome: 'Fábio', email: 'fabio@uni.br' });
   assert.equal(listarTemplatesUsuario(globalThis.localStorage).length, 0);
-  assert.ok([...m.keys()].some(k => k.startsWith('athenes_templates_usuario::e:eva@uni.br')));
+  assert.ok(![...m.keys()].some(k => k.startsWith('athenes_templates_usuario::')), 'os modelos ficam na memória/servidor, não no navegador');
 });
 
 test('nuvem: o documento sai marcado com a conta e a listagem filtra pelo dono', async () => {

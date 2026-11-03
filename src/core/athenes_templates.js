@@ -10,6 +10,7 @@
  * Tudo aqui é puro (sem DOM); o armazenamento recebe o `Storage` por parâmetro.
  */
 import { chaveConta } from './athenes_conta.js';
+import { criarListaSincronizada } from './athenes_lista_sincronizada.js';
 import { criarDocumento, criarModelosPaginaPadrao, criarNovoBloco, criarSecao, gerarId } from './athenes_documento.js';
 import { criarEstilosPadrao } from './athenes_estilos.js';
 import { clonarComNovosIds } from './athenes_arquivos.js';
@@ -148,7 +149,19 @@ export function listarTemplatesNativos() {
 
 // ---------------------------------------------------------------- templates do usuário
 
+/**
+ * "Meus templates": no uso normal ficam na memória da sessão e sincronizam com o servidor (nada fica só no navegador); um
+ * `storage` explícito (testes) continua gravando nele. Os de versões antigas, que estavam no navegador, são enviados ao servidor
+ * e só então apagados daqui.
+ */
+const templatesDoUsuario = criarListaSincronizada({ chave: 'modelos_usuario', legados: ['athenes_templates_usuario'] });
+const usaServidor = (storage) => storage === globalThis.localStorage;
+export const sincronizarTemplatesUsuario = (opcoes) => templatesDoUsuario.sincronizar(opcoes);
+export const aoMudarTemplatesUsuario = (cb) => templatesDoUsuario.aoMudar(cb);
+export const reiniciarTemplatesUsuario = () => templatesDoUsuario.reiniciar();
+
 export function listarTemplatesUsuario(storage = globalThis.localStorage) {
+  if (usaServidor(storage)) return templatesDoUsuario.obter().filter(t => t?.config);
   try {
     const v = JSON.parse(storage?.getItem(chaveConta(CHAVE_TEMPLATES_USUARIO)) || '[]');
     return Array.isArray(v) ? v.filter(t => t?.config) : [];
@@ -156,6 +169,7 @@ export function listarTemplatesUsuario(storage = globalThis.localStorage) {
 }
 
 function gravar(lista, storage) {
+  if (usaServidor(storage)) { templatesDoUsuario.definir(lista); return; }
   storage.setItem(chaveConta(CHAVE_TEMPLATES_USUARIO), JSON.stringify(lista));
 }
 
