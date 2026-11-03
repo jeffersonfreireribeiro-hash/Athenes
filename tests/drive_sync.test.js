@@ -126,3 +126,22 @@ test('falhas não são silenciosas: pasta com erro vira relatório, filhos esper
   const r3 = await sincronizarDocumentosComDrive([criarDocumento({ titulo: 'A' })], 'tk', { fetchImpl: exp.fetchImpl, pastas: arvore() });
   assert.equal(r3.sessaoExpirada, true); assert.equal(r3.enviados, 0);
 });
+
+test('token: vale até a data gravada; vencido é renovado em silêncio (uma renovação para várias chamadas) e sem conexão devolve null', async () => {
+  const { tokenDriveValido, obterTokenDrive } = await import('../src/core/athenes_drive_sync.js');
+  const agora = 1_000_000;
+  assert.equal(tokenDriveValido({ accessToken: 'a', accessTokenExpiraEm: agora + 5000 }, agora), true);
+  assert.equal(tokenDriveValido({ accessToken: 'a', accessTokenExpiraEm: agora - 1 }, agora), false);
+  assert.equal(tokenDriveValido({ accessToken: 'a' }, agora), true, 'token antigo sem data continua valendo');
+  assert.equal(tokenDriveValido({ accessToken: '' }, agora), false);
+
+  assert.equal(await obterTokenDrive({ cfg: { accessToken: 'ok', accessTokenExpiraEm: agora + 1 }, agora, renovar: async () => { throw new Error('não deveria renovar'); } }), 'ok');
+  assert.equal(await obterTokenDrive({ cfg: {}, agora, renovar: async () => 'x' }), null, 'nunca conectou: não abre janela sozinho');
+
+  let chamadas = 0;
+  const vencido = { accessToken: 'velho', accessTokenExpiraEm: agora - 10 };
+  const renovar = async () => { chamadas++; await new Promise(r => setTimeout(r, 10)); return 'novo'; };
+  const [a, b] = await Promise.all([obterTokenDrive({ cfg: vencido, agora, renovar }), obterTokenDrive({ cfg: vencido, agora, renovar })]);
+  assert.deepEqual([a, b, chamadas], ['novo', 'novo', 1]);
+  assert.equal(await obterTokenDrive({ cfg: vencido, agora, renovar: async () => { throw new Error('popup bloqueado'); } }), null, 'falha na renovação = pedir reconexão, sem lançar');
+});

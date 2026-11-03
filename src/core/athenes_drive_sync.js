@@ -34,6 +34,25 @@ async function chamar(fetchImpl, url, opcoes, token) {
 
 export const driveConectado = () => Boolean(obterConfigGoogleDrive().accessToken);
 
+/** O token guardado ainda vale (com a margem de segurança gravada na autenticação)? Sem data de validade (token antigo), vale. */
+export function tokenDriveValido(cfg = obterConfigGoogleDrive(), agora = Date.now()) {
+  return Boolean(cfg.accessToken) && (!cfg.accessTokenExpiraEm || cfg.accessTokenExpiraEm > agora);
+}
+
+let renovacaoEmCurso = null;
+
+/**
+ * Token do Drive utilizável agora: o guardado, se ainda vale; senão tenta renová-lo em silêncio (sem janela, sem consentimento).
+ * Devolve null quando não dá (o usuário precisa reconectar). `renovar` é injetável para teste.
+ */
+export async function obterTokenDrive({ renovar = null, cfg = obterConfigGoogleDrive(), agora = Date.now() } = {}) {
+  if (tokenDriveValido(cfg, agora)) return cfg.accessToken;
+  if (!cfg.accessToken && !cfg.accessTokenExpiraEm) return null; // nunca conectou
+  const tentar = renovar || (async () => (await import('./athenes_colaboracao.js')).autenticarGoogleDrive(cfg.clientId, undefined, { silencioso: true }));
+  renovacaoEmCurso = renovacaoEmCurso || Promise.resolve().then(tentar).catch(() => null).finally(() => { renovacaoEmCurso = null; });
+  return renovacaoEmCurso;
+}
+
 /** Procura a pasta pelo nome dentro do pai; cria quando não existe. */
 export async function buscarOuCriarPasta(token, nome, paiId, fetchImpl = globalThis.fetch) {
   const q = `trashed = false and mimeType = 'application/vnd.google-apps.folder' and name = '${aspas(nome)}'${paiId ? ` and '${aspas(paiId)}' in parents` : ''}`;

@@ -673,7 +673,7 @@ export function extrairIdPastaDrive(urlOuId) {
 /** Ids da estrutura criada no Drive (antes eram descartados ao salvar a configuração e a estrutura se perdia). */
 function idsEstruturaDrive(o) {
   const r = {};
-  for (const k of ['pastaRaizId', 'pastaDocumentosId', 'pastaZoteroId', 'pastaRelatoriosId']) if (o?.[k]) r[k] = o[k];
+  for (const k of ['pastaRaizId', 'pastaDocumentosId', 'pastaZoteroId', 'pastaRelatoriosId', 'accessTokenExpiraEm', 'ultimaSincronizacao', 'emailConectado']) if (o?.[k]) r[k] = o[k];
   return r;
 }
 
@@ -727,7 +727,7 @@ export function salvarConfigGoogleDrive(cfg) {
 /**
  * Solicita autenticação OAuth2 do Google Identity Services com escopo restrito `drive.file`.
  */
-export async function autenticarGoogleDrive(clientId = DEFAULT_GOOGLE_CLIENT_ID, scope = GOOGLE_AUTH_ESCOPOS) {
+export async function autenticarGoogleDrive(clientId = DEFAULT_GOOGLE_CLIENT_ID, scope = GOOGLE_AUTH_ESCOPOS, { silencioso = false } = {}) {
   if (typeof window === 'undefined') throw new Error('Autenticação Google requer navegador.');
   const cid = (clientId || obterConfigGoogleDrive().clientId || DEFAULT_GOOGLE_CLIENT_ID).trim();
   if (!cid) throw new Error('Informe o Google Client ID para conectar ao Google Drive.');
@@ -748,11 +748,15 @@ export async function autenticarGoogleDrive(clientId = DEFAULT_GOOGLE_CLIENT_ID,
             return;
           }
           const cfgAtual = obterConfigGoogleDrive();
-          salvarConfigGoogleDrive({ ...cfgAtual, clientId: cid, accessToken: resp.access_token });
+          // o token do Google dura ~1 h: guardar quando vence permite renová-lo antes de falhar (margem de 2 min)
+          const expiraEm = Date.now() + Math.max(60, Number(resp.expires_in) || 3600) * 1000 - 120000;
+          salvarConfigGoogleDrive({ ...cfgAtual, clientId: cid, accessToken: resp.access_token, accessTokenExpiraEm: expiraEm });
           resolve(resp.access_token);
-        }
+        },
+        error_callback: (err) => reject(new Error(err?.message || err?.type || 'Autorização do Google cancelada ou bloqueada.'))
       });
-      tokenClient.requestAccessToken({ prompt: 'consent' });
+      // '' = o Google só mostra a tela de consentimento na primeira vez (antes aparecia a cada conexão); na renovação silenciosa não abre nada
+      tokenClient.requestAccessToken({ prompt: '' });
     } catch (err) {
       reject(err);
     }

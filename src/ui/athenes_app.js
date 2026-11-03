@@ -17,7 +17,7 @@ import { PainelExportarModal } from './athenes_painel_exportar.js';
 import { ReguasController } from './athenes_reguas.js';
 
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
-import { driveConectado, enviarDocumentoAoDrive, marcarSessaoDriveExpirada } from '../core/athenes_drive_sync.js';
+import { driveConectado, enviarDocumentoAoDrive, marcarSessaoDriveExpirada, obterTokenDrive } from '../core/athenes_drive_sync.js';
 import { obterConfigGoogleDrive } from '../core/athenes_colaboracao.js';
 
 export class AthenesApp {
@@ -275,7 +275,13 @@ export class AthenesApp {
     clearTimeout(this._tDrive);
     this._tDrive = setTimeout(async () => {
       try {
-        await enviarDocumentoAoDrive(doc, obterConfigGoogleDrive().accessToken);
+        const token = await obterTokenDrive();
+        if (!token) {
+          if (!this._avisouReconectar) { this._avisouReconectar = true; mostrarAviso('A conexão com o Google Drive venceu. Abra a página inicial e clique em "Conectar Drive" para voltar a enviar os documentos.', { tipo: 'info' }); }
+          return;
+        }
+        this._avisouReconectar = false;
+        await enviarDocumentoAoDrive(doc, token);
         this.autoSalvar({ semDrive: true }); // grava driveFileId/driveFolderId sem reagendar nem mudar dataModificacao
       } catch (e) {
         if (e.sessaoExpirada) marcarSessaoDriveExpirada();

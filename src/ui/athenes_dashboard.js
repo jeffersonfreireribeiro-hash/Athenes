@@ -38,7 +38,7 @@ import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
-import { driveConectado, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada } from '../core/athenes_drive_sync.js';
+import { driveConectado, tokenDriveValido, obterTokenDrive, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -229,10 +229,11 @@ export class DashboardView {
               ${svgIcone('drive', 16)}
               <strong style="font-size:12px; color:#314F79; letter-spacing:0.03em; text-transform:uppercase;">Pastas do Drive</strong>
             </div>
-            <button type="button" class="ath-btn ath-btn-xs" id="athBtnRecarregarPastasDrive" title="Recarregar árvore de pastas do Drive" style="padding:2px 7px; height:24px; font-size:11px;">
+            <button type="button" class="ath-btn ath-btn-xs" id="athBtnRecarregarPastasDrive" title="Sincronizar agora: cria as pastas e envia os documentos pendentes ao Drive" style="padding:2px 7px; height:24px; font-size:11px;">
               ↻
             </button>
           </div>
+          <button type="button" id="athDriveStatus" class="ath-btn ath-btn-xs" style="margin:6px 10px 0; width:calc(100% - 20px); justify-content:flex-start; gap:6px; font-size:11px; font-weight:700; height:auto; padding:5px 8px; text-align:left; white-space:normal;"></button>
 
           <div class="ath-dash-pastas-lista" id="athDashPastasLista">
             <!-- Preenchido por this.renderizarPastasLateral() -->
@@ -382,6 +383,8 @@ export class DashboardView {
       this.abrirModalVincularPasta();
     });
 
+    root.querySelector('#athDriveStatus')?.addEventListener('click', () => this.conectarDrive());
+    this.atualizarStatusDrive();
     root.querySelector('#athBtnRecarregarPastasDrive')?.addEventListener('click', async () => {
       const btn = root.querySelector('#athBtnRecarregarPastasDrive');
       if (btn) btn.textContent = '...';
@@ -992,6 +995,39 @@ export class DashboardView {
     });
   }
 
+  /** Indicador na barra lateral: conectado (com a última sincronização), conexão vencida ou desconectado; clicar conecta/renova. */
+  atualizarStatusDrive() {
+    const el = this.container.querySelector('#athDriveStatus');
+    if (!el) return;
+    const cfg = obterConfigGoogleDrive();
+    let cor = '#64748B', fundo = '#F1F5F9', texto;
+    if (cfg.accessToken && tokenDriveValido(cfg)) {
+      const quando = cfg.ultimaSincronizacao ? new Date(cfg.ultimaSincronizacao).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'ainda não sincronizado';
+      cor = '#166534'; fundo = '#DCFCE7'; texto = `● Drive conectado · ${quando}`;
+    } else if (cfg.accessToken || cfg.accessTokenExpiraEm) {
+      cor = '#92400E'; fundo = '#FEF3C7'; texto = '● Conexão vencida — clique para renovar';
+    } else {
+      texto = '○ Drive desconectado — clique para conectar';
+    }
+    el.textContent = texto;
+    el.style.color = cor;
+    el.style.background = fundo;
+  }
+
+  /** Conecta (ou renova) o Drive com um clique e já sincroniza pastas e documentos. */
+  async conectarDrive() {
+    const btn = this.container.querySelector('#athDriveStatus');
+    if (btn) btn.textContent = '… conectando';
+    try {
+      const cfg = obterConfigGoogleDrive();
+      const token = (await obterTokenDrive()) || await autenticarGoogleDrive(cfg.clientId);
+      if (token) await this.sincronizarComDrive({ aviso: true });
+    } catch (err) {
+      mostrarAviso(`Não foi possível conectar ao Google Drive: ${err.message}`);
+    }
+    this.atualizarStatusDrive();
+  }
+
   /**
    * Cria no Google Drive as pastas que só existem aqui e envia os documentos pendentes (cada um na pasta dele).
    * `aviso` mostra o resultado mesmo quando deu certo; erros sempre aparecem.
@@ -1001,11 +1037,18 @@ export class DashboardView {
       if (aviso) mostrarAviso('Conecte o Google Drive para criar as pastas e enviar os documentos (menu da nuvem no editor ou tela de login).', { tipo: 'info' });
       return null;
     }
-    const token = obterConfigGoogleDrive().accessToken;
+    const token = await obterTokenDrive(); // renova em silêncio se o token venceu
+    if (!token) {
+      this.atualizarStatusDrive();
+      if (aviso) mostrarAviso('A conexão com o Google Drive venceu. Clique em "Conectar Drive" na barra lateral para renová-la.', { tipo: 'info' });
+      return null;
+    }
     const pastas = obterPastasDriveLocais();
     const rp = await sincronizarPastasComDrive(token, { pastas });
     const rd = docs && !rp.sessaoExpirada ? await sincronizarDocumentosComDrive(this.documentos, token, { pastas }) : { enviados: 0, erros: [], sessaoExpirada: false };
     this.salvarDocumentosLocais();
+    if (!rp.sessaoExpirada && !rd.sessaoExpirada) salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), ultimaSincronizacao: new Date().toISOString() });
+    this.atualizarStatusDrive();
     if (rp.sessaoExpirada || rd.sessaoExpirada) {
       marcarSessaoDriveExpirada();
       mostrarAviso('A sessão do Google Drive expirou. Reconecte o Drive e tente de novo.');
