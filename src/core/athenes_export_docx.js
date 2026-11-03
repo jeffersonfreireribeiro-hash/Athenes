@@ -9,7 +9,7 @@ import { ZipBuilder } from './zip_builder.js';
 import { MM_PARA_DXA, dimensoesPapelMm } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
 import { ancoraDaReferencia, nomeMarcadorWord, referenciaDoBlocoCitacao } from './athenes_citacao.js';
-import { mapaMarcadores, chaveMarcador } from './athenes_marcadores.js';
+import { mapaMarcadores, chaveMarcador, configListaDoBloco, segmentosDeLista } from './athenes_marcadores.js';
 import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
 import { resolverAreasPagina, normalizarNumeracao, normalizarArea, estiloEfetivoNumeracao } from './athenes_paginacao.js';
@@ -771,7 +771,20 @@ export async function exportarParaDocx(documento) {
         const spacingXml = `<w:spacing w:line="${linha}" w:lineRule="${regraLinha ? (tipoLinha === 'exatamente' ? 'exact' : 'atLeast') : 'auto'}" w:before="${antes}" w:after="${depois}"/>`;
 
         if (capitularXml) bodyXmlParts.push(capitularXml);
-        bodyXmlParts.push(`<w:p><w:pPr>${decoXml}${indXml}<w:jc w:val="${jcVal}"/>${spacingXml}</w:pPr>${mkP?.run || ''}${runs.join('')}</w:p>`);
+        if (/<(ul|ol)[\s>]/i.test(String(textoPar))) {
+          // linhas marcadas: um parágrafo por item, com o rótulo e o recuo suspenso; o texto fora das listas segue normal
+          const cfgL = configListaDoBloco(b, estAv);
+          const indL = Math.round((cfgL.nivel - 1) * 6 * TWIP_MM), tabL = Math.round(cfgL.tabMm * TWIP_MM);
+          const inicioL = marcadores.get(chaveMarcador(b))?.numero || 1;
+          for (const sg of segmentosDeLista(textoPar, cfgL, inicioL)) {
+            const runsSg = htmlParaRunsDocx(sg.html);
+            const indSg = sg.tipo === 'item' ? `<w:ind w:left="${indL + tabL}" w:hanging="${tabL}"${recuoDir}/>` : indXml;
+            const rotuloSg = sg.tipo === 'item' ? `<w:r><w:t xml:space="preserve">${escaparXml(sg.rotulo)}</w:t></w:r><w:r><w:tab/></w:r>` : '';
+            bodyXmlParts.push(`<w:p><w:pPr>${decoXml}${indSg}<w:jc w:val="${jcVal}"/>${spacingXml}</w:pPr>${rotuloSg}${runsSg.join('')}</w:p>`);
+          }
+        } else {
+          bodyXmlParts.push(`<w:p><w:pPr>${decoXml}${indXml}<w:jc w:val="${jcVal}"/>${spacingXml}</w:pPr>${mkP?.run || ''}${runs.join('')}</w:p>`);
+        }
       } else if (b.tipo === 'citacao') {
         const refTexto = ` ${referenciaDoBlocoCitacao(b).html}`;
         const textoCompleto = `${b.texto || ''}${refTexto}`;

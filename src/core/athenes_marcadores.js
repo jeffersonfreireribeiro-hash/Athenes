@@ -132,3 +132,51 @@ export function sanearCamposMarcador(estilo) {
   if (novo.marcador_alinhamento !== undefined && !ALINHAMENTOS.has(novo.marcador_alinhamento)) delete novo.marcador_alinhamento;
   return novo;
 }
+
+/** Configuração de aparência (nível, tabulação, alinhamento, numeração) para listas escritas no texto do bloco. */
+export function configListaDoBloco(bloco, estilo, padrao = {}) {
+  const ef = marcadorEfetivo(bloco, estilo);
+  const alin = bloco?.marcador_alinhamento ?? estilo?.marcador_alinhamento ?? 'left';
+  return {
+    tipo: ef?.tipo || padrao.tipo || 'circulo',
+    estiloNum: ef?.estiloNum || bloco?.marcador_estilo_num || estilo?.marcador_estilo_num || 'decimal',
+    separador: ef?.separador || bloco?.marcador_separador || estilo?.marcador_separador || 'ponto',
+    nivel: inteiro(bloco?.marcador_nivel ?? estilo?.marcador_nivel, 1, 5, 1),
+    tabMm: Math.max(3, parseFloat(bloco?.marcador_tab_mm ?? estilo?.marcador_tab_mm) || 7),
+    alinhamento: ALINHAMENTOS.has(alin) ? alin : 'left'
+  };
+}
+
+const attr = (atributos, nome) => new RegExp(`${nome}="([^"]*)"`, 'i').exec(atributos)?.[1];
+
+/**
+ * Quebra o HTML de um bloco que tem listas (<ul>/<ol>, uma por linha marcada com Enter) em segmentos: o texto fora das listas e
+ * um item por <li>, já com o rótulo (cada lista pode ter o seu tipo; numeradas contam a partir de `numeroInicial`).
+ * Serve ao PDF e ao Word, que não têm o CSS de listas do editor.
+ */
+export function segmentosDeLista(html, cfg, numeroInicial = 1) {
+  const segmentos = [];
+  const texto = String(html ?? '');
+  const re = /<(ul|ol)([^>]*)>([\s\S]*?)<\/\1>/gi;
+  let ultimo = 0;
+  let m;
+  const plano = (t) => { if (t.replace(/<br\s*\/?>|&nbsp;|\s/gi, '')) segmentos.push({ tipo: 'texto', html: t }); };
+  while ((m = re.exec(texto))) {
+    plano(texto.slice(ultimo, m.index));
+    ultimo = m.index + m[0].length;
+    const numerada = m[1].toLowerCase() === 'ol';
+    const itensCfg = {
+      ...cfg,
+      tipo: numerada ? 'numero' : (attr(m[2], 'data-marcador') || (cfg.tipo !== 'numero' ? cfg.tipo : 'circulo')),
+      estiloNum: attr(m[2], 'data-num-estilo') || cfg.estiloNum,
+      separador: attr(m[2], 'data-num-sep') || cfg.separador
+    };
+    let n = numerada ? numeroInicial : 1;
+    for (const li of m[3].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)) {
+      segmentos.push({ tipo: 'item', html: li[1], cfg: itensCfg, rotulo: rotuloMarcador(itensCfg, n) });
+      if (numerada) n += 1;
+    }
+  }
+  plano(texto.slice(ultimo));
+  return segmentos;
+}

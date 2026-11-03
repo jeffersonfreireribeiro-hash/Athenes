@@ -13,7 +13,7 @@ import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssTipografia, estiloParaCssNumeracao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
 import { ancoraDaReferencia, referenciaDoBlocoCitacao } from './athenes_citacao.js';
-import { mapaMarcadores, chaveMarcador } from './athenes_marcadores.js';
+import { mapaMarcadores, chaveMarcador, configListaDoBloco, segmentosDeLista } from './athenes_marcadores.js';
 import { hifenizarHtml } from './athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais } from './athenes_estilo_avancado.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
@@ -167,7 +167,17 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
     case 'paragrafo': {
       const av = classesAvancadasDoBloco(est, bloco._frag);
       const texto = av && !bloco._frag?.continuaDaAnterior ? aplicarPalavrasIniciais(textoFormatado, est) : textoFormatado;
-      const mk = /<(ul|ol)[\s>]/i.test(texto) ? { estilo: '', html: '' } : marcadorDoBlocoPdf(bloco, opcoes); // lista escrita à mão já tem o seu marcador
+      if (/<(ul|ol)[\s>]/i.test(texto)) {
+        // linhas marcadas (uma lista por linha com Enter): cada item sai com o seu marcador; o texto fora das listas segue normal
+        const cfg = configListaDoBloco(bloco, est);
+        const ind = (cfg.nivel - 1) * 6;
+        const inicio = opcoes.marcadores?.get(chaveMarcador(bloco))?.numero || 1;
+        const partes = segmentosDeLista(texto, cfg, inicio).map(sg => sg.tipo === 'texto'
+          ? `<div>${sg.html}</div>`
+          : `<div style="position:relative;padding-left:${ind + cfg.tabMm}mm;text-indent:0;"><span class="ath-marc" style="position:absolute;left:${ind}mm;width:${cfg.tabMm - 1.5}mm;text-align:${cfg.alinhamento};white-space:nowrap;">${escaparHtml(sg.rotulo)}</span>${sg.html}</div>`).join('');
+        return `<div class="ath-bloco ath-paragrafo${av ? ' ' + av : ''}" style="${estiloCss}" data-id="${bloco.id}">${partes}</div>`;
+      }
+      const mk = marcadorDoBlocoPdf(bloco, opcoes);
       return `<p class="ath-bloco ath-paragrafo${av ? ' ' + av : ''}" style="${estiloCss}${mk.estilo}" data-id="${bloco.id}">${mk.html}${texto}</p>`;
     }
 

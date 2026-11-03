@@ -3594,6 +3594,46 @@ export class EditorView {
     this.renderizarFolhasPaginas();
   }
 
+  /**
+   * Marcador/numeração só nas linhas selecionadas (cada linha criada com Enter vira um item, como no Word): usa a lista nativa
+   * do navegador sobre a seleção. Devolve false quando não há seleção dentro do texto do bloco (aí vale o marcador do bloco inteiro).
+   */
+  aplicarMarcadorNasLinhas(b, tipo, barra) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return false;
+    const range = sel.getRangeAt(0);
+    const no = range.commonAncestorContainer;
+    const editavel = (no.nodeType === 1 ? no : no.parentElement)?.closest?.('.ath-texto-editable');
+    if (!editavel || !this.container?.contains(editavel)) return false;
+    const idBloco = editavel.closest('[data-bloco-id]')?.dataset.blocoId;
+    if (idBloco && idBloco !== b.id) return false;
+
+    const comando = tipo === 'numero' ? 'insertOrderedList' : 'insertUnorderedList';
+    const listaAtual = (no.nodeType === 1 ? no : no.parentElement)?.closest?.('ul, ol');
+    if (tipo === 'nenhum') {
+      if (!listaAtual && !range.cloneContents().querySelector?.('li')) return true; // nada marcado na seleção
+      document.execCommand(listaAtual?.tagName === 'OL' ? 'insertOrderedList' : 'insertUnorderedList', false, null); // repetir tira a lista das linhas
+    } else {
+      document.execCommand(comando, false, null);
+      const estiloNum = barra.querySelector('#athCtxNumEstilo')?.value || b.marcador_estilo_num || 'decimal';
+      const separador = barra.querySelector('#athCtxNumSep')?.value || b.marcador_separador || 'ponto';
+      const fim = window.getSelection().rangeCount ? window.getSelection().getRangeAt(0) : range;
+      editavel.querySelectorAll('ul, ol').forEach(lista => {
+        if (!fim.intersectsNode(lista)) return;
+        if (lista.tagName === 'OL') { lista.dataset.numEstilo = estiloNum; lista.dataset.numSep = separador; }
+        else lista.dataset.marcador = tipo;
+        lista.dataset.marcLocal = '1'; // este tipo é só das linhas escolhidas
+      });
+      if (tipo === 'numero') { b.marcador_estilo_num = estiloNum; b.marcador_separador = separador; }
+    }
+    b.texto = removerPalavrasIniciais(editavel.innerHTML);
+    if (b.marcador_tipo && b.marcador_tipo !== 'nenhum' && /<(ul|ol)[\s>]/i.test(b.texto)) b.marcador_tipo = 'nenhum'; // o texto já traz as listas: não embrulhar o bloco todo de novo
+    this.notificarMudanca();
+    this.renderizar();
+    this.onSelecionarBloco(b, null);
+    return true;
+  }
+
   /** Estilo de texto do bloco (título: o do nível). */
   estiloDoBloco(b) {
     const porId = Object.fromEntries((this.doc.estilos || []).map(e => [e.id, e]));
@@ -3833,11 +3873,13 @@ export class EditorView {
     const inicio = marc?.numero ?? Math.max(1, parseInt(b.marcador_inicio, 10) || 1);
 
     listas.forEach(lista => {
+      const local = lista.dataset.marcLocal === '1'; // lista só de algumas linhas: guarda o próprio tipo e conta desde 1
       lista.classList.add('ath-lista-config');
       lista.style.setProperty('--ath-list-tab', `${tabMm}mm`);
       lista.style.setProperty('--ath-list-indent', `${indentMm}mm`);
       lista.style.setProperty('--ath-list-align', align);
-      lista.style.setProperty('--ath-list-counter-start', String(inicio - 1));
+      lista.style.setProperty('--ath-list-counter-start', String(local ? 0 : inicio - 1));
+      if (local) return;
 
       if (lista.tagName.toLowerCase() === 'ol') {
         lista.dataset.numEstilo = cfg?.estiloNum ?? (b.marcador_estilo_num || 'decimal');
@@ -4112,6 +4154,7 @@ export class EditorView {
     const aplicarMarcadorNoBlocoSelecionado = (tipo) => {
       const b = this.blocoSelecionado;
       if (!b) return;
+      if (b.tipo !== 'titulo' && b.tipo !== 'subtitulo' && this.aplicarMarcadorNasLinhas(b, tipo, barra)) return;
       if (tipo === 'nenhum') {
         if (marcadorEfetivo({}, this.estiloDoBloco(b))) b.marcador_tipo = 'nenhum'; // o estilo tem marcador: este bloco o desliga
         else delete b.marcador_tipo;

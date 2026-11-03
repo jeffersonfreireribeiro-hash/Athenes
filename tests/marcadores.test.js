@@ -79,3 +79,25 @@ test('pacote de tema: campos de marcador saneados', () => {
   assert.equal(ok.marcador_alinhamento, undefined);
   assert.equal(sanearCamposMarcador({ id: 'b', marcador_tipo: 'lixo', marcador_nivel: 2 }).marcador_nivel, undefined);
 });
+
+test('linhas marcadas com Enter: cada item tem o seu rótulo, listas têm tipo próprio e o texto solto continua normal', async () => {
+  const { segmentosDeLista, configListaDoBloco } = await import('../src/core/athenes_marcadores.js');
+  const cfg = configListaDoBloco({}, {});
+  const html = 'Intro<ul data-marcador="traco"><li>um</li><li>dois</li></ul>meio<ol data-num-estilo="lower_alpha" data-num-sep="parentese"><li>x</li><li>y</li></ol>';
+  const seg = segmentosDeLista(html, cfg, 1);
+  assert.deepEqual(seg.map(s => s.tipo === 'item' ? s.rotulo : s.html), ['Intro', '–', '–', 'meio', 'a)', 'b)']);
+  assert.equal(segmentosDeLista('<ol><li>a</li></ol>', cfg, 4)[0].rotulo, '4.');
+});
+
+test('PDF e Word: bloco com linhas marcadas não vira <ul> dentro de <p> e sai um item por linha', async () => {
+  const { doc, p1 } = docComMarcadores();
+  delete p1.marcador_tipo;
+  p1.texto = 'Antes<ul><li>linha um</li><li>linha dois</li></ul>';
+  repaginarDocumento(doc);
+  const html = gerarDocumentoHtmlPdf(doc).replace(/­/g, ''); // sem os hífens opcionais
+  assert.match(html, /<span class="ath-marc"[^>]*>•<\/span>linha um/);
+  assert.match(html, /<span class="ath-marc"[^>]*>•<\/span>linha dois/);
+  assert.ok(!/<p[^>]*data-id="[^"]*"[^>]*>Antes<ul/.test(html));
+  const docx = await exportarParaDocx(doc);
+  assert.ok(docx.length > 1000);
+});
