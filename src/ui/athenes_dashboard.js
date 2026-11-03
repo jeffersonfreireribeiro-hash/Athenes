@@ -72,7 +72,8 @@ export class DashboardView {
     try {
       if (!this.perfilUsuario?.autenticadoGoogle || nuvemAutenticada() || sessionStorage.getItem('athenes_nuvem_adiada')) return;
       await entrarNaNuvemComGoogle();
-    } catch (_) {
+    } catch (err) {
+      console.warn('[Athenes] Nuvem protegida não confirmada:', err.message);
       try { sessionStorage.setItem('athenes_nuvem_adiada', '1'); } catch (__) {}
     }
   }
@@ -473,6 +474,10 @@ export class DashboardView {
               </div>
               <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnModalDesconectarGoogle" style="font-size:11px; padding:3px 10px; color:#DC2626; font-weight:750; border:1px solid #FCA5A5; background:#FFF1F2; cursor:pointer;" title="Desconectar e voltar ao login">Desconectar / Sair</button>
             </div>
+            <div id="athBoxNuvemSegura" style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-radius:10px; margin:-6px 0 14px; border:1px solid ${nuvemAutenticada() ? '#BBF7D0' : '#FDE68A'}; background:${nuvemAutenticada() ? '#F0FDF4' : '#FFFBEB'};">
+              <span style="font-size:11.5px; color:${nuvemAutenticada() ? '#166534' : '#92400E'}; line-height:1.35;"><strong>Nuvem protegida:</strong> <span id="athTxtNuvemSegura">${nuvemAutenticada() ? 'conta confirmada, só você acessa seus documentos.' : 'ainda não confirmada. Confirme a conta Google para salvar na nuvem.'}</span></span>
+              ${nuvemAutenticada() ? '' : '<button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnConfirmarNuvem" style="font-size:11px; padding:3px 10px; font-weight:750; white-space:nowrap; cursor:pointer;">Confirmar agora</button>'}
+            </div>
           ` : `
             <button type="button" class="glx-btn glx-btn-primary" id="athBtnModalLoginGoogle" style="width:100%; height:38px; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:700; margin-bottom:14px; background:#FFFFFF; color:#1F2937; border:1px solid #CBD5E1; box-shadow:0 1px 3px rgba(0,0,0,0.08); font-size:12.5px; border-radius:8px; cursor:pointer;">
               ${svgIcone('google', 16)} Entrar com a Conta Google (Gmail)
@@ -620,6 +625,21 @@ export class DashboardView {
       encerrarSessao();
       if (typeof this.onLogout === 'function') {
         this.onLogout();
+      }
+    });
+
+    modal.querySelector('#athBtnConfirmarNuvem')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget; const txt = modal.querySelector('#athTxtNuvemSegura');
+      btn.disabled = true;
+      try {
+        await entrarNaNuvemComGoogle();
+        try { sessionStorage.removeItem('athenes_nuvem_adiada'); } catch (_) {}
+        txt.textContent = 'conta confirmada, só você acessa seus documentos.';
+        modal.querySelector('#athBoxNuvemSegura').style.cssText += 'border-color:#BBF7D0; background:#F0FDF4;';
+        btn.remove();
+      } catch (err) {
+        txt.textContent = `não foi possível confirmar: ${err.message}`;
+        btn.disabled = false;
       }
     });
 
