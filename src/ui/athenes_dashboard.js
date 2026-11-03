@@ -36,7 +36,8 @@ import {
   extrairIdPastaDrive
 } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
-import { EstudoArtigosView, carregarArtigosEstudo } from './athenes_estudo_artigos.js';
+import { EstudoArtigosView, carregarArtigosEstudo, salvarArtigosEstudo } from './athenes_estudo_artigos.js';
+import { sincronizarBiblioteca } from '../core/athenes_biblioteca_artigos.js';
 import { sincronizarPerfil } from '../core/athenes_perfil_servidor.js';
 import * as repositorio from '../core/athenes_repositorio.js';
 import { montarEstadoLocal, zoteroLocalParaPerfil, chaveDoZotero } from '../core/athenes_perfil_local.js';
@@ -1430,6 +1431,7 @@ export class DashboardView {
     try {
       const pastasAntes = obterPastasDriveLocais();
       const r = await sincronizarPerfil(montarEstadoLocal(this.documentos));
+      sincronizarBiblioteca().then(res => { if (res?.mudou) { this.renderizarPastasLateral(); this.renderizarBannerPasta(); } }).catch(e => console.warn('[Athenes] Biblioteca no servidor:', e.message));
       this._aplicandoPerfil = true;
       let mudou = false;
 
@@ -1663,7 +1665,7 @@ export class DashboardView {
     let zoteroCfg = {};
     let perfil = {};
     try {
-      artigosEstudo = JSON.parse(lerConta('athenes_artigos_estudo') || '[]');
+      artigosEstudo = carregarArtigosEstudo().map(({ pdfBlobUrl, ...resto }) => resto);
       zoteroCfg = JSON.parse(lerConta('athenes_zotero_cfg') || '{}');
       perfil = JSON.parse(localStorage.getItem('athenes_perfil_colaborador') || '{}');
     } catch (_) {}
@@ -1708,13 +1710,13 @@ export class DashboardView {
 
         if (Array.isArray(dados.artigosEstudo)) {
           try {
-            const atuais = JSON.parse(lerConta('athenes_artigos_estudo') || '[]');
+            const atuais = [...carregarArtigosEstudo()];
             for (const art of dados.artigosEstudo) {
               const idx = atuais.findIndex(a => String(a.id) === String(art.id));
               if (idx >= 0) atuais[idx] = art;
               else atuais.push(art);
             }
-            gravarConta('athenes_artigos_estudo', JSON.stringify(atuais));
+            salvarArtigosEstudo(atuais); // vai para o servidor
           } catch (_) {}
         }
 

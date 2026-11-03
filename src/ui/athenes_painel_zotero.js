@@ -7,6 +7,7 @@
 
 import { lerConta, gravarConta } from '../core/athenes_conta.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
+import * as bib from '../core/athenes_biblioteca_artigos.js';
 import { svgIcone } from './athenes_icones.js';
 
 export function classificarTipoRef(ref) {
@@ -227,9 +228,8 @@ export class PainelZotero {
     (this.doc.referencias || []).forEach(r => refsMap.set(r.id || r.chaveZotero, r));
 
     try {
-      const salvoEstudo = lerConta('athenes_estudo_artigos');
-      if (salvoEstudo) {
-        const artigosEstudo = JSON.parse(salvoEstudo);
+      const artigosEstudo = bib.obterArtigos(); // biblioteca da sessão (servidor), não o navegador
+      {
         if (Array.isArray(artigosEstudo)) {
           for (const a of artigosEstudo) {
             const chave = a.id || a.zoteroKey;

@@ -17,8 +17,10 @@
  */
 
 import { lerConta, gravarConta } from '../core/athenes_conta.js';
-import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive } from '../core/athenes_drive_sync.js';
+import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive, obterPastaRaizDrive, buscarOuCriarPasta } from '../core/athenes_drive_sync.js';
+import { mostrarAviso } from './athenes_aviso.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
+import * as bib from '../core/athenes_biblioteca_artigos.js';
 import {
   obterPerfilColaborador,
   obterConfigGoogleDrive,
@@ -271,11 +273,13 @@ function carregarPdfJs() {
 }
 
 /* ==========================================================================
-   PDFs LOCAIS PERSISTENTES (IndexedDB) + DOWNLOAD DO GOOGLE DRIVE
-   O PDF nunca vai para o Zotero: fica no computador (IndexedDB) ou no Drive.
+   PDFs: ficam no GOOGLE DRIVE da pessoa (nunca só no computador, nunca no Zotero)
+   Na sessão o PDF é aberto a partir de uma URL em memória; ao escolher um arquivo ele sobe para o Drive e o artigo guarda o
+   `driveFileId`. O IndexedDB de versões antigas só é lido para MOVER o que ficou só neste computador para o Drive.
    ========================================================================== */
 const IDB_NOME = 'athenes_pdfs_v1';
 const IDB_STORE = 'pdfs';
+const PASTA_PDFS_DRIVE = 'Bibliografia_PDFs';
 
 function abrirIdbPdfs() {
   return new Promise((resolve, reject) => {
@@ -287,18 +291,7 @@ function abrirIdbPdfs() {
   });
 }
 
-async function salvarPdfLocal(artId, blob) {
-  try {
-    const db = await abrirIdbPdfs();
-    await new Promise((res, rej) => {
-      const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).put(blob, String(artId));
-      tx.oncomplete = res;
-      tx.onerror = () => rej(tx.error);
-    });
-  } catch (_) {}
-}
-
+/** (só legado) PDF que uma versão antiga deixou neste computador. */
 async function obterPdfLocal(artId) {
   try {
     const db = await abrirIdbPdfs();
@@ -312,13 +305,47 @@ async function obterPdfLocal(artId) {
   }
 }
 
-/** Registra um arquivo PDF escolhido no computador: gera URL e guarda para reabrir depois. */
+async function removerPdfLocal(artId) {
+  try {
+    const db = await abrirIdbPdfs();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(String(artId));
+      tx.oncomplete = res;
+      tx.onerror = () => rej(tx.error);
+    });
+  } catch (_) {}
+}
+
+/** Envia o PDF do artigo à pasta "Bibliografia_PDFs" do Drive (dentro da raiz Athenes) e guarda o id. Devolve true se subiu. */
+async function enviarPdfDoArtigoAoDrive(art, blob) {
+  const token = await obterTokenDrive();
+  if (!token) return false;
+  const raizId = await obterPastaRaizDrive(token);
+  const { id: pastaId } = await buscarOuCriarPasta(token, PASTA_PDFS_DRIVE, raizId);
+  const idAtual = String(art.driveFileId || '').trim();
+  const salvo = await salvarArquivoNoGoogleDrive({
+    nomeArquivo: art.driveFileName || blob.name || `${art.id}.pdf`, conteudoBlobOuTexto: blob, mimeType: 'application/pdf', accessToken: token,
+    driveFileId: idAtual && !/^drive_pdf_/.test(idAtual) ? idAtual : null, pastaId
+  });
+  art.driveFileId = salvo.id;
+  art.driveStatus = 'PDF no Google Drive';
+  salvarArtigosEstudo(carregarArtigosEstudo()); // o id do arquivo vai para o servidor
+  return true;
+}
+
+/** Registra um arquivo PDF escolhido no computador: abre na sessão e sobe para o Drive (sem guardar no navegador). */
 function registrarPdfLocalNoArtigo(art, file) {
   art.driveFileName = file.name;
-  art.driveStatus = 'PDF local / Google Drive vinculado';
+  art.driveStatus = 'Enviando o PDF ao Google Drive…';
   art.pdfBlobUrl = URL.createObjectURL(file);
   art.temPdfLocal = true;
-  salvarPdfLocal(art.id, file);
+  enviarPdfDoArtigoAoDrive(art, file).then(ok => {
+    if (!ok) { art.driveStatus = 'PDF só nesta sessão (Drive desconectado)'; mostrarAviso('O PDF está aberto só nesta sessão: conecte o Google Drive para guardá-lo (o Athenes não grava arquivos no navegador).', { tipo: 'info' }); }
+  }).catch(e => {
+    art.driveStatus = 'PDF só nesta sessão (falha ao enviar ao Drive)';
+    mostrarAviso(`Não foi possível enviar o PDF ao Google Drive: ${e.message}`);
+  });
 }
 
 async function baixarPdfBlobDoDrive(fileId, accessToken) {
@@ -330,86 +357,69 @@ async function baixarPdfBlobDoDrive(fileId, accessToken) {
 }
 
 /**
- * Garante que o artigo tenha um PDF real para exibir: usa o que já está em memória,
- * depois o salvo no IndexedDB, depois baixa do Google Drive (se conectado).
- * Retorna true quando conseguiu um PDF novo.
+ * Garante que o artigo tenha um PDF real para exibir: o que já está em memória, depois o do Google Drive. Se só existir o PDF
+ * antigo deste computador, ele é aberto e MOVIDO para o Drive. Retorna true quando conseguiu um PDF.
  */
 async function garantirPdfDoArtigo(art) {
   if (!art) return false;
   if (art.pdfBlobUrl) return true;
-  try {
-    const local = await obterPdfLocal(art.id);
-    if (local) {
-      art.pdfBlobUrl = URL.createObjectURL(local);
-      art.temPdfLocal = true;
-      return true;
-    }
-  } catch (_) {}
   const idDrive = String(art.driveFileId || '').trim();
   if (idDrive && !/^drive_pdf_/.test(idDrive)) {
     const tokenDrive = await obterTokenDrive();
     if (tokenDrive) {
       try {
         const blob = await baixarPdfBlobDoDrive(idDrive, tokenDrive);
-        salvarPdfLocal(art.id, blob);
         art.pdfBlobUrl = URL.createObjectURL(blob);
         art.temPdfLocal = true;
         return true;
       } catch (_) {}
     }
   }
+  try { // legado: PDF que ficou só neste computador
+    const local = await obterPdfLocal(art.id);
+    if (local) {
+      art.pdfBlobUrl = URL.createObjectURL(local);
+      art.temPdfLocal = true;
+      enviarPdfDoArtigoAoDrive(art, local).then(ok => { if (ok) removerPdfLocal(art.id); }).catch(() => {});
+      return true;
+    }
+  } catch (_) {}
   return false;
 }
 
+/**
+ * Move para o Drive os PDFs que versões antigas deixaram só neste computador e apaga a cópia local DEPOIS de enviada.
+ * PDF já no Drive (id real e o arquivo existe) apenas libera o espaço local. Devolve quantos foram movidos.
+ */
+export async function migrarPdfsLocaisParaODrive() {
+  const token = await obterTokenDrive();
+  if (!token) return 0;
+  let movidos = 0;
+  for (const art of carregarArtigosEstudo()) {
+    try {
+      const local = await obterPdfLocal(art.id);
+      if (!local) continue;
+      const idDrive = String(art.driveFileId || '').trim();
+      let noDrive = false;
+      if (idDrive && !/^drive_pdf_/.test(idDrive)) {
+        const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(idDrive)}?fields=id,trashed`, { headers: { Authorization: `Bearer ${token}` } });
+        noDrive = r.ok && !(await r.json()).trashed;
+      }
+      if (!noDrive) noDrive = await enviarPdfDoArtigoAoDrive(art, local);
+      if (noDrive) { await removerPdfLocal(art.id); movidos++; }
+    } catch (_) {}
+  }
+  return movidos;
+}
+
+/** Biblioteca da sessão (memória), sincronizada com o servidor; nada é lido nem gravado no armazenamento do navegador. */
 export function carregarArtigosEstudo() {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      let temChaveZotero = false;
-      try {
-        const zCfg = JSON.parse(lerConta('athenes_zotero_cfg') || '{}');
-        temChaveZotero = Boolean(zCfg.apiKey && String(zCfg.apiKey).trim());
-      } catch (_) {}
-
-      const salvo = lerConta(STORAGE_KEY_ARTIGOS);
-      if (salvo !== null) {
-        const parsed = JSON.parse(salvo);
-        if (Array.isArray(parsed)) {
-          // Garante que URLs blob revogadas da sessão anterior não sejam mantidas
-          parsed.forEach(a => { if (a) a.pdfBlobUrl = null; });
-          if (temChaveZotero) {
-            const semExemplos = parsed.filter(a => !ehArtigoExemploFicticio(a));
-            if (semExemplos.length !== parsed.length) {
-              salvarArtigosEstudo(semExemplos);
-            }
-            return semExemplos;
-          }
-          return parsed;
-        }
-      }
-
-      if (temChaveZotero) {
-        salvarArtigosEstudo([]);
-        return [];
-      }
-    }
-  } catch (_) {}
-  const iniciais = criarArtigosEstudoExemplo();
-  salvarArtigosEstudo(iniciais);
-  return iniciais;
+  bib.definirFiltroDeExemplos(ehArtigoExemploFicticio);
+  return bib.obterArtigos();
 }
 
 export function salvarArtigosEstudo(lista) {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      // Remove pdfBlobUrl efêmero antes de salvar no localStorage
-      const limpo = Array.isArray(lista) ? lista.map(a => {
-        if (!a) return a;
-        const { pdfBlobUrl, ...resto } = a;
-        return resto;
-      }) : lista;
-      gravarConta(STORAGE_KEY_ARTIGOS, JSON.stringify(limpo));
-    }
-  } catch (_) {}
+  bib.definirArtigos(lista); // memória + envio ao servidor (2 s depois da última alteração)
   return lista;
 }
 
@@ -485,6 +495,10 @@ export class EstudoArtigosView {
     this.opcoes = opcoes;
     this.onModoFullScreenChange = opcoes.onModoFullScreenChange || (() => {});
     this.artigos = carregarArtigosEstudo();
+    // a biblioteca vem do servidor: chegou algo de outro computador → atualiza a tela (sem interromper quem está lendo um artigo)
+    this._cancelarBib = bib.aoMudarBiblioteca(() => { this.artigos = carregarArtigosEstudo(); if (!this.artigoAberto && typeof this.renderizar === 'function') this.renderizar(); });
+    bib.sincronizarBiblioteca().catch(e => console.warn('[Athenes] Biblioteca no servidor:', e.message));
+    migrarPdfsLocaisParaODrive().catch(() => {}); // PDFs que ficaram só neste computador vão para o Drive
     this.artigoAberto = null;
     this.paginaAtual = 1;
     this.zoomPct = 100;
