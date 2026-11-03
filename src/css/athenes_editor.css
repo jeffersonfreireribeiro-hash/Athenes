@@ -2674,3 +2674,10 @@ ins.ath-sug-ins:hover, del.ath-sug-del:hover { outline: 1.5px solid var(--ath-su
 .ath-modo-menu .ath-btn-modo-trab:hover { background: #EEF4FA !important; }
 .ath-modo-menu .ath-btn-modo-trab.on { background: #EEF4FA !important; color: var(--ath-primary, #314F79) !important; }
 .rm-barra-blocos .ath-modo-wrap + .rm-ic-guia { margin-left: 0; }
+
+/* A barra de ferramentas nunca passa da coluna do meio: se não couber, os itens quebram para a linha de baixo */
+.rm-barra-blocos { flex-wrap: wrap; row-gap: 6px; min-width: 0; max-width: 100%; box-sizing: border-box; border-radius: 22px; }
+.rm-barra-blocos > * { min-width: 0; }
+.ath-caixa-estilo-btn { width: 150px; }
+.rm-barra-blocos { gap: 6px; }
+.rm-barra-blocos .rm-ic-bt { width: 34px; height: 34px; }
