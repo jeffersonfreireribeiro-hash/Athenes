@@ -52,6 +52,7 @@ import {
 } from '../core/athenes_documento.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
+import { linhasEstimadas, porLinhaUsadoNoTexto, calibracaoDoTexto, definirCalibracaoTexto } from '../core/athenes_fragmentos.js';
 import { hifenizarHtml, removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais, removerPalavrasIniciais } from '../core/athenes_estilo_avancado.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
@@ -2474,6 +2475,8 @@ export class EditorView {
     this.mapaNumSecoes = calcularNumeracaoSecoes(this.doc);
 
     const paginas = this.doc.paginas || [];
+    this._sigPaginas = this.assinaturaPaginacao();
+    this.agendarCalibracao();
     const infoPrev = this.container.querySelector('#rmPrevInfo');
     const mestra = this.obterMestraAtiva();
     const paisagem = mestra?.orientacao === 'paisagem';
@@ -3024,6 +3027,7 @@ export class EditorView {
         b.texto = removerHifensCondicionais(heading.innerHTML);
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida();
+        this.agendarRepaginacao();
       });
       this.instalarSugestaoNoBloco(heading, b);
       el.appendChild(heading);
@@ -3061,6 +3065,7 @@ export class EditorView {
         b.texto = removerPalavrasIniciais(p.innerHTML); // o destaque de palavras iniciais é só de exibição
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida(); // agenda gravação/histórico (adiados): fechar a aba com o cursor no campo não perde mais o texto
+        this.agendarRepaginacao(); // o texto que cresce passa para a página seguinte na hora, sem precisar reabrir o arquivo
       });
 
       p.addEventListener('keydown', e => {
@@ -3576,6 +3581,174 @@ export class EditorView {
     this.agendarSnapshot();
     this.atualizarSumariosAoVivo();
     this.onAlterado(this.doc);
+  }
+
+  /** Assinatura da paginação: blocos por página e onde cada fragmento de texto termina (muda quando o texto passa para outra página). */
+  assinaturaPaginacao() {
+    return (this.doc.paginas || []).map(p => (p.blocos || []).map(b => `${b.id}:${b._frag ? `${b._frag.indice}/${b._frag.total}:${String(b.texto || '').length}` : ''}`).join(',')).join('|');
+  }
+
+  /**
+   * Ao digitar, o texto pode crescer e passar para a página seguinte (ou voltar). Depois de uma pausa curta a paginação é
+   * recalculada e, só se a divisão mudou, as folhas são redesenhadas mantendo o cursor e a rolagem onde estavam.
+   */
+  agendarRepaginacao() {
+    clearTimeout(this._tRepag);
+    this._tRepag = setTimeout(() => this.repaginarAoDigitar(), 350);
+  }
+
+  repaginarAoDigitar() {
+    if (!this.container || modoSomenteLeitura(this.modoTrabalho)) return;
+    repaginarDocumento(this.doc);
+    if (this._sigPaginas === this.assinaturaPaginacao()) return;
+    const palco = this.container.querySelector('#rmPrevPalco');
+    const rolagem = palco?.scrollTop || 0;
+    const cursor = this.guardarCursorNoBloco();
+    this.renderizarFolhasPaginas();
+    if (palco) palco.scrollTop = rolagem;
+    this.restaurarCursorNoBloco(cursor);
+  }
+
+  /** Linhas realmente desenhadas num texto (agrupa os retângulos dos trechos pela posição vertical). */
+  contarLinhasReais(el) {
+    const tops = [];
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = w.nextNode())) {
+      if (!n.data.trim()) continue;
+      const r = document.createRange();
+      r.selectNodeContents(n);
+      for (const q of r.getClientRects()) if (q.height > 0) tops.push({ t: q.top, h: q.height });
+    }
+    tops.sort((a, b) => a.t - b.t);
+    let linhas = 0; let ultimo = -Infinity;
+    for (const q of tops) { if (q.t - ultimo > q.h * 0.6) { linhas++; ultimo = q.t; } }
+    return linhas;
+  }
+
+  agendarCalibracao() {
+    clearTimeout(this._tCalib);
+    this._tCalib = setTimeout(async () => {
+      try { await document.fonts?.ready; } catch (_) {}
+      this.calibrarTextoPelaTela();
+    }, 150);
+  }
+
+  /**
+   * A paginação ESTIMA as linhas de cada parágrafo; aqui elas são MEDIDAS na tela e o erro volta para a paginação:
+   * - blocos inteiros: razão entre linhas reais e estimadas;
+   * - texto dividido entre páginas: se a folha transbordou (ou sobrou espaço) no fim do trecho, o trecho encolhe (ou cresce).
+   * Se algo mudou, a divisão é refeita (no máximo 8 vezes seguidas), com o cursor e a rolagem mantidos.
+   */
+  calibrarTextoPelaTela() {
+    if (!this.container || modoSomenteLeitura(this.modoTrabalho)) return;
+    const blocosPag = (this.doc.paginas || []).flatMap(p => p.blocos || []);
+    const dividido = new Set(blocosPag.filter(x => x._frag).map(x => x._frag.origemId));
+    const porBloco = new Map();
+    const achar = (folha) => blocosPag.find(x => x.id === folha.dataset.blocoId && (x._frag ? String(x._frag.indice) === (folha.dataset.fragmento ?? '') : true));
+    this.container.querySelectorAll('.ath-folha-area-util .ath-bloco-folha').forEach(folha => {
+      const el = folha.querySelector('.ath-texto-editable');
+      const id = folha.dataset.blocoId;
+      if (!el || !id || dividido.has(id)) return; // texto dividido: calibrado pelo transbordo/sobra da folha (abaixo)
+      const b = achar(folha);
+      if (!b || !['paragrafo', 'citacao', 'texto'].includes(b.tipo)) return;
+      const reais = this.contarLinhasReais(el);
+      const porLinha = porLinhaUsadoNoTexto(id);
+      if (!reais || !porLinha) return;
+      const acc = porBloco.get(id) || { reais: 0, est: 0 };
+      acc.reais += reais;
+      acc.est += linhasEstimadas(b.texto, porLinha);
+      porBloco.set(id, acc);
+    });
+    let mudou = false;
+    for (const [id, a] of porBloco) {
+      if (!a.est) continue;
+      const atual = calibracaoDoTexto(id);
+      const novo = Math.min(2, Math.max(0.5, atual * a.reais / a.est));
+      if (Math.abs(novo - atual) / atual > 0.04) { definirCalibracaoTexto(id, novo); mudou = true; }
+    }
+    // texto dividido: compara o fim do trecho com o limite real da folha
+    this.container.querySelectorAll('.ath-folha-area-util').forEach(area => {
+      const folhaA4 = area.parentElement;
+      const blocos = [...(area.firstElementChild?.children || [])];
+      const ultimo = blocos[blocos.length - 1];
+      const b = ultimo && achar(ultimo);
+      const el = ultimo?.querySelector('.ath-texto-editable');
+      if (!b?._frag?.continuaNaProxima || !el) return;
+      const f = folhaA4.getBoundingClientRect();
+      const nominal = f.height >= f.width ? f.width * 297 / 210 : f.width * 210 / 297;
+      const lh = parseFloat(getComputedStyle(el).lineHeight) || 16;
+      const transbordo = f.height - nominal;
+      const sobra = transbordo > 1 ? 0 : area.getBoundingClientRect().bottom - ultimo.getBoundingClientRect().bottom;
+      const n = this.contarLinhasReais(el);
+      if (!n) return;
+      let delta = 0;
+      if (transbordo > 1) delta = -Math.ceil(transbordo / lh);
+      else if (sobra > lh * 2.5) delta = Math.floor(sobra / lh) - 1;
+      if (!delta) return;
+      const id = b._frag.origemId;
+      const atual = calibracaoDoTexto(id);
+      definirCalibracaoTexto(id, atual * n / Math.max(2, n + delta));
+      mudou = true;
+    });
+    if (!mudou) { this._calibN = 0; return; }
+    if ((this._calibN = (this._calibN || 0) + 1) > 8) { this._calibN = 0; return; }
+    repaginarDocumento(this.doc);
+    if (this._sigPaginas === this.assinaturaPaginacao()) return;
+    const palco = this.container.querySelector('#rmPrevPalco');
+    const rolagem = palco?.scrollTop || 0;
+    const cursor = this.guardarCursorNoBloco();
+    this.renderizarFolhasPaginas();
+    if (palco) palco.scrollTop = rolagem;
+    this.restaurarCursorNoBloco(cursor);
+  }
+
+  /** Posição do cursor como (bloco, nº de caracteres desde o início do bloco inteiro, somando os fragmentos anteriores). */
+  guardarCursorNoBloco() {
+    const sel = window.getSelection();
+    const no = sel?.anchorNode;
+    const el = (no?.nodeType === 3 ? no.parentElement : no)?.closest?.('.ath-texto-editable, .ath-titulo-editable');
+    const folha = el?.closest('.ath-bloco-folha');
+    if (!el || !folha || !this.container.contains(el)) return null;
+    const id = folha.dataset.blocoId;
+    const irmaos = [...this.container.querySelectorAll(`.ath-bloco-folha[data-bloco-id="${id}"]`)];
+    let antes = 0;
+    for (const f of irmaos) {
+      if (f === folha) break;
+      antes += (f.querySelector('.ath-texto-editable, .ath-titulo-editable')?.textContent || '').length;
+    }
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    r.setEnd(sel.anchorNode, sel.anchorOffset);
+    return { id, pos: antes + r.toString().length };
+  }
+
+  restaurarCursorNoBloco(cursor) {
+    if (!cursor) return;
+    const editaveis = [...this.container.querySelectorAll(`.ath-bloco-folha[data-bloco-id="${cursor.id}"] .ath-texto-editable, .ath-bloco-folha[data-bloco-id="${cursor.id}"] .ath-titulo-editable`)];
+    let resta = cursor.pos;
+    for (let i = 0; i < editaveis.length; i++) {
+      const el = editaveis[i];
+      const tam = (el.textContent || '').length;
+      if (resta > tam && i < editaveis.length - 1) { resta -= tam; continue; }
+      const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let n; let alvo = null; let off = 0;
+      while ((n = w.nextNode())) {
+        if (resta <= n.data.length) { alvo = n; off = resta; break; }
+        resta -= n.data.length;
+        alvo = n; off = n.data.length;
+      }
+      try {
+        el.focus({ preventScroll: true });
+        const sel = window.getSelection();
+        const r = document.createRange();
+        if (alvo) { r.setStart(alvo, off); } else { r.selectNodeContents(el); }
+        r.collapse(alvo ? true : false);
+        sel.removeAllRanges();
+        sel.addRange(r);
+      } catch (_) {}
+      return;
+    }
   }
 
   agendarSnapshot() {

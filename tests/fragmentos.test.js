@@ -14,7 +14,7 @@ test('corte de HTML: fecha e reabre marcações, conta entidades como 1 caracter
   assert.equal(a, 'um <b>dois <i>t</i></b>');
   assert.equal(b, '<b><i>rês</i> quatro</b> cinco');
   assert.equal(textoPlano(a) + textoPlano(b), textoPlano('um <b>dois <i>três</i> quatro</b> cinco'));
-  assert.deepEqual(dividirHtmlNoTexto('curto', 99), ['curto', '']);
+  assert.deepEqual(dividirHtmlNoTexto('curto', 99).slice(0, 2), ['curto', '']);
   const [c, d] = dividirHtmlNoTexto('ab&amp;cd', 3);
   assert.equal(c, 'ab&amp;'); assert.equal(d, 'cd');
 });
@@ -57,10 +57,11 @@ test('editar um fragmento edita o parágrafo inteiro', () => {
   assert.ok(paginasDe(doc).flatMap(p => p.blocos).some(b => b.id === 'longo' && b.texto.includes('ALTERADA')));
 });
 
-test('o que não deve dividir fica inteiro: curto, com <br>, em grupo e títulos', () => {
+test('o que não deve dividir fica inteiro: curto, com tabela, em grupo e títulos', () => {
   const curto = criarNovoBloco('paragrafo', { texto: palavras(10) });
   assert.equal(podeDividir(curto), true);
-  assert.equal(podeDividir(criarNovoBloco('paragrafo', { texto: 'a<br>b' })), false);
+  assert.equal(podeDividir(criarNovoBloco('paragrafo', { texto: 'a<br>b' })), true, 'quebras de linha internas não impedem a divisão');
+  assert.equal(podeDividir(criarNovoBloco('paragrafo', { texto: '<table></table>' })), false);
   assert.equal(podeDividir(Object.assign(criarNovoBloco('paragrafo', { texto: 'x' }), { grupo: 'g1' })), false);
   assert.equal(podeDividir(criarNovoBloco('titulo', { texto: 'x' })), false);
   assert.equal(podeDividir(criarNovoBloco('figura', {})), false);
@@ -120,4 +121,17 @@ test('PDF: tabela dividida repete o cabeçalho, marca "continuação"/"Continua"
   assert.equal((html.match(/Tabela 1 — Dados/g) || []).length, 1, 'o título completo só no primeiro');
   const estat = (await import('../src/core/athenes_documento.js')).calcularEstatisticas(doc);
   assert.equal(estat.tabelas, 1, 'a tabela dividida conta uma vez');
+});
+
+test('parágrafo com <br>/<div> continua na página seguinte e segue sendo UM bloco (editar um fragmento não o parte em dois)', () => {
+  const doc = criarDocumento({ titulo: 'T' });
+  const sec = corpo(doc);
+  const html = Array.from({ length: 6 }, (_, i) => `<div>${palavras(160)} ${i}</div>`).join('') + palavras(90);
+  sec.blocos = [criarNovoBloco('paragrafo', { id: 'longo', texto: html })];
+  repaginarDocumento(doc);
+  const frs = paginasDe(doc).flatMap(p => p.blocos).filter(b => b.id === 'longo');
+  assert.ok(frs.length >= 2, 'o texto longo passa para a página seguinte');
+  assert.equal(sec.blocos.length, 1, 'continua sendo um único bloco');
+  frs[0].texto = frs[0].texto; // simula a edição de um fragmento (regrava o bloco inteiro)
+  assert.equal(sec.blocos[0].texto, html, 'o texto original é reconstruído sem dividir os <div> em dois');
 });

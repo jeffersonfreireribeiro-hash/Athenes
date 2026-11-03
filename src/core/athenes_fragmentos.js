@@ -36,7 +36,7 @@ export function textoPlano(html) {
  * reabrindo-as na segunda. Retorna [antes, depois].
  */
 export function dividirHtmlNoTexto(html, pos) {
-  let a = ''; let n = 0; let cortou = false; const pilha = []; let b = '';
+  let a = ''; let n = 0; let cortou = false; const pilha = []; let b = ''; let fecha = ''; let abre = '';
   for (const m of String(html ?? '').matchAll(RE_TOKEN)) {
     const [tok, tag, ent, txt] = m;
     if (cortou) { b += tok; continue; }
@@ -51,19 +51,50 @@ export function dividirHtmlNoTexto(html, pos) {
     for (let i = 0; i < pedacos.length; i++) {
       if (!cortou && n >= pos) {
         cortou = true;
-        a += [...pilha].reverse().map(p => `</${p.nome}>`).join('');
-        b = pilha.map(p => p.tag).join('') + pedacos.slice(i).join('');
+        fecha = [...pilha].reverse().map(p => `</${p.nome}>`).join('');
+        abre = pilha.map(p => p.tag).join('');
+        a += fecha;
+        b = abre + pedacos.slice(i).join('');
         break; // o resto do texto deste pedaço já foi para `b`
       }
       if (cortou) { b += pedacos[i]; continue; }
       a += pedacos[i]; n++;
     }
   }
-  if (!cortou) return [a, ''];
-  return [a, b];
+  if (!cortou) return [a, '', '', ''];
+  return [a, b, fecha, abre]; // fecha/abre: marcações fechadas na 1ª parte e reabertas na 2ª (para remendar o corte ao juntar)
+}
+
+/** Marcações que cada fragmento fechou no fim / reabriu no começo por causa do corte (para a emenda ao reunir o texto). */
+const CORTES = new WeakMap();
+
+/** Reúne o texto dos fragmentos em UM só, desfazendo as marcações fechadas e reabertas nos cortes (o bloco segue sendo um). */
+function juntarFragmentos(irmaos) {
+  let acc = '';
+  irmaos.forEach((f, i) => {
+    const t = f.texto;
+    if (i === 0) { acc = t; return; }
+    const fecha = CORTES.get(irmaos[i - 1])?.fecha || '';
+    const abre = CORTES.get(f)?.abre || '';
+    if ((fecha || abre) && acc.endsWith(fecha) && t.startsWith(abre)) acc = acc.slice(0, acc.length - fecha.length) + t.slice(abre.length);
+    else acc += t;
+  });
+  return acc;
 }
 
 // ───────────────────────────── Parâmetros de texto ─────────────────────────────
+
+/**
+ * Calibração por bloco: razão entre as linhas REAIS (medidas no editor) e as estimadas. A estimativa usa uma largura média
+ * de caractere; com fontes e textos reais ela erra para mais ou para menos, e uma página lotada transbordava (ou sobrava
+ * espaço). Com a razão medida, a divisão do texto entre páginas passa a refletir o que é desenhado.
+ */
+const CALIBRACAO = new Map();
+export const definirCalibracaoTexto = (id, razao) => { if (razao && Number.isFinite(razao)) CALIBRACAO.set(id, Math.min(2, Math.max(0.5, razao))); else CALIBRACAO.delete(id); };
+export const calibracaoDoTexto = (id) => CALIBRACAO.get(id) || 1;
+export const limparCalibracaoTexto = () => CALIBRACAO.clear();
+const POR_LINHA_USADO = new Map(); // caracteres por linha usados na última paginação de cada bloco (base da medição)
+export const porLinhaUsadoNoTexto = (id) => POR_LINHA_USADO.get(id) || 0;
 
 /** Tamanho, entrelinha, espaços e caracteres por linha de um bloco de texto (ou null sem estilo). */
 export function parametrosTextoPt(bloco, ctx) {
@@ -76,7 +107,19 @@ export function parametrosTextoPt(bloco, ctx) {
   const recuoMm = bloco.recuo_esquerdo_mm ?? est.recuo_esquerdo_mm ?? 0;
   const larg = Math.max(40, ctx.larguraPt * Math.min(12, Math.max(1, bloco.span || 12)) / 12 - recuoMm * PT_POR_MM);
   const largChar = tam * (est.caixa_alta ? 0.63 : 0.5) * ((est.peso || 400) >= 700 ? 1.06 : 1);
-  return { tam, ent, antes, depois, porLinha: Math.max(6, Math.floor(larg / largChar)), est };
+  const idOrigem = bloco._frag?.origemId || bloco.id;
+  const porLinha = Math.max(6, Math.floor(larg / largChar / calibracaoDoTexto(idOrigem)));
+  POR_LINHA_USADO.set(idOrigem, porLinha);
+  const gapParagrafo = bloco.espaco_paragrafos_pt ?? est.espaco_paragrafos_pt ?? 6; // espaço entre os parágrafos internos (Enter), como no CSS
+  return { tam, ent, antes, depois, porLinha, est, gapParagrafo };
+}
+
+/** Espaço (pt) entre os parágrafos internos de um texto: cada </p> ou </div> seguido de mais texto abre `gap`; cada </li>, 40% dele. */
+export function lacunasInternasPt(html, gap) {
+  const h = String(html || '');
+  const blocos = (h.match(/<\/(?:p|div)>(?=\s*[^\s<])|<\/(?:p|div)>(?=\s*<(?!\/))/gi) || []).length;
+  const itens = (h.match(/<\/li>(?=\s*<li)/gi) || []).length;
+  return blocos * gap + itens * gap * 0.4;
 }
 
 /** Linhas estimadas de um HTML de texto (cada <br>/fim de bloco abre uma nova linha). */
@@ -129,7 +172,7 @@ function criarFragmentoTexto(origem, irmaos, html, extra) {
   Object.defineProperty(f, 'texto', {
     enumerable: true, configurable: true,
     get: () => parte,
-    set: (v) => { parte = v; origem.texto = irmaos.map(x => x.texto).join(''); } // edita o parágrafo inteiro
+    set: (v) => { parte = v; origem.texto = juntarFragmentos(irmaos); } // edita o parágrafo inteiro
   });
   return f;
 }
@@ -140,7 +183,7 @@ function criarFragmentoTexto(origem, irmaos, html, extra) {
  */
 export function podeDividir(b) {
   if (!b || b.grupo || (b.span && b.span < 12)) return false;
-  if (b.tipo === 'paragrafo' || b.tipo === 'citacao') return !/<\s*(br|ul|ol|li|p|div|table|h[1-6])\b/i.test(b.texto || '');
+  if (b.tipo === 'paragrafo' || b.tipo === 'citacao') return !/<\s*(table|h[1-6])\b/i.test(b.texto || ''); // quebras de linha, divs e listas dentro do texto também podem continuar na página seguinte
   if (b.tipo === 'tabela' || b.tipo === 'quadro') return (b.linhas || []).length >= 3;
   return false;
 }
@@ -149,18 +192,35 @@ function dividirTexto(b, livrePt, ctx, topoDePagina) {
   const P = parametrosTextoPt(b, ctx);
   if (!P) return null;
   const plano = textoPlano(b.texto);
-  const total = Math.ceil(plano.length / P.porLinha);
+  const total = linhasEstimadas(b.texto, P.porLinha); // conta também as quebras de linha/parágrafo internas
   const alturaLinha = P.tam * P.ent;
-  let k = Math.floor((livrePt - (topoDePagina ? 0 : P.antes)) / alturaLinha);
-  if (total < 4 || k < 2) return null; // evita viúva/órfã: pelo menos 2 linhas de cada lado
-  if (total - k < 2) k = total - 2;
-  if (k < 2) return null;
-  let corte = Math.min(plano.length - 1, k * P.porLinha);
+  const livre = livrePt - (topoDePagina ? 0 : P.antes);
+  if (total < 4 || livre < alturaLinha * 2) return null; // evita viúva/órfã: pelo menos 2 linhas de cada lado
+  // percorre os trechos (separados por <br>, </p>, </div>, </li>) somando linhas e o espaço entre parágrafos até esgotar o que resta
+  const trechos = String(b.texto || '').split(/(<br\s*\/?>|<\/p>|<\/div>|<\/li>)/i);
+  let usado = 0; let linhas = 0; let ini = 0; let corte = plano.length - 1; let achou = false;
+  for (let i = 0; i < trechos.length; i += 2) {
+    const len = textoPlano(trechos[i]).length;
+    const n = Math.max(1, Math.ceil(len / P.porLinha));
+    if (usado + n * alturaLinha > livre) {
+      const cabem = Math.floor((livre - usado) / alturaLinha);
+      corte = ini + Math.min(len - 1, Math.max(0, cabem) * P.porLinha);
+      linhas += Math.max(0, cabem);
+      achou = true;
+      break;
+    }
+    usado += n * alturaLinha; linhas += n; ini += len;
+    const sep = (trechos[i + 1] || '').toLowerCase();
+    if (/<\/(p|div)>/.test(sep)) usado += P.gapParagrafo; else if (sep === '</li>') usado += P.gapParagrafo * 0.4;
+  }
+  if (!achou || linhas < 2) return null;
+  if (total - linhas < 2) { corte = Math.max(0, corte - (2 - (total - linhas)) * P.porLinha); }
+  corte = Math.min(plano.length - 1, corte);
   const espaco = plano.lastIndexOf(' ', corte);
-  if (espaco > corte * 0.5) corte = espaco + 1; // quebra em palavra inteira; o espaço fica na 1ª parte
-  const [a, resto] = dividirHtmlNoTexto(b.texto, corte);
+  if (espaco > Math.max(ini, corte - P.porLinha * 0.5)) corte = espaco + 1; // quebra em palavra inteira; o espaço fica na 1ª parte
+  const [a, resto, fecha, abre] = dividirHtmlNoTexto(b.texto, corte);
   if (!textoPlano(a).trim() || !textoPlano(resto).trim()) return null;
-  return { a, resto };
+  return { a, resto, fecha, abre };
 }
 
 function dividirTabela(b, livrePt, ctx, topoDePagina) {
@@ -198,6 +258,9 @@ export function dividirParaPagina(b, livrePt, ctx, topoDePagina = false) {
     if (!d) return null;
     primeiro = criarFragmentoTexto(origem, irmaos, d.a, { espaco_depois_pt: 0, ...(b._frag ? { recuo_primeira_linha_mm: b.recuo_primeira_linha_mm, espaco_antes_pt: b.espaco_antes_pt } : {}) });
     resto = criarFragmentoTexto(origem, irmaos, d.resto, { espaco_antes_pt: 0, recuo_primeira_linha_mm: 0, espaco_depois_pt: b.espaco_depois_pt });
+    const cortesDeB = CORTES.get(b) || {};
+    CORTES.set(primeiro, { abre: cortesDeB.abre || '', fecha: d.fecha || '' });
+    CORTES.set(resto, { abre: d.abre || '', fecha: cortesDeB.fecha || '' });
   } else {
     const d = dividirTabela(b, livrePt, ctx, topoDePagina);
     if (!d) return null;

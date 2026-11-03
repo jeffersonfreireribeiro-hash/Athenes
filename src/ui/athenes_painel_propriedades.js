@@ -11,7 +11,7 @@
 
 import { contarUsoDoEstilo, excluirEstilo } from '../core/athenes_estilos.js';
 import { secaoAvancadaHtml, ligarCamposAvancados, gravarRascunhoNoEstilo } from './athenes_editor_estilo_modal.js';
-import { FONTES_SISTEMA, PESOS_FONTE, estiloParaCss, alinhamentoCss, ALINHAMENTOS } from '../core/athenes_estilos.js';
+import { ptParaMm, mmParaPt, FONTES_SISTEMA, PESOS_FONTE, estiloParaCss, alinhamentoCss, ALINHAMENTOS } from '../core/athenes_estilos.js';
 import {
   modeloDaPagina, recalcularNumeracaoAutomatica, resolverReferenciasCruzadas,
   SEPARADORES_LEGENDA, idSeparadorLegenda, ROTULOS_FIGURA, rotuloDaFigura, aplicarNumeracaoNoTitulo, removerPrefixoNumeracaoTitulo,
@@ -522,9 +522,9 @@ export class PainelPropriedades {
         <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:4px; background:#fff;">
           <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;">
             <span>Distância entre Blocos</span>
-            <span style="font-size:10px; color:var(--glx-muted); text-transform:none; font-weight:600;">pt</span>
+            <span style="font-size:10px; color:var(--glx-muted); text-transform:none; font-weight:600;">mm</span>
           </div>
-          <input type="number" id="rmCampoEspacoDepois" class="glx-input" min="0" max="100" step="1" value="${b.espaco_depois_pt ?? estiloAtivo.espaco_depois_pt ?? 8}" style="width:100%; height:32px; padding:0 10px; box-sizing:border-box;">
+          <input type="number" id="rmCampoEspacoDepois" class="glx-input" min="0" max="40" step="0.5" value="${ptParaMm(b.espaco_depois_pt ?? estiloAtivo.espaco_depois_pt ?? 8)}" style="width:100%; height:32px; padding:0 10px; box-sizing:border-box;">
         </div>
 
         <label class="rm-chk" style="font-size:12px; margin-top:4px;">
@@ -620,7 +620,7 @@ export class PainelPropriedades {
 
       // Distância entre blocos em Título
       box.querySelector('#rmCampoEspacoDepois')?.addEventListener('input', e => {
-        b.espaco_depois_pt = parseFloat(e.target.value) || 0;
+        b.espaco_depois_pt = mmParaPt(parseFloat(e.target.value));
         this.notificarMudanca();
       });
 
@@ -887,8 +887,8 @@ export class PainelPropriedades {
 
         <!-- Só a distância ENTRE BLOCOS é do bloco; entrelinha, recuos, espaço antes e entre parágrafos pertencem ao ESTILO de texto -->
         <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:6px; background:#fff;">
-          <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733); display:block;">Distância entre blocos (pt)
-            <input type="number" id="rmCampoEspacoDepois" class="glx-input" style="width:100%;" min="0" max="72" value="${b.espaco_depois_pt ?? estiloAtivo.espaco_depois_pt ?? 8}" title="Espaço depois deste bloco, até o próximo. Entrelinha, recuos e espaçamento entre parágrafos são definidos no estilo de texto.">
+          <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733); display:block;">Distância entre blocos (mm)
+            <input type="number" id="rmCampoEspacoDepois" class="glx-input" style="width:100%;" min="0" max="40" step="0.5" value="${ptParaMm(b.espaco_depois_pt ?? estiloAtivo.espaco_depois_pt ?? 8)}" title="Espaço depois deste bloco, até o próximo. Entrelinha, recuos e espaçamento entre parágrafos são definidos no estilo de texto.">
           </label>
           <p style="margin:6px 0 0; font-size:10.5px; color:var(--glx-muted); line-height:1.35;">Entrelinha, recuos e espaço entre parágrafos ficam no <strong>estilo de texto</strong> (Estilos de Texto).</p>
         </div>
@@ -1130,7 +1130,7 @@ export class PainelPropriedades {
       });
 
       box.querySelector('#rmCampoEspacoDepois')?.addEventListener('input', e => {
-        b.espaco_depois_pt = parseFloat(e.target.value) || 0;
+        b.espaco_depois_pt = mmParaPt(parseFloat(e.target.value));
         this.notificarMudanca();
       });
 
@@ -1704,8 +1704,8 @@ export class PainelPropriedades {
             <option value="dupla" ${b.estilo_linha === 'dupla' ? 'selected' : ''}>Linha Dupla Editorial</option>
           </select>
         </label>
-        <label>Espaço Depois (pt)
-          <input type="number" id="rmDivisorEspaco" min="0" max="72" value="${b.espaco_depois_pt ?? 8}">
+        <label>Espaço Depois (mm)
+          <input type="number" id="rmDivisorEspaco" min="0" max="40" step="0.5" value="${ptParaMm(b.espaco_depois_pt ?? 8)}">
         </label>
       `;
       box.querySelector('#rmDivisorEstilo')?.addEventListener('change', e => {
@@ -1713,18 +1713,18 @@ export class PainelPropriedades {
         this.notificarMudanca();
       });
       box.querySelector('#rmDivisorEspaco')?.addEventListener('input', e => {
-        b.espaco_depois_pt = parseFloat(e.target.value) || 0;
+        b.espaco_depois_pt = mmParaPt(parseFloat(e.target.value));
         this.notificarMudanca();
       });
     }
     else if (b.tipo === 'espaco') {
       box.innerHTML = `
-        <label>Altura do Espaçamento Vertical (pt)
-          <input type="number" id="rmEspacoAltura" min="4" max="240" step="2" value="${b.altura_pt || 24}">
+        <label>Altura do Espaçamento Vertical (mm)
+          <input type="number" id="rmEspacoAltura" min="1" max="85" step="0.5" value="${ptParaMm(b.altura_pt || 24)}">
         </label>
       `;
       box.querySelector('#rmEspacoAltura')?.addEventListener('input', e => {
-        b.altura_pt = Math.max(4, parseFloat(e.target.value) || 24);
+        b.altura_pt = Math.max(4, mmParaPt(parseFloat(e.target.value)) || 24);
         this.notificarMudanca();
       });
     }
@@ -1853,8 +1853,8 @@ export class PainelPropriedades {
       </div>
 
       <div>
-        <label style="font:700 12px var(--glx-font); width:100%; display:block;">Distância Parágrafos Enter (pt)
-          <input type="number" id="athEstiloEspacoParagrafos" class="glx-input" min="0" max="48" step="1" value="${rasc.espaco_paragrafos_pt ?? 6}" style="width:100%; height:34px; margin-top:4px; box-sizing:border-box;">
+        <label style="font:700 12px var(--glx-font); width:100%; display:block;">Distância Parágrafos Enter (mm)
+          <input type="number" id="athEstiloEspacoParagrafos" class="glx-input" min="0" max="17" step="0.5" value="${ptParaMm(rasc.espaco_paragrafos_pt ?? 6)}" style="width:100%; height:34px; margin-top:4px; box-sizing:border-box;">
         </label>
       </div>
 
@@ -1954,7 +1954,7 @@ export class PainelPropriedades {
     });
 
     box.querySelector('#athEstiloEspacoParagrafos').addEventListener('input', e => {
-      rasc.espaco_paragrafos_pt = parseFloat(e.target.value) || 0;
+      rasc.espaco_paragrafos_pt = mmParaPt(parseFloat(e.target.value));
       atualizarPrevia();
     });
 

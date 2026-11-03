@@ -5,7 +5,7 @@
  */
 
 import { extrairItensSumario } from './athenes_sumario.js';
-import { parametrosTextoPt, linhasEstimadas, alturaTabelaPt, dividirParaPagina, podeDividir } from './athenes_fragmentos.js';
+import { parametrosTextoPt, linhasEstimadas, lacunasInternasPt, alturaTabelaPt, dividirParaPagina, podeDividir } from './athenes_fragmentos.js';
 import { garantirEstilosDeTitulos } from './athenes_estilos.js';
 import { aplicarRegrasMestraNasPaginas, vincularOverridesAsPaginas } from './athenes_mestra_canvas.js';
 import { criarEstilosPadrao, PERFIS_FORMATACAO } from './athenes_estilos.js';
@@ -522,7 +522,7 @@ let TITULOS_NO_DOC = 8;
 function alturaTextoPorEstilo(bloco, ctx) {
   const P = parametrosTextoPt(bloco, ctx);
   if (!P) return null;
-  return linhasEstimadas(bloco.texto, P.porLinha) * P.tam * P.ent + P.antes + P.depois;
+  return linhasEstimadas(bloco.texto, P.porLinha) * P.tam * P.ent + P.antes + P.depois + lacunasInternasPt(bloco.texto, P.gapParagrafo);
 }
 
 export function estimarAlturaBlocoPt(bloco, ctx = null) {

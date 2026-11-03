@@ -708,6 +708,11 @@ export function alinhamentoCss(valor, padrao = 'left') {
   return map[valor] || padrao;
 }
 
+/** Afastamentos são guardados em pt (formato do tema) e mostrados/digitados em mm na interface. */
+export const MM_POR_PT = 25.4 / 72;
+export const ptParaMm = (pt) => Math.round((Number(pt) || 0) * MM_POR_PT * 10) / 10;
+export const mmParaPt = (mm) => Math.round((Number(mm) || 0) / MM_POR_PT * 100) / 100;
+
 /** Estilos que o documento não vive sem: o corpo é o destino dos blocos de um estilo excluído. */
 export const ESTILOS_PROTEGIDOS = Object.freeze(['corpo']);
 

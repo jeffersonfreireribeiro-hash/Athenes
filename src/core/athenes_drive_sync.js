@@ -11,7 +11,8 @@
  */
 import {
   obterConfigGoogleDrive, salvarConfigGoogleDrive, obterPastasDriveLocais, salvarPastasDriveLocais,
-  salvarArquivoNoGoogleDrive, obterOuCriarEstruturaPastasAthenes, explicarErroDrive
+  salvarArquivoNoGoogleDrive, obterOuCriarEstruturaPastasAthenes, explicarErroDrive,
+  listarArquivosDoGoogleDrive, baixarArquivoDoGoogleDrive
 } from './athenes_colaboracao.js';
 
 const API = 'https://www.googleapis.com/drive/v3/files';
@@ -219,4 +220,50 @@ export async function sincronizarDocumentosComDrive(documentos, token, { fetchIm
 export function marcarSessaoDriveExpirada() {
   const cfg = obterConfigGoogleDrive();
   salvarConfigGoogleDrive({ ...cfg, accessToken: '' });
+}
+
+// ───────────────────────────── Biblioteca pelo Drive (cada conta enxerga só o próprio Drive) ─────────────────────────────
+
+const semExtensao = (nome) => String(nome || 'Documento').replace(/\.athenes$/i, '').replace(/\.json$/i, '') || 'Documento';
+
+/**
+ * Documentos `.athenes` que o app criou no Drive de quem está conectado (escopo drive.file: nunca de outra conta).
+ * Só o índice (nome, data, id do arquivo): o conteúdo é baixado quando o documento é aberto e depois descartado/atualizado.
+ */
+export async function listarBibliotecaDoDrive(token, { fetchImpl = globalThis.fetch } = {}) {
+  const arquivos = await listarArquivosDoGoogleDrive(token, fetchImpl);
+  return arquivos
+    .filter(f => /\.athenes$/i.test(f.name || ''))
+    .map(f => ({ driveFileId: f.id, titulo: semExtensao(f.name), modificadoEm: f.modifiedTime || '' }));
+}
+
+/**
+ * Acrescenta ao índice local os documentos do Drive que ainda não existem aqui (como "só no Drive": conteúdo baixado ao abrir)
+ * e marca os que já existem para baixar de novo quando o do Drive é mais novo. Devolve { novos, atualizados }.
+ */
+export function mesclarBibliotecaDrive(documentos, arquivos) {
+  const r = { novos: 0, atualizados: 0 };
+  for (const f of arquivos || []) {
+    const local = documentos.find(d => d.driveFileId === f.driveFileId);
+    if (!local) {
+      documentos.unshift({
+        id: `drive_${f.driveFileId}`, titulo: f.titulo, subtitulo: 'Do seu Google Drive', tipoDoc: 'artigo', perfilId: 'abnt',
+        dataModificacao: f.modificadoEm, driveFileId: f.driveFileId, driveSincronizadoEm: f.modificadoEm, origemDrive: true, precisaCarregarConteudo: true
+      });
+      r.novos++;
+    } else if (f.modificadoEm && local.driveSincronizadoEm && f.modificadoEm > local.driveSincronizadoEm && !local.precisaCarregarConteudo && (local.dataModificacao || '') <= local.driveSincronizadoEm) {
+      local.precisaCarregarConteudo = true; // o do Drive é mais novo e não há edição local pendente
+      local.origemDrive = true;
+      r.atualizados++;
+    }
+  }
+  return r;
+}
+
+/** Baixa o conteúdo de um documento do Drive, mantendo os vínculos com o arquivo e a pasta. */
+export async function baixarDocumentoDoDrive(doc, token, { fetchImpl = globalThis.fetch } = {}) {
+  const conteudo = await baixarArquivoDoGoogleDrive(doc.driveFileId, token, fetchImpl);
+  if (!conteudo || typeof conteudo !== 'object') throw new ErroDrive('O arquivo do Drive não é um documento Athenes válido.');
+  const agora = new Date().toISOString();
+  return { ...conteudo, id: doc.id.startsWith('drive_') ? (conteudo.id || doc.id) : doc.id, driveFileId: doc.driveFileId, driveSincronizadoEm: agora, dataModificacao: conteudo.dataModificacao || agora, precisaCarregarConteudo: false, origemDrive: false };
 }

@@ -7,7 +7,7 @@
  */
 
 import { svgIcone } from './athenes_icones.js';
-import { FONTES_SISTEMA, PESOS_FONTE, estiloParaCss } from '../core/athenes_estilos.js';
+import { ptParaMm, mmParaPt, FONTES_SISTEMA, PESOS_FONTE, estiloParaCss } from '../core/athenes_estilos.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { AVANCADO_PADRAO, cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais, normalizarAvancado } from '../core/athenes_estilo_avancado.js';
 
@@ -34,8 +34,8 @@ export function secaoAvancadaHtml() {
     </style>
     <span style="font:800 11.5px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569;">Recuos e decorações do parágrafo</span>
     <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
-      ${campo('Espaço antes (pt)', 'espaco_antes_pt', 'number', 'step="0.5" min="0" max="120"')}
-      ${campo('Espaço depois (pt)', 'espaco_depois_pt', 'number', 'step="0.5" min="0" max="120"')}
+      ${campo('Espaço antes (mm)', 'espaco_antes_pt', 'number', 'data-pt-em-mm step="0.5" min="0" max="42"')}
+      ${campo('Espaço depois (mm)', 'espaco_depois_pt', 'number', 'data-pt-em-mm step="0.5" min="0" max="42"')}
     </div>
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:8px;">
       ${campo('1ª linha (mm)', 'recuo_primeira_linha_mm', 'number', 'step="0.5" min="-50" max="100"')}
@@ -79,13 +79,15 @@ export function ligarCamposAvancados(raiz, rascunho, aoMudar) {
   raiz.querySelectorAll('[data-av]').forEach(inp => {
     const path = inp.dataset.av;
     const atual = lerCaminho(rascunho, path) ?? lerCaminho({ avancado: AVANCADO_PADRAO }, path); // vazio mostra o valor padrão
+    const emMm = inp.hasAttribute('data-pt-em-mm'); // guardado em pt (formato do tema), mostrado em mm
     if (inp.type === 'checkbox') inp.checked = !!atual;
-    else if (atual !== undefined && atual !== '') inp.value = atual;
+    else if (atual !== undefined && atual !== '') inp.value = emMm ? ptParaMm(atual) : atual;
+    else if (emMm) inp.value = 0;
     else if (inp.type === 'color') inp.value = '#314F79';
     inp.addEventListener(inp.type === 'checkbox' || inp.tagName === 'SELECT' ? 'change' : 'input', () => {
       let v;
       if (inp.type === 'checkbox') v = inp.checked;
-      else if (inp.type === 'number') v = inp.value === '' ? 0 : parseFloat(inp.value);
+      else if (inp.type === 'number') v = inp.value === '' ? 0 : (emMm ? mmParaPt(parseFloat(inp.value)) : parseFloat(inp.value));
       else v = inp.value;
       gravarCaminho(rascunho, path, v);
       aoMudar?.();
@@ -205,8 +207,8 @@ export class ModalEditorEstilo {
             <input type="number" id="athModalEstiloEntrelinha" class="ath-input" step="0.05" min="1" max="3" value="${r.entrelinha || 1.5}" style="height:34px;">
           </label>
           <label style="font:700 12px var(--glx-font); color:#334155; display:flex; flex-direction:column; gap:4px;">
-            Espaço Enter (pt)
-            <input type="number" id="athModalEstiloEspacoParagrafos" class="ath-input" min="0" max="48" step="1" value="${r.espaco_paragrafos_pt ?? 6}" style="height:34px;">
+            Espaço Enter (mm)
+            <input type="number" id="athModalEstiloEspacoParagrafos" class="ath-input" min="0" max="17" step="0.5" value="${ptParaMm(r.espaco_paragrafos_pt ?? 6)}" style="height:34px;">
           </label>
         </div>
 
@@ -309,7 +311,7 @@ export class ModalEditorEstilo {
     });
 
     modal.querySelector('#athModalEstiloEspacoParagrafos').addEventListener('input', e => {
-      this.rascunho.espaco_paragrafos_pt = parseInt(e.target.value, 10) || 0;
+      this.rascunho.espaco_paragrafos_pt = mmParaPt(parseFloat(e.target.value));
       atualizarPrevia();
     });
 

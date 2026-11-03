@@ -39,7 +39,7 @@ import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
-import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada } from '../core/athenes_drive_sync.js';
+import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -126,11 +126,17 @@ export class DashboardView {
       const btnAbrir = card?.querySelector('.ath-btn-abrir');
       if (btnAbrir) btnAbrir.textContent = 'Baixando...';
       try {
-        const remoto = await carregarDocumentoDoSupabase(doc.id);
+        let remoto = null;
+        if (doc.origemDrive && doc.driveFileId) {
+          const token = await obterTokenDrive();
+          if (!token) throw new Error('A sessão do Google Drive expirou. Reconecte o Drive.');
+          remoto = await baixarDocumentoDoDrive(doc, token); // conteúdo do SEU Drive, só quando você abre
+        } else {
+          remoto = await carregarDocumentoDoSupabase(doc.id);
+          if (remoto) { remoto.salvoNuvem = true; remoto.precisaCarregarConteudo = false; }
+        }
         if (remoto) {
           docParaAbrir = remoto;
-          docParaAbrir.salvoNuvem = true;
-          docParaAbrir.precisaCarregarConteudo = false;
           const idx = this.documentos.findIndex(d => String(d.id) === String(doc.id));
           if (idx >= 0) this.documentos[idx] = docParaAbrir;
           this.salvarDocumentosLocais();
@@ -1306,55 +1312,37 @@ export class DashboardView {
     reader.readAsText(arquivo);
   }
 
+  /**
+   * Biblioteca na nuvem = o Google Drive de QUEM ESTÁ CONECTADO (nunca a lista global do servidor): traz só o índice
+   * (nome e data) dos documentos que o app criou lá; o conteúdo é baixado ao abrir. Sem Drive conectado, nada é listado.
+   * (O nome do método é antigo: antes listava o Supabase, que mostrava os mesmos arquivos para todas as contas.)
+   */
   async sincronizarComSupabase(silencioso = false) {
     const btn = this.container?.querySelector('#athBtnSincronizarNuvem');
+    if (!driveConectado()) {
+      if (!silencioso) alert('Conecte o Google Drive (engrenagem → Nuvem & Drive) para ver seus documentos na nuvem. Cada conta enxerga só o próprio Drive.');
+      return;
+    }
     if (btn && !silencioso) {
       btn.innerHTML = `${svgIcone('nuvem', 14)} Sincronizando...`;
       btn.disabled = true;
     }
     try {
-      const listaNuvem = await listarDocumentosDoSupabase();
-      if (!Array.isArray(listaNuvem) || listaNuvem.length === 0) {
-        if (!silencioso) alert('Nenhum documento encontrado na sua nuvem Supabase.');
-        return;
-      }
-
-      let novos = 0;
-      for (const item of listaNuvem) {
-        const existente = this.documentos.find(d => String(d.id) === String(item.id));
-        if (!existente) {
-          this.documentos.unshift({
-            id: item.id,
-            titulo: item.titulo || 'Documento da Nuvem',
-            subtitulo: `Sincronizado do Supabase · ${item.atualizado_por || 'Autor'}`,
-            tipoDoc: 'artigo',
-            perfilId: item.norma || 'abnt',
-            dataModificacao: item.atualizado_em,
-            salvoNuvem: true,
-            precisaCarregarConteudo: true
-          });
-          novos++;
-        } else {
-          existente.salvoNuvem = true;
-          if (item.atualizado_em && (!existente.dataModificacao || new Date(item.atualizado_em) > new Date(existente.dataModificacao))) {
-            existente.precisaCarregarConteudo = true;
-            existente.dataModificacao = item.atualizado_em;
-            novos++;
-          }
-        }
-      }
-
-      if (novos > 0) {
+      const token = await obterTokenDrive();
+      if (!token) { if (!silencioso) alert('A sessão do Google Drive expirou. Reconecte o Drive.'); return; }
+      const arquivos = await listarBibliotecaDoDrive(token);
+      const r = mesclarBibliotecaDrive(this.documentos, arquivos);
+      if (r.novos || r.atualizados) {
         this.salvarDocumentosLocais();
         this.atualizarGrid();
       }
       if (!silencioso) {
-        alert(novos > 0 
-          ? `${novos} documento(s) da nuvem atualizados com sucesso!` 
-          : 'Seus documentos já estão atualizados com a nuvem.');
+        alert(r.novos || r.atualizados
+          ? `${r.novos} documento(s) novo(s) e ${r.atualizados} atualizado(s) vindos do seu Google Drive.`
+          : 'Seus documentos já estão atualizados com o seu Google Drive.');
       }
     } catch (err) {
-      if (!silencioso) alert(`Não foi possível sincronizar com a nuvem: ${err.message}`);
+      if (!silencioso) alert(`Não foi possível sincronizar com o Drive: ${err.message}`);
     } finally {
       if (btn && !silencioso) {
         btn.innerHTML = `${svgIcone('nuvem', 14)} Sincronizar Nuvem`;
