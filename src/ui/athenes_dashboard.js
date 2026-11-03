@@ -295,20 +295,23 @@ export class DashboardView {
                 <p>Ambiente de escrita e diagramação acadêmica em blocos com revisão estilo Google Docs e sincronia em tempo real.</p>
               </div>
               <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                <button type="button" class="ath-btn" id="athBtnSincronizarNuvem" title="Sincronizar e baixar documentos salvos na nuvem Supabase" style="font-weight:700;">
-                  ${svgIcone('nuvem', 14)} Sincronizar Nuvem
+                <button type="button" class="ath-btn ath-btn-icone" id="athBtnSincronizarNuvem" title="Sincronizar: traz do servidor e do Drive o que mudou em outros computadores e envia o que mudou aqui" aria-label="Sincronizar">
+                  ${svgIcone('sincronizar', 17)}
                 </button>
-                <button type="button" class="ath-btn" id="athBtnBackupEspaco" title="Exportar ou restaurar backup completo do seu perfil, artigos e documentos para Google Drive">
-                  ${svgIcone('config', 14)} Backup / Drive
+                <button type="button" class="ath-btn ath-btn-icone" id="athBtnBackupEspaco" title="Backup e restauração do perfil, artigos e documentos no Google Drive" aria-label="Backup no Drive">
+                  ${svgIcone('drive', 17)}
                 </button>
-                <label class="ath-btn" style="cursor:pointer;" title="Importar arquivo .athenes ou .json">
-                  ${svgIcone('mais', 14)} Importar JSON
+                <div class="ath-menu-importar" id="athMenuImportar">
+                  <button type="button" class="ath-btn" id="athBtnImportar" aria-haspopup="menu" aria-expanded="false" title="Importar um arquivo ou um modelo do Word">
+                    ${svgIcone('importar', 15)} Importar ${svgIcone('baixo', 12)}
+                  </button>
+                  <ul class="ath-menu-importar-lista" id="athMenuImportarLista" role="menu" hidden>
+                    <li><button type="button" role="menuitem" data-importar="json">${svgIcone('documento', 14)}<span><strong>Documento Athenes</strong><small>.athenes ou .json</small></span></button></li>
+                    <li><button type="button" role="menuitem" data-importar="docx">${svgIcone('docx', 14)}<span><strong>Template do Word</strong><small>.docx: extrai os estilos, sem copiar o texto</small></span></button></li>
+                  </ul>
                   <input type="file" accept=".json,.athenes" id="athInputImportarJson" style="display:none;">
-                </label>
-                <label class="ath-btn" style="cursor:pointer;" title="Importar um modelo do Word (.docx): extrai e consolida os estilos, sem copiar o texto">
-                  ${svgIcone('mais', 14)} Importar template .docx
                   <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" id="athInputImportarDocx" style="display:none;">
-                </label>
+                </div>
                 <button type="button" class="ath-btn ath-btn-primary" id="athBtnNovoDocModal">
                   ${svgIcone('mais', 14)} Novo Documento
                 </button>
@@ -403,6 +406,23 @@ export class DashboardView {
 
     const inputImportar = root.querySelector('#athInputImportarJson');
     inputImportar.addEventListener('change', e => this.importarDocumentoJson(e.target.files[0]));
+
+    const btnImportar = root.querySelector('#athBtnImportar');
+    const listaImportar = root.querySelector('#athMenuImportarLista');
+    const fecharMenuImportar = () => { listaImportar.hidden = true; btnImportar.setAttribute('aria-expanded', 'false'); };
+    btnImportar?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const abrir = listaImportar.hidden;
+      listaImportar.hidden = !abrir;
+      btnImportar.setAttribute('aria-expanded', String(abrir));
+      if (abrir) listaImportar.querySelector('button')?.focus();
+    });
+    listaImportar?.querySelectorAll('[data-importar]').forEach(item => item.addEventListener('click', () => {
+      fecharMenuImportar();
+      root.querySelector(item.dataset.importar === 'docx' ? '#athInputImportarDocx' : '#athInputImportarJson')?.click();
+    }));
+    document.addEventListener('click', (ev) => { if (!ev.target.closest?.('#athMenuImportar')) fecharMenuImportar(); });
+    root.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !listaImportar.hidden) { fecharMenuImportar(); btnImportar.focus(); } });
 
     root.querySelector('#athBtnSincronizarNuvem')?.addEventListener('click', () => {
       this.sincronizarComSupabase(false);
@@ -1539,8 +1559,9 @@ export class DashboardView {
       return;
     }
     if (btn && !silencioso) {
-      btn.innerHTML = `${svgIcone('nuvem', 14)} Sincronizando...`;
+      btn.classList.add('ath-girando');
       btn.disabled = true;
+      btn.title = 'Sincronizando…';
     }
     try {
       const token = await obterTokenDrive();
@@ -1593,8 +1614,9 @@ export class DashboardView {
       if (!silencioso) alert(`Não foi possível sincronizar com o Drive: ${err.message}`);
     } finally {
       if (btn && !silencioso) {
-        btn.innerHTML = `${svgIcone('nuvem', 14)} Sincronizar Nuvem`;
+        btn.classList.remove('ath-girando');
         btn.disabled = false;
+        btn.title = 'Sincronizar: traz do servidor e do Drive o que mudou em outros computadores e envia o que mudou aqui';
       }
     }
   }

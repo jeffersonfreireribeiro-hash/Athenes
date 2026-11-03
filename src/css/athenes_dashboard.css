@@ -1939,3 +1939,26 @@ mark.ath-pdf-grifo-texto {
 .ath-btn-rodape-sair { color: #B42318; border-color: #F5C2C0; background: #FFFFFF; }
 .ath-btn-rodape-sair:hover { background: #FEF2F2; border-color: #E8908B; }
 .ath-btn-rodape:focus-visible { outline: 2px solid var(--ath-primary, #314F79); outline-offset: 2px; }
+
+/* Barra de ações da página inicial: sincronizar e backup só com ícone; Importar como lista */
+.ath-btn-icone { width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.ath-btn-icone:focus-visible, .ath-menu-importar .ath-btn:focus-visible { outline: 2px solid var(--ath-primary, #314F79); outline-offset: 2px; }
+.ath-girando svg { animation: ath-giro 0.9s linear infinite; }
+@keyframes ath-giro { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ath-girando svg { animation-duration: 2.5s; } }
+
+.ath-menu-importar { position: relative; }
+.ath-menu-importar > .ath-btn { display: inline-flex; align-items: center; gap: 7px; }
+.ath-menu-importar-lista {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: 270px; margin: 0; padding: 6px; list-style: none;
+  background: #FFFFFF; border: 1px solid var(--ath-primary-line, #C8D7E6); border-radius: 12px; box-shadow: 0 10px 28px rgba(15, 23, 42, .16);
+}
+.ath-menu-importar-lista[hidden] { display: none; }
+.ath-menu-importar-lista button {
+  width: 100%; display: flex; align-items: flex-start; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent;
+  text-align: left; cursor: pointer; color: #1F2733; font: inherit;
+}
+.ath-menu-importar-lista button:hover, .ath-menu-importar-lista button:focus-visible { background: #EEF4FA; outline: none; }
+.ath-menu-importar-lista strong { display: block; font-size: 12.5px; }
+.ath-menu-importar-lista small { display: block; font-size: 11px; color: #64748B; margin-top: 1px; }
+.ath-menu-importar-lista svg { margin-top: 2px; color: var(--ath-primary, #314F79); flex: none; }
