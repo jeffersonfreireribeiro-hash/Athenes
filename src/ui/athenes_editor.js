@@ -4315,6 +4315,13 @@ export class EditorView {
       this.abrirPainelZotero();
     });
 
+    // Área em que o texto está visível: a barra e a pílula só aparecem quando a seleção está à vista (nunca por cima da faixa de ferramentas)
+    const areaVisivel = () => {
+      const r = this.container?.querySelector('#rmPrevPalco')?.getBoundingClientRect();
+      return r && r.width ? { top: r.top, bottom: r.bottom, left: r.left, right: r.right } : { top: 56, bottom: window.innerHeight, left: 0, right: window.innerWidth };
+    };
+    const estaVisivel = (rect) => { const a = areaVisivel(); return rect.bottom > a.top + 4 && rect.top < a.bottom - 4; };
+
     // Monitora seleção de texto e posição do cursor
     const atualizarPosicaoBarra = () => {
       // Se houver qualquer modal aberto na tela, oculta barra contextual e pill flutuante
@@ -4359,9 +4366,22 @@ export class EditorView {
         if (pillCaret) pillCaret.style.display = 'none';
         const rect = range.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
+          if (!estaVisivel(rect)) { barra.style.display = 'none'; return; } // seleção rolada para fora da área do texto
+          const area = areaVisivel();
           barra.style.display = 'flex';
-          barra.style.left = `${rect.left + rect.width / 2}px`;
-          barra.style.top = `${rect.top}px`;
+          // acompanha o texto: acima da seleção; sem espaço em cima (início da área), vai para baixo dela
+          const larg = barra.offsetWidth || 420;
+          const centro = rect.left + rect.width / 2;
+          barra.style.left = `${Math.max(area.left + larg / 2 + 8, Math.min(area.right - larg / 2 - 8, centro))}px`;
+          if (rect.top - (barra.offsetHeight || 40) - 12 < area.top) {
+            barra.style.top = `${Math.min(rect.bottom, area.bottom - 50)}px`;
+            barra.style.transform = 'translate(-50%, 0)';
+            barra.style.marginTop = '8px';
+          } else {
+            barra.style.top = `${rect.top}px`;
+            barra.style.transform = 'translate(-50%, -100%)';
+            barra.style.marginTop = '-8px';
+          }
 
           // Salva última seleção ativa para aplicar estilos pontuais mesmo com perda temporária de foco
           const blocoEl = editable?.closest('[data-bloco-id]');
@@ -4447,11 +4467,13 @@ export class EditorView {
         } else {
           r = editable.getBoundingClientRect();
         }
+        if (r && !estaVisivel(r)) { if (pillCaret) pillCaret.style.display = 'none'; return; }
         if (r && pillCaret) {
           pillCaret.style.display = 'flex';
-          const left = Math.max(140, Math.min(window.innerWidth - 140, r.left + (r.width || 0) / 2));
+          const area = areaVisivel();
+          const left = Math.max(area.left + 140, Math.min(area.right - 140, r.left + (r.width || 0) / 2));
           pillCaret.style.left = `${left}px`;
-          if (r.top < 55) {
+          if (r.top - 50 < area.top) {
             pillCaret.style.top = `${r.bottom}px`;
             pillCaret.style.transform = 'translate(-50%, 0)';
             pillCaret.style.marginTop = '8px';
@@ -4475,6 +4497,11 @@ export class EditorView {
     });
     document.addEventListener('keyup', () => setTimeout(atualizarPosicaoBarra, 50));
     window.addEventListener('scroll', atualizarPosicaoBarra, true);
+    window.addEventListener('resize', atualizarPosicaoBarra);
+    // a folha é redesenhada (marcadores, estilos, repaginação, zoom): a barra reencontra a seleção e segue o texto
+    let quadro = 0;
+    const seguirTexto = () => { cancelAnimationFrame(quadro); quadro = requestAnimationFrame(atualizarPosicaoBarra); };
+    if (typeof MutationObserver !== 'undefined' && this.container) new MutationObserver(seguirTexto).observe(this.container, { childList: true, subtree: true });
   }
 
   /* ==========================================================================
