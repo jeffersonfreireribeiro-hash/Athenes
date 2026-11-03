@@ -23,6 +23,12 @@ import { obterConfigGoogleDrive } from '../core/athenes_colaboracao.js';
 export class AthenesApp {
   constructor(appContainer) {
     this.container = appContainer;
+    // o salvamento é adiado alguns instantes (ver autoSalvar); ao sair da aba/página o que está pendente é gravado na hora
+    this._tSalvar = null;
+    this._docPendente = null;
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') this.descarregarSalvamento(); });
+    window.addEventListener('pagehide', () => this.descarregarSalvamento());
+    window.addEventListener('beforeunload', () => this.descarregarSalvamento());
     this.documentoAtivo = null;
     this.tela = 'dashboard'; // 'dashboard' | 'editor'
 
@@ -90,6 +96,7 @@ export class AthenesApp {
   }
 
   navegarParaLogin(docIdLink = null) {
+    this.descarregarSalvamento();
     document.querySelectorAll('.ath-modal-backdrop').forEach(m => m.remove());
     this.tela = 'login';
     this.container.innerHTML = '<div id="athAppLogin"></div>';
@@ -123,6 +130,7 @@ export class AthenesApp {
   }
 
   navegarParaDashboard() {
+    this.descarregarSalvamento(); // o painel lê os documentos do armazenamento: grava antes o que ainda estava pendente
     this.editorView?.desmontarAtalhos?.(); // remove os listeners globais do editor que está saindo
     this.tela = 'dashboard';
     this.container.innerHTML = '<div id="athAppDashboard"></div>';
@@ -262,10 +270,9 @@ export class AthenesApp {
   }
 
   /** Com o Drive conectado, o documento sobe (na pasta dele) alguns segundos depois da última alteração. */
-  agendarEnvioDrive() {
-    if (!driveConectado()) return;
+  agendarEnvioDrive(doc = this.documentoAtivo) {
+    if (!driveConectado() || !doc) return;
     clearTimeout(this._tDrive);
-    const doc = this.documentoAtivo;
     this._tDrive = setTimeout(async () => {
       try {
         await enviarDocumentoAoDrive(doc, obterConfigGoogleDrive().accessToken);
@@ -277,21 +284,41 @@ export class AthenesApp {
     }, 4000);
   }
 
-  autoSalvar({ semDrive = false } = {}) {
+  /**
+   * Marca o documento como alterado e agenda a gravação. Serializar e gravar a lista inteira (vários MB com imagens) a cada
+   * tecla custava ~30 ms síncronos; agora a digitação só carimba a data e a gravação acontece ~400 ms depois da última alteração.
+   */
+  autoSalvar({ semDrive = false, imediato = false } = {}) {
     if (!this.documentoAtivo) return;
-    if (!semDrive) this.documentoAtivo.dataModificacao = new Date().toISOString();
+    if (semDrive || imediato) { this.descarregarSalvamento(); this.gravarDocumento(this.documentoAtivo, { semDrive }); return; }
+    this.documentoAtivo.dataModificacao = new Date().toISOString();
+    this._docPendente = this.documentoAtivo;
+    clearTimeout(this._tSalvar);
+    this._tSalvar = setTimeout(() => this.descarregarSalvamento(), 400);
+  }
 
+  /** Grava agora o que estiver pendente (troca de tela, aba oculta, fechamento da página). */
+  descarregarSalvamento() {
+    clearTimeout(this._tSalvar);
+    this._tSalvar = null;
+    const doc = this._docPendente;
+    this._docPendente = null;
+    if (doc) this.gravarDocumento(doc, { semDrive: false });
+  }
+
+  gravarDocumento(doc, { semDrive = false } = {}) {
+    if (!doc) return;
     try {
       const salvo = localStorage.getItem('athenes_docs_indice');
       let lista = salvo ? JSON.parse(salvo) : [];
-      const idx = lista.findIndex(d => d.id === this.documentoAtivo.id);
+      const idx = lista.findIndex(d => d.id === doc.id);
       if (idx >= 0) {
-        lista[idx] = this.documentoAtivo;
+        lista[idx] = doc;
       } else {
-        lista.unshift(this.documentoAtivo);
+        lista.unshift(doc);
       }
       localStorage.setItem('athenes_docs_indice', JSON.stringify(lista));
-      if (!semDrive) this.agendarEnvioDrive();
+      if (!semDrive) this.agendarEnvioDrive(doc);
     } catch (e) {
       // antes falhava em silêncio e o documento voltava sem as alterações ao reabrir
       mostrarAviso(eErroDeCota(e)

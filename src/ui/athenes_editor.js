@@ -136,6 +136,8 @@ function alinhamentoCss(valor, padrao) {
   return ALINHAMENTO_CSS[valor] || padrao;
 }
 
+const LIMITE_HISTORICO_CARACTERES = 24_000_000;
+
 export class EditorView {
   constructor(containerEl, documento, opcoes = {}) {
     this.container = containerEl;
@@ -367,7 +369,9 @@ export class EditorView {
 
     this.historico = this.historico.slice(0, this.historicoIndice + 1);
     this.historico.push(snap);
-    if (this.historico.length > 50) this.historico.shift();
+    // no máximo 50 estados E ~24 M caracteres no total: com imagens embutidas cada estado passa de 2 MB e 50 cópias ocupavam >100 MB
+    let total = this.historico.reduce((n, x) => n + x.length, 0);
+    while (this.historico.length > 2 && (this.historico.length > 50 || total > LIMITE_HISTORICO_CARACTERES)) total -= this.historico.shift().length;
     this.historicoIndice = this.historico.length - 1;
   }
 
@@ -3037,6 +3041,7 @@ export class EditorView {
       p.addEventListener('input', () => {
         b.texto = removerPalavrasIniciais(p.innerHTML); // o destaque de palavras iniciais é só de exibição
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
+        this.notificarMudancaRapida(); // agenda gravação/histórico (adiados): fechar a aba com o cursor no campo não perde mais o texto
       });
 
       p.addEventListener('keydown', e => {
