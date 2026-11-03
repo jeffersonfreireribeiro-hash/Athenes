@@ -750,8 +750,11 @@ export async function exportarParaDocx(documento) {
 
         const antes = b.espaco_antes_pt !== undefined ? Math.round(b.espaco_antes_pt * 20) : 0;
         const depois = b.espaco_depois_pt !== undefined ? Math.round(b.espaco_depois_pt * 20) : 0;
-        const linha = b.entrelinha ? Math.round(b.entrelinha * 240) : 360;
-        const spacingXml = `<w:spacing w:line="${linha}" w:lineRule="auto" w:before="${antes}" w:after="${depois}"/>`;
+        const tipoLinha = b.entrelinha_tipo ?? (b.entrelinha === undefined ? estAv?.entrelinha_tipo : undefined);
+        const ptLinha = Number(b.entrelinha_pt ?? estAv?.entrelinha_pt);
+        const regraLinha = (tipoLinha === 'exatamente' || tipoLinha === 'pelo_menos') && ptLinha > 0;
+        const linha = regraLinha ? Math.round(ptLinha * 20) : (b.entrelinha ? Math.round(b.entrelinha * 240) : 360);
+        const spacingXml = `<w:spacing w:line="${linha}" w:lineRule="${regraLinha ? (tipoLinha === 'exatamente' ? 'exact' : 'atLeast') : 'auto'}" w:before="${antes}" w:after="${depois}"/>`;
 
         if (capitularXml) bodyXmlParts.push(capitularXml);
         bodyXmlParts.push(`<w:p><w:pPr>${decoXml}${indXml}<w:jc w:val="${jcVal}"/>${spacingXml}</w:pPr>${runs.join('')}</w:p>`);

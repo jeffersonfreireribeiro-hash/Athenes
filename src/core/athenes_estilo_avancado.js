@@ -70,6 +70,8 @@ export function sanitizarEstiloAvancado(estilo) {
   if (!estilo || typeof estilo !== 'object') return estilo;
   const novo = { ...estilo };
   if (novo.recuo_direito_mm !== undefined) novo.recuo_direito_mm = num(novo.recuo_direito_mm, 0, 200, 0);
+  if (novo.entrelinha_tipo === 'pelo_menos' || novo.entrelinha_tipo === 'exatamente') novo.entrelinha_pt = num(novo.entrelinha_pt, 1, 400, 14);
+  else { delete novo.entrelinha_tipo; delete novo.entrelinha_pt; }
   const av = normalizarAvancado(novo.avancado);
   if (av) novo.avancado = av; else delete novo.avancado;
   return novo;

@@ -101,7 +101,7 @@ export function parametrosTextoPt(bloco, ctx) {
   const est = ctx.estilos[bloco.estiloId] || (bloco.tipo === 'titulo' ? ctx.estilos[`titulo${Math.min(6, bloco.nivel || 1)}`] : null) || ctx.estilos.corpo;
   if (!est) return null;
   const tam = bloco.tamanho_pt ?? est.tamanho_pt ?? 12;
-  const ent = entrelinhaEfetiva({ entrelinha: bloco.entrelinha ?? est.entrelinha ?? 1.4, fonte: bloco.fonte ?? est.fonte }, 1.4); // mesma conta do CSS: a estimativa de altura acompanha o que é desenhado
+  const ent = entrelinhaEfetiva({ entrelinha: bloco.entrelinha ?? est.entrelinha ?? 1.4, fonte: bloco.fonte ?? est.fonte, tamanho_pt: tam, entrelinha_tipo: bloco.entrelinha !== undefined ? undefined : est.entrelinha_tipo, entrelinha_pt: est.entrelinha_pt }, 1.4); // mesma conta do CSS: a estimativa de altura acompanha o que é desenhado
   const antes = bloco.espaco_antes_pt ?? est.espaco_antes_pt ?? 0;
   const depois = bloco.espaco_depois_pt ?? est.espaco_depois_pt ?? 0;
   const recuoMm = bloco.recuo_esquerdo_mm ?? est.recuo_esquerdo_mm ?? 0;

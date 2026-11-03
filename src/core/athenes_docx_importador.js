@@ -266,6 +266,7 @@ function estiloDe(id, nome, e, tamPad, extra = {}) {
     id, nome, tipo: 'paragrafo', fonte: f.id, tamanho_pt: tam, peso: e.b ? 700 : 400, cor: e.cor || '#1F2733',
     italico: !!e.i, sublinhado: !!e.u, caixa_alta: !!e.caps, alinhamento: ALINHAMENTO[e.jc] || 'esquerda',
     entrelinha: Math.min(3, Math.max(1, Math.round(entrelinha * 100) / 100)),
+    ...((e.linha && (e.regraLinha === 'exact' || e.regraLinha === 'atLeast')) ? { entrelinha_tipo: e.regraLinha === 'exact' ? 'exatamente' : 'pelo_menos', entrelinha_pt: Math.round(e.linha / 20 * 10) / 10 } : {}),
     espaco_antes_pt: Math.round((e.antes || 0) / 20 * 10) / 10, espaco_depois_pt: Math.round((e.depois || 0) / 20 * 10) / 10,
     recuo_primeira_linha_mm: mm(e.primeira || 0), recuo_esquerdo_mm: mm(e.esq || 0), recuo_deslocado_mm: mm(e.deslocado || 0),
     espacamento_letras_em: 0, hifenizacao: false, ...extra

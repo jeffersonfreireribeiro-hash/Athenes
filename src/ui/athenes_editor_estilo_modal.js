@@ -7,7 +7,7 @@
  */
 
 import { svgIcone } from './athenes_icones.js';
-import { ptParaMm, mmParaPt, FONTES_SISTEMA, PESOS_FONTE, estiloParaCss } from '../core/athenes_estilos.js';
+import { ptParaMm, mmParaPt, FONTES_SISTEMA, PESOS_FONTE, estiloParaCss, TIPOS_ENTRELINHA, tipoEntrelinhaDoEstilo, aplicarTipoEntrelinha } from '../core/athenes_estilos.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { AVANCADO_PADRAO, cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais, normalizarAvancado } from '../core/athenes_estilo_avancado.js';
 
@@ -19,7 +19,93 @@ const grupo = (titulo, ativaPath, corpo) => `<fieldset style="border:1px solid #
   <legend style="font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569; padding:0 4px;"><label style="cursor:pointer;"><input type="checkbox" data-av="${ativaPath}"> ${titulo}</label></legend>
   <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px;">${corpo}</div></fieldset>`;
 
-/** Seção "Recuos e decorações" (estilos de parágrafo avançados); os valores vêm de data-av="caminho". */
+const wcampo = (rot, pw, extra = '', unidade = '') => `<label style="${LBL}">${rot}<span style="display:flex; align-items:center; gap:4px;"><input type="number" class="ath-input" data-pw="${pw}" ${extra} style="height:34px; line-height:normal;">${unidade ? `<span style="font:500 11.5px var(--glx-font); color:#64748B;">${unidade}</span>` : ''}</span></label>`;
+const wselect = (rot, pw, opcoes) => `<label style="${LBL}">${rot}<select class="ath-select" data-pw="${pw}" style="height:34px; line-height:normal;">${opcoes.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></label>`;
+const wgrupo = (titulo, corpo) => `<fieldset style="border:0; border-top:1px solid #D5DDE8; padding:6px 0 0; margin:0;"><legend style="font:700 12px var(--glx-font); color:#1E3A8A; padding:0 6px 0 0;">${titulo}</legend>${corpo}</fieldset>`;
+
+/** Seção "Parágrafo" com os nomes e as unidades da caixa Parágrafo do Word (recuos em cm, espaçamentos em pt). */
+export function secaoParagrafoWordHtml() {
+  return `<div id="athParagrafoWord" style="display:flex; flex-direction:column; gap:8px;">
+    <span style="font:800 11.5px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569;">Parágrafo</span>
+    ${wgrupo('Recuo', `<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
+      ${wcampo('Esquerda:', 'esquerda', 'step="0.1" min="0" max="20"', 'cm')}
+      ${wselect('Especial:', 'especial', [['nenhum', '(nenhum)'], ['primeira_linha', 'Primeira linha'], ['deslocamento', 'Deslocamento']])}
+      ${wcampo('Direita:', 'direita', 'step="0.1" min="0" max="20"', 'cm')}
+      ${wcampo('Por:', 'por', 'step="0.1" min="0" max="10"', 'cm')}
+    </div>`)}
+    ${wgrupo('Espaçamento', `<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
+      ${wcampo('Antes:', 'antes', 'step="1" min="0" max="200"', 'pt')}
+      ${wselect('Espaçamento entre linhas:', 'tipo_linha', TIPOS_ENTRELINHA.map(t => [t.id, t.rotulo]))}
+      ${wcampo('Depois:', 'depois', 'step="1" min="0" max="200"', 'pt')}
+      ${wcampo('Em:', 'em_linha', 'step="0.05" min="0.5" max="5"', '<span data-pw-unid-linha></span>')}
+      ${wcampo('Entre parágrafos (Enter):', 'enter', 'step="1" min="0" max="48"', 'pt')}
+    </div>`)}
+  </div>`;
+}
+
+/** Liga os campos data-pw ao rascunho do estilo; guarda recuos em mm e espaços em pt, como o formato do tema. */
+export function ligarParagrafoWord(raiz, r, aoMudar) {
+  const q = (n) => raiz.querySelector(`[data-pw="${n}"]`);
+  if (!q('esquerda')) return;
+  const arred = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
+  const cm = (mm) => arred((Number(mm) || 0) / 10);
+
+  const especialAtual = () => (Number(r.recuo_deslocado_mm) > 0 ? 'deslocamento' : Number(r.recuo_primeira_linha_mm) > 0 ? 'primeira_linha' : 'nenhum');
+  q('esquerda').value = cm(r.recuo_esquerdo_mm);
+  q('direita').value = cm(r.recuo_direito_mm);
+  q('especial').value = especialAtual();
+  q('por').value = q('especial').value === 'deslocamento' ? cm(r.recuo_deslocado_mm) : cm(r.recuo_primeira_linha_mm);
+  q('antes').value = arred(r.espaco_antes_pt || 0, 1);
+  q('depois').value = arred(r.espaco_depois_pt || 0, 1);
+  q('enter').value = arred(r.espaco_paragrafos_pt ?? 6, 1);
+
+  const sincronizarLinha = () => {
+    const tipo = q('tipo_linha').value;
+    const emPt = tipo === 'pelo_menos' || tipo === 'exatamente';
+    const em = q('em_linha');
+    em.disabled = !(emPt || tipo === 'multiplos');
+    em.step = emPt ? '0.5' : '0.05';
+    em.min = emPt ? '1' : '0.5';
+    em.max = emPt ? '400' : '5';
+    em.value = emPt ? arred(r.entrelinha_pt || 0, 1) : (tipo === 'multiplos' ? arred(r.entrelinha || 1.15) : '');
+    raiz.querySelector('[data-pw-unid-linha]').textContent = emPt ? 'pt' : '';
+  };
+  q('tipo_linha').value = tipoEntrelinhaDoEstilo(r);
+  sincronizarLinha();
+
+  const aplicarRecuoEspecial = () => {
+    const esp = q('especial').value;
+    const por = Math.max(0, parseFloat(q('por').value) || 0) * 10;
+    r.recuo_primeira_linha_mm = esp === 'primeira_linha' ? por : 0;
+    r.recuo_deslocado_mm = esp === 'deslocamento' ? por : 0;
+    q('por').disabled = esp === 'nenhum';
+  };
+  q('por').disabled = q('especial').value === 'nenhum';
+
+  const num = (n) => Math.max(0, parseFloat(q(n).value) || 0);
+  q('esquerda').addEventListener('input', () => { r.recuo_esquerdo_mm = num('esquerda') * 10; aoMudar?.(); });
+  q('direita').addEventListener('input', () => { r.recuo_direito_mm = num('direita') * 10; aoMudar?.(); });
+  q('especial').addEventListener('change', () => {
+    if (q('especial').value !== 'nenhum' && !(parseFloat(q('por').value) > 0)) q('por').value = 1.25; // padrão do Word: 1,25 cm
+    aplicarRecuoEspecial(); aoMudar?.();
+  });
+  q('por').addEventListener('input', () => { aplicarRecuoEspecial(); aoMudar?.(); });
+  q('antes').addEventListener('input', () => { r.espaco_antes_pt = num('antes'); aoMudar?.(); });
+  q('depois').addEventListener('input', () => { r.espaco_depois_pt = num('depois'); aoMudar?.(); });
+  q('enter').addEventListener('input', () => { r.espaco_paragrafos_pt = num('enter'); aoMudar?.(); });
+  q('tipo_linha').addEventListener('change', () => {
+    const tipo = q('tipo_linha').value;
+    const valor = tipo === 'pelo_menos' || tipo === 'exatamente' ? (r.entrelinha_pt || Math.round((Number(r.tamanho_pt) || 11) * 1.2 * 2) / 2) : r.entrelinha;
+    aplicarTipoEntrelinha(r, tipo, valor);
+    sincronizarLinha(); aoMudar?.();
+  });
+  q('em_linha').addEventListener('input', () => {
+    const v = parseFloat(q('em_linha').value);
+    if (v > 0) { aplicarTipoEntrelinha(r, q('tipo_linha').value, v); aoMudar?.(); }
+  });
+}
+
+/** Seção "Decorações" (estilos de parágrafo avançados); os valores vêm de data-av="caminho". */
 export function secaoAvancadaHtml() {
   return `<div id="athModalAvancado" style="display:flex; flex-direction:column; gap:8px;">
     <style>
@@ -32,17 +118,8 @@ export function secaoAvancadaHtml() {
       #athModalAvancado fieldset > div { gap:6px !important; }
       #athModalAvancado legend label { display:inline-flex; flex-direction:row !important; align-items:center; }
     </style>
-    <span style="font:800 11.5px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569;">Recuos e decorações do parágrafo</span>
-    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
-      ${campo('Espaço antes (mm)', 'espaco_antes_pt', 'number', 'data-pt-em-mm step="0.5" min="0" max="42"')}
-      ${campo('Espaço depois (mm)', 'espaco_depois_pt', 'number', 'data-pt-em-mm step="0.5" min="0" max="42"')}
-    </div>
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:8px;">
-      ${campo('1ª linha (mm)', 'recuo_primeira_linha_mm', 'number', 'step="0.5" min="-50" max="100"')}
-      ${campo('Esquerdo (mm)', 'recuo_esquerdo_mm', 'number', 'step="0.5" min="0" max="200"')}
-      ${campo('Direito (mm)', 'recuo_direito_mm', 'number', 'step="0.5" min="0" max="200"')}
-      ${campo('Deslocado (mm)', 'recuo_deslocado_mm', 'number', 'step="0.5" min="0" max="100"')}
-    </div>
+    ${secaoParagrafoWordHtml()}
+    <span style="font:800 11.5px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569;">Decorações do parágrafo</span>
     ${grupo('Barra lateral', 'avancado.barra_lateral.ativa',
       `<label style="${LBL}">Lado<select class="ath-select" data-av="avancado.barra_lateral.lado" style="height:34px; line-height:normal;"><option value="esquerda">Esquerda</option><option value="direita">Direita</option></select></label>
        ${campo('Largura (pt)', 'avancado.barra_lateral.largura_pt', 'number', 'step="0.5" min="0.5" max="24"')}
@@ -76,6 +153,7 @@ function gravarCaminho(o, path, valor) {
 
 /** Liga os campos data-av="caminho" de `raiz` ao rascunho do estilo (valores iniciais e alterações ao vivo). */
 export function ligarCamposAvancados(raiz, rascunho, aoMudar) {
+  ligarParagrafoWord(raiz, rascunho, aoMudar);
   raiz.querySelectorAll('[data-av]').forEach(inp => {
     const path = inp.dataset.av;
     const atual = lerCaminho(rascunho, path) ?? lerCaminho({ avancado: AVANCADO_PADRAO }, path); // vazio mostra o valor padrão
@@ -196,26 +274,18 @@ export class ModalEditorEstilo {
           </label>
         </div>
 
-        <!-- Tamanho e Entrelinha -->
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
+        <!-- Tamanho -->
+        <div style="display:grid; grid-template-columns: 1fr; gap:12px;">
           <label style="font:700 12px var(--glx-font); color:#334155; display:flex; flex-direction:column; gap:4px;">
             Tamanho (pt)
             <input type="number" id="athModalEstiloTamanho" class="ath-input" min="6" max="72" step="0.5" value="${r.tamanho_pt || 12}" style="height:34px;">
-          </label>
-          <label style="font:700 12px var(--glx-font); color:#334155; display:flex; flex-direction:column; gap:4px;">
-            Entrelinha
-            <input type="number" id="athModalEstiloEntrelinha" class="ath-input" step="0.05" min="1" max="3" value="${r.entrelinha || 1.5}" style="height:34px;">
-          </label>
-          <label style="font:700 12px var(--glx-font); color:#334155; display:flex; flex-direction:column; gap:4px;">
-            Espaço Enter (mm)
-            <input type="number" id="athModalEstiloEspacoParagrafos" class="ath-input" min="0" max="17" step="0.5" value="${ptParaMm(r.espaco_paragrafos_pt ?? 6)}" style="height:34px;">
           </label>
         </div>
 
         <!-- 7 Modos de Formato / Alinhamento -->
         <div>
           <span style="display:block; font:800 11.5px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569; margin-bottom:6px;">
-            Formato / Alinhamento Editorial (7 Modos)
+            Alinhamento (7 modos editoriais)
           </span>
           <div class="rm-icg rm-icg-formato" style="width:100%; box-sizing:border-box;">
             <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Alinhar à esquerda">
@@ -302,16 +372,6 @@ export class ModalEditorEstilo {
 
     modal.querySelector('#athModalEstiloTamanho').addEventListener('input', e => {
       this.rascunho.tamanho_pt = parseFloat(e.target.value) || 12;
-      atualizarPrevia();
-    });
-
-    modal.querySelector('#athModalEstiloEntrelinha').addEventListener('input', e => {
-      this.rascunho.entrelinha = parseFloat(e.target.value) || 1.5;
-      atualizarPrevia();
-    });
-
-    modal.querySelector('#athModalEstiloEspacoParagrafos').addEventListener('input', e => {
-      this.rascunho.espaco_paragrafos_pt = mmParaPt(parseFloat(e.target.value));
       atualizarPrevia();
     });
 

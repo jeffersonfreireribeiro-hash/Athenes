@@ -550,10 +550,58 @@ export function criarEstilosPadrao(perfilId = 'abnt') {
  */
 export const FATOR_LINHA_SIMPLES = Object.freeze({ times: 1.149, arial: 1.149, georgia: 1.136, garamond: 1.12, cambria: 1.172, calibri: 1.22, aptos: 1.22, consolas: 1.17 });
 
+/**
+ * "Espaçamento entre linhas" com a nomenclatura da caixa Parágrafo do Word. Simples, 1,5 linhas, Duplo e Múltiplos são
+ * múltiplos da linha (`entrelinha`); Pelo menos e Exatamente usam `entrelinha_pt` (altura da linha em pontos).
+ */
+export const TIPOS_ENTRELINHA = Object.freeze([
+  { id: 'simples', rotulo: 'Simples' },
+  { id: '1_5', rotulo: '1,5 linhas' },
+  { id: 'duplo', rotulo: 'Duplo' },
+  { id: 'pelo_menos', rotulo: 'Pelo menos' },
+  { id: 'exatamente', rotulo: 'Exatamente' },
+  { id: 'multiplos', rotulo: 'Múltiplos' }
+]);
+
+/** Tipo de espaçamento entre linhas do estilo, como o Word o chamaria. */
+export function tipoEntrelinhaDoEstilo(estilo) {
+  const t = estilo?.entrelinha_tipo;
+  if ((t === 'pelo_menos' || t === 'exatamente') && Number(estilo.entrelinha_pt) > 0) return t;
+  const v = Number(estilo?.entrelinha) || 1.5;
+  if (Math.abs(v - 1) < 0.001) return 'simples';
+  if (Math.abs(v - 1.5) < 0.001) return '1_5';
+  if (Math.abs(v - 2) < 0.001) return 'duplo';
+  return 'multiplos';
+}
+
+/** Grava no estilo o tipo escolhido e o valor ("Em": múltiplo da linha ou pontos, conforme o tipo). */
+export function aplicarTipoEntrelinha(estilo, tipo, valor) {
+  const tam = Number(estilo.tamanho_pt) || 11;
+  const limita = (n, a, b) => Math.min(b, Math.max(a, n));
+  delete estilo.entrelinha_tipo;
+  delete estilo.entrelinha_pt;
+  if (tipo === 'pelo_menos' || tipo === 'exatamente') {
+    const pt = limita(Number(valor) || tam * 1.2, 1, 400);
+    estilo.entrelinha_tipo = tipo;
+    estilo.entrelinha_pt = pt;
+    estilo.entrelinha = Math.round(limita(pt / tam, 0.5, 3) * 100) / 100; // aproximação para quem lê só o múltiplo
+  } else if (tipo === 'simples') estilo.entrelinha = 1;
+  else if (tipo === '1_5') estilo.entrelinha = 1.5;
+  else if (tipo === 'duplo') estilo.entrelinha = 2;
+  else estilo.entrelinha = limita(Number(valor) || 1.15, 0.5, 5);
+  return estilo;
+}
+
 /** Entrelinha em múltiplos do corpo para o CSS e para a estimativa de altura (valor do estilo × altura da linha simples da fonte). */
 export function entrelinhaEfetiva(estilo, padrao = 1.5) {
+  const fator = FATOR_LINHA_SIMPLES[estilo?.fonte] || 1;
+  const pt = Number(estilo?.entrelinha_pt);
+  if (pt > 0 && (estilo.entrelinha_tipo === 'exatamente' || estilo.entrelinha_tipo === 'pelo_menos')) {
+    const mult = pt / (Number(estilo.tamanho_pt) || 11);
+    return Math.round((estilo.entrelinha_tipo === 'exatamente' ? mult : Math.max(mult, fator)) * 1000) / 1000;
+  }
   const valor = Number(estilo?.entrelinha) || padrao;
-  return Math.round(valor * (FATOR_LINHA_SIMPLES[estilo?.fonte] || 1) * 1000) / 1000;
+  return Math.round(valor * fator * 1000) / 1000;
 }
 
 export function estiloParaCssTipografia(estilo) {

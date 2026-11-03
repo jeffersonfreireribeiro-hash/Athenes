@@ -456,13 +456,13 @@ export class PainelPropriedades {
             <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Alinhar à esquerda: primeira e última linhas à esquerda">
               ${svgIcone('alinhamento_esq', 16)}
             </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'centro' ? 'on' : ''}" data-alin="centro" title="Centralizado: todo o texto centralizado">
+            <button type="button" class="rm-ic-bt ${alinAtivo === 'centro' ? 'on' : ''}" data-alin="centro" title="Centralizada: todo o texto centralizado">
               ${svgIcone('alinhamento_cen', 16)}
             </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'direita' ? 'on' : ''}" data-alin="direita" title="Alinhar à direita: todo o texto alinhado à direita">
+            <button type="button" class="rm-ic-bt ${alinAtivo === 'direita' ? 'on' : ''}" data-alin="direita" title="Direita: todo o texto alinhado à direita">
               ${svgIcone('alinhamento_dir', 16)}
             </button>
-            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado' ? 'on' : ''}" data-alin="justificado" title="Justificado total: todas as linhas preenchem toda a largura">
+            <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado' ? 'on' : ''}" data-alin="justificado" title="Justificada: todas as linhas preenchem toda a largura">
               ${svgIcone('alinhamento_jus', 16)}
             </button>
             <button type="button" class="rm-ic-bt ${alinAtivo === 'justificado_esquerda' ? 'on' : ''}" data-alin="justificado_esquerda" title="Justificado com a última linha à esquerda (padrão editorial)">
@@ -1842,10 +1842,10 @@ export class PainelPropriedades {
       <!-- FORMATO: 7 botões ocupando 100% da largura útil -->
       <div>
         <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
-          Formato
+          Alinhamento
         </span>
         <div class="rm-icg rm-icg-formato" style="width:100%; box-sizing:border-box;">
-          <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Alinhar à esquerda: primeira e última linhas à esquerda">
+          <button type="button" class="rm-ic-bt ${alinAtivo === 'esquerda' ? 'on' : ''}" data-alin="esquerda" title="Esquerda: primeira e última linhas à esquerda">
             ${svgIcone('alinhamento_esq', 16)}
           </button>
           <button type="button" class="rm-ic-bt ${alinAtivo === 'centro' ? 'on' : ''}" data-alin="centro" title="Centralizado: todo o texto centralizado">
@@ -1870,21 +1870,12 @@ export class PainelPropriedades {
       </div>
 
       <div class="rm-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-        <label style="font:700 12px var(--glx-font);">Entrelinha
-          <input type="number" id="athEstiloEntrelinha" class="glx-input" step="0.05" min="1" max="3" value="${rasc.entrelinha || 1.5}" style="width:100%; height:34px; margin-top:4px; box-sizing:border-box;">
-        </label>
         <label style="font:700 12px var(--glx-font);">Cor do texto
           <label class="rm-cor-linha-badge" id="athEstiloCorBadge" style="display:flex; align-items:center; gap:6px; cursor:pointer; padding:3px 10px; border-radius:999px; background:var(--ath-input, #F4F5F8); border:1px solid var(--ath-primary-line, #C8D7E6); margin-top:4px; height:34px; box-sizing:border-box; position:relative;" title="Clique para escolher a cor">
             <span id="athEstiloCorSwatch" style="width:16px; height:16px; border-radius:50%; background:${corAtiva}; border:1px solid rgba(0,0,0,0.2); display:inline-block; flex:none;"></span>
             <span style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);" id="athEstiloCorHex">${corAtiva}</span>
             <input type="color" id="athEstiloCorInput" value="${corAtiva.startsWith('#') ? corAtiva : '#1F2733'}" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
           </label>
-        </label>
-      </div>
-
-      <div>
-        <label style="font:700 12px var(--glx-font); width:100%; display:block;">Distância Parágrafos Enter (mm)
-          <input type="number" id="athEstiloEspacoParagrafos" class="glx-input" min="0" max="17" step="0.5" value="${ptParaMm(rasc.espaco_paragrafos_pt ?? 6)}" style="width:100%; height:34px; margin-top:4px; box-sizing:border-box;">
         </label>
       </div>
 
@@ -1964,11 +1955,6 @@ export class PainelPropriedades {
       });
     });
 
-    box.querySelector('#athEstiloEntrelinha').addEventListener('input', e => {
-      rasc.entrelinha = parseFloat(e.target.value) || 1.5;
-      atualizarPrevia();
-    });
-
     box.querySelector('#athEstiloCorBadge').addEventListener('click', () => {
       inputCor.click();
     });
@@ -1980,11 +1966,6 @@ export class PainelPropriedades {
 
     box.querySelector('#athEstiloHifenizacao')?.addEventListener('change', e => {
       rasc.hifenizacao = e.target.checked;
-      atualizarPrevia();
-    });
-
-    box.querySelector('#athEstiloEspacoParagrafos').addEventListener('input', e => {
-      rasc.espaco_paragrafos_pt = mmParaPt(parseFloat(e.target.value));
       atualizarPrevia();
     });
 
