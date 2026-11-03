@@ -44,3 +44,34 @@ test('abrir baixa o conteúdo do Drive e mantém o vínculo com o arquivo', asyn
   assert.equal(doc.precisaCarregarConteudo, false);
   assert.ok(doc.driveSincronizadoEm >= (doc.dataModificacao || ''), 'não é reenviado ao Drive só por ter sido baixado');
 });
+
+test('outro computador: as pastas do Drive voltam para a árvore local e os documentos caem nas pastas certas', async () => {
+  const m = new Map();
+  globalThis.localStorage = { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), key: i => [...m.keys()][i], get length() { return m.size; } };
+  const { importarPastasDoDrive } = await import('../src/core/athenes_drive_sync.js');
+  const filhos = {
+    RAIZ: [{ id: 'F1', name: 'Relatórios & Artigos' }, { id: 'F2', name: 'Tese' }, { id: 'S', name: 'Documentos' }],
+    F1: [{ id: 'F11', name: 'Capítulos' }], F2: [], F11: []
+  };
+  const fetchFalso = async (url) => {
+    const q = decodeURIComponent(new URL(url).searchParams.get('q') || '');
+    if (/name = 'Athenes'/.test(q)) return resp({ files: [{ id: 'RAIZ', name: 'Athenes' }] });
+    const pai = /'([^']+)' in parents/.exec(q)?.[1];
+    return resp({ files: filhos[pai] || [] });
+  };
+  const pastas = [
+    { id: 'pasta_bib_raiz', nome: 'Bibliografia & Leituras', tipo: 'bibliografia', origem: 'minhas', subpastas: [] },
+    { id: 'pasta_rel_raiz', nome: 'Relatórios & Artigos', tipo: 'relatorios', origem: 'minhas', subpastas: [] }
+  ];
+  const r = await importarPastasDoDrive('T', { fetchImpl: fetchFalso, pastas });
+  assert.equal(pastas.find(p => p.id === 'pasta_rel_raiz').driveId, 'F1', 'a pasta local de mesmo nome é vinculada à do Drive');
+  assert.equal(r.importadas, 2, 'Tese e Capítulos vieram do Drive');
+  assert.ok(pastas.find(p => p.nome === 'Tese'));
+  assert.equal(pastas.find(p => p.id === 'pasta_rel_raiz').subpastas[0].nome, 'Capítulos');
+  assert.ok(!pastas.some(p => p.nome === 'Documentos'), 'pasta de sistema não vira pasta do usuário');
+
+  const docs = [];
+  const idCap = pastas.find(p => p.id === 'pasta_rel_raiz').subpastas[0].id;
+  mesclarBibliotecaDrive(docs, [{ driveFileId: 'a1', titulo: 'Cap 1', modificadoEm: '2026-11-03T00:00:00Z', driveFolderId: 'F11' }], r.mapa);
+  assert.deepEqual([docs[0].pastaId, docs[0].driveFolderId], [idCap, 'F11']);
+});

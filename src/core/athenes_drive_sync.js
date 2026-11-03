@@ -234,23 +234,27 @@ export async function listarBibliotecaDoDrive(token, { fetchImpl = globalThis.fe
   const arquivos = await listarArquivosDoGoogleDrive(token, fetchImpl);
   return arquivos
     .filter(f => /\.athenes$/i.test(f.name || ''))
-    .map(f => ({ driveFileId: f.id, titulo: semExtensao(f.name), modificadoEm: f.modifiedTime || '' }));
+    .map(f => ({ driveFileId: f.id, titulo: semExtensao(f.name), modificadoEm: f.modifiedTime || '', driveFolderId: f.parents?.[0] || '' }));
 }
 
 /**
  * Acrescenta ao índice local os documentos do Drive que ainda não existem aqui (como "só no Drive": conteúdo baixado ao abrir)
  * e marca os que já existem para baixar de novo quando o do Drive é mais novo. Devolve { novos, atualizados }.
  */
-export function mesclarBibliotecaDrive(documentos, arquivos) {
+export function mesclarBibliotecaDrive(documentos, arquivos, mapaPastas = {}) {
   const r = { novos: 0, atualizados: 0 };
   for (const f of arquivos || []) {
     const local = documentos.find(d => d.driveFileId === f.driveFileId);
     if (!local) {
       documentos.unshift({
         id: `drive_${f.driveFileId}`, titulo: f.titulo, subtitulo: 'Do seu Google Drive', tipoDoc: 'artigo', perfilId: 'abnt',
-        dataModificacao: f.modificadoEm, driveFileId: f.driveFileId, driveSincronizadoEm: f.modificadoEm, origemDrive: true, precisaCarregarConteudo: true
+        dataModificacao: f.modificadoEm, driveFileId: f.driveFileId, driveSincronizadoEm: f.modificadoEm, origemDrive: true, precisaCarregarConteudo: true,
+        ...(f.driveFolderId ? { driveFolderId: f.driveFolderId } : {}), ...(mapaPastas[f.driveFolderId] ? { pastaId: mapaPastas[f.driveFolderId] } : {})
       });
       r.novos++;
+    } else if (!local.pastaId && mapaPastas[f.driveFolderId]) {
+      local.pastaId = mapaPastas[f.driveFolderId]; // documento já importado antes, agora na pasta certa
+      r.atualizados++;
     } else if (f.modificadoEm && local.driveSincronizadoEm && f.modificadoEm > local.driveSincronizadoEm && !local.precisaCarregarConteudo && (local.dataModificacao || '') <= local.driveSincronizadoEm) {
       local.precisaCarregarConteudo = true; // o do Drive é mais novo e não há edição local pendente
       local.origemDrive = true;
@@ -266,4 +270,46 @@ export async function baixarDocumentoDoDrive(doc, token, { fetchImpl = globalThi
   if (!conteudo || typeof conteudo !== 'object') throw new ErroDrive('O arquivo do Drive não é um documento Athenes válido.');
   const agora = new Date().toISOString();
   return { ...conteudo, id: doc.id.startsWith('drive_') ? (conteudo.id || doc.id) : doc.id, driveFileId: doc.driveFileId, driveSincronizadoEm: agora, dataModificacao: conteudo.dataModificacao || agora, precisaCarregarConteudo: false, origemDrive: false };
+}
+
+// ───────────────────────────── Estrutura de pastas vinda do Drive (outro computador, mesmo Google) ─────────────────────────────
+
+const PASTAS_DE_SISTEMA = new Set(['Documentos', 'Zotero_Notas', 'Relatorios_PDF']); // criadas pelo app dentro da raiz; seus arquivos ficam em "todas"
+
+async function listarSubpastasDoDrive(token, paiId, fetchImpl) {
+  const q = `trashed = false and mimeType = 'application/vnd.google-apps.folder' and '${aspas(paiId)}' in parents`;
+  const r = await chamar(fetchImpl, `${API}?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=100&orderBy=name`, {}, token);
+  return r.files || [];
+}
+
+/**
+ * Traz para a árvore local as pastas que já existem sob a raiz "Athenes" do Drive: vincula as de mesmo nome (e nível) às locais
+ * e cria as que faltam. Em outro computador a árvore local começa só com as pastas padrão; sem isto a estrutura do Drive se perdia.
+ * Devolve { importadas, vinculadas, mapa } (mapa: id da pasta no Drive → id da pasta local).
+ */
+export async function importarPastasDoDrive(token, { fetchImpl = globalThis.fetch, pastas = obterPastasDriveLocais() } = {}) {
+  const r = { importadas: 0, vinculadas: 0, mapa: {} };
+  const raizId = await obterPastaRaizDrive(token, fetchImpl, pastas);
+  let total = 0;
+  const visitar = async (lista, paiDriveId, paiLocal, nivel) => {
+    if (nivel > 6 || total > 300) return;
+    for (const f of await listarSubpastasDoDrive(token, paiDriveId, fetchImpl)) {
+      if (nivel === 0 && PASTAS_DE_SISTEMA.has(f.name)) continue;
+      total++;
+      let local = lista.find(p => p.driveId === f.id) || lista.find(p => !p.driveId && p.nome === f.name && p.origem !== 'compartilhada');
+      if (local) {
+        if (!local.driveId) { local.driveId = f.id; r.vinculadas++; }
+      } else {
+        local = { id: `drive_${f.id}`, nome: f.name, tipo: paiLocal?.tipo || 'relatorios', origem: 'minhas', ...(paiLocal ? { parentId: paiLocal.id } : {}), driveId: f.id, subpastas: [] };
+        lista.push(local);
+        r.importadas++;
+      }
+      r.mapa[f.id] = local.id;
+      if (!Array.isArray(local.subpastas)) local.subpastas = [];
+      await visitar(local.subpastas, f.id, local, nivel + 1);
+    }
+  };
+  await visitar(pastas, raizId, null, 0);
+  salvarPastasDriveLocais(pastas);
+  return r;
 }

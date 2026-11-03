@@ -41,7 +41,7 @@ import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso, eErroDeCota } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';
-import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
+import { driveConectado, tokenDriveValido, obterTokenDrive, obterTokenOuConectar, sincronizarPastasComDrive, sincronizarDocumentosComDrive, marcarSessaoDriveExpirada, importarPastasDoDrive, listarBibliotecaDoDrive, mesclarBibliotecaDrive, baixarDocumentoDoDrive } from '../core/athenes_drive_sync.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -1351,15 +1351,20 @@ export class DashboardView {
     try {
       const token = await obterTokenDrive();
       if (!token) { if (!silencioso) alert('A sessão do Google Drive expirou. Reconecte o Drive.'); return; }
+      // 1) a estrutura de pastas do Drive (outro computador começa só com as padrão); 2) os documentos, já nas pastas certas
+      let pastasNovas = { importadas: 0, vinculadas: 0, mapa: {} };
+      try { pastasNovas = await importarPastasDoDrive(token); } catch (e) { console.warn('[Athenes] Pastas do Drive não importadas:', e.message); }
+      if (pastasNovas.importadas || pastasNovas.vinculadas) this.pastasDrive = obterPastasDriveLocais();
       const arquivos = await listarBibliotecaDoDrive(token);
-      const r = mesclarBibliotecaDrive(this.documentos, arquivos);
-      if (r.novos || r.atualizados) {
+      const r = mesclarBibliotecaDrive(this.documentos, arquivos, pastasNovas.mapa);
+      if (pastasNovas.importadas) { this.salvarDocumentosLocais(); this.renderizar(); }
+      else if (r.novos || r.atualizados) {
         this.salvarDocumentosLocais();
         this.atualizarGrid();
       }
       if (!silencioso) {
         alert(r.novos || r.atualizados
-          ? `${r.novos} documento(s) novo(s) e ${r.atualizados} atualizado(s) vindos do seu Google Drive.`
+          ? `${r.novos} documento(s) novo(s) e ${r.atualizados} atualizado(s)${pastasNovas.importadas ? `, ${pastasNovas.importadas} pasta(s) trazida(s)` : ''} vindos do seu Google Drive.`
           : 'Seus documentos já estão atualizados com o seu Google Drive.');
       }
     } catch (err) {

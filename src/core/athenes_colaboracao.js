@@ -767,8 +767,9 @@ function idsEstruturaDrive(o) {
 }
 
 export function obterConfigGoogleDrive() {
-  const pastaUrlPadrao = 'https://drive.google.com/drive/folders/1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv?usp=drive_link';
-  const pastaIdPadrao = '1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv';
+  // sem pasta padrão: o ID que ficava aqui era de UMA conta e apontava para fora do Drive de qualquer outra pessoa
+  const pastaUrlPadrao = '';
+  const pastaIdPadrao = '';
   try {
     if (typeof localStorage !== 'undefined') {
       const salvo = lerConta('athenes_gdrive_config');
@@ -940,17 +941,23 @@ export async function salvarArquivoNoGoogleDrive({
 export async function listarArquivosDoGoogleDrive(accessToken, fetchImpl = globalThis.fetch) {
   if (!accessToken) throw new Error('Token de acesso do Google Drive ausente.');
   const q = encodeURIComponent("trashed = false and (name contains '.athenes' or mimeType = 'application/json')");
-  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime,size)&orderBy=modifiedTime desc&pageSize=30`;
-
-  const resp = await fetchImpl(url, {
-    method: 'GET',
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
-  if (!resp.ok) {
-    throw new Error(`Erro ao listar arquivos do Google Drive (${resp.status}).`);
+  const todos = [];
+  let pagina = '';
+  for (let i = 0; i < 10; i++) { // até 1000 arquivos, 100 por página
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,modifiedTime,size,parents)&orderBy=modifiedTime desc&pageSize=100${pagina ? `&pageToken=${encodeURIComponent(pagina)}` : ''}`;
+    const resp = await fetchImpl(url, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    if (!resp.ok) {
+      throw new Error(`Erro ao listar arquivos do Google Drive (${resp.status}).`);
+    }
+    const data = await resp.json();
+    todos.push(...(data.files || []));
+    pagina = data.nextPageToken || '';
+    if (!pagina) break;
   }
-  const data = await resp.json();
-  return data.files || [];
+  return todos;
 }
 
 /**
