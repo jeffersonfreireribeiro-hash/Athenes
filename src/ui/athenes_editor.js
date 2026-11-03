@@ -467,8 +467,24 @@ export class EditorView {
     root.className = 'rm-conteudo';
 
     // 1. Topo Shell (Marca, Título do Documento e Botões Globais)
+    const rotuloModo = { [MODOS_TRABALHO.EDICAO]: ['lapis', 'Edição'], [MODOS_TRABALHO.SUGESTAO]: ['sugestao', 'Sugestão'], [MODOS_TRABALHO.COMPARAR]: ['grade', 'Comparar'], [MODOS_TRABALHO.VISUALIZACAO]: ['olho', 'Leitura'] }[this.modoTrabalho] || ['lapis', 'Edição'];
+    const MODO_ATUAL_ICONE = svgIcone(rotuloModo[0], 14);
+    const MODO_ATUAL_ROTULO = rotuloModo[1];
+    const MODOS_ITENS = `<button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.EDICAO ? 'on' : ''}" data-modo="edicao" ${this.modoPermitido('edicao') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Modo Edição: edita o documento diretamente">
+            ${svgIcone('lapis', 13)} <span>Edição</span>
+          </button>
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.SUGESTAO ? 'on' : ''}" data-modo="sugestao" ${this.modoPermitido('sugestao') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Modo Sugestão: alterações ficam marcadas para Aceitar (✓) ou Rejeitar (✗)">
+            ${svgIcone('sugestao', 13)} <span>Sugestão</span>
+            ${(this.doc.sugestoes?.length > 0) ? `<span style="background:#FFFFFF; color:#059669; border-radius:999px; padding:0 5px; font-size:10px; font-weight:800;">${this.doc.sugestoes.length}</span>` : ''}
+          </button>
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.COMPARAR ? 'on' : ''}" data-modo="comparar" ${this.modoPermitido('comparar') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Comparar lado a lado: original × proposta, com diff e rolagem sincronizada">
+            ${svgIcone('grade', 13)} <span>Comparar</span>
+          </button>
+          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.VISUALIZACAO ? 'on' : ''}" data-modo="leitura" ${this.modoPermitido('leitura') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Leitura fiel: réplica exata da exportação/impressão, somente leitura">
+            ${svgIcone('olho', 13)} <span>Leitura</span>
+          </button>`;
     const topoShell = document.createElement('header');
-    topoShell.className = 'ath-topo-shell';
+    topoShell.className = 'ath-topo-shell' + (modoSomenteLeitura(this.modoTrabalho) ? ' ath-modo-revisao' : '');
     topoShell.innerHTML = `
       <div class="ath-topo-esq">
         <a class="ath-marca-link" id="athBrandVoltar" title="Voltar para a Visão Geral">
@@ -482,21 +498,59 @@ export class EditorView {
         <!-- Presença em Tempo Real (Avatares Online) -->
         <div class="ath-presenca-avatares" id="athAvataresPresenca" title="Colaboradores online neste documento"></div>
 
-        <!-- Seletor dos 4 modos: Edição / Sugestão / Comparar lado a lado / Leitura fiel (impressão) -->
-        <div class="ath-seletor-modo-trabalho" id="athSeletorModoTrabalho" role="group" aria-label="Modo de Trabalho">
-          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.EDICAO ? 'on' : ''}" data-modo="edicao" ${this.modoPermitido('edicao') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Modo Edição: edita o documento diretamente">
-            ${svgIcone('lapis', 13)} <span>Edição</span>
-          </button>
-          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.SUGESTAO ? 'on' : ''}" data-modo="sugestao" ${this.modoPermitido('sugestao') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Modo Sugestão: alterações ficam marcadas para Aceitar (✓) ou Rejeitar (✗)">
-            ${svgIcone('sugestao', 13)} <span>Sugestão</span>
-            ${(this.doc.sugestoes?.length > 0) ? `<span style="background:#FFFFFF; color:#059669; border-radius:999px; padding:0 5px; font-size:10px; font-weight:800;">${this.doc.sugestoes.length}</span>` : ''}
-          </button>
-          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.COMPARAR ? 'on' : ''}" data-modo="comparar" ${this.modoPermitido('comparar') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Comparar lado a lado: original × proposta, com diff e rolagem sincronizada">
-            ${svgIcone('grade', 13)} <span>Comparar</span>
-          </button>
-          <button type="button" class="ath-btn-modo-trab ${this.modoTrabalho === MODOS_TRABALHO.VISUALIZACAO ? 'on' : ''}" data-modo="leitura" ${this.modoPermitido('leitura') ? '' : 'disabled style="opacity:.4; cursor:not-allowed;"'} title="Leitura fiel: réplica exata da exportação/impressão, somente leitura">
-            ${svgIcone('olho', 13)} <span>Leitura</span>
-          </button>
+        <div class="rm-prev-menus-topo" id="rmPrevMenusTopo">
+          <div class="rm-menu-topo-item" data-menu="arquivo">
+            <button type="button" class="rm-btn-menu-topo" id="athBtnMenuArquivo" aria-haspopup="dialog" aria-expanded="false" title="Configurar propriedades do arquivo, formato e margens">
+              ${svgIcone('documento', 14)}
+              <span>Arquivo & Margens</span>
+              <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
+                <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="rm-topo-popover" id="athPopoverArquivo" role="dialog" aria-label="Arquivo e Margens" hidden></div>
+          </div>
+
+          <div class="rm-menu-topo-item" data-menu="cabrod">
+            <button type="button" class="rm-btn-menu-topo" id="athBtnMenuCabRod" aria-haspopup="dialog" aria-expanded="false" title="Configurar cabeçalho, rodapé e numeração da página">
+              ${svgIcone('subtitulo', 14)}
+              <span>Cabeçalho & Rodapé</span>
+              <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
+                <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="rm-topo-popover" id="athPopoverCabRod" role="dialog" aria-label="Cabeçalho e Rodapé" hidden></div>
+          </div>
+
+          <div class="rm-menu-topo-item" data-menu="estilos">
+            <button type="button" class="rm-btn-menu-topo" id="athBtnMenuEstilos" aria-haspopup="dialog" aria-expanded="false" title="Estilos tipográficos do documento">
+              ${svgIcone('paragrafo', 14)}
+              <span>Estilos de Texto</span>
+              <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
+                <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="rm-topo-popover rm-topo-popover-estilos" id="athPopoverEstilos" role="dialog" aria-label="Estilos de Texto" hidden></div>
+          </div>
+
+          <div class="rm-menu-topo-item" data-menu="config">
+            <button type="button" class="rm-btn-menu-topo" id="athBtnMenuConfig" aria-haspopup="menu" aria-expanded="false" aria-label="Configurações" title="Configurações: tema e estilos, nuvem e Drive">
+              ${svgIcone('config', 15)}
+              <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
+                <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="rm-topo-popover rm-topo-config" id="athPopoverConfig" role="menu" aria-label="Configurações" hidden>
+              <button type="button" class="rm-config-item" role="menuitem" data-cfg="tema">
+                ${svgIcone('paleta', 16)}
+                <span><strong>Tema & Estilos</strong><small>Importar, exportar ou gerar com IA</small></span>
+              </button>
+              <button type="button" class="rm-config-item" role="menuitem" data-cfg="nuvem">
+                ${svgIcone('nuvem_ok', 16)}
+                <span><strong>Nuvem & Drive</strong><small>Supabase, Google Drive e revisões</small></span>
+              </button>
+            </div>
+            <div class="rm-topo-popover" id="athPopoverNuvem" role="dialog" aria-label="Nuvem, Google Drive e Revisões" hidden style="width:360px;"></div>
+          </div>
         </div>
 
         <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="athBtnAbaZotero">
@@ -519,67 +573,6 @@ export class EditorView {
 
         <!-- COLUNA CENTRAL: Prévia da Folha A4 com Barra de Blocos Flutuante e Edição Direta -->
         <section class="rm-col rm-col-prev" id="rmColPrev">
-          <div class="rm-prev-topo">
-            <div class="rm-prev-topo-esq">
-              <strong>Prévia</strong>
-              <span id="rmPrevInfo" class="rm-prev-info"></span>
-            </div>
-            <div class="rm-prev-menus-topo" id="rmPrevMenusTopo">
-              <div class="rm-menu-topo-item" data-menu="arquivo">
-                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuArquivo" aria-haspopup="dialog" aria-expanded="false" title="Configurar propriedades do arquivo, formato e margens">
-                  ${svgIcone('documento', 14)}
-                  <span>Arquivo & Margens</span>
-                  <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
-                    <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </button>
-                <div class="rm-topo-popover" id="athPopoverArquivo" role="dialog" aria-label="Arquivo e Margens" hidden></div>
-              </div>
-
-              <div class="rm-menu-topo-item" data-menu="cabrod">
-                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuCabRod" aria-haspopup="dialog" aria-expanded="false" title="Configurar cabeçalho, rodapé e numeração da página">
-                  ${svgIcone('subtitulo', 14)}
-                  <span>Cabeçalho & Rodapé</span>
-                  <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
-                    <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </button>
-                <div class="rm-topo-popover" id="athPopoverCabRod" role="dialog" aria-label="Cabeçalho e Rodapé" hidden></div>
-              </div>
-
-              <div class="rm-menu-topo-item" data-menu="estilos">
-                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuEstilos" aria-haspopup="dialog" aria-expanded="false" title="Estilos tipográficos do documento">
-                  ${svgIcone('paragrafo', 14)}
-                  <span>Estilos de Texto</span>
-                  <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
-                    <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </button>
-                <div class="rm-topo-popover rm-topo-popover-estilos" id="athPopoverEstilos" role="dialog" aria-label="Estilos de Texto" hidden></div>
-              </div>
-
-              <div class="rm-menu-topo-item" data-menu="config">
-                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuConfig" aria-haspopup="menu" aria-expanded="false" aria-label="Configurações" title="Configurações: tema e estilos, nuvem e Drive">
-                  ${svgIcone('config', 15)}
-                  <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
-                    <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </button>
-                <div class="rm-topo-popover rm-topo-config" id="athPopoverConfig" role="menu" aria-label="Configurações" hidden>
-                  <button type="button" class="rm-config-item" role="menuitem" data-cfg="tema">
-                    ${svgIcone('paleta', 16)}
-                    <span><strong>Tema & Estilos</strong><small>Importar, exportar ou gerar com IA</small></span>
-                  </button>
-                  <button type="button" class="rm-config-item" role="menuitem" data-cfg="nuvem">
-                    ${svgIcone('nuvem_ok', 16)}
-                    <span><strong>Nuvem & Drive</strong><small>Supabase, Google Drive e revisões</small></span>
-                  </button>
-                </div>
-                <div class="rm-topo-popover" id="athPopoverNuvem" role="dialog" aria-label="Nuvem, Google Drive e Revisões" hidden style="width:360px;"></div>
-              </div>
-            </div>
-          </div>
-
           <div class="rm-barra-blocos" id="rmBarraBlocos">
             <button type="button" class="rm-ic-bt" id="rmVoltar" title="Voltar para a Visão Geral" aria-label="Voltar">
               ${svgIcone('voltar', 16)}
@@ -594,6 +587,16 @@ export class EditorView {
             <button type="button" class="rm-ic-bt" id="rmRefazer" title="Refazer (Ctrl+Y)" aria-label="Refazer">
               ${svgIcone('refazer', 16)}
             </button>
+            <span class="rm-barra-sep" aria-hidden="true"></span>
+
+            <!-- Estilo de texto em uso (clique para escolher outro) -->
+            <div class="ath-caixa-estilo" id="athCaixaEstilo">
+              <button type="button" class="ath-caixa-estilo-btn" id="athBtnCaixaEstilo" aria-haspopup="listbox" aria-expanded="false" title="Estilo de texto em uso: clique para escolher outro">
+                <span id="athRotuloCaixaEstilo">Corpo de Texto</span>
+                <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true"><path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <div class="ath-caixa-estilo-menu" id="athMenuCaixaEstilo" role="listbox" hidden></div>
+            </div>
             <span class="rm-barra-sep" aria-hidden="true"></span>
 
             <!-- Botões de Inserção de Blocos com Ícones Glaux -->
@@ -623,6 +626,17 @@ export class EditorView {
             <button type="button" class="rm-ic-bt" id="rmAddEspaco" data-tip="Espaço" title="Inserir Espaçamento">${svgIcone('espacamento', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddSumario" data-tip="Sumário" title="Inserir Sumário automático (títulos em todos os níveis)">${svgIcone('sumario', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddQuebra" data-tip="Quebra" title="Inserir Quebra de Página">${svgIcone('quebra_pagina', 16)}</button>
+
+            <!-- Modo de trabalho (como no Docs): Edição / Sugestão / Comparar / Leitura -->
+            <div class="ath-modo-wrap" id="athModoWrap">
+              <button type="button" class="ath-modo-atual" id="athBtnModoAtual" aria-haspopup="menu" aria-expanded="false" title="Modo de trabalho">
+                ${MODO_ATUAL_ICONE} <span>${MODO_ATUAL_ROTULO}</span>
+                <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true"><path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <div class="ath-modo-menu" id="athModoMenu" role="menu" hidden>
+                ${MODOS_ITENS}
+              </div>
+            </div>
 
             <!-- Botão de Grade à Direita -->
             <button type="button" class="rm-ic-bt rm-ic-guia ${this.guiasVisiveis ? 'on' : ''}" id="rmGuia" aria-pressed="${this.guiasVisiveis}" title="Alternar visualização da grade de 12 colunas">
@@ -737,6 +751,65 @@ export class EditorView {
         this.renderizar();
       });
     });
+
+    // Menu do modo de trabalho (na barra de ferramentas, como no Docs)
+    const btnModo = root.querySelector('#athBtnModoAtual');
+    const menuModo = root.querySelector('#athModoMenu');
+    btnModo?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      menuModo.hidden = !menuModo.hidden;
+      btnModo.setAttribute('aria-expanded', String(!menuModo.hidden));
+    });
+    document.addEventListener('click', (ev) => { if (menuModo && !menuModo.hidden && !ev.target.closest?.('#athModoWrap')) { menuModo.hidden = true; btnModo?.setAttribute('aria-expanded', 'false'); } });
+
+    // Caixa do estilo de texto em uso: mostra o estilo do bloco/trecho e abre a lista para trocar
+    const caixaBtn = root.querySelector('#athBtnCaixaEstilo');
+    const caixaMenu = root.querySelector('#athMenuCaixaEstilo');
+    const caixaRotulo = root.querySelector('#athRotuloCaixaEstilo');
+    const estiloEmUso = () => {
+      const sel = window.getSelection?.();
+      const no = sel?.rangeCount ? sel.getRangeAt(0).startContainer : null;
+      const el = no ? (no.nodeType === 1 ? no : no.parentElement) : null;
+      const spanId = el?.closest?.('.ath-estilo-span')?.dataset.estiloId;
+      const dentro = el && this.container?.contains(el);
+      const blocoId = dentro ? el.closest?.('[data-bloco-id]')?.dataset.blocoId : null;
+      const dono = (blocoId && this.buscarBlocoPorId((this.doc.paginas || []).flatMap(p => p.blocos || []).find(x => x.id === blocoId)?._frag?.origemId || blocoId)) || this.blocoSelecionado;
+      if (spanId) return (this.doc.estilos || []).find(e => e.id === spanId) || null;
+      return dono ? (this.estiloDoBloco(dono) || null) : null;
+    };
+    const atualizarCaixaEstilo = () => {
+      if (!caixaRotulo) return;
+      const e = estiloEmUso();
+      caixaRotulo.textContent = e?.nome || 'Sem estilo';
+      caixaBtn.classList.toggle('vazio', !e);
+    };
+    this._atualizarCaixaEstilo = atualizarCaixaEstilo;
+    const fecharCaixa = () => { if (caixaMenu) { caixaMenu.hidden = true; caixaBtn?.setAttribute('aria-expanded', 'false'); } };
+    // mousedown sem tirar a seleção do texto: o estilo vai para o trecho selecionado (ou o bloco, sem seleção)
+    caixaBtn?.addEventListener('mousedown', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!caixaMenu.hidden) { fecharCaixa(); return; }
+      const atual = estiloEmUso();
+      caixaMenu.innerHTML = (this.doc.estilos || []).map(e => `
+        <button type="button" class="ath-caixa-estilo-item ${atual?.id === e.id ? 'on' : ''}" role="option" data-estilo-id="${e.id}">
+          <span style="font-weight:${e.peso || 400};">${escapeHtml(e.nome)}</span><small>${e.tamanho_pt || 12}pt</small>
+        </button>`).join('');
+      caixaMenu.hidden = false;
+      caixaBtn.setAttribute('aria-expanded', 'true');
+      caixaMenu.querySelectorAll('[data-estilo-id]').forEach(it => it.addEventListener('mousedown', (e2) => {
+        e2.preventDefault();
+        e2.stopPropagation();
+        fecharCaixa();
+        this.aplicarEstiloNoTextoSelecionado(it.dataset.estiloId);
+        setTimeout(atualizarCaixaEstilo, 30);
+      }));
+    });
+    document.addEventListener('mousedown', (ev) => { if (caixaMenu && !caixaMenu.hidden && !ev.target.closest?.('#athCaixaEstilo')) fecharCaixa(); });
+    let tCaixa = 0;
+    document.addEventListener('selectionchange', () => { clearTimeout(tCaixa); tCaixa = setTimeout(atualizarCaixaEstilo, 60); });
+    root.addEventListener('click', () => setTimeout(atualizarCaixaEstilo, 60));
+    setTimeout(atualizarCaixaEstilo, 0);
 
     // Botões de inserção de blocos
     const adicionar = (tipo, dados = {}) => {
@@ -2479,6 +2552,7 @@ export class EditorView {
     recalcularNumeracaoAutomatica(this.doc);
     this.mapaNumSecoes = calcularNumeracaoSecoes(this.doc);
     this.mapaMarc = mapaMarcadores(this.doc);
+    setTimeout(() => this._atualizarCaixaEstilo?.(), 0);
 
     const paginas = this.doc.paginas || [];
     this._sigPaginas = this.assinaturaPaginacao();
