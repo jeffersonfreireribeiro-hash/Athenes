@@ -290,8 +290,12 @@ function construirHfDaMestra(documento, mestra, ctx) {
     midias.push({ el, nome, rId: `rIdImg${midias.length + 1}` });
   }
   const ancoras = () => midias.map(({ el, rId }, i) => {
-    const x = el.sangria ? 0 : (el.x_mm || 0), y = el.sangria ? 0 : (el.y_mm || 0);
-    const w = el.sangria ? papel.largura_mm : (el.largura_mm || papel.largura_mm), h = el.sangria ? papel.altura_mm : (el.altura_mm || 40);
+    // mesma regra do PDF: sangria = folha inteira; "respeitar recuo" = posição relativa às margens e largura útil da folha
+    const respRecuo = !el.sangria && !!el.respeitar_recuo;
+    const x = el.sangria ? 0 : (respRecuo ? (m.l || 0) + (el.x_mm || 0) : (el.x_mm || 0));
+    const y = el.sangria ? 0 : (respRecuo ? (m.t || 0) + (el.y_mm || 0) : (el.y_mm || 0));
+    const w = el.sangria ? papel.largura_mm : (respRecuo ? papel.largura_mm - (m.l || 0) - (m.r || 0) : (el.largura_mm || papel.largura_mm));
+    const h = el.sangria ? papel.altura_mm : (el.altura_mm || 40);
     const E = (v) => Math.round(v * EMU_MM);
     return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251650000 + i}" behindDoc="${el.camada === 'frente' ? 0 : 1}" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>${E(x)}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>${E(y)}</wp:posOffset></wp:positionV><wp:extent cx="${E(w)}" cy="${E(h)}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${ctx.contMidia * 10 + i + 1}" name="Imagem ${i + 1}"/><wp:cNvGraphicFramePr/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="${rId}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${E(w)}" cy="${E(h)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`;
   }).join('');

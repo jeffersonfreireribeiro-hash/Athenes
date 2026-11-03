@@ -46,7 +46,8 @@ function areaPaginaHtml(area, m) {
   // com uma única zona preenchida, as vazias não ocupam espaço (o texto usa a largura inteira da área)
   const sozinha = [area.zonas.esquerda, area.zonas.centro, area.zonas.direita].filter(Boolean).length === 1;
   // multilinha (ex.: número acima do texto): o texto da esquerda usa a largura que sobra; centro e direita só o que ocupam
-  const flexDe = (cls, txt) => (area.multilinha ? (cls === 'left' ? '1 1 0' : (txt ? '0 0 auto' : '0 0 0')) : (sozinha && !txt ? '0 0 0' : '1 1 0'));
+  const multi = area.multilinha && !!area.zonas.esquerda; // só centro/direita preenchidos: vale a divisão normal (o centro fica centralizado)
+  const flexDe = (cls, txt) => (multi ? (cls === 'left' ? '1 1 0' : (txt ? '0 0 auto' : '0 0 0')) : (sozinha && !txt ? '0 0 0' : '1 1 0'));
   const z = (cls, txt) => `<div style="flex:${flexDe(cls, txt)};min-width:0;text-align:${cls};overflow-wrap:anywhere;white-space:pre-wrap;">${escaparHtml(txt)}</div>`;
   return `<${area.tipo === 'cabecalho' ? 'header' : 'footer'} class="ath-pg-area ath-folha-${area.tipo}" style="position:absolute;left:${m.l}mm;right:${m.r}mm;${lado}display:flex;align-items:flex-start;gap:${sozinha ? 0 : 3}mm;${cssDe(area.css)}">${z('left', area.zonas.esquerda)}${z('center', area.zonas.centro)}${z('right', area.zonas.direita)}</${area.tipo === 'cabecalho' ? 'header' : 'footer'}>`;
 }

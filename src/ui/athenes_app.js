@@ -307,8 +307,14 @@ export class AthenesApp {
   descarregarSalvamento() {
     clearTimeout(this._tSalvar);
     this._tSalvar = null;
-    const doc = this._docPendente;
+    let doc = this._docPendente;
     this._docPendente = null;
+    // um snapshot de colaboração troca `editorView.doc` sem passar por onAlterado: gravar o objeto antigo sobrescreveria o mais novo
+    const doEditor = this.editorView?.doc;
+    if (doc && doEditor && doEditor.id === doc.id && doEditor !== doc) {
+      doc = doEditor;
+      if (this.documentoAtivo?.id === doc.id) this.documentoAtivo = doc;
+    }
     if (doc) this.gravarDocumento(doc, { semDrive: false });
   }
 

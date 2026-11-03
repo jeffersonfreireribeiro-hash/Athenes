@@ -53,7 +53,7 @@ const familia = (id) => (FONTES_SISTEMA[id]?.familia || FONTES_SISTEMA.nunito.fa
 export function construirAreaPaginaDom(area) {
   garantirCss();
   const el = document.createElement('div');
-  el.className = `ath-pg-area ath-pg-${area.tipo}${area.multilinha ? ' multilinha' : ''}`;
+  el.className = `ath-pg-area ath-pg-${area.tipo}${area.multilinha && area.zonas.esquerda ? ' multilinha' : ''}`;
   Object.assign(el.style, area.css);
   const zona = (cls, texto) => {
     const z = document.createElement('div');

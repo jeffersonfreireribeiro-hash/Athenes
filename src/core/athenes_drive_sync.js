@@ -70,12 +70,39 @@ export async function buscarOuCriarPasta(token, nome, paiId, fetchImpl = globalT
   return { id: nova.id, criada: true };
 }
 
-/** Pasta raiz "Athenes" no Drive (guardada na configuração). */
-export async function obterPastaRaizDrive(token, fetchImpl = globalThis.fetch) {
+const raizValidada = new Set(); // "idDaPasta|token": já conferida nesta sessão (evita uma consulta por envio)
+
+/** A pasta existe, não está na lixeira e esta conta enxerga? (apagada ou conta diferente → false) */
+async function pastaDriveExiste(token, id, fetchImpl) {
+  try {
+    const r = await chamar(fetchImpl, `${API}/${encodeURIComponent(id)}?fields=id,trashed`, {}, token);
+    return !!r?.id && !r.trashed;
+  } catch (e) {
+    if (e.status === 404 || e.status === 403) return false;
+    throw e; // 401 e falhas de rede não significam "pasta sumiu"
+  }
+}
+
+const limparDriveIds = (lista) => { for (const p of lista || []) { delete p.driveId; limparDriveIds(p.subpastas); } };
+
+/**
+ * Pasta raiz "Athenes" no Drive (guardada na configuração). Se a guardada não existe mais ou é de outra conta,
+ * recria a raiz e esquece os `driveId` das pastas locais (eles apontavam para dentro da raiz antiga).
+ */
+export async function obterPastaRaizDrive(token, fetchImpl = globalThis.fetch, pastas = null) {
   const cfg = obterConfigGoogleDrive();
-  if (cfg.pastaRaizId) return cfg.pastaRaizId;
+  if (cfg.pastaRaizId) {
+    const chave = `${cfg.pastaRaizId}|${token}`;
+    if (raizValidada.has(chave)) return cfg.pastaRaizId;
+    if (await pastaDriveExiste(token, cfg.pastaRaizId, fetchImpl)) { raizValidada.add(chave); return cfg.pastaRaizId; }
+    salvarConfigGoogleDrive({ ...cfg, pastaRaizId: '', pastaDocumentosId: '', pastaZoteroId: '', pastaRelatoriosId: '' });
+    const locais = obterPastasDriveLocais();
+    limparDriveIds(locais); salvarPastasDriveLocais(locais);
+    if (pastas) limparDriveIds(pastas); // a árvore em uso por quem chamou
+  }
   const { id } = await buscarOuCriarPasta(token, NOME_RAIZ, null, fetchImpl);
-  salvarConfigGoogleDrive({ ...cfg, accessToken: token, pastaRaizId: id });
+  salvarConfigGoogleDrive({ ...obterConfigGoogleDrive(), accessToken: token, pastaRaizId: id });
+  raizValidada.add(`${id}|${token}`);
   return id;
 }
 
@@ -86,7 +113,7 @@ export async function obterPastaRaizDrive(token, fetchImpl = globalThis.fetch) {
 export async function sincronizarPastasComDrive(token, { fetchImpl = globalThis.fetch, pastas = obterPastasDriveLocais() } = {}) {
   const r = { criadas: 0, existentes: 0, erros: [], sessaoExpirada: false };
   let raizId;
-  try { raizId = await obterPastaRaizDrive(token, fetchImpl); } catch (e) { r.erros.push({ pasta: NOME_RAIZ, erro: e.message }); r.sessaoExpirada = !!e.sessaoExpirada; return r; }
+  try { raizId = await obterPastaRaizDrive(token, fetchImpl, pastas); } catch (e) { r.erros.push({ pasta: NOME_RAIZ, erro: e.message }); r.sessaoExpirada = !!e.sessaoExpirada; return r; }
 
   const visitar = async (lista, paiDriveId) => {
     for (const p of lista || []) {
@@ -139,7 +166,7 @@ async function enviarDocumentoAoDriveInterno(doc, token, { fetchImpl = globalThi
   const sync = await sincronizarPastasComDrive(token, { fetchImpl, pastas });
   if (sync.sessaoExpirada) throw new ErroDrive('A sessão do Google Drive expirou. Reconecte o Drive.', 401);
   const pasta = acharPasta(pastas, doc.pastaId);
-  const alvo = pasta?.driveId || pasta?.driveFolderId || await obterPastaRaizDrive(token, fetchImpl);
+  const alvo = pasta?.driveId || pasta?.driveFolderId || await obterPastaRaizDrive(token, fetchImpl, pastas);
   const conteudo = JSON.stringify(doc, (k, v) => (k === 'paginas' ? undefined : v));
 
   let id = doc.driveFileId || null;
