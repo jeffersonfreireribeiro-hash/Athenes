@@ -6,6 +6,7 @@
  * Inclui barra superior de Identificação / Login do Usuário sincronizada com Supabase e Google Drive.
  */
 
+import { lerConta, gravarConta, contaEhPrimeira } from '../core/athenes_conta.js';
 import { TIPOS_DOCUMENTO, criarDocumento } from '../core/athenes_documento.js';
 import { PERFIS_FORMATACAO } from '../core/athenes_estilos.js';
 import {
@@ -65,7 +66,7 @@ export class DashboardView {
 
   carregarDocumentosLocais() {
     try {
-      const salvo = localStorage.getItem('athenes_docs_indice');
+      const salvo = lerConta('athenes_docs_indice');
       if (salvo) {
         this.documentos = JSON.parse(salvo);
       }
@@ -73,7 +74,9 @@ export class DashboardView {
       this.documentos = [];
     }
 
-    if (!this.documentos || this.documentos.length === 0) {
+    // os documentos de exemplo são só da primeira conta do navegador: as demais começam vazias (antes todas "herdavam" os mesmos arquivos)
+    if ((!this.documentos || this.documentos.length === 0) && !contaEhPrimeira()) this.documentos = [];
+    else if (!this.documentos || this.documentos.length === 0) {
       const docExemplo1 = criarDocumento({
         titulo: 'Análise Espacial e Diretrizes de Reurbanização Sustentável',
         subtitulo: 'Estudo de caso e proposições metodológicas para comunidades consolidadas',
@@ -99,7 +102,7 @@ export class DashboardView {
 
   salvarDocumentosLocais() {
     try {
-      localStorage.setItem('athenes_docs_indice', JSON.stringify(this.documentos));
+      gravarConta('athenes_docs_indice', JSON.stringify(this.documentos));
     } catch (e) {
       mostrarAviso(eErroDeCota(e) ? 'Armazenamento do navegador cheio: as últimas alterações não foram salvas. Faça um backup ou exclua documentos antigos.' : `Não foi possível salvar: ${e.message}`);
     }
@@ -110,7 +113,7 @@ export class DashboardView {
    * (cota do navegador cheia, Supabase indisponível) para o gerenciador de arquivos desfazer a ação.
    */
   async persistirDocumentos(docs = []) {
-    localStorage.setItem('athenes_docs_indice', JSON.stringify(this.documentos));
+    gravarConta('athenes_docs_indice', JSON.stringify(this.documentos));
     for (const d of docs) {
       if (d.salvoNuvem) await salvarDocumentoNoSupabase(d, this.perfilUsuario);
     }
@@ -417,7 +420,7 @@ export class DashboardView {
     let zoteroUserId = '';
     let zoteroApiKey = '';
     try {
-      const z = JSON.parse(localStorage.getItem('athenes_zotero_cfg') || '{}');
+      const z = JSON.parse(lerConta('athenes_zotero_cfg') || '{}');
       zoteroUserId = z.userId || '';
       zoteroApiKey = z.apiKey || '';
     } catch (_) {}
@@ -651,8 +654,8 @@ export class DashboardView {
       const zId = modal.querySelector('#athLoginZoteroId').value.trim();
       const zKey = modal.querySelector('#athLoginZoteroKey').value.trim();
       try {
-        const zAtual = JSON.parse(localStorage.getItem('athenes_zotero_cfg') || '{}');
-        localStorage.setItem('athenes_zotero_cfg', JSON.stringify({
+        const zAtual = JSON.parse(lerConta('athenes_zotero_cfg') || '{}');
+        gravarConta('athenes_zotero_cfg', JSON.stringify({
           ...zAtual,
           userId: zId || zAtual.userId || '',
           apiKey: zKey !== undefined ? zKey : (zAtual.apiKey || '')
@@ -1433,8 +1436,8 @@ export class DashboardView {
     let zoteroCfg = {};
     let perfil = {};
     try {
-      artigosEstudo = JSON.parse(localStorage.getItem('athenes_artigos_estudo') || '[]');
-      zoteroCfg = JSON.parse(localStorage.getItem('athenes_zotero_cfg') || '{}');
+      artigosEstudo = JSON.parse(lerConta('athenes_artigos_estudo') || '[]');
+      zoteroCfg = JSON.parse(lerConta('athenes_zotero_cfg') || '{}');
       perfil = JSON.parse(localStorage.getItem('athenes_perfil_colaborador') || '{}');
     } catch (_) {}
 
@@ -1478,19 +1481,19 @@ export class DashboardView {
 
         if (Array.isArray(dados.artigosEstudo)) {
           try {
-            const atuais = JSON.parse(localStorage.getItem('athenes_artigos_estudo') || '[]');
+            const atuais = JSON.parse(lerConta('athenes_artigos_estudo') || '[]');
             for (const art of dados.artigosEstudo) {
               const idx = atuais.findIndex(a => String(a.id) === String(art.id));
               if (idx >= 0) atuais[idx] = art;
               else atuais.push(art);
             }
-            localStorage.setItem('athenes_artigos_estudo', JSON.stringify(atuais));
+            gravarConta('athenes_artigos_estudo', JSON.stringify(atuais));
           } catch (_) {}
         }
 
         if (dados.zoteroCfg && Object.keys(dados.zoteroCfg).length > 0) {
           try {
-            localStorage.setItem('athenes_zotero_cfg', JSON.stringify(dados.zoteroCfg));
+            gravarConta('athenes_zotero_cfg', JSON.stringify(dados.zoteroCfg));
           } catch (_) {}
         }
 

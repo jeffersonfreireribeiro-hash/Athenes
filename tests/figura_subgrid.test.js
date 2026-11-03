@@ -8,7 +8,7 @@ import {
   aplicarEstiloFiguraAoBloco
 } from '../src/core/athenes_figura_layout.js';
 import { renderizarBlocoHtml, gerarDocumentoHtmlPdf } from '../src/core/athenes_export_pdf.js';
-import { estiloParaCssComAlinhamento, localizarEstilo } from '../src/core/athenes_estilos.js';
+import { estiloParaCssComAlinhamento, localizarEstilo, entrelinhaEfetiva } from '../src/core/athenes_estilos.js';
 import { papeisTipografiaFigura } from '../src/ui/athenes_figura_ui.js';
 import { figuraTemVariasImagens, extrairTipografiaTituloFonte } from '../src/core/athenes_figura_layout.js';
 import { aplicarCamadaSelecao } from '../src/core/athenes_tabela_estilo.js';
@@ -195,7 +195,7 @@ const estiloCompleto = {
 test('Estilo de texto COMPLETO: todas as propriedades do estilo chegam ao CSS e o alinhamento do bloco vence', () => {
   const css = estiloParaCssComAlinhamento(estiloCompleto, '');
   for (const trecho of ['font-size: 13pt', 'font-weight: 700', 'color: #AA0000', 'font-style: italic', 'text-transform: uppercase',
-    'line-height: 1.8', 'text-align: center', 'margin-top: 6pt', 'margin-left: 4mm', 'letter-spacing: 0.05em']) {
+    `line-height: ${entrelinhaEfetiva(estiloCompleto)}`, 'text-align: center', 'margin-top: 6pt', 'margin-left: 4mm', 'letter-spacing: 0.05em']) {
     assert.ok(css.includes(trecho), trecho);
   }
   assert.match(css, /Times New Roman/);
@@ -319,7 +319,7 @@ test('Tabela/quadro/figura — estilo de texto próprio para a NUMERAÇÃO ("Tab
     assert.ok(!m[1].includes('text-align'), 'sem layout de bloco no prefixo');
     // dados: tipografia na própria <table>, sem alinhamento/margens do estilo
     const tab = /<table[^>]*style="([^"]*)"/.exec(html)[1];
-    assert.ok(tab.includes('font-size: 8.5pt') && tab.includes('color: #123456') && tab.includes('line-height: 1.1') && tab.includes('font-style: italic'), `${tipo}: tipografia dos dados`);
+    assert.ok(tab.includes('font-size: 8.5pt') && tab.includes('color: #123456') && tab.includes(`line-height: ${entrelinhaEfetiva(dados)}`) && tab.includes('font-style: italic'), `${tipo}: tipografia dos dados`);
     assert.ok(!/text-align: (left|center|right); text-align-last/.test(tab), 'alinhamento do estilo não vaza para a tabela');
     // negrito do cabeçalho continua explícito; dados não anulam o peso do estilo
     assert.ok(/<th style="[^"]*font-weight:(800|400)/.test(html));

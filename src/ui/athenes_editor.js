@@ -9,6 +9,7 @@
  * - Coluna 3 (Direita): Inspetor de Bloco, Posição na Folha (12 colunas) e Blocos Compostos.
  */
 
+import { contarUsoDoEstilo, excluirEstilo, ESTILOS_PROTEGIDOS } from '../core/athenes_estilos.js';
 import { obterTokenOuConectar, obterTokenDrive } from '../core/athenes_drive_sync.js';
 import { elementosMestraHtml, renderizadoPeloCanvas, contextoVariaveisPagina } from '../core/athenes_mestra_render.js';
 import { margensEfetivasMm, elementosEfetivosDaPagina, caixaEnvolvente, sobrescreverNoDocumento, restaurarNoDocumento } from '../core/athenes_mestra_canvas.js';
@@ -486,9 +487,6 @@ export class EditorView {
         <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="athBtnAbaZotero">
           ${svgIcone('zotero', 15)} <span>Zotero</span>
         </button>
-        <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="athBtnAbaConexoes">
-          ${svgIcone('conexoes', 15)} <span>Grafo</span>
-        </button>
         <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="athBtnExportarModal">
           ${svgIcone('exportar', 14)} <span>Exportar</span>
         </button>
@@ -545,21 +543,23 @@ export class EditorView {
                 <div class="rm-topo-popover rm-topo-popover-estilos" id="athPopoverEstilos" role="dialog" aria-label="Estilos de Texto" hidden></div>
               </div>
 
-              <div class="rm-menu-topo-item" data-menu="tema">
-                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuTema" title="Central de Estilos & Tema: Importar, Exportar ou Gerar com IA">
-                  ${svgIcone('paleta', 14)}
-                  <span>Tema & Estilos</span>
-                </button>
-              </div>
-
-              <div class="rm-menu-topo-item" data-menu="nuvem">
-                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuNuvem" aria-haspopup="dialog" aria-expanded="false" title="Supabase Nuvem, Google Drive e Revisões Colaborativas">
-                  ${svgIcone('nuvem_ok', 14)}
-                  <span>Nuvem & Drive</span>
+              <div class="rm-menu-topo-item" data-menu="config">
+                <button type="button" class="rm-btn-menu-topo" id="athBtnMenuConfig" aria-haspopup="menu" aria-expanded="false" aria-label="Configurações" title="Configurações: tema e estilos, nuvem e Drive">
+                  ${svgIcone('config', 15)}
                   <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
                     <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </button>
+                <div class="rm-topo-popover rm-topo-config" id="athPopoverConfig" role="menu" aria-label="Configurações" hidden>
+                  <button type="button" class="rm-config-item" role="menuitem" data-cfg="tema">
+                    ${svgIcone('paleta', 16)}
+                    <span><strong>Tema & Estilos</strong><small>Importar, exportar ou gerar com IA</small></span>
+                  </button>
+                  <button type="button" class="rm-config-item" role="menuitem" data-cfg="nuvem">
+                    ${svgIcone('nuvem_ok', 16)}
+                    <span><strong>Nuvem & Drive</strong><small>Supabase, Google Drive e revisões</small></span>
+                  </button>
+                </div>
                 <div class="rm-topo-popover" id="athPopoverNuvem" role="dialog" aria-label="Nuvem, Google Drive e Revisões" hidden style="width:360px;"></div>
               </div>
             </div>
@@ -603,7 +603,6 @@ export class EditorView {
               </button>
               <div class="rm-menu-bloco" role="menu" hidden></div>
             </div>
-            <button type="button" class="rm-ic-bt" id="rmAddMapa" data-tip="Mapa" title="Inserir Mapa Territorial">${svgIcone('mapa', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddFormula" data-tip="Fórmula" title="Inserir Fórmula Matemática">${svgIcone('formula', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddNota" data-tip="Nota" title="Inserir nota de rodapé (Ctrl+Alt+F)">${svgIcone('nota', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddDivisor" data-tip="Divisor" title="Inserir Divisor">${svgIcone('divisor', 16)}</button>
@@ -693,7 +692,6 @@ export class EditorView {
     root.querySelector('#rmRefazer').addEventListener('click', () => this.refazer());
 
     root.querySelector('#athBtnAbaZotero').addEventListener('click', () => this.onAbrirZotero());
-    root.querySelector('#athBtnAbaConexoes').addEventListener('click', () => this.onAbrirConexoes());
     root.querySelector('#athBtnExportarModal').addEventListener('click', () => this.onAbrirExportar());
 
     // Card de decisão: clique em uma marca de sugestão (ou cursor posicionado sobre ela) abre Aceitar/Rejeitar
@@ -758,7 +756,6 @@ export class EditorView {
     root.querySelector('#rmAddTexto').addEventListener('click', () => adicionar('paragrafo', { texto: 'Escreva seu parágrafo diretamente aqui...' }));
     this.ligarMenusDeBlocos(root, adicionar);
     root.querySelector('#rmAddTabela').addEventListener('click', () => adicionar('tabela', { titulo: 'Tabela — Dados quantitativos' }));
-    root.querySelector('#rmAddMapa').addEventListener('click', () => adicionar('mapa', { titulo: 'Mapa — Delimitação territorial' }));
     root.querySelector('#rmAddFormula').addEventListener('click', () => adicionar('formula', { latex: 'E = m \\cdot c^2' }));
     const btnNota = root.querySelector('#rmAddNota');
     btnNota.addEventListener('mousedown', (e) => e.preventDefault()); // mantém o cursor no texto
@@ -804,14 +801,15 @@ export class EditorView {
     const popCabRod = root.querySelector('#athPopoverCabRod');
     const popEstilos = root.querySelector('#athPopoverEstilos');
     const popNuvem = root.querySelector('#athPopoverNuvem');
+    const popConfig = root.querySelector('#athPopoverConfig');
 
     const btnArquivo = root.querySelector('#athBtnMenuArquivo');
     const btnCabRod = root.querySelector('#athBtnMenuCabRod');
     const btnEstilos = root.querySelector('#athBtnMenuEstilos');
-    const btnNuvem = root.querySelector('#athBtnMenuNuvem');
+    const btnConfig = root.querySelector('#athBtnMenuConfig'); // a engrenagem abre o menu e também "acende" quando a Nuvem está aberta
 
-    const popovers = { arquivo: popArquivo, cabrod: popCabRod, estilos: popEstilos, nuvem: popNuvem };
-    const botoes = { arquivo: btnArquivo, cabrod: btnCabRod, estilos: btnEstilos, nuvem: btnNuvem };
+    const popovers = { arquivo: popArquivo, cabrod: popCabRod, estilos: popEstilos, config: popConfig, nuvem: popNuvem };
+    const botoes = { arquivo: btnArquivo, cabrod: btnCabRod, estilos: btnEstilos, config: btnConfig, nuvem: btnConfig };
 
     const fecharTodos = () => {
       Object.values(popovers).forEach(p => { if (p) p.hidden = true; });
@@ -856,16 +854,16 @@ export class EditorView {
       togglePopover('estilos');
     });
 
-    btnNuvem?.addEventListener('click', (e) => {
+    btnConfig?.addEventListener('click', (e) => {
       e.stopPropagation();
-      togglePopover('nuvem');
+      togglePopover('config');
     });
 
-    root.querySelector('#athBtnMenuTema')?.addEventListener('click', (e) => {
+    popConfig?.querySelectorAll('[data-cfg]').forEach(item => item.addEventListener('click', (e) => {
       e.stopPropagation();
-      fecharTodos();
-      this.abrirModalCentralEstilos();
-    });
+      if (item.dataset.cfg === 'tema') { fecharTodos(); this.abrirModalCentralEstilos(); }
+      else togglePopover('nuvem'); // fecha o menu e abre o painel de Nuvem & Drive no mesmo lugar
+    }));
 
     // 1. Popover Arquivo & Margens
     popArquivo.innerHTML = `
@@ -1142,14 +1140,16 @@ export class EditorView {
             </span>
             ${est.personalizado ? '<em class="rm-estilo-tag" style="flex:none;">seu</em>' : ''}
           </div>
-          <button type="button" class="rm-ic" data-acao="editar-estilo" title="Editar estilo (${est.nome})" style="width:26px; height:26px; flex:none; border-radius:6px; border:1px solid #CBD5E1; background:#fff;">
-            ${svgIcone('lapis', 13)}
+          <button type="button" class="rm-ic" data-acao="editar-estilo" title="Editar estilo (${est.nome})" style="width:auto; height:26px; padding:0 10px; gap:5px; display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; font:700 11px var(--glx-font); flex:none; border-radius:8px; border:1px solid #CBD5E1; background:#fff; color:#314F79;">
+            ${svgIcone('lapis', 13)} Editar
           </button>
+          ${est.id === 'corpo' ? '' : `<button type="button" class="rm-ic" data-acao="excluir-estilo" title="Excluir estilo (${est.nome})" style="width:26px; height:26px; flex:none; border-radius:6px; color:#DC2626;">${svgIcone('lixeira', 13)}</button>`}
         </div>
       `;
 
       const itemCard = li.querySelector('.rm-estilo-item');
       const btnEditar = li.querySelector('[data-acao="editar-estilo"]');
+      li.querySelector('[data-acao="excluir-estilo"]')?.addEventListener('click', (e) => { e.stopPropagation(); this.excluirEstiloComConfirmacao(est);  });
 
       const selecionarEAplicar = () => {
         this.estiloSelecionadoId = est.id;
@@ -1167,7 +1167,7 @@ export class EditorView {
       };
 
       itemCard.addEventListener('click', (e) => {
-        if (e.target.closest('[data-acao="editar-estilo"]')) return;
+        if (e.target.closest('[data-acao]')) return;
         selecionarEAplicar();
       });
 
@@ -1949,14 +1949,16 @@ export class EditorView {
             </span>
             ${est.personalizado ? '<em class="rm-estilo-tag" style="flex:none;">seu</em>' : ''}
           </div>
-          <button type="button" class="rm-ic" data-acao="editar-estilo" title="Editar estilo (${est.nome})" style="width:26px; height:26px; flex:none; border-radius:6px; border:1px solid #CBD5E1; background:#fff;">
-            ${svgIcone('lapis', 13)}
+          <button type="button" class="rm-ic" data-acao="editar-estilo" title="Editar estilo (${est.nome})" style="width:auto; height:26px; padding:0 10px; gap:5px; display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; font:700 11px var(--glx-font); flex:none; border-radius:8px; border:1px solid #CBD5E1; background:#fff; color:#314F79;">
+            ${svgIcone('lapis', 13)} Editar
           </button>
+          ${est.id === 'corpo' ? '' : `<button type="button" class="rm-ic" data-acao="excluir-estilo" title="Excluir estilo (${est.nome})" style="width:26px; height:26px; flex:none; border-radius:6px; color:#DC2626;">${svgIcone('lixeira', 13)}</button>`}
         </div>
       `;
 
       const itemCard = li.querySelector('.rm-estilo-item');
       const btnEditar = li.querySelector('[data-acao="editar-estilo"]');
+      li.querySelector('[data-acao="excluir-estilo"]')?.addEventListener('click', (e) => { e.stopPropagation(); this.excluirEstiloComConfirmacao(est);  });
 
       const selecionarEAplicar = () => {
         this.estiloSelecionadoId = est.id;
@@ -1973,7 +1975,7 @@ export class EditorView {
       };
 
       itemCard.addEventListener('click', (e) => {
-        if (e.target.closest('[data-acao="editar-estilo"]')) return;
+        if (e.target.closest('[data-acao]')) return;
         selecionarEAplicar();
       });
 
@@ -2154,6 +2156,21 @@ export class EditorView {
     if (ativo && this.container?.contains(ativo) && ativo.isContentEditable) ativo.blur();
     window.getSelection?.()?.removeAllRanges();
     this.onSelecionarBloco(null, null);
+  }
+
+  /** Exclui um estilo do documento (pede confirmação e diz quantos blocos serão reatribuídos). O Corpo do Texto é protegido. */
+  excluirEstiloComConfirmacao(est) {
+    if (!est || ESTILOS_PROTEGIDOS.includes(est.id)) return false;
+    const uso = contarUsoDoEstilo(this.doc, est.id);
+    const aviso = uso
+      ? `O estilo "${est.nome}" é usado em ${uso} bloco(s). Eles passarão para o título do mesmo nível ou para o Corpo do Texto. Excluir mesmo assim?`
+      : `Excluir o estilo "${est.nome}"?`;
+    if (!window.confirm(aviso)) return false;
+    if (!excluirEstilo(this.doc, est.id).ok) return false;
+    if (this.estiloSelecionadoId === est.id) this.estiloSelecionadoId = null;
+    this.notificarMudanca(true);
+    this.renderizar();
+    return true;
   }
 
   atualizarSelecaoVisualBloco(blocoId) {
@@ -2975,7 +2992,8 @@ export class EditorView {
       ...(b.espacamento_palavras_em !== undefined ? { espacamento_palavras_em: b.espacamento_palavras_em } : {}),
       ...(b.hifenizacao !== undefined ? { hifenizacao: b.hifenizacao } : {})
     };
-    const cssEstilo = estiloParaCss(estiloMesclado);
+    // as margens verticais do estilo já vão no contêiner do bloco (abaixo); repetidas no texto, o espaço entre blocos saía em dobro
+    const cssEstilo = estiloParaCss(estiloMesclado).replace(/margin-(?:top|bottom)\s*:[^;]*;?/g, '');
 
     // Espaçamentos e margens verticais entre blocos e entre parágrafos
     const espacoDepoisPt = b.espaco_depois_pt ?? estiloMesclado.espaco_depois_pt ?? 8;

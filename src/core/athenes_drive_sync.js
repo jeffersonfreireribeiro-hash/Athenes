@@ -11,7 +11,7 @@
  */
 import {
   obterConfigGoogleDrive, salvarConfigGoogleDrive, obterPastasDriveLocais, salvarPastasDriveLocais,
-  salvarArquivoNoGoogleDrive, obterOuCriarEstruturaPastasAthenes
+  salvarArquivoNoGoogleDrive, obterOuCriarEstruturaPastasAthenes, explicarErroDrive
 } from './athenes_colaboracao.js';
 
 const API = 'https://www.googleapis.com/drive/v3/files';
@@ -27,7 +27,7 @@ async function chamar(fetchImpl, url, opcoes, token) {
   if (!resp.ok) {
     let det = '';
     try { det = (await resp.json())?.error?.message || ''; } catch { /* sem corpo */ }
-    throw new ErroDrive(resp.status === 401 ? 'A sessão do Google Drive expirou. Reconecte o Drive.' : `Google Drive (${resp.status}): ${det || 'falha na requisição'}`, resp.status);
+    throw new ErroDrive(resp.status === 401 ? 'A sessão do Google Drive expirou. Reconecte o Drive.' : (explicarErroDrive(resp.status, det) || `Google Drive (${resp.status}): ${det || 'falha na requisição'}`), resp.status);
   }
   return resp.json();
 }

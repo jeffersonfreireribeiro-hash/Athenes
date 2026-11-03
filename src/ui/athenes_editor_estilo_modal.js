@@ -20,10 +20,24 @@ const grupo = (titulo, ativaPath, corpo) => `<fieldset style="border:1px solid #
   <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px;">${corpo}</div></fieldset>`;
 
 /** Seção "Recuos e decorações" (estilos de parágrafo avançados); os valores vêm de data-av="caminho". */
-function secaoAvancadaHtml() {
-  return `<div id="athModalAvancado" style="display:flex; flex-direction:column; gap:10px;">
+export function secaoAvancadaHtml() {
+  return `<div id="athModalAvancado" style="display:flex; flex-direction:column; gap:8px;">
+    <style>
+      #athModalAvancado input:not([type=checkbox]), #athModalAvancado select { height:28px !important; min-height:0 !important; padding:0 8px !important; border-radius:6px !important; font:500 12px var(--glx-font) !important; color:#1F2733 !important; box-sizing:border-box; width:100%; background:#F8FAFC; border:1px solid #D5DDE8; }
+      #athModalAvancado input[type=color] { padding:2px !important; cursor:pointer; }
+      #athModalAvancado input[type=checkbox] { appearance:auto !important; -webkit-appearance:checkbox !important; width:14px !important; height:14px !important; min-height:0 !important; padding:0 !important; margin:0 6px 0 0 !important; border-radius:3px !important; vertical-align:-2px; accent-color:#314F79; flex:none; }
+      #athModalAvancado label { gap:2px !important; }
+      #athModalAvancado .rm-chk { display:inline-flex !important; flex-direction:row !important; align-items:center; gap:0 !important; white-space:nowrap; }
+      #athModalAvancado fieldset { padding:6px 10px 8px !important; }
+      #athModalAvancado fieldset > div { gap:6px !important; }
+      #athModalAvancado legend label { display:inline-flex; flex-direction:row !important; align-items:center; }
+    </style>
     <span style="font:800 11.5px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569;">Recuos e decorações do parágrafo</span>
-    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
+    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
+      ${campo('Espaço antes (pt)', 'espaco_antes_pt', 'number', 'step="0.5" min="0" max="120"')}
+      ${campo('Espaço depois (pt)', 'espaco_depois_pt', 'number', 'step="0.5" min="0" max="120"')}
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:8px;">
       ${campo('1ª linha (mm)', 'recuo_primeira_linha_mm', 'number', 'step="0.5" min="-50" max="100"')}
       ${campo('Esquerdo (mm)', 'recuo_esquerdo_mm', 'number', 'step="0.5" min="0" max="200"')}
       ${campo('Direito (mm)', 'recuo_direito_mm', 'number', 'step="0.5" min="0" max="200"')}
@@ -58,6 +72,44 @@ function gravarCaminho(o, path, valor) {
   const ultimo = ks.pop();
   const alvo = ks.reduce((x, k) => (x[k] = x[k] && typeof x[k] === 'object' ? x[k] : {}, x[k]), o);
   alvo[ultimo] = valor;
+}
+
+/** Liga os campos data-av="caminho" de `raiz` ao rascunho do estilo (valores iniciais e alterações ao vivo). */
+export function ligarCamposAvancados(raiz, rascunho, aoMudar) {
+  raiz.querySelectorAll('[data-av]').forEach(inp => {
+    const path = inp.dataset.av;
+    const atual = lerCaminho(rascunho, path) ?? lerCaminho({ avancado: AVANCADO_PADRAO }, path); // vazio mostra o valor padrão
+    if (inp.type === 'checkbox') inp.checked = !!atual;
+    else if (atual !== undefined && atual !== '') inp.value = atual;
+    else if (inp.type === 'color') inp.value = '#314F79';
+    inp.addEventListener(inp.type === 'checkbox' || inp.tagName === 'SELECT' ? 'change' : 'input', () => {
+      let v;
+      if (inp.type === 'checkbox') v = inp.checked;
+      else if (inp.type === 'number') v = inp.value === '' ? 0 : parseFloat(inp.value);
+      else v = inp.value;
+      gravarCaminho(rascunho, path, v);
+      aoMudar?.();
+    });
+  });
+  // cada grupo só mostra os campos quando está ativo; desativado fica só o título com a caixa de ativar
+  raiz.querySelectorAll('fieldset').forEach(fs => {
+    const chave = fs.querySelector('legend input[type=checkbox]');
+    const corpo = fs.querySelector(':scope > div');
+    if (!chave || !corpo) return;
+    const sincronizar = () => { corpo.style.display = chave.checked ? 'grid' : 'none'; fs.style.paddingBottom = chave.checked ? '' : '0'; };
+    chave.addEventListener('change', sincronizar);
+    sincronizar();
+  });
+}
+
+/** Grava no estilo o rascunho, com o bloco avançado já saneado (sem nada ativo ele some do estilo). */
+export function gravarRascunhoNoEstilo(estilo, rascunho) {
+  const av = normalizarAvancado(rascunho.avancado);
+  if (av) rascunho.avancado = av; else delete rascunho.avancado;
+  if (!rascunho.recuo_direito_mm) delete rascunho.recuo_direito_mm;
+  if (!av) delete estilo.avancado;
+  if (!rascunho.recuo_direito_mm) delete estilo.recuo_direito_mm;
+  Object.assign(estilo, rascunho);
 }
 
 export class ModalEditorEstilo {
@@ -281,21 +333,7 @@ export class ModalEditorEstilo {
       atualizarPrevia();
     });
 
-    modal.querySelectorAll('[data-av]').forEach(inp => {
-      const path = inp.dataset.av;
-      const atual = lerCaminho(this.rascunho, path);
-      if (inp.type === 'checkbox') inp.checked = !!atual;
-      else if (atual !== undefined && atual !== '') inp.value = atual;
-      else if (inp.type === 'color') inp.value = '#314F79';
-      inp.addEventListener(inp.type === 'checkbox' || inp.tagName === 'SELECT' ? 'change' : 'input', () => {
-        let v;
-        if (inp.type === 'checkbox') v = inp.checked;
-        else if (inp.type === 'number') v = inp.value === '' ? 0 : parseFloat(inp.value);
-        else v = inp.value;
-        gravarCaminho(this.rascunho, path, v);
-        atualizarPrevia();
-      });
-    });
+    ligarCamposAvancados(modal, this.rascunho, atualizarPrevia);
 
     modal.querySelectorAll('[data-alin]').forEach(btn => {
       btn.addEventListener('click', () => {

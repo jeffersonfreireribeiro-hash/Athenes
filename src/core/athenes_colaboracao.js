@@ -4,6 +4,7 @@
  * Modos de Trabalho estilo Google Docs (Edição, Sugestão e Visualização) e Google Drive API.
  */
 
+import { lerConta, gravarConta, definirContaAtiva, limparContaAtiva, obterContaAtiva } from './athenes_conta.js';
 export const SUPABASE_CONFIG_PADRAO = Object.freeze({
   url: 'https://xizxdtaxgvouopkqdbie.supabase.co',
   anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpenhkdGF4Z3ZvdW9wa3FkYmllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1NjEyNjMsImV4cCI6MjEwOTEzNzI2M30.QRzjuLjDWiRHVI0cZsDXUc2E-RgVxeJTqRc4Ji38_Cg',
@@ -54,6 +55,7 @@ export function obterPerfilColaborador() {
 }
 
 export function salvarPerfilColaborador(perfil) {
+  if (perfil?.conectado) definirContaAtiva(perfil); // dados do navegador passam a ser os desta conta
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('athenes_perfil_colaborador', JSON.stringify(perfil));
@@ -115,10 +117,12 @@ export function encerrarSessao() {
     p.autenticadoGoogle = false;
     delete p.foto;
     delete p.email;
+    p.conta = '';
     salvarPerfilColaborador(p);
 
-    const cfg = obterConfigGoogleDrive();
-    salvarConfigGoogleDrive({ ...cfg, accessToken: '' });
+    const cfg = obterConfigGoogleDrive(); // ainda na conta que está saindo: apaga o token dela
+    salvarConfigGoogleDrive({ ...cfg, accessToken: '', accessTokenExpiraEm: 0 });
+    limparContaAtiva();
   } catch (_) {}
 }
 
@@ -340,6 +344,9 @@ export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = 
   const agora = new Date().toISOString();
   doc.dataModificacao = agora;
 
+  // a nuvem guarda de quem é o documento: a listagem só devolve os da conta que está conectada
+  const conta = obterContaAtiva();
+  if (conta) doc.proprietario = { ...(doc.proprietario || {}), conta };
   const payload = {
     id: String(doc.id),
     titulo: String(doc.titulo || 'Documento sem título'),
@@ -375,10 +382,12 @@ export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = 
 /**
  * Lista os documentos salvos na nuvem Supabase.
  */
-export async function listarDocumentosDoSupabase(fetchImpl = globalThis.fetch) {
+export async function listarDocumentosDoSupabase(fetchImpl = globalThis.fetch, { conta = obterContaAtiva() } = {}) {
   if (typeof fetchImpl !== 'function') return [];
   const cfg = obterConfigSupabase();
-  const endpoint = `${cfg.url}/rest/v1/${cfg.tabela}?select=id,titulo,autor,norma,atualizado_em,atualizado_por&order=atualizado_em.desc&limit=50`;
+  // só os documentos da conta conectada (antes vinham os 50 mais recentes de TODOS); sem conta identificada, sem filtro (testes/anônimo)
+  const filtroDono = conta ? `&${encodeURIComponent('conteudo_json->proprietario->>conta')}=eq.${encodeURIComponent(conta)}` : '';
+  const endpoint = `${cfg.url}/rest/v1/${cfg.tabela}?select=id,titulo,autor,norma,atualizado_em,atualizado_por${filtroDono}&order=atualizado_em.desc&limit=50`;
 
   const resp = await fetchImpl(endpoint, {
     method: 'GET',
@@ -659,6 +668,22 @@ export const GOOGLE_DRIVE_ESCOPO = 'https://www.googleapis.com/auth/drive.file';
 export const GOOGLE_AUTH_ESCOPOS = 'openid email profile https://www.googleapis.com/auth/drive.file';
 export const DEFAULT_GOOGLE_CLIENT_ID = '948015162542-j898e50a80pf0a9fo69belsar291fh41.apps.googleusercontent.com';
 
+/**
+ * Traduz as falhas conhecidas da API do Google Drive em instruções para o usuário (null = sem tradução).
+ * O erro "API has not been used in project N before or it is disabled" acontece quando a Drive API não foi ativada no projeto Google do app.
+ */
+export function explicarErroDrive(status, detalhe = '') {
+  const t = String(detalhe || '');
+  if (Number(status) === 403 && /has not been used|is disabled|accessNotConfigured|SERVICE_DISABLED/i.test(t)) {
+    const projeto = /project[=\s]+(\d{6,})/i.exec(t)?.[1] || '';
+    const link = /https:\/\/console\.developers\.google\.com\/apis\/api\/drive\.googleapis\.com\/overview\?project=\d+/.exec(t)?.[0]
+      || (projeto ? `https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=${projeto}` : 'https://console.cloud.google.com/apis/library/drive.googleapis.com');
+    return `A API do Google Drive ainda não está ativada no projeto Google do Athenes${projeto ? ` (nº ${projeto})` : ''}. Ative-a em ${link} e tente de novo depois de 2 a 5 minutos.`;
+  }
+  if (Number(status) === 403 && /insufficient|scope|permission/i.test(t)) return 'O Google não concedeu permissão suficiente ao Athenes. Reconecte o Drive e aceite o acesso aos arquivos criados pelo app.';
+  return null;
+}
+
 export function extrairIdPastaDrive(urlOuId) {
   if (!urlOuId) return '';
   const str = String(urlOuId).trim();
@@ -682,7 +707,7 @@ export function obterConfigGoogleDrive() {
   const pastaIdPadrao = '1N2Yi8PhbANCG5wDw_7lmscrrk0jwWGpv';
   try {
     if (typeof localStorage !== 'undefined') {
-      const salvo = localStorage.getItem('athenes_gdrive_config');
+      const salvo = lerConta('athenes_gdrive_config');
       if (salvo) {
         const parsed = JSON.parse(salvo);
         const pastaUrl = parsed.pastaUrl || pastaUrlPadrao;
@@ -718,7 +743,7 @@ export function salvarConfigGoogleDrive(cfg) {
   };
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('athenes_gdrive_config', JSON.stringify(normalizado));
+      gravarConta('athenes_gdrive_config', JSON.stringify(normalizado));
     }
   } catch (_) {}
   return normalizado;
@@ -839,7 +864,7 @@ export async function salvarArquivoNoGoogleDrive({
 
   if (!resp.ok) {
     const det = await resp.text().catch(() => '');
-    throw new Error(`Erro ao salvar no Google Drive (${resp.status}): ${det}`);
+    throw new Error(explicarErroDrive(resp.status, det) || `Erro ao salvar no Google Drive (${resp.status}): ${det}`);
   }
   return await resp.json();
 }
@@ -1066,7 +1091,7 @@ export function obterPastasDriveLocais() {
 
   try {
     if (typeof localStorage !== 'undefined') {
-      const salvo = localStorage.getItem(STORAGE_KEY_PASTAS_DRIVE);
+      const salvo = lerConta(STORAGE_KEY_PASTAS_DRIVE);
       if (salvo) {
         const parsed = JSON.parse(salvo);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -1084,7 +1109,7 @@ export function salvarPastasDriveLocais(pastas) {
   _memoriaPastasDrive = JSON.parse(JSON.stringify(pastas));
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_PASTAS_DRIVE, JSON.stringify(pastas));
+      gravarConta(STORAGE_KEY_PASTAS_DRIVE, JSON.stringify(pastas));
     }
   } catch (_) {}
 }
@@ -1209,7 +1234,7 @@ export async function criarSubpastaNoGoogleDrive({ accessToken, nome, parentFold
   if (!resp.ok) {
     let errDet = '';
     try { const ej = await resp.json(); errDet = ej.error?.message || ''; } catch (_) {}
-    throw new Error(`Erro ao criar subpasta no Drive (${resp.status}): ${errDet}`);
+    throw new Error(explicarErroDrive(resp.status, errDet) || `Erro ao criar subpasta no Drive (${resp.status}): ${errDet}`);
   }
   return await resp.json();
 }

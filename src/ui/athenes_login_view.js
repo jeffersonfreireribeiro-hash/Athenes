@@ -177,6 +177,7 @@ export class TelaLoginView {
         p.foto = info.picture;
       }
       p.autenticadoGoogle = true;
+      p.conta = ''; // recalcula pela conta Google
       p.conectado = true;
       p.continuarConectado = continuarConectado;
       salvarPerfilColaborador(p);
@@ -226,6 +227,9 @@ export class TelaLoginView {
     p.email = email;
     p.papel = papel;
     p.instituicao = instituicao;
+    p.autenticadoGoogle = false; // identificação acadêmica não é conta Google
+    delete p.foto;
+    p.conta = ''; // recalcula pelo e-mail informado (ou pelo nome)
     p.conectado = true;
     p.continuarConectado = continuarConectado;
     salvarPerfilColaborador(p);

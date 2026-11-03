@@ -9,6 +9,7 @@
  *     secoes: [{ nome, mestraId, blocos }] }   // blocos iniciais (placeholders)
  * Tudo aqui é puro (sem DOM); o armazenamento recebe o `Storage` por parâmetro.
  */
+import { chaveConta } from './athenes_conta.js';
 import { criarDocumento, criarModelosPaginaPadrao, criarNovoBloco, criarSecao, gerarId } from './athenes_documento.js';
 import { criarEstilosPadrao } from './athenes_estilos.js';
 import { clonarComNovosIds } from './athenes_arquivos.js';
@@ -149,13 +150,13 @@ export function listarTemplatesNativos() {
 
 export function listarTemplatesUsuario(storage = globalThis.localStorage) {
   try {
-    const v = JSON.parse(storage?.getItem(CHAVE_TEMPLATES_USUARIO) || '[]');
+    const v = JSON.parse(storage?.getItem(chaveConta(CHAVE_TEMPLATES_USUARIO)) || '[]');
     return Array.isArray(v) ? v.filter(t => t?.config) : [];
   } catch { return []; }
 }
 
 function gravar(lista, storage) {
-  storage.setItem(CHAVE_TEMPLATES_USUARIO, JSON.stringify(lista));
+  storage.setItem(chaveConta(CHAVE_TEMPLATES_USUARIO), JSON.stringify(lista));
 }
 
 /** Cria o template a partir do documento aberto e o grava (lança em falha de cota: o chamador avisa). */

@@ -16,6 +16,7 @@ const VAZIOS = new Set(['br', 'img', 'hr', 'input', 'wbr']);
 /** fragmento → { origem, irmaos[] }: relação mantida fora do objeto para o JSON do documento ficar plano. */
 const REGISTRO = new WeakMap();
 
+import { entrelinhaEfetiva } from './athenes_estilos.js';
 export const ehFragmento = (b) => !!b?._frag;
 export const origemDoFragmento = (b) => REGISTRO.get(b)?.origem || null;
 
@@ -69,7 +70,7 @@ export function parametrosTextoPt(bloco, ctx) {
   const est = ctx.estilos[bloco.estiloId] || (bloco.tipo === 'titulo' ? ctx.estilos[`titulo${Math.min(6, bloco.nivel || 1)}`] : null) || ctx.estilos.corpo;
   if (!est) return null;
   const tam = bloco.tamanho_pt ?? est.tamanho_pt ?? 12;
-  const ent = bloco.entrelinha ?? est.entrelinha ?? 1.4;
+  const ent = entrelinhaEfetiva({ entrelinha: bloco.entrelinha ?? est.entrelinha ?? 1.4, fonte: bloco.fonte ?? est.fonte }, 1.4); // mesma conta do CSS: a estimativa de altura acompanha o que é desenhado
   const antes = bloco.espaco_antes_pt ?? est.espaco_antes_pt ?? 0;
   const depois = bloco.espaco_depois_pt ?? est.espaco_depois_pt ?? 0;
   const recuoMm = bloco.recuo_esquerdo_mm ?? est.recuo_esquerdo_mm ?? 0;

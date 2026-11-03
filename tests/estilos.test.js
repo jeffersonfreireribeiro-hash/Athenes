@@ -47,3 +47,23 @@ describe('Athenes — Sistema de Estilos e Perfis', () => {
     assert.ok(cssTitulo.includes('break-after: avoid'));
   });
 });
+
+describe('Entrelinha: "1" é a linha simples da fonte, como no Word', () => {
+  it('fontes do Word ganham a altura da linha simples; Nunito e importadas seguem o valor cru', async () => {
+    const { entrelinhaEfetiva, FATOR_LINHA_SIMPLES } = await import('../src/core/athenes_estilos.js');
+    assert.equal(entrelinhaEfetiva({ fonte: 'aptos', entrelinha: 1 }), 1.22);
+    assert.equal(entrelinhaEfetiva({ fonte: 'times', entrelinha: 1.5 }), 1.724); // 1,5 linhas de Times
+    assert.equal(entrelinhaEfetiva({ fonte: 'nunito', entrelinha: 1.5 }), 1.5);
+    assert.equal(entrelinhaEfetiva({ fonte: 'minha_fonte_importada', entrelinha: 1.2 }), 1.2);
+    assert.equal(entrelinhaEfetiva({ fonte: 'aptos' }), 1.83, 'sem valor: 1,5 linhas');
+    assert.ok(Object.values(FATOR_LINHA_SIMPLES).every(f => f > 1 && f < 1.4));
+    const css = estiloParaCss({ id: 'x', fonte: 'aptos', entrelinha: 1 });
+    assert.match(css, /line-height: 1\.22;/);
+  });
+
+  it('a estimativa de altura usa a mesma entrelinha do CSS (a paginação acompanha o que é desenhado)', async () => {
+    const { parametrosTextoPt } = await import('../src/core/athenes_fragmentos.js');
+    const P = parametrosTextoPt({ tipo: 'paragrafo', estiloId: 'corpo', texto: 'x' }, { estilos: { corpo: { id: 'corpo', fonte: 'aptos', tamanho_pt: 11, entrelinha: 1 } }, larguraPt: 400 });
+    assert.equal(P.ent, 1.22);
+  });
+});

@@ -46,7 +46,9 @@ export class ModalCentralEstilos {
     modal.className = 'ath-modal';
     modal.style.maxWidth = '880px';
     modal.style.width = '95%';
-    modal.style.height = '85vh';
+    // a altura acompanha o conteúdo da aba (antes era fixa em 85vh e sobrava um vazio enorme); o mínimo evita saltos entre abas curtas
+    modal.style.minHeight = 'min(520px, 85vh)';
+    modal.style.maxHeight = '85vh';
     modal.style.display = 'flex';
     modal.style.flexDirection = 'column';
     modal.style.borderRadius = '16px';

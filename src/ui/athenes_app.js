@@ -3,9 +3,10 @@
  * Athenes — Coordenador Principal da Aplicação Web e Roteamento de Telas.
  */
 
+import { lerConta, gravarConta, definirContaAtiva } from '../core/athenes_conta.js';
 import { DashboardView } from './athenes_dashboard.js';
 import { TelaLoginView } from './athenes_login_view.js';
-import { estaSessaoAtiva, encerrarSessao } from '../core/athenes_colaboracao.js';
+import { estaSessaoAtiva, encerrarSessao, obterPerfilColaborador } from '../core/athenes_colaboracao.js';
 import { criarDocumento } from '../core/athenes_documento.js';
 import { carregarDocumentoDoSupabase } from '../core/athenes_colaboracao.js';
 import { sanitizarDocumentoImportado } from '../core/athenes_seguranca.js';
@@ -40,6 +41,7 @@ export class AthenesApp {
     this.painelConexoes = null;
     this.reguas = null;
 
+    if (estaSessaoAtiva()) definirContaAtiva(obterPerfilColaborador()); // já conectado: os dados lidos a seguir são os desta conta
     this.iniciar();
   }
 
@@ -81,7 +83,7 @@ export class AthenesApp {
 
   carregarUltimoDocENavegarEditor() {
     try {
-      const salvo = localStorage.getItem('athenes_docs_indice');
+      const salvo = lerConta('athenes_docs_indice');
       const lista = salvo ? JSON.parse(salvo) : [];
       if (lista.length > 0) {
         const docSalvo = localStorage.getItem(`athenes_doc_${lista[0].id}`);
@@ -97,6 +99,7 @@ export class AthenesApp {
 
   navegarParaLogin(docIdLink = null) {
     this.descarregarSalvamento();
+    this.documentoAtivo = null; // o documento da conta que saiu não pode ser gravado na conta seguinte
     document.querySelectorAll('.ath-modal-backdrop').forEach(m => m.remove());
     this.tela = 'login';
     this.container.innerHTML = '<div id="athAppLogin"></div>';
@@ -321,7 +324,7 @@ export class AthenesApp {
   gravarDocumento(doc, { semDrive = false } = {}) {
     if (!doc) return;
     try {
-      const salvo = localStorage.getItem('athenes_docs_indice');
+      const salvo = lerConta('athenes_docs_indice');
       let lista = salvo ? JSON.parse(salvo) : [];
       const idx = lista.findIndex(d => d.id === doc.id);
       if (idx >= 0) {
@@ -329,7 +332,7 @@ export class AthenesApp {
       } else {
         lista.unshift(doc);
       }
-      localStorage.setItem('athenes_docs_indice', JSON.stringify(lista));
+      gravarConta('athenes_docs_indice', JSON.stringify(lista));
       if (!semDrive) this.agendarEnvioDrive(doc);
     } catch (e) {
       // antes falhava em silêncio e o documento voltava sem as alterações ao reabrir

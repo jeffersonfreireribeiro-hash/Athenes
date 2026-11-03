@@ -2613,3 +2613,20 @@ ins.ath-sug-ins:hover, del.ath-sug-del:hover { outline: 1.5px solid var(--ath-su
 .ath-dash-main-area > .ath-dash-pasta-banner { flex: 0 0 auto; }
 .ath-dash-main-area > #athSecaoDashEscrita:not([hidden]),
 .ath-dash-main-area > #athSecaoDashArtigosZotero:not([hidden]) { flex: 1 0 auto; }
+
+/* Menu de configurações (engrenagem): Tema & Estilos e Nuvem & Drive */
+.rm-topo-config { width: 270px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.rm-config-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; color: #1F2733; font: inherit; }
+.rm-config-item:hover, .rm-config-item:focus-visible { background: #EEF4FA; outline: none; }
+.rm-config-item svg { flex: none; color: #314F79; }
+.rm-config-item strong { display: block; font: 700 12.5px var(--glx-font, inherit); }
+.rm-config-item small { display: block; font-size: 11px; color: #64748B; }
+
+/* caixas de marcar do painel de estilo: tamanho nativo, discreto */
+#athEstiloItalico, #athEstiloCaixaAlta, #athEstiloHifenizacao { appearance: auto; -webkit-appearance: checkbox; width: 14px; height: 14px; min-height: 0; padding: 0; border-radius: 3px; accent-color: #314F79; }
+
+/* Fidelidade com o PDF/DOCX: o bloco na folha não ganha preenchimento nem borda que estreitem o texto ou aumentem a distância
+   entre blocos; o destaque de passar o mouse/selecionar é desenhado por fora (sombra), sem ocupar espaço. */
+.ath-folha-area-util .ath-bloco-folha { padding: 0; border: 0; }
+.ath-folha-area-util .ath-bloco-folha:hover { box-shadow: 0 0 0 1.5px #CBD5E1; }
+.ath-folha-area-util .ath-bloco-folha.sel { box-shadow: 0 0 0 1.5px #314F79, 0 0 0 4.5px rgba(49, 79, 121, 0.16); }

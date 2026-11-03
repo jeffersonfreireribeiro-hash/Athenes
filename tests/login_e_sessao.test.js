@@ -103,7 +103,8 @@ test('Athenes — Sistema de Login, Sessão e Continuidade Conectada', async (t)
       conectado: true,
       continuarConectado: true
     });
-    mockStorage.local.set('athenes_gdrive_config', JSON.stringify({ clientId: 'id123', accessToken: 'token123' }));
+    const chaveDrive = 'athenes_gdrive_config::g:teste@exemplo.com'; // o token do Drive pertence à conta conectada
+    mockStorage.local.set(chaveDrive, JSON.stringify({ clientId: 'id123', accessToken: 'token123' }));
 
     encerrarSessao();
 
@@ -114,7 +115,7 @@ test('Athenes — Sistema de Login, Sessão e Continuidade Conectada', async (t)
     assert.equal(p.foto, undefined);
     assert.equal(p.email, undefined);
 
-    const driveCfg = JSON.parse(mockStorage.local.get('athenes_gdrive_config') || '{}');
+    const driveCfg = JSON.parse(mockStorage.local.get(chaveDrive) || '{}');
     assert.equal(driveCfg.accessToken, '');
   });
 

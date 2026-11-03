@@ -5,6 +5,7 @@
  * inserção de citações e fichamento/resumos pessoais.
  */
 
+import { lerConta, gravarConta } from '../core/athenes_conta.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import { svgIcone } from './athenes_icones.js';
 
@@ -48,7 +49,7 @@ export class PainelZotero {
 
   carregarCredenciais() {
     try {
-      const salvo = localStorage.getItem('athenes_zotero_cfg');
+      const salvo = lerConta('athenes_zotero_cfg');
       if (salvo) {
         const cfg = JSON.parse(salvo);
         this.client.userId = cfg.userId || '';
@@ -60,7 +61,7 @@ export class PainelZotero {
 
   salvarCredenciais() {
     try {
-      localStorage.setItem('athenes_zotero_cfg', JSON.stringify({
+      gravarConta('athenes_zotero_cfg', JSON.stringify({
         userId: this.client.userId,
         apiKey: this.client.apiKey,
         isGroup: this.client.isGroup
@@ -226,7 +227,7 @@ export class PainelZotero {
     (this.doc.referencias || []).forEach(r => refsMap.set(r.id || r.chaveZotero, r));
 
     try {
-      const salvoEstudo = localStorage.getItem('athenes_estudo_artigos');
+      const salvoEstudo = lerConta('athenes_estudo_artigos');
       if (salvoEstudo) {
         const artigosEstudo = JSON.parse(salvoEstudo);
         if (Array.isArray(artigosEstudo)) {

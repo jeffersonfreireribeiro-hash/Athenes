@@ -543,6 +543,19 @@ export function criarEstilosPadrao(perfilId = 'abnt') {
  * espaçamento de letras/palavras). Serve a conteúdos que têm layout próprio, como as células de uma tabela:
  * alinhamento, margens, recuos e fundo do estilo não se aplicam.
  */
+/**
+ * Altura da linha "simples" (entrelinha 1) de cada fonte do Word, em múltiplos do tamanho do corpo (ascent + descent + lineGap).
+ * No Word, "entrelinha 1" é essa altura, não 1,0× o corpo: com line-height CSS cru (1,0) as linhas ficavam mais apertadas que no Word
+ * e a seleção de texto se sobrepunha. Fontes fora da lista (Nunito, importadas) seguem o valor cru, como sempre foi.
+ */
+export const FATOR_LINHA_SIMPLES = Object.freeze({ times: 1.149, arial: 1.149, georgia: 1.136, garamond: 1.12, cambria: 1.172, calibri: 1.22, aptos: 1.22, consolas: 1.17 });
+
+/** Entrelinha em múltiplos do corpo para o CSS e para a estimativa de altura (valor do estilo × altura da linha simples da fonte). */
+export function entrelinhaEfetiva(estilo, padrao = 1.5) {
+  const valor = Number(estilo?.entrelinha) || padrao;
+  return Math.round(valor * (FATOR_LINHA_SIMPLES[estilo?.fonte] || 1) * 1000) / 1000;
+}
+
 export function estiloParaCssTipografia(estilo) {
   if (!estilo) return '';
   const f = FONTES_SISTEMA[estilo.fonte] || FONTES_SISTEMA.nunito;
@@ -551,7 +564,7 @@ export function estiloParaCssTipografia(estilo) {
     `font-size: ${estilo.tamanho_pt || 11}pt`,
     `font-weight: ${estilo.peso || 400}`,
     `color: ${estilo.cor || '#1F2733'}`,
-    `line-height: ${estilo.entrelinha || 1.5}`
+    `line-height: ${entrelinhaEfetiva(estilo)}`
   ];
   if (estilo.italico) p.push('font-style: italic');
   if (estilo.caixa_alta) p.push('text-transform: uppercase');
@@ -625,7 +638,7 @@ export function estiloParaCss(estilo, fontesDisponiveis = FONTES_SISTEMA) {
   }
 
   // Entrelinha
-  props.push(`line-height: ${estilo.entrelinha || 1.5};`);
+  props.push(`line-height: ${entrelinhaEfetiva(estilo)};`);
 
   // Espaçamentos verticais
   if (estilo.espaco_antes_pt) props.push(`margin-top: ${estilo.espaco_antes_pt}pt;`);
@@ -695,6 +708,51 @@ export function alinhamentoCss(valor, padrao = 'left') {
   return map[valor] || padrao;
 }
 
+/** Estilos que o documento não vive sem: o corpo é o destino dos blocos de um estilo excluído. */
+export const ESTILOS_PROTEGIDOS = Object.freeze(['corpo']);
+
+const ehChaveDeEstilo = (k) => k === 'estiloId' || /_estilo_id$/.test(k);
+function paraCadaBloco(doc, fn) {
+  for (const sec of doc?.secoes || []) for (const b of sec.blocos || []) fn(b);
+  for (const b of doc?.modelos_blocos || []) fn(b);
+}
+
+/** Quantos blocos usam o estilo (como estilo do bloco ou como estilo de título/legenda/fonte/numeração/dados). */
+export function contarUsoDoEstilo(doc, id) {
+  let n = 0;
+  paraCadaBloco(doc, (b) => { if (Object.keys(b).some(k => ehChaveDeEstilo(k) && b[k] === id)) n++; });
+  return n;
+}
+
+/**
+ * Exclui um estilo do documento. Blocos que o usavam passam a usar o título do mesmo nível (se for título) ou o Corpo;
+ * referências auxiliares (`titulo_estilo_id`, `legenda_estilo_id`…) são removidas e voltam ao padrão do bloco.
+ * Devolve { ok, reatribuidos, substituto } ou { ok:false, motivo }.
+ */
+export function excluirEstilo(doc, id) {
+  if (!doc || !Array.isArray(doc.estilos)) return { ok: false, motivo: 'documento' };
+  if (ESTILOS_PROTEGIDOS.includes(id)) return { ok: false, motivo: 'protegido' };
+  const idx = doc.estilos.findIndex(e => e.id === id);
+  if (idx < 0) return { ok: false, motivo: 'inexistente' };
+  doc.estilos.splice(idx, 1);
+  doc.estilos_excluidos = [...new Set([...(doc.estilos_excluidos || []), id])];
+  const base = (doc.estilos.find(e => e.id === 'corpo') || doc.estilos[0])?.id || '';
+  let reatribuidos = 0;
+  paraCadaBloco(doc, (b) => {
+    let tocou = false;
+    for (const k of Object.keys(b)) {
+      if (!ehChaveDeEstilo(k) || b[k] !== id) continue;
+      if (k === 'estiloId') {
+        const doNivel = b.tipo === 'titulo' ? `titulo${Math.min(6, Number(b.nivel) || 1)}` : '';
+        b.estiloId = doNivel && doc.estilos.some(e => e.id === doNivel) ? doNivel : base;
+      } else delete b[k];
+      tocou = true;
+    }
+    if (tocou) reatribuidos++;
+  });
+  return { ok: true, reatribuidos, substituto: base };
+}
+
 /** Garante os estilos Título 4–6 em documentos criados antes do suporte a seções profundas (não altera os existentes). */
 export function garantirEstilosDeTitulos(doc) {
   if (!doc || !Array.isArray(doc.estilos)) return doc;
@@ -702,7 +760,8 @@ export function garantirEstilosDeTitulos(doc) {
   const padrao = criarEstilosPadrao(doc.perfil || 'abnt');
   const maiorNivel = Math.max(0, ...(doc.secoes || []).flatMap(s => s.blocos || []).filter(b => b.tipo === 'titulo').map(b => Number(b.nivel) || 0));
   for (const n of [4, 5, 6]) {
-    if ((!doc.estilos_minimos || n <= maiorNivel) && !ids.has(`titulo${n}`)) {
+    const excluido = (doc.estilos_excluidos || []).includes(`titulo${n}`); // o usuário apagou de propósito: não recriar
+    if ((!doc.estilos_minimos || n <= maiorNivel) && !ids.has(`titulo${n}`) && !excluido) {
       const e = padrao.find(x => x.id === `titulo${n}`);
       if (e) doc.estilos.push(JSON.parse(JSON.stringify(e)));
     }

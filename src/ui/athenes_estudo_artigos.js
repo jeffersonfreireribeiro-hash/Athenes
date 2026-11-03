@@ -16,6 +16,7 @@
  *      Salvar Citação no Zotero (p. X), Criar Nota Adesiva ou Copiar em formato ABNT.
  */
 
+import { lerConta, gravarConta } from '../core/athenes_conta.js';
 import { obterTokenOuConectar, obterTokenDrive } from '../core/athenes_drive_sync.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import {
@@ -365,11 +366,11 @@ export function carregarArtigosEstudo() {
     if (typeof localStorage !== 'undefined') {
       let temChaveZotero = false;
       try {
-        const zCfg = JSON.parse(localStorage.getItem('athenes_zotero_cfg') || '{}');
+        const zCfg = JSON.parse(lerConta('athenes_zotero_cfg') || '{}');
         temChaveZotero = Boolean(zCfg.apiKey && String(zCfg.apiKey).trim());
       } catch (_) {}
 
-      const salvo = localStorage.getItem(STORAGE_KEY_ARTIGOS);
+      const salvo = lerConta(STORAGE_KEY_ARTIGOS);
       if (salvo !== null) {
         const parsed = JSON.parse(salvo);
         if (Array.isArray(parsed)) {
@@ -406,7 +407,7 @@ export function salvarArtigosEstudo(lista) {
         const { pdfBlobUrl, ...resto } = a;
         return resto;
       }) : lista;
-      localStorage.setItem(STORAGE_KEY_ARTIGOS, JSON.stringify(limpo));
+      gravarConta(STORAGE_KEY_ARTIGOS, JSON.stringify(limpo));
     }
   } catch (_) {}
   return lista;
@@ -504,7 +505,7 @@ export class EstudoArtigosView {
 
   carregarConfigZotero() {
     try {
-      const salvo = localStorage.getItem('athenes_zotero_cfg');
+      const salvo = lerConta('athenes_zotero_cfg');
       if (salvo) {
         const cfg = JSON.parse(salvo);
         this.zoteroClient.userId = cfg.userId ? String(cfg.userId).trim() : '';
@@ -520,7 +521,7 @@ export class EstudoArtigosView {
     if (cfg.apiKey !== undefined) this.zoteroClient.apiKey = String(cfg.apiKey).trim();
     if (cfg.username !== undefined) this.zoteroClient.username = cfg.username;
     try {
-      localStorage.setItem('athenes_zotero_cfg', JSON.stringify({
+      gravarConta('athenes_zotero_cfg', JSON.stringify({
         userId: this.zoteroClient.userId,
         apiKey: this.zoteroClient.apiKey,
         username: this.zoteroClient.username || '',

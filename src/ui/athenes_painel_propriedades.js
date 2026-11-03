@@ -9,6 +9,8 @@
  * - Inserção de referências cruzadas e citações Zotero
  */
 
+import { contarUsoDoEstilo, excluirEstilo } from '../core/athenes_estilos.js';
+import { secaoAvancadaHtml, ligarCamposAvancados, gravarRascunhoNoEstilo } from './athenes_editor_estilo_modal.js';
 import { FONTES_SISTEMA, PESOS_FONTE, estiloParaCss, alinhamentoCss, ALINHAMENTOS } from '../core/athenes_estilos.js';
 import {
   modeloDaPagina, recalcularNumeracaoAutomatica, resolverReferenciasCruzadas,
@@ -406,8 +408,8 @@ export class PainelPropriedades {
           <div>
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <label style="font:700 12px var(--glx-font); margin:0;">Estilo</label>
-              <button type="button" class="rm-ic" id="athBtnEditarEstiloDoBloco" title="Editar estilo com lápis" style="width:22px; height:22px;">
-                ${svgIcone('lapis', 12)}
+              <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnEditarEstiloDoBloco" title="Abrir o painel completo deste estilo: fonte, entrelinha, recuos, espaçamentos e decorações" style="display:inline-flex; align-items:center; gap:4px; height:24px; padding:0 8px; font-weight:700;">
+                ${svgIcone('lapis', 12)} Editar estilo
               </button>
             </div>
             <select id="rmCampoEstilo" class="glx-select" style="width:100%; margin-top:4px;">
@@ -681,8 +683,8 @@ export class PainelPropriedades {
         <div>
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <label style="font:700 12px var(--glx-font); margin:0;">Estilo de texto</label>
-            <button type="button" class="rm-ic" id="athBtnEditarEstiloDoBloco" title="Configurar este estilo no painel" style="width:22px; height:22px;">
-              ${svgIcone('lapis', 12)}
+            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnEditarEstiloDoBloco" title="Abrir o painel completo deste estilo: fonte, entrelinha, recuos, espaçamentos e decorações" style="display:inline-flex; align-items:center; gap:4px; height:24px; padding:0 8px; font-weight:700;">
+              ${svgIcone('lapis', 12)} Editar estilo
             </button>
           </div>
           <select id="rmCampoEstilo" class="glx-select" style="width:100%; margin-top:4px;">
@@ -883,41 +885,12 @@ export class PainelPropriedades {
           </button>
         </div>
 
-        <!-- Espaçamentos e Distâncias: Entre Blocos e Parágrafos (Enter) -->
+        <!-- Só a distância ENTRE BLOCOS é do bloco; entrelinha, recuos, espaço antes e entre parágrafos pertencem ao ESTILO de texto -->
         <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-top:6px; background:#fff;">
-          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
-            <span>Distâncias e Espaçamentos</span>
-            <span style="font-size:10px; color:var(--glx-muted); text-transform:none; font-weight:600;">Blocos & Parágrafos</span>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Distância entre Blocos (pt)
-                <input type="number" id="rmCampoEspacoDepois" class="glx-input" style="width:100%;" min="0" max="72" value="${b.espaco_depois_pt ?? estiloAtivo.espaco_depois_pt ?? 8}" title="Margem de afastamento para o próximo bloco">
-              </label>
-              <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733);">Distância Parágrafos Enter (pt)
-                <input type="number" id="rmCampoDistanciaParagrafos" class="glx-input" style="width:100%;" min="0" max="48" value="${b.espaco_paragrafos_pt ?? estiloAtivo.espaco_paragrafos_pt ?? 6}" title="Espaço entre parágrafos criados com Enter no mesmo bloco">
-              </label>
-            </div>
-            <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <label style="font-size:11px; color:var(--glx-muted);">Entrelinha (linhas)
-                <input type="number" id="rmCampoEntrelinha" class="glx-input" style="width:100%;" min="0.8" max="3.0" step="0.05" value="${b.entrelinha || estiloAtivo.entrelinha || 1.5}">
-              </label>
-              <label style="font-size:11px; color:var(--glx-muted);">Espaço antes do bloco (pt)
-                <input type="number" id="rmCampoEspacoAntes" class="glx-input" style="width:100%;" min="0" max="72" value="${b.espaco_antes_pt ?? estiloAtivo.espaco_antes_pt ?? 0}">
-              </label>
-            </div>
-            <div class="ath-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <label style="font-size:11px; color:var(--glx-muted);">Recuo 1ª linha (mm)
-                <input type="number" id="rmCampoRecuo1" class="glx-input" style="width:100%;" min="0" max="50" value="${b.recuo_primeira_linha_mm ?? estiloAtivo.recuo_primeira_linha_mm ?? 0}">
-              </label>
-              <label style="font-size:11px; color:var(--glx-muted);">Recuo esquerdo (mm)
-                <input type="number" id="rmCampoRecuoEsq" class="glx-input" style="width:100%;" min="0" max="100" value="${b.recuo_esquerdo_mm ?? estiloAtivo.recuo_esquerdo_mm ?? 0}">
-              </label>
-            </div>
-            <div style="display:none;">
-              <input type="number" id="rmCampoTracking" value="${b.espacamento_letras_em || estiloAtivo.espacamento_letras_em || 0}">
-            </div>
-          </div>
+          <label style="font-size:11px; font-weight:700; color:var(--ath-text, #1F2733); display:block;">Distância entre blocos (pt)
+            <input type="number" id="rmCampoEspacoDepois" class="glx-input" style="width:100%;" min="0" max="72" value="${b.espaco_depois_pt ?? estiloAtivo.espaco_depois_pt ?? 8}" title="Espaço depois deste bloco, até o próximo. Entrelinha, recuos e espaçamento entre parágrafos são definidos no estilo de texto.">
+          </label>
+          <p style="margin:6px 0 0; font-size:10.5px; color:var(--glx-muted); line-height:1.35;">Entrelinha, recuos e espaço entre parágrafos ficam no <strong>estilo de texto</strong> (Estilos de Texto).</p>
         </div>
 
         <!-- Indicador de Override Local e Redefinição do Estilo -->
@@ -1156,33 +1129,8 @@ export class PainelPropriedades {
         this.notificarMudanca();
       });
 
-      // Avançado
-      box.querySelector('#rmCampoEntrelinha').addEventListener('input', e => {
-        b.entrelinha = parseFloat(e.target.value) || 1.5;
-        this.notificarMudanca();
-      });
-      box.querySelector('#rmCampoTracking').addEventListener('input', e => {
-        b.espacamento_letras_em = parseFloat(e.target.value) || 0;
-        this.notificarMudanca();
-      });
-      box.querySelector('#rmCampoEspacoAntes').addEventListener('input', e => {
-        b.espaco_antes_pt = parseFloat(e.target.value) || 0;
-        this.notificarMudanca();
-      });
-      box.querySelector('#rmCampoEspacoDepois').addEventListener('input', e => {
+      box.querySelector('#rmCampoEspacoDepois')?.addEventListener('input', e => {
         b.espaco_depois_pt = parseFloat(e.target.value) || 0;
-        this.notificarMudanca();
-      });
-      box.querySelector('#rmCampoDistanciaParagrafos')?.addEventListener('input', e => {
-        b.espaco_paragrafos_pt = parseFloat(e.target.value) || 0;
-        this.notificarMudanca();
-      });
-      box.querySelector('#rmCampoRecuo1').addEventListener('input', e => {
-        b.recuo_primeira_linha_mm = parseFloat(e.target.value) || 0;
-        this.notificarMudanca();
-      });
-      box.querySelector('#rmCampoRecuoEsq').addEventListener('input', e => {
-        b.recuo_esquerdo_mm = parseFloat(e.target.value) || 0;
         this.notificarMudanca();
       });
 
@@ -1910,6 +1858,8 @@ export class PainelPropriedades {
         </label>
       </div>
 
+      ${secaoAvancadaHtml()}
+
       <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
         <label class="rm-chk" style="font-size:12px;">
           <input type="checkbox" id="athEstiloItalico" ${rasc.italico ? 'checked' : ''}> Itálico
@@ -1931,11 +1881,11 @@ export class PainelPropriedades {
             Salvar como Novo
           </button>
         </div>
-        ${est.personalizado ? `
+        ${est.id !== 'corpo' ? `
           <button type="button" class="glx-btn glx-btn-perigo glx-btn-sm" id="athBtnExcluirEstilo" style="width:100%; color:#DC2626; border-color:#FECACA; background:#FEF2F2;">
-            Excluir Estilo
+            Excluir estilo
           </button>
-        ` : ''}
+        ` : '<p style="margin:0; font-size:11px; color:var(--glx-muted);">O Corpo do Texto é o estilo-base do documento e não pode ser excluído.</p>'}
       </div>
     `;
 
@@ -2008,6 +1958,8 @@ export class PainelPropriedades {
       atualizarPrevia();
     });
 
+    ligarCamposAvancados(box, rasc, atualizarPrevia);
+
     box.querySelector('#athEstiloItalico').addEventListener('change', e => {
       rasc.italico = e.target.checked;
       atualizarPrevia();
@@ -2019,7 +1971,7 @@ export class PainelPropriedades {
     });
 
     box.querySelector('#athBtnSalvarEstilo').addEventListener('click', () => {
-      Object.assign(est, rasc);
+      gravarRascunhoNoEstilo(est, rasc);
       this.notificarMudanca(true);
       this.renderizar();
     });
@@ -2039,14 +1991,15 @@ export class PainelPropriedades {
     });
 
     box.querySelector('#athBtnExcluirEstilo')?.addEventListener('click', () => {
-      if (!window.confirm(`Tem certeza que deseja excluir o estilo "${est.nome}"?`)) return;
-      const idx = this.doc.estilos.findIndex(e => e.id === est.id);
-      if (idx >= 0) {
-        this.doc.estilos.splice(idx, 1);
-        this.estiloSelecionado = null;
-        this.notificarMudanca(true);
-        this.renderizar();
-      }
+      const uso = contarUsoDoEstilo(this.doc, est.id);
+      const aviso = uso
+        ? `O estilo "${est.nome}" é usado em ${uso} bloco(s). Eles passarão para o título do mesmo nível ou para o Corpo do Texto. Excluir mesmo assim?`
+        : `Excluir o estilo "${est.nome}"?`;
+      if (!window.confirm(aviso)) return;
+      if (!excluirEstilo(this.doc, est.id).ok) return;
+      this.estiloSelecionado = null;
+      this.notificarMudanca(true);
+      this.renderizar();
     });
 
     wrapper.appendChild(box);
