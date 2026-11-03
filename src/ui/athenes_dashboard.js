@@ -238,7 +238,7 @@ export class DashboardView {
               ↻
             </button>
           </div>
-          <button type="button" id="athDriveStatus" class="ath-btn ath-btn-xs" style="margin:6px 10px 0; width:calc(100% - 20px); justify-content:flex-start; gap:6px; font-size:11px; font-weight:700; height:auto; padding:5px 8px; text-align:left; white-space:normal;"></button>
+          <button type="button" id="athDriveStatus" class="ath-btn ath-btn-xs" style="margin:6px 0 0; width:100%; box-sizing:border-box; justify-content:flex-start; gap:6px; font-size:11px; font-weight:700; height:auto; padding:5px 8px; text-align:left; white-space:normal;"></button>
 
           <div class="ath-dash-pastas-lista" id="athDashPastasLista">
             <!-- Preenchido por this.renderizarPastasLateral() -->
@@ -314,7 +314,7 @@ export class DashboardView {
             <header class="ath-dash-head ath-dash-head-zotero" style="margin-bottom:18px;">
               <div class="ath-dash-titulo">
                 <h1>Estúdio de Artigos, Leitura de PDF & Fichamento Zotero</h1>
-                <p>Leia os PDFs direto do seu Google Drive em Tela Cheia, risque à mão livre estilo Samsung Notes, marque citações e sincronize notas com o Zotero.</p>
+                <p>Leia seus PDFs em tela cheia, risque à mão livre, marque citações e sincronize suas notas com o Zotero.</p>
               </div>
               <div id="athHeaderAcoesZotero" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"></div>
             </header>
