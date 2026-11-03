@@ -115,6 +115,26 @@ export class ZoteroClient {
   }
 
   /**
+   * Citação no texto já formatada pelo Zotero (CSL) para um item da biblioteca, ex.: "(Silva, 2020)".
+   * Devolve '' quando não há conexão ou o item não existe, para quem chama usar o formato local.
+   */
+  async obterCitacaoFormatada(chaveItem, estiloCsl = 'apa', { fetchImpl = globalThis.fetch } = {}) {
+    if (!chaveItem || !this.apiKey) return '';
+    try {
+      await this.garantirUserId();
+      if (!this.userId) return '';
+      const params = new URLSearchParams({ include: 'citation', style: estiloCsl, linkwrap: '0' });
+      const res = await fetchImpl(`${this.getBaseUrl()}/items/${encodeURIComponent(chaveItem)}?${params}`, { headers: this.getHeaders() });
+      if (!res.ok) return '';
+      const dados = await res.json();
+      const html = String(dados?.citation || '');
+      return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /**
    * Busca itens na biblioteca (com filtro por texto e/ou coleção)
    */
   async buscarItens({ termo = '', colecaoKey = '', limite = 50 } = {}) {

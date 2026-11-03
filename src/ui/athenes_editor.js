@@ -54,6 +54,7 @@ import { svgIcone, svgLogo } from './athenes_icones.js';
 import { ModalCompartilhar } from './athenes_compartilhar_modal.js';
 import { modosPermitidos, modoInicialDoPapel } from '../core/athenes_compartilhamento.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
+import { montarCitacao, indiceNaLista } from '../core/athenes_citacao.js';
 import { linhasEstimadas, porLinhaUsadoNoTexto, calibracaoDoTexto, definirCalibracaoTexto } from '../core/athenes_fragmentos.js';
 import { hifenizarHtml, removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais, removerPalavrasIniciais } from '../core/athenes_estilo_avancado.js';
@@ -3525,18 +3526,18 @@ export class EditorView {
     }
   }
 
-  inserirCitacaoNoCursor(ref, formato = 'parentese') {
+  /** Insere a citação no cursor. `opcoes`: { estilo, linkar, pagina, textoPronto } (ver athenes_citacao.js). */
+  inserirCitacaoNoCursor(ref, formato = 'parentese', opcoes = {}) {
     if (!ref) return;
-    const autorSobrenome = (ref.autores?.[0]?.sobrenome || ref.autor || 'AUTOR');
-    const autor = formato === 'narrativa' ? autorSobrenome : autorSobrenome.toUpperCase();
-    const ano = ref.ano || new Date().getFullYear();
-    const tag = formato === 'narrativa' ? ` ${autor} (${ano})` : ` (${autor}, ${ano})`;
 
     // Garante que a referência bibliográfica seja incluída na lista do documento
     if (!this.doc.referencias) this.doc.referencias = [];
     if (!this.doc.referencias.some(r => (r.id && r.id === ref.id) || (r.chaveZotero && r.chaveZotero === ref.chaveZotero))) {
       this.doc.referencias.push(ref);
     }
+
+    const { html } = montarCitacao(ref, { estilo: 'abnt', ...opcoes, formato, indice: indiceNaLista(this.doc, ref) });
+    const tagHtml = ` ${html}`;
 
     let inserido = false;
     const sel = typeof window !== 'undefined' ? window.getSelection() : null;
@@ -3547,14 +3548,17 @@ export class EditorView {
       const editable = elPai?.closest('.ath-texto-editable, .ath-titulo-editable, [contenteditable="true"]');
       if (editable) {
         try {
-          if (typeof document !== 'undefined' && document.queryCommandSupported && document.queryCommandSupported('insertText')) {
-            document.execCommand('insertText', false, tag);
+          if (typeof document !== 'undefined' && document.queryCommandSupported && document.queryCommandSupported('insertHTML')) {
+            document.execCommand('insertHTML', false, tagHtml);
             inserido = true;
           } else {
             range.deleteContents();
-            const node = document.createTextNode(tag);
+            const molde = document.createElement('template');
+            molde.innerHTML = tagHtml;
+            const node = molde.content.cloneNode(true);
+            const ultimo = node.lastChild;
             range.insertNode(node);
-            range.setStartAfter(node);
+            if (ultimo) range.setStartAfter(ultimo);
             range.collapse(true);
             sel.removeAllRanges();
             sel.addRange(range);
@@ -3568,7 +3572,7 @@ export class EditorView {
     }
 
     if (!inserido && this.blocoSelecionado && this.blocoSelecionado.texto !== undefined) {
-      this.blocoSelecionado.texto += tag;
+      this.blocoSelecionado.texto += tagHtml;
     }
 
     this.notificarMudanca();

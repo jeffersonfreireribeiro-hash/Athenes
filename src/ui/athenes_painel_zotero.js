@@ -9,6 +9,7 @@ import { lerConta, gravarConta } from '../core/athenes_conta.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import * as bib from '../core/athenes_biblioteca_artigos.js';
 import { svgIcone } from './athenes_icones.js';
+import { ESTILOS_CITACAO, ESTILOS_CSL, eEstiloNumerico, estiloDoDocumento, referenciaDoArtigo, formatarCitacaoTexto, indiceNaLista } from '../core/athenes_citacao.js';
 
 export function classificarTipoRef(ref) {
   if (!ref) return { id: 'outro', label: 'Outro', bg: '#F1F5F9', cor: '#475569' };
@@ -27,6 +28,8 @@ export function classificarTipoRef(ref) {
   }
   return { id: 'outro', label: 'Referência', bg: '#F1F5F9', cor: '#475569' };
 }
+
+const escaparAttr = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
 export class PainelZotero {
   constructor(containerEl, documento, opcoes = {}) {
@@ -89,6 +92,7 @@ export class PainelZotero {
     root.style.gap = '8px';
 
     // Calcula contagens para as badges das abas
+    const est = estiloDoDocumento(this.doc);
     const totalRef = this.referenciasCache.length;
     let nArt = 0;
     let nLiv = 0;
@@ -120,6 +124,26 @@ export class PainelZotero {
             ${svgIcone('config', 13)}
           </button>
         </div>
+      </div>
+
+      <!-- Estilo de citação no texto -->
+      <div id="athZoteroEstilo" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; font-size:11.5px; color:#334155;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:700;">Estilo
+          <select id="athCitEstilo" class="glx-select" style="height:26px; font-size:11px;" title="Estilo da citação no texto">
+            ${ESTILOS_CITACAO.map(e => `<option value="${e.id}" ${est.estilo === e.id ? 'selected' : ''}>${e.rotulo}</option>`).join('')}
+          </select>
+        </label>
+        <label id="athCitCslBox" style="display:${est.estilo === 'zotero' ? 'flex' : 'none'}; align-items:center; gap:6px; font-weight:700;" title="Estilo CSL pedido ao Zotero (precisa da conexão com a sua conta)">CSL
+          <select id="athCitCsl" class="glx-select" style="height:26px; font-size:11px;">
+            ${ESTILOS_CSL.map(e => `<option value="${e.id}" ${est.csl === e.id ? 'selected' : ''}>${e.rotulo}</option>`).join('')}
+          </select>
+        </label>
+        <label style="display:flex; align-items:center; gap:4px;" title="Página ou intervalo (opcional), ex.: 15 ou 15-17">Pág.
+          <input type="text" id="athCitPagina" value="${escaparAttr(this.paginaCitacao || '')}" placeholder="—" style="width:56px; height:24px; font-size:11px; padding:0 6px; border:1px solid #CBD5E1; border-radius:6px;">
+        </label>
+        <label style="display:flex; align-items:center; gap:4px; cursor:pointer;" title="A citação leva ao item correspondente na lista de referências (no editor, no PDF e no Word)">
+          <input type="checkbox" id="athCitLinkar" ${est.linkar ? 'checked' : ''}> Linkar à referência
+        </label>
       </div>
 
       <!-- Barra de Pesquisa Rápida -->
@@ -218,6 +242,23 @@ export class PainelZotero {
       this.atualizarListaItens();
     });
 
+    const guardarEstilo = () => {
+      this.doc.estiloCitacao = {
+        estilo: root.querySelector('#athCitEstilo').value,
+        linkar: root.querySelector('#athCitLinkar').checked,
+        csl: root.querySelector('#athCitCsl').value
+      };
+      this.paginaCitacao = root.querySelector('#athCitPagina').value.trim();
+      root.querySelector('#athCitCslBox').style.display = this.doc.estiloCitacao.estilo === 'zotero' ? 'flex' : 'none';
+      this.onAlterado();
+      this.atualizarListaItens();
+    };
+    ['#athCitEstilo', '#athCitCsl', '#athCitLinkar'].forEach(q => root.querySelector(q)?.addEventListener('change', guardarEstilo));
+    root.querySelector('#athCitPagina')?.addEventListener('input', () => {
+      this.paginaCitacao = root.querySelector('#athCitPagina').value.trim();
+      this.atualizarListaItens();
+    });
+
     const inputBib = root.querySelector('#athInputBibtex');
     inputBib?.addEventListener('change', e => this.processarArquivoBibtex(e.target.files[0]));
 
@@ -227,33 +268,14 @@ export class PainelZotero {
     const refsMap = new Map();
     (this.doc.referencias || []).forEach(r => refsMap.set(r.id || r.chaveZotero, r));
 
-    try {
-      const artigosEstudo = bib.obterArtigos(); // biblioteca da sessão (servidor), não o navegador
-      {
-        if (Array.isArray(artigosEstudo)) {
-          for (const a of artigosEstudo) {
-            const chave = a.id || a.zoteroKey;
-            if (chave && !refsMap.has(chave)) {
-              const autoresArr = a.autores ? a.autores.split(/,| e /).map(s => ({ sobrenome: s.trim() })) : [{ sobrenome: a.autor || 'Autor' }];
-              refsMap.set(chave, {
-                id: a.id || ('ref_' + Math.random().toString(36).slice(2, 9)),
-                chaveZotero: a.zoteroKey || '',
-                titulo: a.titulo || 'Artigo sem título',
-                autores: autoresArr,
-                ano: a.ano || '2024',
-                publicacao: a.periodico || a.categoria || 'Estúdio de Artigos',
-                tipo: 'artigo',
-                temPdf: !!(a.pdfUrl || a.driveArquivoId),
-                fichamento: a.fichamento || a.resumo || '',
-                resumo: a.resumo || '',
-                citacoesMarcadas: a.citacoesMarcadas || [],
-                palavrasChave: a.tags || []
-              });
-            }
-          }
-        }
-      }
-    } catch (_) {}
+    // Cada artigo é convertido sozinho: um registro estranho não pode esconder a biblioteca inteira
+    for (const a of (bib.obterArtigos() || [])) {
+      try {
+        const ref = referenciaDoArtigo(a);
+        const chave = ref.id || ref.chaveZotero;
+        if (chave && !refsMap.has(chave) && !(ref.chaveZotero && refsMap.has(ref.chaveZotero))) refsMap.set(chave, ref);
+      } catch (e) { console.warn('[Athenes] artigo ignorado na lista de citação:', e.message); }
+    }
 
     this.referenciasCache = Array.from(refsMap.values());
 
@@ -392,6 +414,7 @@ export class PainelZotero {
       card.style.transition = 'all 0.15s ease';
 
       const cat = classificarTipoRef(ref);
+      const botoesCitar = this.botoesDeCitacao(ref);
       const autoresTxt = (ref.autores || []).map(a => a.sobrenome).slice(0, 3).join(', ') + ((ref.autores?.length || 0) > 3 ? ' et al.' : '');
 
       card.innerHTML = `
@@ -408,8 +431,7 @@ export class PainelZotero {
             ${ref.publicacao || ref.editora || 'Biblioteca Geral'}
           </span>
           <div style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
-            <button type="button" class="glx-btn glx-btn-xs glx-btn-primary ath-btn-citar" data-formato="parentese" style="padding:2px 8px; font-weight:700; border-radius:6px; font-size:10.5px;" title="Citação Indireta ABNT: (AUTOR, Ano)">(AUTOR, Ano)</button>
-            <button type="button" class="glx-btn glx-btn-xs glx-btn-soft ath-btn-citar" data-formato="narrativa" style="padding:2px 8px; font-weight:700; border-radius:6px; font-size:10.5px; border:1px solid #CBD5E1;" title="Citação Direta/Narrativa ABNT: Autor (Ano)">Autor (Ano)</button>
+            ${botoesCitar}
           </div>
         </div>
       `;
@@ -427,6 +449,16 @@ export class PainelZotero {
 
       listaEl.appendChild(card);
     }
+  }
+
+  /** Botões de inserir, com o texto exato que será colocado no documento (conforme estilo e página). */
+  botoesDeCitacao(ref) {
+    const est = estiloDoDocumento(this.doc);
+    const base = { estilo: est.estilo, pagina: this.paginaCitacao, indice: indiceNaLista(this.doc, ref) };
+    const rotulo = (formato) => escaparAttr(est.estilo === 'zotero' ? (formato === 'narrativa' ? 'Narrativa' : 'Citar') : formatarCitacaoTexto(ref, { ...base, formato }));
+    const botao = (formato, classe, extra) => `<button type="button" class="glx-btn glx-btn-xs ${classe} ath-btn-citar" data-formato="${formato}" style="padding:2px 8px; font-weight:700; border-radius:6px; font-size:10.5px; ${extra}" title="Inserir no texto: ${rotulo(formato)}">${rotulo(formato)}</button>`;
+    const unico = eEstiloNumerico(est.estilo) || est.estilo === 'zotero';
+    return botao('parentese', 'glx-btn-primary', '') + (unico ? '' : botao('narrativa', 'glx-btn-soft', 'border:1px solid #CBD5E1;'));
   }
 
   selecionarItem(ref) {
@@ -464,12 +496,21 @@ export class PainelZotero {
     });
   }
 
-  inserirCitacaoNoDocumento(ref, formato = 'parentese') {
+  async inserirCitacaoNoDocumento(ref, formato = 'parentese') {
+    if (!this.doc.referencias) this.doc.referencias = [];
     if (!this.doc.referencias.some(r => r.id === ref.id)) {
       this.doc.referencias.push(ref);
       this.onAlterado();
     }
-    this.onInserirCitacao(ref, formato);
+    const est = estiloDoDocumento(this.doc);
+    const opcoes = { estilo: est.estilo, linkar: est.linkar, pagina: this.paginaCitacao };
+    if (est.estilo === 'zotero') {
+      // O Zotero formata (CSL); sem conexão ou sem a obra lá, cai no formato ABNT local
+      const texto = await this.client.obterCitacaoFormatada(ref.chaveZotero, est.csl);
+      if (texto) opcoes.textoPronto = this.paginaCitacao ? texto.replace(/\)$/, `, p. ${this.paginaCitacao})`) : texto;
+      else opcoes.estilo = 'abnt';
+    }
+    this.onInserirCitacao(ref, formato, opcoes);
   }
 
   abrirModalConfig() {

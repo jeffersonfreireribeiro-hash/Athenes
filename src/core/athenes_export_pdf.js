@@ -12,6 +12,7 @@ import { margensEfetivasMm } from './athenes_mestra_canvas.js';
 import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssTipografia, estiloParaCssNumeracao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
+import { ancoraDaReferencia } from './athenes_citacao.js';
 import { hifenizarHtml } from './athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, classesAvancadasDoBloco, aplicarPalavrasIniciais } from './athenes_estilo_avancado.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
@@ -331,7 +332,7 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       const norma = documento.perfil || 'abnt';
       const refsFormatadas = refs.map((r, i) => {
         const html = formatarReferenciaCompleta(r, norma, i + 1);
-        return `<div class="ath-ref-item" style="${estiloParaCss(estilosMap.referencias)}">${html}</div>`;
+        return `<div class="ath-ref-item" id="${ancoraDaReferencia(r)}" style="${estiloParaCss(estilosMap.referencias)}">${html}</div>`;
       }).join('\n');
 
       return `<div class="ath-bloco ath-referencias" data-id="${bloco.id}">

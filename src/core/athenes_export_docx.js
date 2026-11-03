@@ -8,6 +8,7 @@ import { normalizarAvancado, aplicarPalavrasIniciais, separarPrimeiraLetra } fro
 import { ZipBuilder } from './zip_builder.js';
 import { MM_PARA_DXA, dimensoesPapelMm } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
+import { ancoraDaReferencia, nomeMarcadorWord } from './athenes_citacao.js';
 import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
 import { resolverAreasPagina, normalizarNumeracao, normalizarArea, estiloEfetivoNumeracao } from './athenes_paginacao.js';
@@ -98,11 +99,13 @@ function htmlParaRunsDocx(htmlTexto, estiloPadrao = {}) {
       runs.push('<w:r><w:br/></w:r>');
     }
 
-    const tokens = trecho.split(/(<\/?(?:strong|b|em|i|u|span|small|sup)[^>]*>)/gi);
+    const tokens = trecho.split(/(<\/?(?:strong|b|em|i|u|span|small|sup|a)[^>]*>)/gi);
     let negrito = Boolean(estiloPadrao.negrito);
     let italico = Boolean(estiloPadrao.italico);
     let sublinhado = Boolean(estiloPadrao.sublinhado);
     let destaque = null; // <span class="ath-pi" style="..."> de palavras iniciais
+    let inicioLink = -1; // <a class="ath-citacao-link">: link interno para a referência na lista
+    let alvoLink = '';
 
     for (const token of tokens) {
       if (!token) continue;
@@ -125,6 +128,15 @@ function htmlParaRunsDocx(htmlTexto, estiloPadrao = {}) {
         italico = true;
       } else if (lower.startsWith('</em') || lower.startsWith('</i')) {
         italico = false;
+      } else if (lower.startsWith('<a ') && lower.includes('ath-citacao-link')) {
+        alvoLink = /href="#([^"]+)"/.exec(token)?.[1] || '';
+        inicioLink = alvoLink ? runs.length : -1;
+      } else if (lower.startsWith('</a')) {
+        if (inicioLink >= 0 && runs.length > inicioLink) {
+          const dentro = runs.splice(inicioLink);
+          runs.push(`<w:hyperlink w:anchor="${nomeMarcadorWord(alvoLink)}" w:history="1">${dentro.join('')}</w:hyperlink>`);
+        }
+        inicioLink = -1;
       } else if (lower.startsWith('<span class="ath-pi"')) {
         const css = /style="([^"]*)"/.exec(token)?.[1] || '';
         destaque = {
@@ -898,7 +910,9 @@ export async function exportarParaDocx(documento) {
         for (let i = 0; i < refs.length; i++) {
           const htmlRef = formatarReferenciaCompleta(refs[i], norma, i + 1);
           const runs = htmlParaRunsDocx(htmlRef);
-          bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:line="240" w:lineRule="auto" w:after="160"/><w:ind w:firstLine="0"/></w:pPr>${runs.join('')}</w:p>`);
+          const marcador = nomeMarcadorWord(ancoraDaReferencia(refs[i])); // alvo das citações linkadas no texto
+          const idMarcador = 7000 + i;
+          bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="left"/><w:spacing w:line="240" w:lineRule="auto" w:after="160"/><w:ind w:firstLine="0"/></w:pPr><w:bookmarkStart w:id="${idMarcador}" w:name="${marcador}"/>${runs.join('')}<w:bookmarkEnd w:id="${idMarcador}"/></w:p>`);
         }
       }
     }
