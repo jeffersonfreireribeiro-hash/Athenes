@@ -35,6 +35,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -449,17 +451,24 @@ private fun CampoFolha(
     placeholder: String,
     editavel: Boolean,
     modifier: Modifier = Modifier,
-    onFocused: () -> Unit = {}
+    onFocused: () -> Unit = {},
+    onCursorChange: ((Int) -> Unit)? = null
 ) {
+    var campo by remember { mutableStateOf(TextFieldValue(value)) }
+    if (campo.text != value) campo = campo.copy(text = value, selection = TextRange(campo.selection.start.coerceAtMost(value.length)))
     BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
+        value = campo,
+        onValueChange = {
+            campo = it
+            if (it.text != value) onValueChange(it.text)
+            onCursorChange?.invoke(it.selection.start)
+        },
         readOnly = !editavel,
         textStyle = style,
         cursorBrush = SolidColor(AthenesPrimary),
         modifier = modifier
             .fillMaxWidth()
-            .onFocusChanged { if (it.isFocused) onFocused() },
+            .onFocusChanged { if (it.isFocused) { onFocused(); onCursorChange?.invoke(campo.selection.start) } },
         decorationBox = { interno ->
             // propagateMinConstraints: o campo interno ocupa a largura toda, então textAlign (centro/justificado) funciona
             Box(Modifier.fillMaxWidth().padding(vertical = 4.dp), propagateMinConstraints = true) {
@@ -492,6 +501,7 @@ private fun ItemBlocoFolha(
 ) {
     val borda = RoundedCornerShape(6.dp)
     val selecionar = { vm.selecionarBloco(bloco.id) }
+    var posicaoCursor by remember(bloco.id) { mutableIntStateOf(0) }
     val alinhamento = when (bloco.alinhamento) {
         AlinhamentoTexto.ESQUERDA -> TextAlign.Left
         AlinhamentoTexto.CENTRO -> TextAlign.Center
@@ -521,12 +531,18 @@ private fun ItemBlocoFolha(
                 )
             }
 
-            TipoBlocoEditor.PARAGRAFO -> CampoFolha(
-                value = bloco.texto, onValueChange = { vm.atualizarTextoBloco(bloco.id, it) },
-                editavel = editavel, placeholder = "Escreva aqui…", onFocused = selecionar,
-                modifier = Modifier.padding(start = if (compacto) 14.dp else 24.dp),
-                style = TextStyle(fontSize = if (compacto) 14.sp else 12.5.sp, lineHeight = if (compacto) 22.sp else 19.sp, color = TextoCor, textAlign = alinhamento)
-            )
+            TipoBlocoEditor.PARAGRAFO -> Column {
+                CampoFolha(
+                    value = bloco.texto, onValueChange = { vm.atualizarTextoBloco(bloco.id, it) },
+                    editavel = editavel, placeholder = "Escreva aqui…", onFocused = selecionar,
+                    onCursorChange = { posicaoCursor = it },
+                    modifier = Modifier.padding(start = if (compacto) 14.dp else 24.dp),
+                    style = TextStyle(fontSize = if (compacto) 14.sp else 12.5.sp, lineHeight = if (compacto) 22.sp else 19.sp, color = TextoCor, textAlign = alinhamento)
+                )
+                if (selecionado && editavel && posicaoCursor in 1 until bloco.texto.length) {
+                    TextButton(onClick = { vm.dividirBloco(bloco.id, posicaoCursor) }) { Text("Dividir bloco aqui") }
+                }
+            }
 
             TipoBlocoEditor.LISTA -> Column {
                 val itens = bloco.texto.lines()
@@ -570,16 +586,20 @@ private fun ItemBlocoFolha(
                 Text("Quebra de página", fontSize = 11.sp, color = AthenesTextMuted)
             }
 
-            TipoBlocoEditor.CITACAO -> Row(
-                modifier = Modifier.fillMaxWidth().padding(start = if (compacto) 28.dp else 50.dp).height(IntrinsicSize.Min)
-            ) {
-                Box(Modifier.width(3.dp).fillMaxHeight().background(AthenesPrimary))
-                Spacer(Modifier.width(8.dp))
-                CampoFolha(
-                    value = bloco.texto, onValueChange = { vm.atualizarTextoBloco(bloco.id, it) },
-                    editavel = editavel, placeholder = "Citação direta longa (mais de 3 linhas)…", onFocused = selecionar,
-                    style = TextStyle(fontSize = if (compacto) 12.5.sp else 11.sp, lineHeight = if (compacto) 18.sp else 15.sp, color = Color(0xFF334155), textAlign = TextAlign.Justify)
-                )
+            TipoBlocoEditor.CITACAO -> Column {
+                Row(modifier = Modifier.fillMaxWidth().padding(start = if (compacto) 28.dp else 50.dp).height(IntrinsicSize.Min)) {
+                    Box(Modifier.width(3.dp).fillMaxHeight().background(AthenesPrimary))
+                    Spacer(Modifier.width(8.dp))
+                    CampoFolha(
+                        value = bloco.texto, onValueChange = { vm.atualizarTextoBloco(bloco.id, it) },
+                        editavel = editavel, placeholder = "Citação direta longa (mais de 3 linhas)…", onFocused = selecionar,
+                        onCursorChange = { posicaoCursor = it },
+                        style = TextStyle(fontSize = if (compacto) 12.5.sp else 11.sp, lineHeight = if (compacto) 18.sp else 15.sp, color = Color(0xFF334155), textAlign = TextAlign.Justify)
+                    )
+                }
+                if (selecionado && editavel && posicaoCursor in 1 until bloco.texto.length) {
+                    TextButton(onClick = { vm.dividirBloco(bloco.id, posicaoCursor) }) { Text("Dividir bloco aqui") }
+                }
             }
 
             TipoBlocoEditor.FIGURA -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {

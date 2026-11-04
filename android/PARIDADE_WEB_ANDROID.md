@@ -24,7 +24,7 @@ Inventário de 04/11/2026. A coluna **estado** descreve o código Android atual,
 | Fontes de catálogo/importadas/variáveis e hifenização | `src/core/athenes_fontes.js`, `src/core/athenes_fontes_catalogo.js`, `src/core/athenes_hifenizacao.js` | Não | Editor, Estilos |
 | Pacote `athenes-tema-v1`: importar, validar, aplicar, exportar e prompt de extração | `src/core/athenes_pacote_estilo.js`, `src/ui/athenes_central_estilos_modal.js` | Não | Editor, Central de Estilos |
 | Modelos ABNT, APA, Vancouver e IEEE | `src/core/athenes_templates.js`, `src/core/athenes_template_de_tema.js` | Não | Novo documento |
-| Citar Zotero e Dividir Bloco Aqui | `src/ui/athenes_editor_barra_contextual.js`, `src/ui/athenes_painel_zotero.js` | Parcial: inserção simples de citação, sem divisão | Editor, barra contextual |
+| Citar Zotero e Dividir Bloco Aqui | `src/ui/athenes_editor_barra_contextual.js`, `src/ui/athenes_painel_zotero.js` | Parcial: inserção simples de citação; divisão de parágrafo e citação no cursor com histórico; falta inserção de citação no cursor e paridade da barra contextual | Editor, barra contextual |
 | Oito estilos bibliográficos e referências automáticas com links | `src/core/athenes_bibliografia_estilos.js`, `src/core/athenes_citacao.js`, `src/core/athenes_bibliografia.js` | Não | Editor, Citações / Referências |
 | Modos Edição, Sugestão, Comparar e Leitura | `src/ui/athenes_visoes_revisao.js` | Parcial: seletor sem fluxo completo | Editor, Revisão |
 | Comentários, sugestões e comparação de versões | `src/core/athenes_colaboracao.js`, `src/core/athenes_diff.js`, `src/ui/athenes_sugestoes_ui.js` | Não | Editor, Revisão |

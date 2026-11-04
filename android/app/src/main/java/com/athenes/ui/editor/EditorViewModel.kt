@@ -343,6 +343,25 @@ class EditorViewModel : ViewModel() {
         marcarAlterado()
     }
 
+    /** Divide um parágrafo ou citação na posição do cursor, preservando o estilo dos dois blocos. */
+    fun dividirBloco(id: String, posicao: Int): Boolean {
+        val lista = _blocos.value.toMutableList()
+        val indice = lista.indexOfFirst { it.id == id }
+        if (indice < 0) return false
+        val original = lista[indice]
+        if (original.tipo !in setOf(TipoBlocoEditor.PARAGRAFO, TipoBlocoEditor.CITACAO) ||
+            posicao <= 0 || posicao >= original.texto.length) return false
+        salvarNoHistorico()
+        lista[indice] = original.copy(texto = original.texto.substring(0, posicao))
+        val novo = original.copy(id = UUID.randomUUID().toString(), texto = original.texto.substring(posicao))
+        lista.add(indice + 1, novo)
+        _blocos.value = lista
+        _blocoSelecionadoId.value = novo.id
+        salvarNoHistorico()
+        marcarAlterado()
+        return true
+    }
+
     fun desfazer() {
         if (indiceHistorico > 0) {
             indiceHistorico--
