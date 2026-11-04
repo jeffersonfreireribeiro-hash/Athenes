@@ -26,6 +26,26 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class ExportadorTest {
 
+    @Test fun `referencia cruzada acompanha numeracao e aponta para o bloco em PDF e DOCX`() {
+        val doc = DocumentoExport("Teste", "", "", "", listOf(
+            BlocoExport(TipoBlocoExport.FIGURA, id = "primeira", legenda = "Imagem inicial"),
+            BlocoExport(TipoBlocoExport.PARAGRAFO, texto = "Veja [ref:figura:segunda] e [ref:formula:equacao]."),
+            BlocoExport(TipoBlocoExport.FIGURA, id = "segunda", legenda = "Imagem final"),
+            BlocoExport(TipoBlocoExport.FORMULA, id = "equacao", formula = "x = y")
+        ))
+        val html = ExportadorDocumento.gerarHtml(doc, ResolvedorImagem { null })
+        assertTrue(html.contains("href=\"#b_segunda\">Figura 2</a>"))
+        assertTrue(html.contains("href=\"#b_equacao\">Equação (1)</a>"))
+        assertTrue(html.contains("id=\"b_segunda\""))
+        val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, ResolvedorImagem { null }))["word/document.xml"]!!)
+        DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(ByteArrayInputStream(xml.toByteArray()))
+        assertTrue(xml.contains("w:anchor=\"b_segunda\""))
+        assertTrue(xml.contains("w:name=\"b_segunda\""))
+        assertTrue(xml.contains("Figura 2"))
+        val semDestino = doc.copy(blocos = doc.blocos.filterNot { it.id == "segunda" })
+        assertTrue(ExportadorDocumento.gerarHtml(semDestino, ResolvedorImagem { null }).contains("[ref:figura:segunda]"))
+    }
+
     @Test fun `espaco em pontos mantém altura no PDF e no DOCX`() {
         val doc = DocumentoExport("Teste", "", "", "", listOf(BlocoExport(TipoBlocoExport.ESPACO, alturaPt = 36.5)))
         val html = ExportadorDocumento.gerarHtml(doc, ResolvedorImagem { null })

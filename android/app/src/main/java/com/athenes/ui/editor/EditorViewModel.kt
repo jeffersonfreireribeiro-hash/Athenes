@@ -414,6 +414,30 @@ class EditorViewModel : ViewModel() {
         _painelCitacaoAberto.value = false
     }
 
+    fun inserirReferenciaCruzada(destinoId: String) {
+        val destino = _blocos.value.find { it.id == destinoId } ?: return
+        val tipo = when (destino.tipo) {
+            TipoBlocoEditor.FIGURA -> "figura"
+            TipoBlocoEditor.TABELA -> "tabela"
+            TipoBlocoEditor.QUADRO -> "quadro"
+            TipoBlocoEditor.FORMULA -> "formula"
+            else -> return
+        }
+        val marca = "[ref:$tipo:${destino.id}]"
+        salvarNoHistorico()
+        val alvo = _blocos.value.find { it.id == _blocoSelecionadoId.value }
+        if (alvo != null && alvo.tipo in setOf(TipoBlocoEditor.PARAGRAFO, TipoBlocoEditor.CITACAO)) {
+            val posicao = cursorTexto?.takeIf { it.first == alvo.id }?.second?.coerceIn(0, alvo.texto.length) ?: alvo.texto.length
+            val prefixo = if (posicao > 0 && !alvo.texto[posicao - 1].isWhitespace()) " " else ""
+            val novo = alvo.texto.substring(0, posicao) + prefixo + marca + alvo.texto.substring(posicao)
+            atualizarBloco(alvo.id) { it.copy(texto = novo, citacoes = CitacoesInline.atualizarDepoisDaEdicao(it.texto, novo, it.citacoes)) }
+            cursorTexto = alvo.id to (posicao + prefixo.length + marca.length)
+        } else {
+            inserirAposSelecionado(BlocoEditor(tipo = TipoBlocoEditor.PARAGRAFO, texto = marca))
+        }
+        salvarNoHistorico()
+    }
+
     /** Transfere um destaque do leitor para um bloco de citação longa com referência vinculada. */
     fun inserirCitacaoLonga(artigo: ArtigoEstudoDetalhado, destaque: CitacaoMarcada) {
         val referencia = ReferenciaAcademica.doArtigo(artigo)
@@ -525,6 +549,7 @@ class EditorViewModel : ViewModel() {
         blocos = _blocos.value.map { b ->
             BlocoExport(
                 tipo = TipoBlocoExport.valueOf(b.tipo.name),
+                id = b.id,
                 titulo = b.titulo, texto = b.texto, legenda = b.legenda, fonte = b.fonte,
                 formula = b.formulaLatex, imagem = b.imagem,
                 alinhamento = AlinhamentoExport.valueOf(b.alinhamento.name),

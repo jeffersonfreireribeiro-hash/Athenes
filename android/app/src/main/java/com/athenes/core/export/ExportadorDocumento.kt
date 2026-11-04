@@ -14,6 +14,7 @@ import java.util.zip.ZipOutputStream
 /** Bloco do documento em forma neutra (sem Android), para exportação. */
 data class BlocoExport(
     val tipo: TipoBlocoExport,
+    val id: String = "",
     val titulo: String = "",
     val texto: String = "",
     val legenda: String = "",
@@ -62,6 +63,41 @@ fun interface ResolvedorImagem {
  */
 object ExportadorDocumento {
 
+    private val referenciaCruzada = Regex("\\[ref:(figura|tabela|quadro|formula):([a-zA-Z0-9_-]+)]", RegexOption.IGNORE_CASE)
+
+    private fun ancoraBloco(id: String) = "b_" + id.replace(Regex("[^a-zA-Z0-9_]"), "_").take(36)
+
+    private fun rotulos(doc: DocumentoExport): Map<String, String> {
+        val contagem = mutableMapOf<TipoBlocoExport, Int>()
+        return buildMap {
+            doc.blocos.forEach { bloco ->
+                val nome = when (bloco.tipo) {
+                    TipoBlocoExport.FIGURA -> "Figura"
+                    TipoBlocoExport.TABELA -> "Tabela"
+                    TipoBlocoExport.QUADRO -> "Quadro"
+                    TipoBlocoExport.FORMULA -> "Equação"
+                    else -> return@forEach
+                }
+                val numero = (contagem[bloco.tipo] ?: 0) + 1
+                contagem[bloco.tipo] = numero
+                if (bloco.id.isNotBlank()) put(bloco.id, if (bloco.tipo == TipoBlocoExport.FORMULA) "$nome ($numero)" else "$nome $numero")
+            }
+        }
+    }
+
+    private fun textoComReferenciasHtml(texto: String, rotulos: Map<String, String>): String = buildString {
+        var anterior = 0
+        referenciaCruzada.findAll(texto).forEach { match ->
+            append(html(texto.substring(anterior, match.range.first)))
+            val id = match.groupValues[2]
+            val rotulo = rotulos[id]
+            if (rotulo == null) append(html(match.value))
+            else append("<a href=\"#${ancoraBloco(id)}\">${html(rotulo)}</a>")
+            anterior = match.range.last + 1
+        }
+        append(html(texto.substring(anterior)))
+    }
+
     // ------------------------------------------------------------------ DOCX
 
     fun gerarDocx(doc: DocumentoExport, imagens: ResolvedorImagem): ByteArray {
@@ -72,6 +108,7 @@ object ExportadorDocumento {
         val titulos = doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
         val numerosTitulos = NumeracaoSecoes.calcular(titulos.map { it.nivelTitulo })
         val referenciasOrdenadas = Bibliografia.ordenar(doc.referencias, doc.estiloBibliografico)
+        val rotulos = rotulos(doc)
 
         if (doc.titulo.isNotBlank()) corpo.append(par(doc.titulo, centro = true, negrito = true, tamanho = 32, depois = 120))
         if (doc.subtitulo.isNotBlank()) corpo.append(par(doc.subtitulo, centro = true, italico = true, tamanho = 26, depois = 120))
@@ -83,7 +120,11 @@ object ExportadorDocumento {
 
         var secao = 0
         var formula = 0
+        var marcadorBlocoId = doc.referencias.size + 1
         for (b in doc.blocos) {
+            if (b.id.isNotBlank() && b.tipo in setOf(TipoBlocoExport.FIGURA, TipoBlocoExport.TABELA, TipoBlocoExport.QUADRO, TipoBlocoExport.FORMULA)) {
+                corpo.append(par("", marcador = ancoraBloco(b.id), marcadorId = marcadorBlocoId++))
+            }
             when (b.tipo) {
                 TipoBlocoExport.TITULO -> {
                     if (b.titulo.isNotBlank()) {
@@ -92,10 +133,10 @@ object ExportadorDocumento {
                     }
                 }
                 TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) {
-                    corpo.append(par(b.texto, alinhamento = b.alinhamento, recuoPrimeira = 709, citacoes = b.citacoes))
+                    corpo.append(par(b.texto, alinhamento = b.alinhamento, recuoPrimeira = 709, citacoes = b.citacoes, rotulos = rotulos))
                 }
                 TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) {
-                    corpo.append(par(b.texto, justificado = true, simples = true, tamanho = 20, recuoEsq = 2268, antes = 120, depois = 120, citacoes = b.citacoes))
+                    corpo.append(par(b.texto, justificado = true, simples = true, tamanho = 20, recuoEsq = 2268, antes = 120, depois = 120, citacoes = b.citacoes, rotulos = rotulos))
                 }
                 TipoBlocoExport.FIGURA -> {
                     if (b.legenda.isNotBlank()) corpo.append(par(b.legenda, centro = true, negrito = true, tamanho = 20, simples = true, antes = 120, depois = 60, mantemProximo = true))
@@ -228,6 +269,7 @@ object ExportadorDocumento {
         numId: Int? = null,
         estilo: String? = null,
         citacoes: List<CitacaoInline> = emptyList(),
+        rotulos: Map<String, String> = emptyMap(),
         marcador: String? = null,
         marcadorId: Int = 0
     ): String {
@@ -260,17 +302,29 @@ object ExportadorDocumento {
             val partes = trecho.split("\n").joinToString("<w:br/>") { "<w:t xml:space=\"preserve\">${xml(it)}</w:t>" }
             return "<w:r><w:rPr>$rpr</w:rPr>$partes</w:r>"
         }
+        fun runsComReferencias(trecho: String): String = buildString {
+            var anterior = 0
+            referenciaCruzada.findAll(trecho).forEach { match ->
+                if (match.range.first > anterior) append(run(trecho.substring(anterior, match.range.first)))
+                val id = match.groupValues[2]
+                val rotulo = rotulos[id]
+                if (rotulo == null) append(run(match.value))
+                else append("<w:hyperlink w:anchor=\"${ancoraBloco(id)}\" w:history=\"1\">${run(rotulo)}</w:hyperlink>")
+                anterior = match.range.last + 1
+            }
+            if (anterior < trecho.length || isEmpty()) append(run(trecho.substring(anterior)))
+        }
         val conteudo = buildString {
             var anterior = 0
             for (c in citacoes.sortedBy { it.inicio }) {
                 if (c.inicio < anterior || c.fim > texto.length || c.fim <= c.inicio) continue
-                if (c.inicio > anterior) append(run(texto.substring(anterior, c.inicio)))
+                if (c.inicio > anterior) append(runsComReferencias(texto.substring(anterior, c.inicio)))
                 append("<w:hyperlink w:anchor=\"${Bibliografia.ancora(c.refId)}\" w:history=\"1\">")
                 append(run(texto.substring(c.inicio, c.fim)))
                 append("</w:hyperlink>")
                 anterior = c.fim
             }
-            if (anterior < texto.length || isEmpty()) append(run(texto.substring(anterior)))
+            if (anterior < texto.length || isEmpty()) append(runsComReferencias(texto.substring(anterior)))
         }
         val inicioMarcador = if (marcador != null) "<w:bookmarkStart w:id=\"$marcadorId\" w:name=\"$marcador\"/>" else ""
         val fimMarcador = if (marcador != null) "<w:bookmarkEnd w:id=\"$marcadorId\"/>" else ""
@@ -346,6 +400,7 @@ object ExportadorDocumento {
         val titulos = doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
         val numerosTitulos = NumeracaoSecoes.calcular(titulos.map { it.nivelTitulo })
         val referenciasOrdenadas = Bibliografia.ordenar(doc.referencias, doc.estiloBibliografico)
+        val rotulos = rotulos(doc)
         fun mm(valor: Double): String = java.lang.String.format(java.util.Locale.US, "%.2f", valor)
         val sb = StringBuilder()
         sb.append(
@@ -382,6 +437,9 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
         var formula = 0
         var ilustracao = 0
         for (b in doc.blocos) {
+            if (b.id.isNotBlank() && b.tipo in setOf(TipoBlocoExport.FIGURA, TipoBlocoExport.TABELA, TipoBlocoExport.QUADRO, TipoBlocoExport.FORMULA)) {
+                sb.append("<span id=\"${ancoraBloco(b.id)}\"></span>")
+            }
             if (b.tipo in setOf(TipoBlocoExport.FIGURA, TipoBlocoExport.TABELA, TipoBlocoExport.QUADRO) && b.legenda.isNotBlank()) {
                 ilustracao++
                 sb.append("<span id=\"ilustracao-$ilustracao\"></span>")
@@ -404,7 +462,7 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                     val nivelHtml = (b.nivelTitulo + 1).coerceAtMost(6)
                     sb.append("<h$nivelHtml id=\"secao-$secao\">${numerosTitulos[secao - 1]}&nbsp; ${html(b.titulo)}</h$nivelHtml>")
                 }
-                TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha;text-align-last:$ultimaLinha\">${htmlComCitacoes(b.texto, b.citacoes)}</p>")
+                TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha;text-align-last:$ultimaLinha\">${htmlComCitacoes(b.texto, b.citacoes, rotulos)}</p>")
                 TipoBlocoExport.LISTA -> if (b.texto.isNotBlank()) {
                     val tag = if (b.listaNumerada) "ol" else "ul"
                     sb.append("<$tag>")
@@ -440,7 +498,7 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> sb.append("<div style=\"break-before:page\"></div>")
                 TipoBlocoExport.ESPACO -> sb.append("<div aria-hidden=\"true\" style=\"height:${b.alturaPt.coerceIn(1.0, 720.0)}pt\"></div>")
-                TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${htmlComCitacoes(b.texto, b.citacoes)}</div>")
+                TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${htmlComCitacoes(b.texto, b.citacoes, rotulos)}</div>")
                 TipoBlocoExport.FIGURA -> {
                     sb.append("<figure>")
                     if (b.legenda.isNotBlank()) sb.append("<figcaption>${html(b.legenda)}</figcaption>")
@@ -481,16 +539,16 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
     private fun html(s: String): String = s
         .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("\n", "<br>")
 
-    private fun htmlComCitacoes(texto: String, citacoes: List<CitacaoInline>): String = buildString {
+    private fun htmlComCitacoes(texto: String, citacoes: List<CitacaoInline>, rotulos: Map<String, String>): String = buildString {
         var anterior = 0
         for (c in citacoes.sortedBy { it.inicio }) {
             if (c.inicio < anterior || c.fim > texto.length || c.fim <= c.inicio) continue
-            append(html(texto.substring(anterior, c.inicio)))
+            append(textoComReferenciasHtml(texto.substring(anterior, c.inicio), rotulos))
             append("<a href=\"#${Bibliografia.ancora(c.refId)}\" style=\"color:inherit;text-decoration:none\">")
             append(html(texto.substring(c.inicio, c.fim)))
             append("</a>")
             anterior = c.fim
         }
-        append(html(texto.substring(anterior)))
+        append(textoComReferenciasHtml(texto.substring(anterior), rotulos))
     }
 }

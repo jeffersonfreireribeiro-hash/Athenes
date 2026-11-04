@@ -194,6 +194,7 @@ fun EditorDocumentoScreen(
 
     val editavel = modoRevisao != "leitura"
     val blocoSelecionado = remember(blocos, blocoSelecionadoId) { blocos.find { it.id == blocoSelecionadoId } }
+    var mostrarReferenciasCruzadas by remember { mutableStateOf(false) }
     val estrutura = remember(blocos) { viewModel.montarEstrutura(blocos) }
     val titulosIlustracoes = remember(blocos) { blocos.filter { it.tipo in setOf(TipoBlocoEditor.FIGURA, TipoBlocoEditor.TABELA, TipoBlocoEditor.QUADRO) && it.legenda.isNotBlank() }.map { it.legenda } }
     val algumPainelAberto = painelEstruturaAberto || painelInspetorAberto
@@ -320,7 +321,8 @@ fun EditorDocumentoScreen(
                             // leva o bloco recém-criado à vista
                             scope.launch { rolarParaSelecionado(listState, viewModel) }
                         },
-                        onCitar = viewModel::abrirPainelCitacao
+                        onCitar = viewModel::abrirPainelCitacao,
+                        onReferenciaCruzada = { mostrarReferenciasCruzadas = true }
                     )
                 }
             }
@@ -399,6 +401,35 @@ fun EditorDocumentoScreen(
                 estilo = estiloBibliografico,
                 onEstiloAlterado = viewModel::definirEstiloBibliografico,
                 onFechar = viewModel::fecharPainelCitacao
+            )
+        }
+        if (mostrarReferenciasCruzadas) {
+            val destinos = blocos.filter { it.tipo in setOf(TipoBlocoEditor.FIGURA, TipoBlocoEditor.TABELA, TipoBlocoEditor.QUADRO, TipoBlocoEditor.FORMULA) }
+            AlertDialog(
+                onDismissRequest = { mostrarReferenciasCruzadas = false },
+                title = { Text("Referência cruzada") },
+                text = {
+                    if (destinos.isEmpty()) Text("Adicione uma figura, tabela, quadro ou fórmula primeiro.")
+                    else LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                        itemsIndexed(destinos) { _, destino ->
+                            val tipo = when (destino.tipo) {
+                                TipoBlocoEditor.FIGURA -> "Figura"
+                                TipoBlocoEditor.TABELA -> "Tabela"
+                                TipoBlocoEditor.QUADRO -> "Quadro"
+                                else -> "Equação"
+                            }
+                            val numero = blocos.takeWhile { it.id != destino.id }.count { it.tipo == destino.tipo } + 1
+                            val detalhe = if (destino.tipo == TipoBlocoEditor.FORMULA) destino.formulaLatex else destino.legenda
+                            TextButton(onClick = {
+                                viewModel.inserirReferenciaCruzada(destino.id)
+                                mostrarReferenciasCruzadas = false
+                            }, modifier = Modifier.fillMaxWidth()) {
+                                Text("$tipo $numero · ${detalhe.ifBlank { "Sem legenda" }}", modifier = Modifier.fillMaxWidth())
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { mostrarReferenciasCruzadas = false }) { Text("Fechar") } }
             )
         }
     }

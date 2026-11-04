@@ -37,6 +37,7 @@ fun EditorBarraBlocos(
     onRefazer: () -> Unit,
     onAdicionarBloco: (TipoBlocoEditor) -> Unit,
     onCitar: () -> Unit,
+    onReferenciaCruzada: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -84,6 +85,9 @@ fun EditorBarraBlocos(
                     colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = AthenesPrimary)
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = "Citar da biblioteca", tint = Color.White, modifier = Modifier.size(22.dp))
+                }
+                BotaoBarra(onReferenciaCruzada, "Inserir referência cruzada") {
+                    Icon(Icons.Rounded.Link, null, tint = CinzaIcone)
                 }
             }
         }
