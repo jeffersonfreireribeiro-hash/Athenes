@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.athenes.core.model.Documento
 import com.athenes.core.data.ZoteroCredentialsStore
 import com.athenes.core.data.ZoteroColecoes
+import com.athenes.core.data.PastasDocumento
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.components.*
 import com.athenes.ui.theme.*
@@ -77,7 +78,9 @@ fun BibliotecaScreen(
     val documentos by viewModel.documentosFiltrados.collectAsState()
     val lixeira by viewModel.lixeira.collectAsState()
     val pastas by viewModel.pastas.collectAsState()
+    val arvorePastas = remember(pastas) { PastasDocumento.organizar(pastas) }
     var mostrandoLixeira by rememberSaveable { mutableStateOf(false) }
+    var mostrarPastas by remember { mutableStateOf(false) }
     var pastaAtivaId by rememberSaveable { mutableStateOf<String?>(null) }
     var criarPastaAberto by remember { mutableStateOf(false) }
     var nomeNovaPasta by remember { mutableStateOf("") }
@@ -228,17 +231,11 @@ fun BibliotecaScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    FilterChip(selected = !mostrandoLixeira && pastaAtivaId == null, onClick = { pastaAtivaId = null; mostrandoLixeira = false }, label = { Text("Todos (${documentos.size})") })
-                    pastas.forEach { pasta ->
-                        val pai = pastas.find { it.id == pasta.pastaPaiId }
-                        FilterChip(
-                            selected = !mostrandoLixeira && pastaAtivaId == pasta.id,
-                            onClick = { pastaAtivaId = pasta.id; mostrandoLixeira = false },
-                            label = {
-                                val nome = if (pai == null) pasta.nome else "${pai.nome} / ${pasta.nome}"
-                                Text("$nome (${documentos.count { it.pastaId == pasta.id }})")
-                            }
-                        )
+                    val pastaAtiva = arvorePastas.find { it.pasta.id == pastaAtivaId }
+                    OutlinedButton(onClick = { mostrarPastas = true }) {
+                        Icon(Icons.Rounded.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(pastaAtiva?.caminho ?: "Todos (${documentos.size})")
                     }
                     FilterChip(selected = mostrandoLixeira, onClick = { mostrandoLixeira = true }, label = { Text("Lixeira (${lixeira.size})") })
                     if (!mostrandoLixeira) OutlinedButton(onClick = { nomeNovaPasta = ""; criarPastaAberto = true }) { Text("Nova pasta") }
@@ -588,6 +585,26 @@ fun BibliotecaScreen(
                         modifier = Modifier.fillMaxWidth().padding(start = (entrada.nivel * 16).coerceAtMost(96).dp)
                     ) {
                         Text(entrada.colecao.nome, modifier = Modifier.fillMaxWidth(), fontWeight = if (entrada.colecao.chave == colecaoZoteroFiltro) FontWeight.Bold else FontWeight.Normal)
+                    }
+                }
+            }
+        }
+    }
+    if (mostrarPastas) {
+        ModalBottomSheet(onDismissRequest = { mostrarPastas = false }) {
+            Text("Pastas de documentos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 560.dp)) {
+                item {
+                    TextButton(onClick = { pastaAtivaId = null; mostrandoLixeira = false; mostrarPastas = false }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Todos (${documentos.size})", modifier = Modifier.fillMaxWidth())
+                    }
+                }
+                items(arvorePastas, key = { it.pasta.id }) { entrada ->
+                    TextButton(
+                        onClick = { pastaAtivaId = entrada.pasta.id; mostrandoLixeira = false; mostrarPastas = false },
+                        modifier = Modifier.fillMaxWidth().padding(start = (entrada.nivel * 16).coerceAtMost(96).dp)
+                    ) {
+                        Text("${entrada.pasta.nome} (${documentos.count { it.pastaId == entrada.pasta.id }})", modifier = Modifier.fillMaxWidth(), fontWeight = if (entrada.pasta.id == pastaAtivaId) FontWeight.Bold else FontWeight.Normal)
                     }
                 }
             }

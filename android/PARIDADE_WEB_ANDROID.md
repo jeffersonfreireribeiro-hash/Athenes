@@ -5,7 +5,7 @@ Inventário de 04/11/2026. A coluna **estado** descreve o código Android atual,
 | Recurso da web | Fonte na web | Estado no APK | Destino Android |
 | --- | --- | --- | --- |
 | Abas Escrita e Artigos Zotero | `src/ui/athenes_dashboard.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: biblioteca e leitor existem, sem as duas abas equivalentes | Documentos / Biblioteca |
-| Árvore de pastas, subpastas, contadores, Todos e compartilhadas | `src/ui/athenes_dashboard_pastas.js`, `src/core/athenes_arquivos.js` | Parcial: pastas locais, subpastas, contadores e Todos em faixa horizontal; faltam árvore lateral e compartilhadas | Documentos, painel de pastas |
+| Árvore de pastas, subpastas, contadores, Todos e compartilhadas | `src/ui/athenes_dashboard_pastas.js`, `src/core/athenes_arquivos.js` | Parcial: pastas locais, subpastas e contadores em árvore na folha inferior; faltam painel lateral em telas largas e pastas compartilhadas | Documentos, painel de pastas |
 | Criar, renomear, excluir e mover pastas; vincular pasta do Drive | `src/ui/athenes_dashboard_pastas.js`, `src/core/athenes_drive_navegar.js` | Parcial: criação, renomeação e exclusão locais; faltam arrastar pastas e vínculo ao Drive | Documentos, painel de pastas |
 | Mover documentos entre pastas | `src/ui/athenes_dashboard_pastas.js` | Parcial: menu Mover para… local; falta arrastar no tablet | Documentos, menu Mover para…; arrastar no tablet |
 | Cartões com metadados, busca, ordenação e ações de documento | `src/ui/athenes_dashboard.js`, `src/ui/athenes_arquivos_ui.js`, `src/core/athenes_repositorio.js` | Parcial: cartões e ações básicas em `BibliotecaScreen.kt` | Documentos |
