@@ -1,6 +1,8 @@
 package com.athenes
 
 import com.athenes.core.data.BibtexParser
+import com.athenes.core.data.ArtigoEstudoRepository
+import com.athenes.core.data.ZoteroItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -34,5 +36,18 @@ class BibtexParserTest {
         assertEquals(1, itens.size)
         assertEquals("webpage", itens.single().tipo)
         assertTrue(itens.single().autores.isEmpty())
+    }
+
+    @Test fun `importacao repetida nao duplica e sincronizacao preserva bib`() {
+        val repo = ArtigoEstudoRepository()
+        val bib = "@article{obra, title={Obra local}, author={Silva, Ana}, year={2025}}"
+        repo.importarBib(bib)
+        repo.importarBib(bib)
+        assertEquals(1, repo.artigos.value.count { it.id == "bib:obra" })
+        repo.aplicarBibliotecaZotero(
+            listOf(ZoteroItem("ZOTERO01", "book", "Livro remoto", emptyList(), "2024", "", "", emptyList(), emptyList(), emptyMap())),
+            emptyList()
+        )
+        assertEquals(listOf("ZOTERO01", "bib:obra"), repo.artigos.value.map { it.id })
     }
 }
