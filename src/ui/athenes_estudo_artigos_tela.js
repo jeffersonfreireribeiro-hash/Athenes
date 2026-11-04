@@ -5,6 +5,7 @@
  */
 import { obterConfigGoogleDrive } from '../core/athenes_colaboracao.js';
 import { localDoPdfVinculado } from '../core/athenes_zotero_anexos_notas.js';
+import { tornarColunasRedimensionaveis } from './athenes_colunas_redim.js';
 import { artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
@@ -297,6 +298,7 @@ export const metodosEstudoTela = {
 
     root.appendChild(editorEl);
     this.container.appendChild(root);
+    tornarColunasRedimensionaveis(editorEl.querySelector('.rm-ed-grade'), { nome: 'estudio', padraoEsq: 340, padraoDir: 350 }); // barras laterais: recolher e ajustar a largura
 
     // Renderiza TODAS as páginas empilhadas no palco central
     this.renderizarTodasAsPaginasNoPalco(root, art, paginasPdf);

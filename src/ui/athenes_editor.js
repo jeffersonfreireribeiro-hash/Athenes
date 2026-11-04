@@ -10,6 +10,7 @@
  */
 
 import { contarUsoDoEstilo, excluirEstilo, ESTILOS_PROTEGIDOS } from '../core/athenes_estilos.js';
+import { tornarColunasRedimensionaveis } from './athenes_colunas_redim.js';
 import { obterTokenDrive } from '../core/athenes_drive_sync.js';
 import { elementosMestraHtml, renderizadoPeloCanvas, contextoVariaveisPagina } from '../core/athenes_mestra_render.js';
 import { margensEfetivasMm, elementosEfetivosDaPagina, caixaEnvolvente, sobrescreverNoDocumento, restaurarNoDocumento } from '../core/athenes_mestra_canvas.js';
@@ -651,6 +652,7 @@ export class EditorView {
 
     root.appendChild(editorEl);
     this.container.appendChild(root);
+    tornarColunasRedimensionaveis(editorEl.querySelector('.rm-ed-grade'), { nome: 'editor', padraoEsq: 310, padraoDir: 330 }); // barras laterais: recolher e ajustar a largura
 
     // Liga eventos dos botões de topo e barra
     this.ligarEventosGerais(root);

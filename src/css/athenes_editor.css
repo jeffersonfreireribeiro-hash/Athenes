@@ -2688,3 +2688,21 @@ ins.ath-sug-ins:hover, del.ath-sug-del:hover { outline: 1.5px solid var(--ath-su
 
 /* Citação linkada à referência: herda cor e sem sublinhado (a limpeza de estilos remove o style inline) */
 a.ath-citacao-link { color: inherit; text-decoration: none; cursor: pointer; }
+
+/* Barras laterais recolhíveis e de largura ajustável (athenes_colunas_redim.js) */
+.rm-editor .rm-ed-grade.ath-redim { position: relative; grid-template-columns: var(--ath-col-esq, 310px) minmax(0, 1fr) var(--ath-col-dir, 330px) !important; transition: grid-template-columns .18s ease; }
+.rm-ed-grade.ath-redim.ath-redim-arrastando { transition: none; user-select: none; cursor: col-resize; }
+.rm-ed-grade.ath-redim-fechada-esq > .rm-col-esq, .rm-ed-grade.ath-redim-fechada-dir > .rm-col-dir { visibility: hidden; overflow: hidden; pointer-events: none; }
+.ath-redim-alca { position: absolute; top: 0; bottom: 0; width: 14px; z-index: 6; display: flex; align-items: center; justify-content: center; cursor: col-resize; touch-action: none; outline: none; }
+.ath-redim-alca-esq { left: calc(var(--ath-col-esq, 310px) + var(--ath-gap, 12px) / 2 - 7px); }
+.ath-redim-alca-dir { right: calc(var(--ath-col-dir, 330px) + var(--ath-gap, 12px) / 2 - 7px); }
+.ath-redim-linha { position: absolute; top: 12px; bottom: 12px; left: 50%; width: 3px; margin-left: -1.5px; border-radius: 3px; background: transparent; transition: background .12s; }
+.ath-redim-alca:hover .ath-redim-linha, .ath-redim-alca:focus-visible .ath-redim-linha, .ath-redim-arrastando .ath-redim-linha { background: #314F79; }
+.ath-redim-alca:focus-visible { box-shadow: 0 0 0 2px rgba(49, 79, 121, .35); border-radius: 6px; }
+.ath-redim-bt { position: relative; width: 18px; height: 40px; padding: 0; border: 1px solid #C8D7E6; border-radius: 9px; background: #fff; color: #314F79; font: 700 14px/1 var(--glx-font, sans-serif); cursor: pointer; opacity: 0; transition: opacity .12s; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(15, 23, 42, .12); }
+.ath-redim-alca:hover .ath-redim-bt, .ath-redim-alca:focus-within .ath-redim-bt, .ath-redim-fechada-esq .ath-redim-alca-esq .ath-redim-bt, .ath-redim-fechada-dir .ath-redim-alca-dir .ath-redim-bt { opacity: 1; }
+.ath-redim-bt:hover { background: #EEF4FA; }
+@media (hover: none) { .ath-redim-bt { opacity: 1; } }
+@media (max-width: 1180px) { .rm-editor .rm-ed-grade.ath-redim { grid-template-columns: 1fr !important; } .ath-redim-alca { display: none; } }
+.rm-editor.ath-modo-revisao .rm-ed-grade.ath-redim { grid-template-columns: minmax(0, 1fr) !important; }
+.rm-editor.ath-modo-revisao .ath-redim-alca { display: none; }
