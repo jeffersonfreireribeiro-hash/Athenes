@@ -50,10 +50,11 @@ data class ReferenciaAcademica(
             return ReferenciaAcademica(
                 id = artigo.id, tipo = artigo.tipoZotero, titulo = artigo.titulo,
                 autores = autores, ano = artigo.ano.takeIf { it > 0 }?.toString().orEmpty(),
-                publicacao = campos["publicationTitle"] ?: campos["bookTitle"] ?: campos["proceedingsTitle"].orEmpty(),
-                editora = campos["publisher"].orEmpty(), local = campos["place"].orEmpty(),
-                volume = campos["volume"].orEmpty(), numero = campos["issue"].orEmpty(),
-                paginas = campos["pages"].orEmpty(), doi = campos["DOI"] ?: artigo.zoteroConfig.doi,
+                publicacao = campos["publicationTitle"] ?: campos["bookTitle"] ?: campos["proceedingsTitle"]
+                    ?: campos["journal"] ?: campos["booktitle"] ?: "",
+                editora = campos["publisher"].orEmpty(), local = campos["place"] ?: campos["address"].orEmpty(),
+                volume = campos["volume"].orEmpty(), numero = campos["issue"] ?: campos["number"].orEmpty(),
+                paginas = campos["pages"].orEmpty(), doi = campos["DOI"] ?: campos["doi"] ?: artigo.zoteroConfig.doi,
                 url = campos["url"].orEmpty()
             )
         }
@@ -175,10 +176,10 @@ object Bibliografia {
                 when {
                     periodico -> juntar(ponto(aut), ponto(titulo), "$pub${if (ref.local.isNotBlank()) ", ${ref.local}" else ""}${if (ref.volume.isNotBlank()) ", v. ${ref.volume}" else ""}${if (ref.numero.isNotBlank()) ", n. ${ref.numero}" else ""}${if (pag.isNotBlank()) ", p. $pag" else ""}, $ano.", acesso)
                     capitulo -> juntar(ponto(aut), ponto(titulo), "In: ${ponto(pub.ifBlank { "Livro" })}", "${if (ref.local.isNotBlank()) "${ref.local}: " else ""}${if (ref.editora.isNotBlank()) "${ref.editora}, " else ""}$ano.", if (pag.isNotBlank()) "p. $pag." else "", acesso)
-                    congresso -> juntar(ponto(aut), ponto(titulo), "In: ${pub.ifBlank { "Anais" }}${if (ref.local.isNotBlank()) ", ${ref.local}" else ""}, $ano.", if (pag.isNotBlank()) "p. $pag." else "", acesso)
-                    tese -> juntar(ponto(aut), ponto(titulo), "$ano. Tese/Dissertação${if (ref.editora.isNotBlank()) " – ${ref.editora}" else ""}, $ano.", acesso)
+                    congresso -> juntar(ponto(aut), ponto(titulo), "In: ${pub.ifBlank { "Anais" }}${if (ref.ano.isNotBlank()) ", $ano" else ""}${if (ref.local.isNotBlank()) ", ${ref.local}" else ""}.", "${if (ref.editora.isNotBlank()) "${ref.editora}, " else ""}$ano.", if (pag.isNotBlank()) "p. $pag." else "", acesso)
+                    tese -> juntar(ponto(aut), ponto(titulo), "$ano. Tese/Dissertação${if (ref.editora.isNotBlank()) " – ${ref.editora}" else ""}${if (ref.local.isNotBlank()) ", ${ref.local}" else ""}, $ano.", acesso)
                     web -> juntar(ponto(aut), ponto(titulo), "${if (pub.isNotBlank()) "$pub, " else ""}$ano.", acesso)
-                    else -> juntar(ponto(aut), ponto(titulo), "${if (ref.local.isNotBlank()) "${ref.local}: " else ""}${if (ref.editora.isNotBlank()) "${ref.editora}, " else ""}$ano.", acesso)
+                    else -> juntar(ponto(aut), ponto(titulo), "${if (ref.local.isNotBlank()) "${ref.local}: " else ""}${if (ref.editora.isNotBlank()) "${ref.editora}, " else ""}$ano.", if (ref.tipo in setOf("report", "relatorio_tecnico")) "Relatório técnico." else "", acesso)
                 }
             }
             EstiloBibliografico.APA -> {
@@ -186,8 +187,10 @@ object Bibliografia {
                 val fim = doiUrl.ifBlank { ref.url }
                 when {
                     periodico -> juntar(cab, ponto(titulo), "$pub${if (ref.volume.isNotBlank()) ", ${ref.volume}" else ""}${if (ref.numero.isNotBlank()) "(${ref.numero})" else ""}${if (pag.isNotBlank()) ", $pag" else ""}.", fim)
-                    capitulo -> juntar(cab, ponto(titulo), "In ${ponto(pub.ifBlank { "Livro" })}", if (pag.isNotBlank()) "(pp. $pag)." else "", ponto(ref.editora), fim)
+                    capitulo -> juntar(cab, ponto(titulo), "In ${pub.ifBlank { "Livro" }}${if (pag.isNotBlank()) " (pp. $pag)" else ""}.", ponto(ref.editora), fim)
+                    congresso -> juntar(cab, ponto(titulo), "${pub.ifBlank { "Anais" }}${if (ref.local.isNotBlank()) ", ${ref.local}" else ""}.", fim)
                     tese -> juntar(cab, "$titulo [Tese/Dissertação].", ponto(ref.editora), fim)
+                    web -> juntar(cab, ponto(titulo), ponto(pub), ref.url)
                     else -> juntar(cab, ponto(titulo), ponto(ref.editora.ifBlank { pub }), fim)
                 }
             }
@@ -195,6 +198,9 @@ object Bibliografia {
                 val cab = "${aut.ifBlank { titulo }} ($ano)"
                 when {
                     periodico -> juntar(cab, "'$titulo',", "$pub${if (ref.volume.isNotBlank()) ", ${ref.volume}" else ""}${if (ref.numero.isNotBlank()) "(${ref.numero})" else ""}${if (pag.isNotBlank()) ", pp. $pag" else ""}.", if (ref.doi.isNotBlank()) "doi: ${ref.doi}." else ref.url)
+                    capitulo -> juntar(cab, "'$titulo',", "in ${ponto(pub.ifBlank { "Livro" })}", "${if (ref.local.isNotBlank()) "${ref.local}: " else ""}${ponto(ref.editora)}", if (pag.isNotBlank()) "pp. $pag." else "", if (ref.doi.isNotBlank()) "doi: ${ref.doi}." else ref.url)
+                    congresso -> juntar(cab, "'$titulo',", "${pub.ifBlank { "Proceedings" }}${if (ref.local.isNotBlank()) ", ${ref.local}" else ""}${if (pag.isNotBlank()) ", pp. $pag" else ""}.", if (ref.doi.isNotBlank()) "doi: ${ref.doi}." else ref.url)
+                    tese -> juntar(cab, ponto(titulo), "Tese/Dissertação.", ponto(ref.editora), if (ref.doi.isNotBlank()) "doi: ${ref.doi}." else ref.url)
                     else -> juntar(cab, ponto(titulo), "${if (ref.local.isNotBlank()) "${ref.local}: " else ""}${ponto(ref.editora.ifBlank { pub })}", if (ref.doi.isNotBlank()) "doi: ${ref.doi}." else ref.url)
                 }
             }
@@ -202,6 +208,9 @@ object Bibliografia {
                 val cab = juntar(ponto(aut.ifBlank { titulo }), ponto(ano))
                 when {
                     periodico -> juntar(cab, "“${ponto(titulo)}”", "$pub${if (ref.volume.isNotBlank()) " ${ref.volume}" else ""}${if (ref.numero.isNotBlank()) " (${ref.numero})" else ""}${if (pag.isNotBlank()) ": $pag" else ""}.", doiUrl.ifBlank { ref.url })
+                    capitulo -> juntar(cab, "“${ponto(titulo)}”", "In ${pub.ifBlank { "Livro" }}${if (pag.isNotBlank()) ", $pag" else ""}.", "${if (ref.local.isNotBlank()) "${ref.local}: " else ""}${ponto(ref.editora)}", doiUrl.ifBlank { ref.url })
+                    congresso -> juntar(cab, "“${ponto(titulo)}”", "Paper presented at ${pub.ifBlank { "conference" }}${if (ref.local.isNotBlank()) ", ${ref.local}" else ""}.", doiUrl.ifBlank { ref.url })
+                    tese -> juntar(cab, ponto(titulo), "Tese/Dissertação, ${ponto(ref.editora)}", doiUrl.ifBlank { ref.url })
                     else -> juntar(cab, ponto(titulo), "${if (ref.local.isNotBlank()) "${ref.local}: " else ""}${ponto(ref.editora.ifBlank { pub })}", doiUrl.ifBlank { ref.url })
                 }
             }
@@ -209,11 +218,15 @@ object Bibliografia {
                 val cab = ponto(aut)
                 when {
                     periodico -> juntar(cab, "“${ponto(titulo)}”", "$pub${if (ref.volume.isNotBlank()) ", vol. ${ref.volume}" else ""}${if (ref.numero.isNotBlank()) ", no. ${ref.numero}" else ""}${if (ref.ano.isNotBlank()) ", $ano" else ""}${if (pag.isNotBlank()) ", pp. $pag" else ""}.", doiUrl.ifBlank { ref.url })
+                    capitulo -> juntar(cab, "“${ponto(titulo)}”", "${pub.ifBlank { "Livro" }}${if (ref.editora.isNotBlank()) ", ${ref.editora}" else ""}${if (ref.ano.isNotBlank()) ", $ano" else ""}${if (pag.isNotBlank()) ", pp. $pag" else ""}.", doiUrl.ifBlank { ref.url })
+                    congresso -> juntar(cab, "“${ponto(titulo)}”", "${pub.ifBlank { "Conference" }}${if (ref.ano.isNotBlank()) ", $ano" else ""}${if (ref.local.isNotBlank()) ", ${ref.local}" else ""}.", doiUrl.ifBlank { ref.url })
                     else -> juntar(cab, ponto(titulo), "${if (ref.editora.isNotBlank()) "${ref.editora}, " else ""}$ano.", doiUrl.ifBlank { ref.url })
                 }
             }
             EstiloBibliografico.VANCOUVER -> when {
                 periodico -> juntar(ponto(aut), ponto(titulo), ponto(pub), "$ano${if (ref.volume.isNotBlank()) ";${ref.volume}" else ""}${if (ref.numero.isNotBlank()) "(${ref.numero})" else ""}${if (pag.isNotBlank()) ":$pag" else ""}.", if (ref.doi.isNotBlank()) "doi:${ref.doi}" else "")
+                capitulo -> juntar(ponto(aut), ponto(titulo), "In: ${ponto(pub.ifBlank { "Livro" })}", "${if (ref.local.isNotBlank()) "${ref.local}: " else ""}${ref.editora}${if (ref.ano.isNotBlank()) "; $ano" else ""}${if (pag.isNotBlank()) ". p. $pag" else ""}.")
+                web -> juntar(ponto(aut), ponto(titulo), ponto(pub), if (ref.ano.isNotBlank()) "$ano." else "", if (ref.url.isNotBlank()) "Available from: ${ref.url}" else "")
                 else -> juntar(ponto(aut), ponto(titulo), "${if (ref.local.isNotBlank()) "${ref.local}: " else ""}${ref.editora}${if (ref.ano.isNotBlank()) "; $ano" else ""}.")
             }
             EstiloBibliografico.IEEE -> {
@@ -221,10 +234,12 @@ object Bibliografia {
                 val fim = if (ref.doi.isNotBlank()) "doi: ${ref.doi}." else if (ref.url.isNotBlank()) "[Online]. Available: ${ref.url}" else ""
                 when {
                     periodico -> juntar(cab, "“$titulo,”", "$pub${if (ref.volume.isNotBlank()) ", vol. ${ref.volume}" else ""}${if (ref.numero.isNotBlank()) ", no. ${ref.numero}" else ""}${if (pag.isNotBlank()) ", pp. $pag" else ""}${if (ref.ano.isNotBlank()) ", $ano" else ""}.", fim)
+                    capitulo || congresso -> juntar(cab, "“$titulo,”", "in ${pub.ifBlank { "Proceedings" }}${if (ref.local.isNotBlank()) ", ${ref.local}" else ""}${if (ref.ano.isNotBlank()) ", $ano" else ""}${if (pag.isNotBlank()) ", pp. $pag" else ""}.", fim)
+                    tese -> juntar(cab, "“$titulo,”", "Tese/Dissertação, ${ref.editora}${if (ref.ano.isNotBlank()) ", $ano" else ""}.", fim)
                     else -> juntar(cab, ponto(titulo), "${if (ref.local.isNotBlank()) "${ref.local}: " else ""}${ref.editora}${if (ref.ano.isNotBlank()) ", $ano" else ""}.", fim)
                 }
             }
         }
-        return juntar(prefixo, corpo)
+        return prefixo + corpo
     }
 }
