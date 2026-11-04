@@ -6,6 +6,7 @@
 import { FONTES_SISTEMA, criarEstilosPadrao } from '../core/athenes_estilos.js';
 import { svgIcone } from './athenes_icones.js';
 import { unirBlocosTexto } from '../core/athenes_documento.js';
+import { modoSomenteLeitura } from '../core/athenes_colaboracao.js';
 import { removerPalavrasIniciais } from '../core/athenes_estilo_avancado.js';
 import { sanearHtmlTexto } from '../core/athenes_estilo_exclusivo.js';
 
@@ -378,6 +379,31 @@ export const metodosBarraContextual = {
     };
 
     document.addEventListener('selectionchange', atualizarPosicaoBarra);
+
+    // Selecionar texto de VÁRIOS blocos arrastando o mouse: cada bloco é um campo editável à parte e o navegador não deixa a seleção
+    // sair do campo onde o arrasto começou. Quando o ponteiro passa para outro bloco, os campos deixam de ser editáveis até soltar o
+    // mouse; a seleção então atravessa os blocos e aparece a pílula "Unir blocos".
+    let arrasto = null;
+    document.addEventListener('mousedown', (e) => {
+      const campo = e.button === 0 && this.container?.contains(e.target) ? e.target.closest?.('.ath-texto-editable') : null;
+      arrasto = campo && !modoSomenteLeitura(this.modoTrabalho) ? { bloco: campo.closest('[data-bloco-id]'), liberado: false } : null;
+    }, true);
+    document.addEventListener('mousemove', (e) => {
+      if (!arrasto || arrasto.liberado || !(e.buttons & 1)) return;
+      const outro = e.target.closest?.('[data-bloco-id]');
+      if (!outro || outro === arrasto.bloco) return;
+      arrasto.liberado = true;
+      this.container.querySelectorAll('.ath-texto-editable[contenteditable="true"]').forEach(x => { x.contentEditable = 'false'; x.dataset.arrastoRestaurar = '1'; });
+    }, true);
+    const fimDoArrasto = () => {
+      if (arrasto?.liberado) {
+        this.container?.querySelectorAll('[data-arrasto-restaurar]').forEach(x => { x.contentEditable = 'true'; delete x.dataset.arrastoRestaurar; });
+        setTimeout(atualizarPosicaoBarra, 0);
+      }
+      arrasto = null;
+    };
+    document.addEventListener('mouseup', fimDoArrasto, true);
+    window.addEventListener('blur', fimDoArrasto);
     document.addEventListener('click', (e) => {
       if (barra && !barra.contains(e.target)) {
         fecharDropdownsCtx();
