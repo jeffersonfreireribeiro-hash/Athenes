@@ -21,16 +21,23 @@ class ArtigoEstudoRepository {
     private val persistenciaScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var gravacaoPendente: Job? = null
     private var anotacoesPendentes: Job? = null
+    private var itensZotero: List<ZoteroItem> = emptyList()
+    private var itensBib: List<ZoteroItem> = emptyList()
 
     fun ativarPersistencia(context: Context) {
         if (contexto != null) return
         contexto = context.applicationContext
+        itensBib = contexto!!.getSharedPreferences("biblioteca_bib", Context.MODE_PRIVATE)
+            .getString("dados", null)?.let { salvo ->
+                runCatching { ZoteroCacheCodec.ler(salvo).first }.getOrNull()
+            }.orEmpty()
         contexto!!.getSharedPreferences("biblioteca_zotero", Context.MODE_PRIVATE)
             .getString("dados", null)?.let { salvo ->
                 runCatching { ZoteroCacheCodec.ler(salvo) }.getOrNull()?.let { (itens, colecoes) ->
-                    if (itens.isNotEmpty()) aplicarBibliotecaZotero(itens, colecoes)
+                    if (itens.isNotEmpty() || itensBib.isNotEmpty()) aplicarBibliotecaZotero(itens, colecoes)
                 }
             }
+        if (itensBib.isNotEmpty() && itensZotero.isEmpty()) aplicarBibliotecaZotero(emptyList(), emptyList())
         val preferencias = contexto!!.getSharedPreferences("tracos_pdf", Context.MODE_PRIVATE)
         val anotacoes = contexto!!.getSharedPreferences("anotacoes_pdf", Context.MODE_PRIVATE)
         val notasZoteroPrefs = contexto!!.getSharedPreferences("notas_zotero", Context.MODE_PRIVATE)
@@ -165,10 +172,21 @@ class ArtigoEstudoRepository {
     private val _colecoesZotero = MutableStateFlow<List<ZoteroColecao>>(emptyList())
     val colecoesZotero: StateFlow<List<ZoteroColecao>> = _colecoesZotero.asStateFlow()
 
+    fun importarBib(conteudo: String): Int {
+        val importados = BibtexParser.ler(conteudo)
+        require(importados.isNotEmpty()) { "O arquivo BIB não contém referências válidas." }
+        itensBib = (itensBib + importados).associateBy { it.chave }.values.toList()
+        contexto?.getSharedPreferences("biblioteca_bib", Context.MODE_PRIVATE)
+            ?.edit()?.putString("dados", ZoteroCacheCodec.escrever(itensBib, emptyList()))?.apply()
+        aplicarBibliotecaZotero(itensZotero, _colecoesZotero.value)
+        return importados.size
+    }
+
     fun aplicarBibliotecaZotero(itens: List<ZoteroItem>, colecoes: List<ZoteroColecao>) {
+        itensZotero = itens
         val anteriores = _artigos.value.associateBy { it.id }
         _colecoesZotero.value = colecoes
-        _artigos.value = itens.map { item ->
+        _artigos.value = (itens + itensBib).distinctBy { it.chave }.map { item ->
             val anterior = anteriores[item.chave]
             val ano = Regex("(?:19|20)\\d{2}").find(item.data)?.value?.toIntOrNull() ?: 0
             ArtigoEstudoDetalhado(

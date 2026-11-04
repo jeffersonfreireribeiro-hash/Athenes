@@ -70,6 +70,22 @@ fun BibliotecaScreen(
             ), Toast.LENGTH_LONG).show()
         }
     }
+    val escolherBib = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) escopo.launch {
+            val resultado = runCatching {
+                val texto = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { entrada ->
+                        String(entrada.readNBytes(10_000_001), Charsets.UTF_8)
+                    } ?: error("Não foi possível abrir o arquivo BIB.")
+                }
+                viewModel.importarBib(texto)
+            }
+            Toast.makeText(context, resultado.fold(
+                onSuccess = { "$it referências importadas do BIB." },
+                onFailure = { it.message ?: "Não foi possível importar o BIB." }
+            ), Toast.LENGTH_LONG).show()
+        }
+    }
     val credenciaisZotero = remember(context) { ZoteroCredentialsStore(context) }
     var updateBannerDismissed by remember { mutableStateOf(false) }
 
@@ -410,6 +426,12 @@ fun BibliotecaScreen(
                             )
                         }
                     }
+                }
+
+                TextButton(onClick = { escolherBib.launch("*/*") }) {
+                    Icon(Icons.Rounded.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Importar referências BIB")
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
