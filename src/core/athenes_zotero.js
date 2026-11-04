@@ -368,6 +368,9 @@ export class ZoteroClient {
       chave,
       tipo,
       itemTypeZotero: d.itemType,
+      // todos os campos do item como estão no Zotero (para o painel "Informações"; o resumo, as tags e as coleções têm campo próprio)
+      camposZotero: Object.fromEntries(Object.entries(d).filter(([k, v]) => !['creators', 'tags', 'collections', 'relations', 'abstractNote'].includes(k) && (v === null || typeof v !== 'object'))),
+      criadores: (d.creators || []).map(c => ({ creatorType: c.creatorType || 'author', lastName: c.lastName || '', firstName: c.firstName || '', name: c.name || '' })),
       titulo: d.title || 'Sem título',
       autores: autores.length ? autores : [{ sobrenome: 'ANÔNIMO', prenome: '' }],
       ano,

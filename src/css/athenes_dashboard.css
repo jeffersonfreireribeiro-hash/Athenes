@@ -1966,3 +1966,7 @@ mark.ath-pdf-grifo-texto {
 .ath-pdf-sem-arquivo strong { display: block; font-size: 15px; color: #314F79; margin-bottom: 8px; }
 .ath-pdf-sem-arquivo p { font-size: 12.5px; line-height: 1.5; margin: 0 0 14px; color: #64748B; }
 .ath-pdf-sem-arquivo-acoes { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.ath-zot-info-lista { display: grid; grid-template-columns: minmax(70px, 34%) 1fr; gap: 6px 10px; margin: 8px 0 0; font-size: 11.5px; }
+.ath-zot-info-lista dt { color: #64748B; text-align: right; font-weight: 600; }
+.ath-zot-info-lista dd { margin: 0; color: #1E293B; word-break: break-word; }
+.ath-zot-info-lista a { color: #314F79; }

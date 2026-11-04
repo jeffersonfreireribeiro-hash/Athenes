@@ -270,6 +270,9 @@ export class EstudoArtigosView {
       id: 'zot_' + (item.id || Date.now().toString(36)),
       pastaId: item.pastaId || pastaId || 'pasta_bib_raiz',
       chaveZotero: item.chave || item.id || 'ZOTLOCAL',
+      itemTypeZotero: item.itemTypeZotero || '',
+      camposZotero: item.camposZotero || null,
+      criadores: item.criadores || null,
       titulo: item.titulo || 'Artigo sem título',
       autores: item.autores?.length ? item.autores : [{ sobrenome: 'Autor', prenome: '' }],
       ano: item.ano || String(new Date().getFullYear()),
@@ -918,6 +921,9 @@ export class EstudoArtigosView {
       const existente = this.artigos.find(a => a.chaveZotero === it.chave || (!a.chaveZotero && a.titulo === it.titulo));
       if (existente) {
         existente.colecoesZotero = it.colecoes || [];
+        existente.itemTypeZotero = it.itemTypeZotero || existente.itemTypeZotero || '';
+        existente.camposZotero = it.camposZotero || existente.camposZotero || null; // informações do Zotero atualizadas a cada sincronização
+        existente.criadores = it.criadores || existente.criadores || null;
         if (naRaizOuZotero(existente)) { existente.pastasIds = ids; existente.pastaId = ids[0]; }
         return;
       }

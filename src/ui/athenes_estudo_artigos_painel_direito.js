@@ -6,10 +6,21 @@
 import { obterTokenOuConectar, obterTokenDrive } from '../core/athenes_drive_sync.js';
 import { obterConfigGoogleDrive, autenticarGoogleDrive, salvarArquivoNoGoogleDrive } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
+import { linhasInformacoesZotero, informacoesDoArtigo } from '../core/athenes_zotero_campos.js';
 import { svgIcone } from './athenes_icones.js';
 import { obterPdfLocal, registrarPdfLocalNoArtigo, garantirPdfDoArtigo, salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo } from './athenes_estudo_artigos_dados.js';
 
 export const metodosEstudoPainelDireito = {
+  /** "Informações" do item no Zotero (tipo, campos do tipo, autores com função, datas), só os preenchidos. */
+  htmlInformacoesZotero(art) {
+    const linhas = linhasInformacoesZotero(informacoesDoArtigo(art));
+    if (!linhas.length) return '';
+    return `<details class="ath-zot-info" open>
+      <summary class="ath-fichamento-rotulo" style="cursor:pointer; margin-top:14px;">Informações do Zotero</summary>
+      <dl class="ath-zot-info-lista">${linhas.map(l => `<dt>${escapeHtml(l.rotulo)}</dt><dd>${l.valor.startsWith('http://') || l.valor.startsWith('https://') ? `<a href="${escapeHtml(l.valor)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.valor)}</a>` : escapeHtml(l.valor)}</dd>`).join('')}</dl>
+    </details>`;
+  },
+
   renderizarPainelDireitoEstudio(box, art) {
     if (!box) return;
     box.innerHTML = '';
@@ -75,6 +86,8 @@ export const metodosEstudoPainelDireito = {
 
           <label class="ath-fichamento-rotulo" style="margin-top:10px;">Tags / Palavras-Chave (Zotero)</label>
           <input type="text" id="athEstudoTagsInput" class="ath-input" value="${escapeHtml((art.palavrasChave || []).join(', '))}" placeholder="Ex.: REURB, Morfologia, SIG">
+
+          ${this.htmlInformacoesZotero(art)}
         </div>
       `;
 
