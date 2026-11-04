@@ -39,6 +39,7 @@ fun EditorTopBar(
     onSalvar: () -> Unit,
     onExportarDocx: () -> Unit,
     onExportarPdf: () -> Unit,
+    onExportarJson: () -> Unit,
     onConfigurarPagina: () -> Unit,
     onVoltar: () -> Unit,
     modifier: Modifier = Modifier
@@ -118,6 +119,7 @@ fun EditorTopBar(
                     CabecalhoMenu("Exportar")
                     ItemMenu("Word (.docx)", Icons.Rounded.Description, false) { onExportarDocx(); menuAberto = false }
                     ItemMenu("PDF (imprimir)", Icons.Rounded.PictureAsPdf, false) { onExportarPdf(); menuAberto = false }
+                    ItemMenu("Documento JSON", Icons.Rounded.Description, false) { onExportarJson(); menuAberto = false }
                     HorizontalDivider()
                     ItemMenu("Salvar agora", Icons.Rounded.Save, false) { onSalvar(); menuAberto = false }
                 }

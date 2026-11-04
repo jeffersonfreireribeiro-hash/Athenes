@@ -135,6 +135,23 @@ fun EditorDocumentoScreen(
         viewModel.salvarDocumento()
         criarDocx.launch(viewModel.nomeBaseArquivo() + ".docx")
     }
+    val criarJson = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) scope.launch {
+            val resultado = runCatching {
+                val conteudo = viewModel.exportarJson()
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(conteudo.toByteArray(Charsets.UTF_8)) }
+                        ?: error("Não foi possível criar o arquivo.")
+                }
+            }
+            Toast.makeText(context, resultado.fold({ "Documento JSON exportado." }, { it.message ?: "Falha na exportação JSON." }), Toast.LENGTH_LONG).show()
+        }
+    }
+    val exportarJson: () -> Unit = {
+        if (blocos.any { it.imagem.isNotBlank() }) {
+            Toast.makeText(context, "JSON simples não incorpora imagens. Use DOCX ou PDF para este documento.", Toast.LENGTH_LONG).show()
+        } else criarJson.launch(viewModel.nomeBaseArquivo() + ".json")
+    }
     val exportarPdf: () -> Unit = {
         viewModel.salvarDocumento()
         scope.launch {
@@ -256,6 +273,7 @@ fun EditorDocumentoScreen(
                     onSalvar = viewModel::salvarDocumento,
                     onExportarDocx = exportarDocx,
                     onExportarPdf = exportarPdf,
+                    onExportarJson = exportarJson,
                     onConfigurarPagina = { mostrarConfigPagina = true },
                     onVoltar = ::sair
                 )

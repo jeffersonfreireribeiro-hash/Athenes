@@ -1,6 +1,8 @@
 package com.athenes.ui.library
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -29,6 +31,9 @@ import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.components.*
 import com.athenes.ui.theme.*
 import com.athenes.ui.updater.UpdateBanner
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun BibliotecaScreen(
@@ -42,6 +47,23 @@ fun BibliotecaScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val escopo = rememberCoroutineScope()
+    val escolherDocumentoJson = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) escopo.launch {
+            val resultado = runCatching {
+                val texto = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { entrada ->
+                        String(entrada.readNBytes(10_000_001), Charsets.UTF_8)
+                    } ?: error("Não foi possível abrir o arquivo.")
+                }
+                withContext(Dispatchers.IO) { viewModel.importarDocumentoJson(texto) }
+            }
+            Toast.makeText(context, resultado.fold(
+                onSuccess = { "Documento importado: ${it.titulo}" },
+                onFailure = { it.message ?: "Não foi possível importar o arquivo." }
+            ), Toast.LENGTH_LONG).show()
+        }
+    }
     val credenciaisZotero = remember(context) { ZoteroCredentialsStore(context) }
     var updateBannerDismissed by remember { mutableStateOf(false) }
 
@@ -186,6 +208,12 @@ fun BibliotecaScreen(
                     onTipoFiltroAlterado = viewModel::setTipoFiltro,
                     onNovoDocumentoClick = viewModel::abrirDialogNovo
                 )
+
+                TextButton(onClick = { escolherDocumentoJson.launch("application/json") }) {
+                    Icon(Icons.Rounded.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Importar documento JSON")
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
 

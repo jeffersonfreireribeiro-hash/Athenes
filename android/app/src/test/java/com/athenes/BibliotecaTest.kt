@@ -139,4 +139,25 @@ class BibliotecaTest {
             pasta.deleteRecursively()
         }
     }
+
+    @Test
+    fun `importacao json cria documento novo e rejeita tipos e imagens sem arquivo`() {
+        val pasta = Files.createTempDirectory("athenes-import-test").toFile()
+        try {
+            val repositorio = DocumentoRepository(storageDir = pasta)
+            val json = JSONObject()
+                .put("titulo", "Documento importado")
+                .put("autores", "Pesquisadora")
+                .put("blocos", org.json.JSONArray().put(JSONObject().put("tipo", "PARAGRAFO").put("id", "antigo").put("texto", "Texto preservado")))
+            val doc = repositorio.importarDocumentoJson(json.toString())
+            val bloco = JSONObject(File(pasta, "editor_${doc.id}.json").readText()).getJSONArray("blocos").getJSONObject(0)
+            assertEquals("Texto preservado", bloco.getString("texto"))
+            assertTrue(bloco.getString("id") != "antigo")
+            assertTrue(repositorio.documentos.value.any { it.id == doc.id })
+            assertTrue(runCatching { repositorio.importarDocumentoJson(json.put("blocos", org.json.JSONArray().put(JSONObject().put("tipo", "DESCONHECIDO"))).toString()) }.isFailure)
+            assertTrue(runCatching { repositorio.importarDocumentoJson(json.put("blocos", org.json.JSONArray().put(JSONObject().put("tipo", "FIGURA").put("imagem", "ausente.png"))).toString()) }.isFailure)
+        } finally {
+            pasta.deleteRecursively()
+        }
+    }
 }

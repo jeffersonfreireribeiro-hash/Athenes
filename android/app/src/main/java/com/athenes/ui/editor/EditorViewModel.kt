@@ -371,6 +371,13 @@ class EditorViewModel : ViewModel() {
             .replace(Regex("[^a-z0-9]+"), "_").trim('_').take(48).trim('_')
             .ifEmpty { "documento" }
 
+    fun exportarJson(): String {
+        require(_blocos.value.none { it.imagem.isNotBlank() }) {
+            "Este documento contém imagens. A exportação JSON simples não as incorpora."
+        }
+        return serializar()
+    }
+
     // ------------------------------------------------------------------
     // Persistência: um arquivo JSON por documento em filesDir
     // ------------------------------------------------------------------

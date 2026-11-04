@@ -173,6 +173,35 @@ class DocumentoRepository(private val context: Context? = null, private val stor
         return novo
     }
 
+    /** Importa um arquivo do editor Android sem sobrescrever trabalhos existentes. */
+    fun importarDocumentoJson(conteudo: String): Documento {
+        require(conteudo.length <= 10_000_000) { "Arquivo maior que 10 MB." }
+        val raiz = JSONObject(conteudo)
+        val blocos = raiz.optJSONArray("blocos") ?: throw IllegalArgumentException("Arquivo sem blocos do editor Android.")
+        require(blocos.length() <= 20_000) { "Documento com blocos demais." }
+        val tipos = setOf("TITULO", "PARAGRAFO", "CITACAO", "FIGURA", "TABELA", "FORMULA", "DIVISOR")
+        for (i in 0 until blocos.length()) {
+            val bloco = blocos.getJSONObject(i)
+            require(bloco.optString("tipo") in tipos) { "Tipo de bloco não reconhecido." }
+            require(bloco.optString("imagem").isBlank()) { "Este documento depende de imagens externas. Use o backup completo." }
+            bloco.put("id", UUID.randomUUID().toString())
+        }
+        val titulo = raiz.optString("titulo").trim()
+        require(titulo.isNotEmpty()) { "Documento sem título." }
+        val pasta = storageDir ?: throw IllegalStateException("Armazenamento indisponível.")
+        val novo = Documento(
+            id = UUID.randomUUID().toString(), titulo = titulo,
+            subtitulo = raiz.optString("subtitulo"), autor = raiz.optString("autores"),
+            resumo = raiz.optString("resumo"), tipo = TipoDocumento.DOCUMENTO,
+            modificadoEm = "Hoje"
+        )
+        val destino = File(pasta, "editor_${novo.id}.json")
+        destino.writeText(raiz.toString())
+        _documentos.value = listOf(novo) + _documentos.value
+        salvarEmDisco()
+        return novo
+    }
+
     fun duplicarDocumento(id: String) {
         val original = _documentos.value.find { it.id == id } ?: return
         val copia = original.copy(

@@ -108,6 +108,7 @@ class BibliotecaViewModel(
 
     fun restaurarDocumento(id: String) = repository.restaurarDocumento(id)
     fun excluirDefinitivamente(id: String) = repository.excluirDefinitivamente(id)
+    fun importarDocumentoJson(conteudo: String) = repository.importarDocumentoJson(conteudo)
 
     fun criarPasta(nome: String, pastaPaiId: String? = null) = repository.criarPasta(nome, pastaPaiId)
     fun moverDocumento(id: String, pastaId: String?) = repository.moverDocumento(id, pastaId)
