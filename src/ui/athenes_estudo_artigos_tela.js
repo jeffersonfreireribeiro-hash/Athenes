@@ -709,6 +709,14 @@ export const metodosEstudoTela = {
       const canvasPag = folhaWrap.querySelector(`canvas[data-canvas-pag="${numPag}"]`);
       this.inicializarCanvasTinta(canvasPag, art, numPag, root);
 
+      // a folha fica dentro de uma caixa do tamanho que aparece na tela (o zoom muda a caixa, não só o desenho)
+      const folhaParaEscala = folhaWrap.querySelector('.ath-pdf-folha-container');
+      const caixaEscala = document.createElement('div');
+      caixaEscala.className = 'ath-pdf-escala';
+      folhaParaEscala.replaceWith(caixaEscala);
+      caixaEscala.appendChild(folhaParaEscala);
+      this.aplicarEscalaNaFolha(folhaWrap, escalaZoom);
+
       // Clicar na folha define ela como página ativa
       const folhaContainer = folhaWrap.querySelector('.ath-pdf-folha-container');
       folhaContainer.addEventListener('pointerdown', () => {
@@ -721,12 +729,11 @@ export const metodosEstudoTela = {
       const palcoRender = root.querySelector('#athEstudioPalco');
       const desenhar = (folha) => this.renderizarPaginaPdfReal(pdfInfo, folha, parseInt(folha.dataset.numPagina, 10));
       if (typeof IntersectionObserver !== 'undefined' && palcoRender) {
-        const obs = new IntersectionObserver(entradas => {
-          entradas.forEach(en => {
-            if (en.isIntersecting) { obs.unobserve(en.target); desenhar(en.target); }
-          });
-        }, { root: palcoRender, rootMargin: '900px 0px' });
-        folhasReais.forEach(f => obs.observe(f));
+        this._obsPerto?.disconnect(); this._obsLonge?.disconnect();
+        // perto da tela: desenha (ou refaz, se o zoom mudou); muito longe: larga o bitmap para não estourar a memória
+        this._obsPerto = new IntersectionObserver(entradas => { entradas.forEach(en => { if (en.isIntersecting) desenhar(en.target); }); }, { root: palcoRender, rootMargin: '900px 0px' });
+        this._obsLonge = new IntersectionObserver(entradas => { entradas.forEach(en => { if (!en.isIntersecting) this.liberarBitmapDaFolha(en.target); }); }, { root: palcoRender, rootMargin: '4500px 0px' });
+        folhasReais.forEach(f => { this._obsPerto.observe(f); this._obsLonge.observe(f); });
       } else {
         folhasReais.forEach(desenhar);
       }

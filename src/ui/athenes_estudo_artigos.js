@@ -490,25 +490,48 @@ export class EstudoArtigosView {
     }
   }
 
+  /**
+   * Pixels reais do bitmap por pixel de CSS da folha (nitidez do texto). Considera a tela (mínimo 2x, para o texto não ficar serrilhado
+   * em tela comum), o zoom (ampliar pede mais pixels) e um teto de memória por página (~16 megapixels).
+   */
+  fatorQualidadePdf(altura = 1123) {
+    const zoom = Math.max(1, (this.zoomPct || 100) / 100);
+    const desejado = Math.max(window.devicePixelRatio || 1, 2) * zoom;
+    const teto = Math.sqrt(16e6 / (794 * Math.max(1, altura)));
+    return Math.max(1, Math.min(desejado, teto, 6));
+  }
+
   async renderizarPaginaPdfReal(info, folha, numPag) {
-    if (!folha || folha.dataset.renderizada) return;
+    if (!folha) return;
+    const alturaCss = Math.round(794 * info.dims[numPag - 1].h / info.dims[numPag - 1].w);
+    const fator = this.fatorQualidadePdf(alturaCss);
+    // já desenhada nesta definição: nada a fazer; desenhada em outra (zoom mudou): refaz só o bitmap
+    if (folha.dataset.renderizada === '1' && Math.abs(Number(folha.dataset.qualidade || 0) - fator) < 0.2) return;
+    const token = (folha._tokenRender = (folha._tokenRender || 0) + 1);
     folha.dataset.renderizada = '1';
     try {
       const page = await info.doc.getPage(numPag);
       const d = info.dims[numPag - 1];
       const escala = 794 / d.w;
       const viewport = page.getViewport({ scale: escala });
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const cv = folha.querySelector('.ath-pdf-render-canvas');
       if (!cv) return;
-      cv.width = Math.floor(viewport.width * dpr);
-      cv.height = Math.floor(viewport.height * dpr);
+      // desenha fora da tela e só então troca: a página não pisca em branco ao mudar o zoom
+      const novo = document.createElement('canvas');
+      novo.width = Math.floor(viewport.width * fator);
+      novo.height = Math.floor(viewport.height * fator);
       await page.render({
-        canvasContext: cv.getContext('2d'),
+        canvasContext: novo.getContext('2d'),
         viewport,
-        transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null
+        transform: [fator, 0, 0, fator, 0, 0]
       }).promise;
+      if (token !== folha._tokenRender || !folha.isConnected) return; // outra renderização mais nova assumiu
+      cv.width = novo.width; cv.height = novo.height;
+      cv.getContext('2d').drawImage(novo, 0, 0);
+      folha.dataset.qualidade = String(fator);
+      if (folha.dataset.textoPronto === '1') return; // a camada de texto não depende do zoom
 
+      folha.dataset.textoPronto = '1';
       const camada = folha.querySelector('.ath-pdf-text-layer');
       if (camada) {
         camada.style.setProperty('--scale-factor', String(escala));
@@ -549,6 +572,16 @@ export class EstudoArtigosView {
     } catch (err) {
       console.warn('Athenes — falha ao desenhar página do PDF:', err);
     }
+  }
+
+  /** Páginas muito longe da tela largam o bitmap (um PDF de 30 páginas em alta definição passaria de 1 GB); voltam a ser desenhadas ao se aproximar. */
+  liberarBitmapDaFolha(folha) {
+    const cv = folha?.querySelector('.ath-pdf-render-canvas');
+    if (!cv || folha.dataset.renderizada !== '1') return;
+    folha._tokenRender = (folha._tokenRender || 0) + 1;
+    cv.width = 1; cv.height = 1;
+    folha.dataset.renderizada = '';
+    folha.dataset.qualidade = '';
   }
 
   definirPaginaAtivaSilencioso(numPag, root) {
@@ -720,6 +753,19 @@ export class EstudoArtigosView {
     return map[tool] || tool;
   }
 
+  /** A folha ocupa no layout o tamanho que aparece (sem sobrar espaço entre as páginas): caixa com o tamanho escalado e a folha escalada dentro. */
+  aplicarEscalaNaFolha(wrap, escala) {
+    const folha = wrap?.querySelector('.ath-pdf-folha-container');
+    const caixa = folha?.parentElement;
+    if (!folha || !caixa?.classList.contains('ath-pdf-escala')) return;
+    const h = parseFloat(folha.dataset.alturaReal) || folha.offsetHeight || 1123;
+    wrap.style.minHeight = ''; // a altura vem da caixa escalada (antes ficava a do zoom em que a tela foi montada)
+    caixa.style.width = `${794 * escala}px`;
+    caixa.style.height = `${h * escala}px`;
+    folha.style.transformOrigin = '0 0';
+    folha.style.transform = escala === 1 ? '' : `scale(${escala})`;
+  }
+
   aplicarZoom(novoZoom, root) {
     const lim = Math.max(50, Math.min(250, Math.round(novoZoom)));
     this.zoomPct = lim;
@@ -728,16 +774,15 @@ export class EstudoArtigosView {
     const container = root || this.container;
     const palco = container?.querySelector('#athEstudioPalco');
     if (palco) {
-      const wraps = palco.querySelectorAll('.ath-pdf-pagina-bloco-wrap');
-      wraps.forEach(wrap => {
-        const folha = wrap.querySelector('.ath-pdf-folha-container');
-        if (folha) {
-          folha.style.transform = `scale(${escala})`;
-          folha.style.transformOrigin = 'top center';
-          const hOriginal = parseFloat(folha.dataset.alturaReal || folha.style.height) || 1123;
-          wrap.style.minHeight = `${Math.round(hOriginal * escala) + 36}px`;
-        }
-      });
+      palco.style.setProperty('--ath-zoom', String(escala)); // a etiqueta da página acompanha a largura da folha
+      palco.querySelectorAll('.ath-pdf-pagina-bloco-wrap').forEach(wrap => this.aplicarEscalaNaFolha(wrap, escala));
+      // a definição do texto acompanha o zoom: refaz o bitmap das páginas perto da tela (as outras, ao se aproximarem)
+      clearTimeout(this._tZoomQualidade);
+      this._tZoomQualidade = setTimeout(() => {
+        const obs = this._obsPerto;
+        if (!obs) return;
+        palco.querySelectorAll('.ath-pdf-folha-container[data-num-pagina]').forEach(f => { if (f.querySelector('.ath-pdf-render-canvas')) { obs.unobserve(f); obs.observe(f); } });
+      }, 220);
       const lbl = container.querySelector('#athZoomRotulo');
       if (lbl) {
         lbl.textContent = `Escala / Zoom das Folhas PDF (${this.zoomPct}%)`;

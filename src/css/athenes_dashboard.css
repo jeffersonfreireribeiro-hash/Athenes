@@ -2039,3 +2039,10 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
 .ath-dn-dica { flex: 1; color: #64748B; font-size: 11px; }
 .ath-drive-nav .ath-modal-foot { display: flex; align-items: center; gap: 12px; }
 .ath-dn-mais[hidden] { display: none; }
+
+/* Zoom do estúdio de PDF: a folha ocupa no layout o tamanho que aparece (sem vão entre páginas) e a etiqueta acompanha */
+.ath-pdf-todas-paginas-stack { align-items: flex-start; }
+.ath-pdf-pagina-bloco-wrap { align-items: flex-start; margin-inline: auto; }
+.ath-pdf-escala { position: relative; flex: none; margin-inline: auto; }
+.ath-pdf-escala > .ath-pdf-folha-container { position: absolute; left: 0; top: 0; }
+.ath-pdf-pagina-bloco-wrap > .ath-pdf-etiqueta-pagina { width: max(calc(794px * var(--ath-zoom, 1)), 300px); box-sizing: border-box; margin-inline: auto; }
