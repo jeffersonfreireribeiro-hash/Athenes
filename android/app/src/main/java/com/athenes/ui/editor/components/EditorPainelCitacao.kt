@@ -1,6 +1,8 @@
 package com.athenes.ui.editor.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.core.data.ArtigoEstudoRepository
+import com.athenes.core.citacao.EstiloBibliografico
 import com.athenes.core.model.ArtigoEstudoDetalhado
 import com.athenes.ui.theme.AthenesPrimary
 import com.athenes.ui.theme.AthenesTextDark
@@ -30,6 +33,8 @@ import com.athenes.ui.theme.AthenesTextMuted
 @Composable
 fun EditorPainelCitacao(
     onCitar: (ArtigoEstudoDetalhado) -> Unit,
+    estilo: EstiloBibliografico,
+    onEstiloAlterado: (EstiloBibliografico) -> Unit,
     onFechar: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -77,6 +82,12 @@ fun EditorPainelCitacao(
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             )
+            Text("Estilo de citação", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 10.dp))
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                EstiloBibliografico.entries.forEach { opcao ->
+                    FilterChip(selected = estilo == opcao, onClick = { onEstiloAlterado(opcao) }, label = { Text(opcao.rotulo) })
+                }
+            }
             Spacer(Modifier.height(8.dp))
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),

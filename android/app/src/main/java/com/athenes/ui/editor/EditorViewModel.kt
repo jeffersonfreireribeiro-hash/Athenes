@@ -6,6 +6,13 @@ import com.athenes.core.export.AlinhamentoExport
 import com.athenes.core.export.BlocoExport
 import com.athenes.core.export.DocumentoExport
 import com.athenes.core.export.TipoBlocoExport
+import com.athenes.core.citacao.Bibliografia
+import com.athenes.core.citacao.BibliografiaCodec
+import com.athenes.core.citacao.CitacaoInline
+import com.athenes.core.citacao.CitacoesInline
+import com.athenes.core.citacao.EstiloBibliografico
+import com.athenes.core.citacao.ReferenciaAcademica
+import com.athenes.core.citacao.TextoComCitacoes
 import com.athenes.core.model.ArtigoEstudoDetalhado
 import com.athenes.core.model.Documento
 import com.athenes.core.model.ConfiguracaoPagina
@@ -70,7 +77,8 @@ data class BlocoEditor(
     val estiloId: String = "texto",
     val tabelaLinhas: List<List<String>> = emptyList(),
     val listaNumerada: Boolean = false,
-    val nivelTitulo: Int = 1
+    val nivelTitulo: Int = 1,
+    val citacoes: List<CitacaoInline> = emptyList()
 )
 
 data class SecaoEstrutura(
@@ -102,6 +110,10 @@ class EditorViewModel : ViewModel() {
     val tipoDocumento: StateFlow<TipoDocumento> = _tipoDocumento.asStateFlow()
     private val _configuracaoPagina = MutableStateFlow(ConfiguracaoPagina())
     val configuracaoPagina: StateFlow<ConfiguracaoPagina> = _configuracaoPagina.asStateFlow()
+    private val _estiloBibliografico = MutableStateFlow(EstiloBibliografico.ABNT)
+    val estiloBibliografico: StateFlow<EstiloBibliografico> = _estiloBibliografico.asStateFlow()
+    private val _referencias = MutableStateFlow<List<ReferenciaAcademica>>(emptyList())
+    val referencias: StateFlow<List<ReferenciaAcademica>> = _referencias.asStateFlow()
 
     private val _modoRevisao = MutableStateFlow("edicao") // "edicao" | "sugestao" | "leitura"
     val modoRevisao: StateFlow<String> = _modoRevisao.asStateFlow()
@@ -160,6 +172,8 @@ class EditorViewModel : ViewModel() {
         _resumo.value = doc.resumo
         _tipoDocumento.value = doc.tipo
         _configuracaoPagina.value = ConfiguracaoPagina()
+        _estiloBibliografico.value = EstiloBibliografico.ABNT
+        _referencias.value = emptyList()
         _painelEstruturaAberto.value = false
         _painelInspetorAberto.value = false
         _painelCitacaoAberto.value = false
@@ -172,6 +186,8 @@ class EditorViewModel : ViewModel() {
             _resumo.value = lido.resumo
             _blocos.value = lido.blocos.ifEmpty { listOf(blocoParagrafoVazio()) }
             _configuracaoPagina.value = lido.pagina
+            _estiloBibliografico.value = lido.estiloBibliografico
+            _referencias.value = lido.referencias
         } else {
             _blocos.value = if (doc.id == ID_DOCUMENTO_EXEMPLO) obterBlocosIniciais() else listOf(blocoParagrafoVazio())
             if (doc.id == ID_DOCUMENTO_EXEMPLO && _resumo.value.isBlank()) _resumo.value = RESUMO_EXEMPLO
@@ -194,6 +210,20 @@ class EditorViewModel : ViewModel() {
         marcarAlterado()
     }
     fun definirModoRevisao(modo: String) { _modoRevisao.value = modo }
+
+    fun definirEstiloBibliografico(estilo: EstiloBibliografico) {
+        if (_estiloBibliografico.value == estilo) return
+        salvarNoHistorico()
+        _estiloBibliografico.value = estilo
+        _blocos.value = _blocos.value.map { bloco ->
+            if (bloco.citacoes.isEmpty()) bloco else {
+                val novo = CitacoesInline.reformatar(TextoComCitacoes(bloco.texto, bloco.citacoes), _referencias.value, estilo)
+                bloco.copy(texto = novo.texto, citacoes = novo.citacoes)
+            }
+        }
+        salvarNoHistorico()
+        marcarAlterado()
+    }
 
     fun alternarPainelEstrutura() {
         _painelEstruturaAberto.value = !_painelEstruturaAberto.value
@@ -235,7 +265,9 @@ class EditorViewModel : ViewModel() {
         marcarAlterado()
     }
 
-    fun atualizarTextoBloco(id: String, novo: String) = atualizarBloco(id) { it.copy(texto = novo) }
+    fun atualizarTextoBloco(id: String, novo: String) = atualizarBloco(id) {
+        it.copy(texto = novo, citacoes = CitacoesInline.atualizarDepoisDaEdicao(it.texto, novo, it.citacoes))
+    }
     fun atualizarTituloBloco(id: String, novo: String) = atualizarBloco(id) { it.copy(titulo = novo) }
     fun atualizarLegendaBloco(id: String, novo: String) = atualizarBloco(id) { it.copy(legenda = novo) }
     fun atualizarFonteBloco(id: String, novo: String) = atualizarBloco(id) { it.copy(fonte = novo) }
@@ -307,24 +339,23 @@ class EditorViewModel : ViewModel() {
         inserirAposSelecionado(novo)
     }
 
-    /** Insere a citação ABNT (SOBRENOME, ano) no bloco de texto selecionado (ou cria um parágrafo). */
+    /** Insere uma citação estruturada no cursor e mantém a obra na lista do documento. */
     fun inserirCitacao(artigo: ArtigoEstudoDetalhado) {
-        // ABNT: autores separados por ponto e vírgula; o campo de origem pode trazer "A & B, 2025"
-        val sobrenome = artigo.autores.substringBefore(",").replace(" & ", "; ").replace(" e ", "; ").trim()
-            .ifBlank { artigo.autores.substringBefore(" ").trim() }
-        val marca = "(${sobrenome.uppercase()}, ${artigo.ano})"
+        val referencia = ReferenciaAcademica.doArtigo(artigo)
+        if (_referencias.value.none { it.id == referencia.id }) _referencias.value = _referencias.value + referencia
+        val indice = _referencias.value.indexOfFirst { it.id == referencia.id } + 1
+        val marca = Bibliografia.citacao(referencia, _estiloBibliografico.value, indice)
         val alvo = _blocos.value.find { it.id == _blocoSelecionadoId.value }
         salvarNoHistorico()
         if (alvo != null && (alvo.tipo == TipoBlocoEditor.PARAGRAFO || alvo.tipo == TipoBlocoEditor.CITACAO)) {
             val posicao = cursorTexto?.takeIf { it.first == alvo.id }?.second?.coerceIn(0, alvo.texto.length) ?: alvo.texto.length
-            val antes = alvo.texto.substring(0, posicao)
-            val depois = alvo.texto.substring(posicao)
-            val prefixo = if (antes.isNotEmpty() && !antes.last().isWhitespace()) " " else ""
-            val sufixo = if (depois.isNotEmpty() && !depois.first().isWhitespace()) " " else ""
-            atualizarBloco(alvo.id) { it.copy(texto = antes + prefixo + marca + sufixo + depois) }
-            cursorTexto = alvo.id to (posicao + prefixo.length + marca.length + sufixo.length)
+            val novo = CitacoesInline.inserir(TextoComCitacoes(alvo.texto, alvo.citacoes), posicao, referencia.id, marca)
+            atualizarBloco(alvo.id) { it.copy(texto = novo.texto, citacoes = novo.citacoes) }
+            val prefixo = if (posicao > 0 && !alvo.texto[posicao - 1].isWhitespace()) 1 else 0
+            cursorTexto = alvo.id to (posicao + prefixo + marca.length)
         } else {
-            inserirAposSelecionado(BlocoEditor(tipo = TipoBlocoEditor.PARAGRAFO, texto = marca))
+            inserirAposSelecionado(BlocoEditor(tipo = TipoBlocoEditor.PARAGRAFO, texto = marca,
+                citacoes = listOf(CitacaoInline(referencia.id, 0, marca.length))))
         }
         salvarNoHistorico()
         _painelCitacaoAberto.value = false
@@ -368,7 +399,9 @@ class EditorViewModel : ViewModel() {
             posicao <= 0 || posicao >= original.texto.length) return false
         salvarNoHistorico()
         lista[indice] = original.copy(texto = original.texto.substring(0, posicao))
-        val novo = original.copy(id = UUID.randomUUID().toString(), texto = original.texto.substring(posicao))
+        lista[indice] = lista[indice].copy(citacoes = original.citacoes.filter { it.fim <= posicao })
+        val novo = original.copy(id = UUID.randomUUID().toString(), texto = original.texto.substring(posicao),
+            citacoes = original.citacoes.filter { it.inicio >= posicao }.map { it.copy(inicio = it.inicio - posicao, fim = it.fim - posicao) })
         lista.add(indice + 1, novo)
         _blocos.value = lista
         _blocoSelecionadoId.value = novo.id
@@ -483,6 +516,8 @@ class EditorViewModel : ViewModel() {
         raiz.put("autores", _autores.value)
         raiz.put("resumo", _resumo.value)
         raiz.put("pagina", ConfiguracaoPaginaCodec.escrever(_configuracaoPagina.value))
+        raiz.put("estiloBibliografico", _estiloBibliografico.value.id)
+        raiz.put("referencias", BibliografiaCodec.escrever(_referencias.value))
         val arr = JSONArray()
         _blocos.value.forEach { b ->
             arr.put(JSONObject().apply {
@@ -492,6 +527,7 @@ class EditorViewModel : ViewModel() {
                 put("tabela", JSONArray(b.tabelaLinhas.map { JSONArray(it) }))
                 put("listaNumerada", b.listaNumerada)
                 put("nivelTitulo", b.nivelTitulo)
+                put("citacoes", BibliografiaCodec.escreverCitacoes(b.citacoes))
             })
         }
         raiz.put("blocos", arr)
@@ -500,7 +536,8 @@ class EditorViewModel : ViewModel() {
 
     private class ConteudoLido(
         val titulo: String, val subtitulo: String, val autores: String, val resumo: String,
-        val blocos: List<BlocoEditor>, val pagina: ConfiguracaoPagina
+        val blocos: List<BlocoEditor>, val pagina: ConfiguracaoPagina,
+        val estiloBibliografico: EstiloBibliografico, val referencias: List<ReferenciaAcademica>
     )
 
     private fun lerDoDisco(id: String): ConteudoLido? {
@@ -520,6 +557,7 @@ class EditorViewModel : ViewModel() {
                     alinhamento = runCatching { AlinhamentoTexto.valueOf(o.optString("alinhamento")) }.getOrDefault(AlinhamentoTexto.JUSTIFICADO),
                     estiloId = o.optString("estiloId", "texto"), listaNumerada = o.optBoolean("listaNumerada"),
                     nivelTitulo = o.optInt("nivelTitulo", 1).coerceIn(1, 9),
+                    citacoes = BibliografiaCodec.lerCitacoes(o.optJSONArray("citacoes"), o.optString("texto")),
                     tabelaLinhas = if (tab == null) emptyList() else (0 until tab.length()).map { r ->
                         val l = tab.getJSONArray(r)
                         (0 until l.length()).map { c -> l.getString(c) }
@@ -529,7 +567,9 @@ class EditorViewModel : ViewModel() {
             ConteudoLido(
                 raiz.optString("titulo"), raiz.optString("subtitulo"),
                 raiz.optString("autores"), raiz.optString("resumo"), blocos,
-                ConfiguracaoPaginaCodec.ler(raiz.optJSONObject("pagina"))
+                ConfiguracaoPaginaCodec.ler(raiz.optJSONObject("pagina")),
+                EstiloBibliografico.deId(raiz.optString("estiloBibliografico")),
+                BibliografiaCodec.ler(raiz.optJSONArray("referencias"))
             )
         } catch (_: Exception) {
             null

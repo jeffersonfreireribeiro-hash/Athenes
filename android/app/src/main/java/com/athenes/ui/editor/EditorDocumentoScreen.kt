@@ -88,6 +88,7 @@ fun EditorDocumentoScreen(
     val resumo by viewModel.resumo.collectAsState()
     val tipoDoc by viewModel.tipoDocumento.collectAsState()
     val configPagina by viewModel.configuracaoPagina.collectAsState()
+    val estiloBibliografico by viewModel.estiloBibliografico.collectAsState()
     var mostrarConfigPagina by remember { mutableStateOf(false) }
     val modoRevisao by viewModel.modoRevisao.collectAsState()
     val salvo by viewModel.salvo.collectAsState()
@@ -366,7 +367,12 @@ fun EditorDocumentoScreen(
             exit = slideOutVertically { it } + fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            EditorPainelCitacao(onCitar = viewModel::inserirCitacao, onFechar = viewModel::fecharPainelCitacao)
+            EditorPainelCitacao(
+                onCitar = viewModel::inserirCitacao,
+                estilo = estiloBibliografico,
+                onEstiloAlterado = viewModel::definirEstiloBibliografico,
+                onFechar = viewModel::fecharPainelCitacao
+            )
         }
     }
 
