@@ -157,8 +157,10 @@ class ExportadorTest {
         assertTrue(html.contains("<li>Primeiro item</li><li>Segundo item</li>"))
         assertTrue(html.contains("break-before:page"))
         val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/document.xml"]!!)
-        assertTrue(xml.contains("•  Primeiro item"))
-        assertTrue(xml.contains("•  Segundo item"))
+        assertTrue(xml.contains("<w:numId w:val=\"1\"/>"))
+        assertTrue(xml.contains("Primeiro item"))
+        assertTrue(xml.contains("Segundo item"))
+        assertTrue(entradas(ExportadorDocumento.gerarDocx(doc, imagens)).containsKey("word/numbering.xml"))
         assertTrue(xml.contains("<w:br w:type=\"page\"/>"))
     }
 
@@ -173,8 +175,11 @@ class ExportadorTest {
         assertTrue(html.contains("Quadro 1 — Conceitos"))
         assertTrue(html.contains("<table>"))
         val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/document.xml"]!!)
-        assertTrue(xml.contains("1.  Etapa um"))
-        assertTrue(xml.contains("2.  Etapa dois"))
+        assertTrue(xml.contains("<w:numId w:val=\"2\"/>"))
+        assertTrue(xml.contains("Etapa um"))
+        assertTrue(xml.contains("Etapa dois"))
+        val numeracao = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/numbering.xml"]!!)
+        assertTrue(numeracao.contains("<w:numFmt w:val=\"decimal\"/>"))
         assertTrue(xml.contains("Quadro 1 — Conceitos"))
         assertTrue(xml.contains("<w:tbl>"))
     }

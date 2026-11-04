@@ -57,6 +57,7 @@ object ExportadorDocumento {
         require(doc.pagina.validar()) { "Configuração de página inválida." }
         val midias = mutableListOf<Pair<String, ImagemExport>>() // nome no zip -> imagem
         val corpo = StringBuilder()
+        val temLista = doc.blocos.any { it.tipo == TipoBlocoExport.LISTA }
 
         if (doc.titulo.isNotBlank()) corpo.append(par(doc.titulo, centro = true, negrito = true, tamanho = 32, depois = 120))
         if (doc.subtitulo.isNotBlank()) corpo.append(par(doc.subtitulo, centro = true, italico = true, tamanho = 26, depois = 120))
@@ -99,8 +100,8 @@ object ExportadorDocumento {
                     formula++
                     corpo.append(par("${b.formula}          ($formula)", centro = true, antes = 120, depois = 120))
                 }
-                TipoBlocoExport.LISTA -> b.texto.lines().filter { it.isNotBlank() }.forEachIndexed { indice, item ->
-                    corpo.append(par("${if (b.listaNumerada) "${indice + 1}." else "•"}  ${item.trim()}", recuoEsq = 709, depois = 60))
+                TipoBlocoExport.LISTA -> b.texto.lines().filter { it.isNotBlank() }.forEach { item ->
+                    corpo.append(par(item.trim(), depois = 60, numId = if (b.listaNumerada) 2 else 1))
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> corpo.append("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>")
                 TipoBlocoExport.DIVISOR -> corpo.append(
@@ -116,6 +117,7 @@ object ExportadorDocumento {
             """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"""
         )
+        if (temLista) relsDoc.append("<Relationship Id=\"rIdNumbering\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering\" Target=\"numbering.xml\"/>")
         midias.forEachIndexed { i, (nome, _) ->
             relsDoc.append("<Relationship Id=\"rIdImg${i + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"media/$nome\"/>")
         }
@@ -131,6 +133,7 @@ object ExportadorDocumento {
         }
         tipos.append("<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>")
         tipos.append("<Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/></Types>")
+        if (temLista) tipos.insert(tipos.length - "</Types>".length, "<Override PartName=\"/word/numbering.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml\"/>")
 
         val raiz = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"""
@@ -147,6 +150,7 @@ object ExportadorDocumento {
             entrada("_rels/.rels", raiz.toByteArray())
             entrada("word/document.xml", documento.toByteArray())
             entrada("word/styles.xml", estilos.toByteArray())
+            if (temLista) entrada("word/numbering.xml", numeracaoDocx.toByteArray())
             entrada("word/_rels/document.xml.rels", relsDoc.toString().toByteArray())
             midias.forEach { (nome, img) -> entrada("word/media/$nome", img.bytes) }
         }
@@ -158,6 +162,13 @@ object ExportadorDocumento {
     private const val NS_WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
     private const val NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main"
     private const val NS_PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture"
+
+    private val numeracaoDocx = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="singleLevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="left"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="720"/></w:tabs><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum>
+<w:abstractNum w:abstractNumId="1"><w:multiLevelType w:val="singleLevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:lvlJc w:val="left"/><w:pPr><w:tabs><w:tab w:val="num" w:pos="720"/></w:tabs><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum>
+<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"""
 
     private fun par(
         texto: String,
@@ -173,6 +184,7 @@ object ExportadorDocumento {
         antes: Int = 0,
         depois: Int = 0,
         mantemProximo: Boolean = false,
+        numId: Int? = null,
         estilo: String? = null
     ): String {
         val jc = when {
@@ -188,6 +200,7 @@ object ExportadorDocumento {
         val ppr = buildString {
             estilo?.let { append("<w:pStyle w:val=\"$it\"/>") }
             if (mantemProximo) append("<w:keepNext/>")
+            if (numId != null) append("<w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"$numId\"/></w:numPr>")
             append("<w:spacing w:before=\"$antes\" w:after=\"$depois\" w:line=\"$linha\" w:lineRule=\"auto\"/>")
             if (recuoPrimeira > 0 || recuoEsq > 0) {
                 append("<w:ind w:left=\"$recuoEsq\"${if (recuoPrimeira > 0) " w:firstLine=\"$recuoPrimeira\"" else ""}/>")
