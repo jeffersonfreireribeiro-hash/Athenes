@@ -38,6 +38,8 @@ import com.athenes.core.data.ZoteroApiClient
 import com.athenes.core.data.ZoteroCredentialsStore
 import com.athenes.core.model.AbaInspetorDireito
 import com.athenes.core.model.PaginaPdfInfo
+import com.athenes.core.model.ArtigoEstudoDetalhado
+import com.athenes.core.model.CitacaoMarcada
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.reader.components.*
 import java.io.File
@@ -47,6 +49,7 @@ import java.util.UUID
 fun EstudoArtigosScreen(
     artigoIdInicial: String? = null,
     onVoltarBiblioteca: () -> Unit,
+    onCitarNoDocumento: (ArtigoEstudoDetalhado, CitacaoMarcada) -> Unit = { _, _ -> },
     updateInfo: AppUpdateInfo? = null,
     onOpenUpdateDialog: () -> Unit = {},
     onCheckUpdateManual: () -> Unit = {},
@@ -394,6 +397,7 @@ fun EstudoArtigosScreen(
                         onSelecionarAba = { viewModel.selecionarAbaDireita(it) },
                         onNovaCitacaoClick = { viewModel.abrirCriacaoCitacao() },
                         onRemoverCitacao = { viewModel.removerCitacao(it) },
+                        onInserirCitacaoNoDocumento = { cit -> onCitarNoDocumento(artigoExibido, cit) },
                         onNovaNotaClick = { viewModel.abrirCriacaoNota() },
                         onRemoverNota = { viewModel.removerNota(it) },
                         onImportarNotasZotero = importarNotasZotero,

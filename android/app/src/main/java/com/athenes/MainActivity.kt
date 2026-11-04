@@ -8,6 +8,8 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -26,6 +28,8 @@ import com.athenes.core.data.DocumentoRepository
 import com.athenes.core.data.ArtigoEstudoRepository
 import com.athenes.core.data.ZoteroCredentialsStore
 import com.athenes.core.model.Documento
+import com.athenes.core.model.ArtigoEstudoDetalhado
+import com.athenes.core.model.CitacaoMarcada
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.core.updater.AppUpdater
 import com.athenes.ui.editor.EditorDocumentoScreen
@@ -71,9 +75,19 @@ class MainActivity : ComponentActivity() {
                 var destino by rememberSaveable { mutableStateOf(DestinoPrincipal.DOCUMENTOS) }
                 var documentoSelecionadoId by rememberSaveable { mutableStateOf<String?>(null) }
                 var artigoSelecionadoId by rememberSaveable { mutableStateOf("art_radino_2020") }
+                var citacaoPendenteArtigoId by rememberSaveable { mutableStateOf<String?>(null) }
+                var citacaoPendenteId by rememberSaveable { mutableStateOf<String?>(null) }
+                var escolherDocumentoCitacao by rememberSaveable { mutableStateOf(false) }
+                val documentosAtuais by repository.documentos.collectAsState()
                 var appUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
                 var showUpdateDialog by remember { mutableStateOf(false) }
                 val scope = rememberCoroutineScope()
+
+                fun solicitarDocumentoParaCitacao(artigo: ArtigoEstudoDetalhado, citacao: CitacaoMarcada) {
+                    citacaoPendenteArtigoId = artigo.id
+                    citacaoPendenteId = citacao.id
+                    escolherDocumentoCitacao = true
+                }
 
                 suspend fun checkAppUpdate(forced: Boolean = false) {
                     try {
@@ -163,6 +177,7 @@ class MainActivity : ComponentActivity() {
                                         onOpenUpdateDialog = { showUpdateDialog = true },
                                         onCheckUpdateManual = { scope.launch { checkAppUpdate(forced = true) } },
                                         onVoltarBiblioteca = { destino = DestinoPrincipal.BIBLIOTECA },
+                                        onCitarNoDocumento = ::solicitarDocumentoParaCitacao,
                                         modifier = Modifier.padding(padding)
                                     )
                                     DestinoPrincipal.CONTA -> ContaScreen(Modifier.padding(padding))
@@ -174,6 +189,9 @@ class MainActivity : ComponentActivity() {
                     AppTela.EDITOR_DOCUMENTO -> {
                         EditorDocumentoScreen(
                             documentoInicial = repository.documentos.value.find { it.id == documentoSelecionadoId },
+                            citacaoPendenteArtigoId = citacaoPendenteArtigoId,
+                            citacaoPendenteId = citacaoPendenteId,
+                            onCitacaoPendenteInserida = { citacaoPendenteArtigoId = null; citacaoPendenteId = null },
                             onVoltarBiblioteca = {
                                 destino = DestinoPrincipal.DOCUMENTOS
                                 telaAtual = AppTela.BIBLIOTECA
@@ -190,9 +208,45 @@ class MainActivity : ComponentActivity() {
                             onVoltarBiblioteca = {
                                 destino = DestinoPrincipal.BIBLIOTECA
                                 telaAtual = AppTela.BIBLIOTECA
-                            }
+                            },
+                            onCitarNoDocumento = ::solicitarDocumentoParaCitacao
                         )
                     }
+                }
+
+                if (escolherDocumentoCitacao) {
+                    AlertDialog(
+                        onDismissRequest = { escolherDocumentoCitacao = false; citacaoPendenteId = null; citacaoPendenteArtigoId = null },
+                        title = { Text("Inserir citação em documento") },
+                        text = {
+                            Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                                documentosAtuais.forEach { doc ->
+                                    TextButton(onClick = {
+                                        documentoSelecionadoId = doc.id
+                                        escolherDocumentoCitacao = false
+                                        telaAtual = AppTela.EDITOR_DOCUMENTO
+                                    }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                        Text(doc.titulo, modifier = Modifier.fillMaxWidth())
+                                    }
+                                }
+                                if (documentosAtuais.isEmpty()) Text("Nenhum documento disponível.")
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                documentoSelecionadoId = repository.adicionarDocumento("Novo documento").id
+                                escolherDocumentoCitacao = false
+                                telaAtual = AppTela.EDITOR_DOCUMENTO
+                            }) { Text("Novo documento") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                escolherDocumentoCitacao = false
+                                citacaoPendenteId = null
+                                citacaoPendenteArtigoId = null
+                            }) { Text("Cancelar") }
+                        }
+                    )
                 }
 
                 // Diálogo de Atualização do Aplicativo (Modal com barra de progresso em tempo real)

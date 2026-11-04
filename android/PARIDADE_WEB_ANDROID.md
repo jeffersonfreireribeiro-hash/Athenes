@@ -38,7 +38,7 @@ Inventário de 04/11/2026. A coluna **estado** descreve o código Android atual,
 | PDF real em rolagem contínua, zoom e cache | `src/ui/athenes_estudo_artigos_tela.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: seleção local, renderização sob demanda, zoom de 75% a 200% e cache em `PdfRealViewer.kt`; falta vínculo ao Drive | Estudo |
 | Grifos, seis cores, caneta, linha, borracha, notas, citações e fichamento | `src/ui/athenes_estudo_artigos_anotacoes.js`, `src/ui/athenes_estudo_artigos_painel_direito.js` | Parcial: traços, notas e citações guardados localmente e visíveis na página; falta seleção real de texto do PDF, importação Zotero e paridade completa do fichamento | Estudo |
 | Selecionar PDF, baixar anexo e importar notas do Zotero | `src/core/athenes_zotero_anexos_notas.js`, `src/ui/athenes_estudo_artigos_modais.js` | Parcial: seleção local, escolha e download de PDF importado, e importação de notas/destaques com IDs estáveis; falta paridade completa dos dados importados e vínculo com Drive | Estudo, PDF |
-| Citação direta longa a partir de destaque | `src/core/athenes_citacao.js`, `src/ui/athenes_estudo_artigos_anotacoes.js` | Não | Estudo, Citar |
+| Citação direta longa a partir de destaque | `src/core/athenes_citacao.js`, `src/ui/athenes_estudo_artigos_anotacoes.js` | Parcial: citação marcada no leitor pode ser inserida como bloco de citação longa em documento escolhido, com página e referência vinculada; falta seleção textual fiel do PDF e conferência da página da publicação | Estudo, Citar |
 | Grafo de obras, autores, temas e anos | `src/core/athenes_conexoes.js`, `src/ui/athenes_painel_conexoes.js` | Não | Biblioteca, Conexões |
 
 ## Sequência de implementação

@@ -14,6 +14,7 @@ import com.athenes.core.citacao.EstiloBibliografico
 import com.athenes.core.citacao.ReferenciaAcademica
 import com.athenes.core.citacao.TextoComCitacoes
 import com.athenes.core.model.ArtigoEstudoDetalhado
+import com.athenes.core.model.CitacaoMarcada
 import com.athenes.core.model.Documento
 import com.athenes.core.model.ConfiguracaoPagina
 import com.athenes.core.model.ConfiguracaoPaginaCodec
@@ -369,6 +370,22 @@ class EditorViewModel : ViewModel() {
         }
         salvarNoHistorico()
         _painelCitacaoAberto.value = false
+    }
+
+    /** Transfere um destaque do leitor para um bloco de citação longa com referência vinculada. */
+    fun inserirCitacaoLonga(artigo: ArtigoEstudoDetalhado, destaque: CitacaoMarcada) {
+        val referencia = ReferenciaAcademica.doArtigo(artigo)
+        val indice = _referencias.value.indexOfFirst { it.id == referencia.id }.takeIf { it >= 0 }?.plus(1)
+            ?: (_referencias.value.size + 1)
+        val citacaoLonga = CitacoesInline.deDestaque(destaque.texto, destaque.pagina, referencia, _estiloBibliografico.value, indice)
+        salvarNoHistorico()
+        if (_referencias.value.none { it.id == referencia.id }) _referencias.value = _referencias.value + referencia
+        inserirAposSelecionado(BlocoEditor(tipo = TipoBlocoEditor.CITACAO, texto = citacaoLonga.texto,
+            citacoes = citacaoLonga.citacoes))
+        if (_blocos.value.none { it.tipo == TipoBlocoEditor.REFERENCIAS })
+            _blocos.value = _blocos.value + BlocoEditor(tipo = TipoBlocoEditor.REFERENCIAS)
+        salvarNoHistorico()
+        marcarAlterado()
     }
 
     private fun inserirAposSelecionado(novo: BlocoEditor) {

@@ -37,4 +37,11 @@ class CitacoesInlineTest {
         assertEquals(citacoes, BibliografiaCodec.lerCitacoes(BibliografiaCodec.escreverCitacoes(citacoes), "Texto"))
         assertTrue(BibliografiaCodec.lerCitacoes(BibliografiaCodec.escreverCitacoes(citacoes), "Curto".dropLast(1)).isEmpty())
     }
+
+    @Test fun `destaque vira citacao longa com pagina e vinculo`() {
+        val bloco = CitacoesInline.deDestaque("  Trecho selecionado  ", 12, ref, EstiloBibliografico.ABNT, 1)
+        assertEquals("Trecho selecionado\n(SILVA, 2025, p. 12)", bloco.texto)
+        assertEquals("(SILVA, 2025, p. 12)", bloco.texto.substring(bloco.citacoes.single().inicio, bloco.citacoes.single().fim))
+        assertEquals("obra", bloco.citacoes.single().refId)
+    }
 }

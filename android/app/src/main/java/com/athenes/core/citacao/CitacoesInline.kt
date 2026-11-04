@@ -12,6 +12,15 @@ data class CitacaoInline(
 data class TextoComCitacoes(val texto: String, val citacoes: List<CitacaoInline>)
 
 object CitacoesInline {
+    fun deDestaque(trecho: String, pagina: Int, ref: ReferenciaAcademica, estilo: EstiloBibliografico, indice: Int): TextoComCitacoes {
+        val limpo = trecho.trim()
+        require(limpo.isNotEmpty()) { "O destaque não contém texto." }
+        val paginaTexto = pagina.takeIf { it > 0 }?.toString().orEmpty()
+        val marca = Bibliografia.citacao(ref, estilo, indice, paginaTexto)
+        val texto = "$limpo\n$marca"
+        return TextoComCitacoes(texto, listOf(CitacaoInline(ref.id, limpo.length + 1, texto.length, paginaTexto)))
+    }
+
     /** Se a edição tocar o texto de uma citação, o vínculo é retirado; demais intervalos acompanham o deslocamento. */
     fun atualizarDepoisDaEdicao(antigo: String, novo: String, citacoes: List<CitacaoInline>): List<CitacaoInline> {
         if (antigo == novo) return citacoes

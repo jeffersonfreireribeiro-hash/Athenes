@@ -57,6 +57,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import android.widget.Toast
 import com.athenes.core.data.ImagemRepositorio
+import com.athenes.core.data.ArtigoEstudoRepository
 import com.athenes.core.export.ExportadorDocumento
 import com.athenes.core.export.ResolvedorImagem
 import com.athenes.core.citacao.Bibliografia
@@ -74,6 +75,9 @@ private const val LARGURA_COMPACTA_DP = 600
 fun EditorDocumentoScreen(
     documentoInicial: Documento?,
     onVoltarBiblioteca: () -> Unit,
+    citacaoPendenteArtigoId: String? = null,
+    citacaoPendenteId: String? = null,
+    onCitacaoPendenteInserida: () -> Unit = {},
     viewModel: EditorViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
@@ -83,6 +87,20 @@ fun EditorDocumentoScreen(
     // Idempotente por id: carrega antes do primeiro frame (arquivo pequeno), sem piscar a folha vazia.
     remember(documentoInicial?.id) {
         if (documentoInicial != null) viewModel.carregarDocumento(documentoInicial, context.filesDir)
+    }
+
+    LaunchedEffect(documentoInicial?.id, citacaoPendenteArtigoId, citacaoPendenteId) {
+        if (documentoInicial != null && citacaoPendenteArtigoId != null && citacaoPendenteId != null) {
+            val artigo = ArtigoEstudoRepository.compartilhado.artigos.value.find { it.id == citacaoPendenteArtigoId }
+            val destaque = artigo?.citacoes?.find { it.id == citacaoPendenteId }
+            if (artigo != null && destaque != null) {
+                runCatching { viewModel.inserirCitacaoLonga(artigo, destaque) }
+                    .onFailure { Toast.makeText(context, it.message ?: "Não foi possível inserir a citação.", Toast.LENGTH_LONG).show() }
+            } else {
+                Toast.makeText(context, "Citação não encontrada na biblioteca.", Toast.LENGTH_LONG).show()
+            }
+            onCitacaoPendenteInserida()
+        }
     }
 
     val titulo by viewModel.titulo.collectAsState()

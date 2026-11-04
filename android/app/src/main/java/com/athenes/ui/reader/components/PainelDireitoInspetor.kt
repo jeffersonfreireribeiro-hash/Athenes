@@ -44,6 +44,7 @@ fun PainelDireitoInspetor(
     onSelecionarAba: (AbaInspetorDireito) -> Unit,
     onNovaCitacaoClick: () -> Unit,
     onRemoverCitacao: (String) -> Unit,
+    onInserirCitacaoNoDocumento: (CitacaoMarcada) -> Unit = {},
     onNovaNotaClick: () -> Unit,
     onRemoverNota: (String) -> Unit,
     onImportarNotasZotero: () -> Unit,
@@ -128,6 +129,7 @@ fun PainelDireitoInspetor(
                         citacoes = artigo.citacoes,
                         onNovaCitacaoClick = onNovaCitacaoClick,
                         onRemoverCitacao = onRemoverCitacao,
+                        onInserirNoDocumento = onInserirCitacaoNoDocumento,
                         context = context
                     )
                     AbaInspetorDireito.INFORMACOES_ZOTERO -> {
@@ -400,6 +402,7 @@ private fun ConteudoAbaCitacoes(
     citacoes: List<CitacaoMarcada>,
     onNovaCitacaoClick: () -> Unit,
     onRemoverCitacao: (String) -> Unit,
+    onInserirNoDocumento: (CitacaoMarcada) -> Unit,
     context: Context
 ) {
     LazyColumn(
@@ -466,7 +469,8 @@ private fun ConteudoAbaCitacoes(
                         clipboard.setPrimaryClip(clip)
                         Toast.makeText(context, "Citação ABNT copiada!", Toast.LENGTH_SHORT).show()
                     },
-                    onRemover = { onRemoverCitacao(cit.id) }
+                    onRemover = { onRemoverCitacao(cit.id) },
+                    onInserirNoDocumento = { onInserirNoDocumento(cit) }
                 )
             }
         }
@@ -477,7 +481,8 @@ private fun ConteudoAbaCitacoes(
 private fun CardCitacaoItem(
     citacao: CitacaoMarcada,
     onCopiarAbnt: () -> Unit,
-    onRemover: () -> Unit
+    onRemover: () -> Unit,
+    onInserirNoDocumento: () -> Unit
 ) {
     Surface(
         color = Color.White,
@@ -566,6 +571,11 @@ private fun CardCitacaoItem(
                     color = AthenesPrimary
                 )
             )
+            TextButton(onClick = onInserirNoDocumento, modifier = Modifier.heightIn(min = 48.dp)) {
+                Icon(Icons.Rounded.FormatQuote, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Inserir em documento")
+            }
 
             if (citacao.comentario.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
