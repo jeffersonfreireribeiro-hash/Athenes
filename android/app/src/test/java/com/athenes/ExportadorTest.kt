@@ -183,4 +183,22 @@ class ExportadorTest {
         assertTrue(xml.contains("Quadro 1 — Conceitos"))
         assertTrue(xml.contains("<w:tbl>"))
     }
+
+    @Test
+    fun `sumario acompanha os titulos no html e docx`() {
+        val doc = documento().copy(blocos = listOf(
+            BlocoExport(TipoBlocoExport.SUMARIO),
+            BlocoExport(TipoBlocoExport.TITULO, titulo = "Introdução"),
+            BlocoExport(TipoBlocoExport.PARAGRAFO, texto = "Texto"),
+            BlocoExport(TipoBlocoExport.TITULO, titulo = "Método")
+        ))
+        val html = ExportadorDocumento.gerarHtml(doc, imagens)
+        assertTrue(html.contains("href=\"#secao-1\">Introdução</a>"))
+        assertTrue(html.contains("href=\"#secao-2\">Método</a>"))
+        assertTrue(html.contains("id=\"secao-2\""))
+        val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/document.xml"]!!)
+        assertTrue(xml.contains("SUMÁRIO"))
+        assertTrue(xml.contains("1  Introdução"))
+        assertTrue(xml.contains("2  Método"))
+    }
 }

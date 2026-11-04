@@ -20,7 +20,7 @@ data class BlocoExport(
     val listaNumerada: Boolean = false
 )
 
-enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, QUEBRA_PAGINA, DIVISOR }
+enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, SUMARIO, QUEBRA_PAGINA, DIVISOR }
 enum class AlinhamentoExport {
     ESQUERDA, CENTRO, DIREITA, JUSTIFICADO,
     JUSTIFICADO_ESQUERDA, JUSTIFICADO_CENTRO, JUSTIFICADO_DIREITA
@@ -72,8 +72,10 @@ object ExportadorDocumento {
         for (b in doc.blocos) {
             when (b.tipo) {
                 TipoBlocoExport.TITULO -> {
-                    secao++
-                    corpo.append(par("$secao  ${b.titulo.uppercase()}", negrito = true, tamanho = 24, antes = 240, depois = 120, estilo = "Heading1"))
+                    if (b.titulo.isNotBlank()) {
+                        secao++
+                        corpo.append(par("$secao  ${b.titulo.uppercase()}", negrito = true, tamanho = 24, antes = 240, depois = 120, estilo = "Heading1"))
+                    }
                 }
                 TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) {
                     corpo.append(par(b.texto, alinhamento = b.alinhamento, recuoPrimeira = 709))
@@ -102,6 +104,11 @@ object ExportadorDocumento {
                 }
                 TipoBlocoExport.LISTA -> b.texto.lines().filter { it.isNotBlank() }.forEach { item ->
                     corpo.append(par(item.trim(), depois = 60, numId = if (b.listaNumerada) 2 else 1))
+                }
+                TipoBlocoExport.SUMARIO -> {
+                    corpo.append(par("SUMÁRIO", negrito = true, antes = 120, depois = 120))
+                    doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
+                        .forEachIndexed { indice, titulo -> corpo.append(par("${indice + 1}  ${titulo.titulo}", depois = 60)) }
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> corpo.append("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>")
                 TipoBlocoExport.DIVISOR -> corpo.append(
@@ -305,13 +312,19 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                 AlinhamentoExport.JUSTIFICADO -> "auto"
             }
             when (b.tipo) {
-                TipoBlocoExport.TITULO -> { secao++; sb.append("<h2>$secao&nbsp; ${html(b.titulo)}</h2>") }
+                TipoBlocoExport.TITULO -> if (b.titulo.isNotBlank()) { secao++; sb.append("<h2 id=\"secao-$secao\">$secao&nbsp; ${html(b.titulo)}</h2>") }
                 TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha;text-align-last:$ultimaLinha\">${html(b.texto)}</p>")
                 TipoBlocoExport.LISTA -> if (b.texto.isNotBlank()) {
                     val tag = if (b.listaNumerada) "ol" else "ul"
                     sb.append("<$tag>")
                     b.texto.lines().filter { it.isNotBlank() }.forEach { sb.append("<li>${html(it.trim())}</li>") }
                     sb.append("</$tag>")
+                }
+                TipoBlocoExport.SUMARIO -> {
+                    sb.append("<nav aria-label=\"Sumário\"><h2>SUMÁRIO</h2><ol>")
+                    doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
+                        .forEachIndexed { indice, titulo -> sb.append("<li><a href=\"#secao-${indice + 1}\">${html(titulo.titulo)}</a></li>") }
+                    sb.append("</ol></nav>")
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> sb.append("<div style=\"break-before:page\"></div>")
                 TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${html(b.texto)}</div>")

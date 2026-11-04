@@ -49,6 +49,7 @@ enum class TipoBlocoEditor(val rotulo: String, val desc: String) {
     QUADRO("Quadro", "Conteúdo conceitual em células"),
     FORMULA("Fórmula", "Expressão matemática numerada"),
     LISTA("Lista", "Itens em lista"),
+    SUMARIO("Sumário", "Títulos gerados automaticamente"),
     QUEBRA_PAGINA("Quebra de página", "Inicia uma nova página na exportação"),
     DIVISOR("Divisor", "Linha divisória ou espaçamento")
 }
@@ -285,6 +286,7 @@ class EditorViewModel : ViewModel() {
             )
             TipoBlocoEditor.FORMULA -> BlocoEditor(tipo = tipo, formulaLatex = "x = y", alinhamento = AlinhamentoTexto.CENTRO)
             TipoBlocoEditor.LISTA -> BlocoEditor(tipo = tipo, texto = "Primeiro item\nSegundo item", alinhamento = AlinhamentoTexto.ESQUERDA)
+            TipoBlocoEditor.SUMARIO -> BlocoEditor(tipo = tipo, alinhamento = AlinhamentoTexto.ESQUERDA)
             TipoBlocoEditor.QUEBRA_PAGINA -> BlocoEditor(tipo = tipo)
             TipoBlocoEditor.DIVISOR -> BlocoEditor(tipo = tipo)
         }

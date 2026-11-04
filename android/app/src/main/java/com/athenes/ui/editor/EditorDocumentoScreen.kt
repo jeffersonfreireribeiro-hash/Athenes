@@ -168,6 +168,7 @@ fun EditorDocumentoScreen(
     val editavel = modoRevisao != "leitura"
     val blocoSelecionado = remember(blocos, blocoSelecionadoId) { blocos.find { it.id == blocoSelecionadoId } }
     val estrutura = remember(blocos) { viewModel.montarEstrutura(blocos) }
+    val titulosSumario = remember(blocos) { blocos.filter { it.tipo == TipoBlocoEditor.TITULO && it.titulo.isNotBlank() }.map { it.titulo } }
     val algumPainelAberto = painelEstruturaAberto || painelInspetorAberto
 
     fun sair() {
@@ -245,6 +246,7 @@ fun EditorDocumentoScreen(
                     editavel = editavel,
                     compacto = compacto,
                     numeroFormula = numeroFormula,
+                    titulosSumario = titulosSumario,
                     onEscolherImagem = escolherImagem,
                     vm = viewModel
                 )
@@ -481,6 +483,7 @@ private fun ItemBlocoFolha(
     editavel: Boolean,
     compacto: Boolean,
     numeroFormula: Int,
+    titulosSumario: List<String>,
     onEscolherImagem: (String) -> Unit,
     vm: EditorViewModel
 ) {
@@ -538,6 +541,14 @@ private fun ItemBlocoFolha(
                     }
                 }
                 if (editavel) TextButton(onClick = { vm.atualizarTextoBloco(bloco.id, bloco.texto + "\n") }) { Text("Adicionar item") }
+            }
+
+            TipoBlocoEditor.SUMARIO -> Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                Text("SUMÁRIO", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextoCor)
+                titulosSumario.forEachIndexed { indice, titulo ->
+                    Text("${indice + 1}  $titulo", fontSize = 12.sp, color = TextoCor, modifier = Modifier.padding(top = 4.dp))
+                }
+                if (titulosSumario.isEmpty()) Text("Adicione títulos para gerar o sumário.", fontSize = 12.sp, color = AthenesTextMuted)
             }
 
             TipoBlocoEditor.QUEBRA_PAGINA -> Column {
