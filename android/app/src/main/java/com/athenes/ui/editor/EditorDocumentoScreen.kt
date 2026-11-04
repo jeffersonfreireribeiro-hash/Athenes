@@ -51,6 +51,7 @@ import com.athenes.ui.editor.components.EditorPainelInspetor
 import com.athenes.ui.editor.components.EditorPainelCitacao
 import com.athenes.ui.editor.components.EditorTopBar
 import com.athenes.ui.editor.components.DialogConfiguracaoPagina
+import com.athenes.ui.editor.components.GrafoConexoesDialog
 import com.athenes.ui.theme.AthenesPrimary
 import com.athenes.ui.theme.AthenesTextMuted
 import androidx.compose.foundation.Image
@@ -112,6 +113,7 @@ fun EditorDocumentoScreen(
     val estiloBibliografico by viewModel.estiloBibliografico.collectAsState()
     val referencias by viewModel.referencias.collectAsState()
     var mostrarConfigPagina by remember { mutableStateOf(false) }
+    var mostrarConexoes by remember { mutableStateOf(false) }
     val modoRevisao by viewModel.modoRevisao.collectAsState()
     val salvo by viewModel.salvo.collectAsState()
     val blocos by viewModel.blocos.collectAsState()
@@ -275,6 +277,7 @@ fun EditorDocumentoScreen(
                     titulosIlustracoes = titulosIlustracoes,
                     referencias = referencias,
                     estiloBibliografico = estiloBibliografico,
+                    onVerConexoes = { mostrarConexoes = true },
                     onEscolherImagem = escolherImagem,
                     vm = viewModel
                 )
@@ -407,6 +410,7 @@ fun EditorDocumentoScreen(
             onFechar = { mostrarConfigPagina = false }
         )
     }
+    if (mostrarConexoes) GrafoConexoesDialog(referencias = referencias, onFechar = { mostrarConexoes = false })
 
 
 }
@@ -528,6 +532,7 @@ private fun ItemBlocoFolha(
     titulosIlustracoes: List<String>,
     referencias: List<ReferenciaAcademica>,
     estiloBibliografico: EstiloBibliografico,
+    onVerConexoes: () -> Unit,
     onEscolherImagem: (String) -> Unit,
     vm: EditorViewModel
 ) {
@@ -615,6 +620,7 @@ private fun ItemBlocoFolha(
 
             TipoBlocoEditor.REFERENCIAS -> Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Text("REFERÊNCIAS", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextoCor)
+                TextButton(onClick = onVerConexoes, modifier = Modifier.heightIn(min = 48.dp)) { Text("Ver conexões") }
                 Bibliografia.ordenar(referencias, estiloBibliografico).forEachIndexed { indice, ref ->
                     Text(Bibliografia.formatar(ref, estiloBibliografico, indice + 1), fontSize = 12.sp,
                         color = TextoCor, modifier = Modifier.padding(top = 8.dp))
