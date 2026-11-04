@@ -38,6 +38,7 @@ fun EditorBarraBlocos(
     onAdicionarBloco: (TipoBlocoEditor) -> Unit,
     onCitar: () -> Unit,
     onReferenciaCruzada: () -> Unit,
+    onNotaRodape: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -88,6 +89,9 @@ fun EditorBarraBlocos(
                 }
                 BotaoBarra(onReferenciaCruzada, "Inserir referência cruzada") {
                     Icon(Icons.Rounded.Link, null, tint = CinzaIcone)
+                }
+                BotaoBarra(onNotaRodape, "Notas de rodapé") {
+                    Icon(Icons.Rounded.Superscript, null, tint = CinzaIcone)
                 }
             }
         }

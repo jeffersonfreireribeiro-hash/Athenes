@@ -44,8 +44,11 @@ data class DocumentoExport(
     val blocos: List<BlocoExport>,
     val pagina: ConfiguracaoPagina = ConfiguracaoPagina(),
     val estiloBibliografico: EstiloBibliografico = EstiloBibliografico.ABNT,
-    val referencias: List<ReferenciaAcademica> = emptyList()
+    val referencias: List<ReferenciaAcademica> = emptyList(),
+    val notasRodape: List<NotaRodapeExport> = emptyList()
 )
+
+data class NotaRodapeExport(val id: String, val texto: String)
 
 /** Imagem já resolvida para exportação. */
 class ImagemExport(val bytes: ByteArray, val extensao: String, val largura: Int, val altura: Int) {
@@ -64,6 +67,19 @@ fun interface ResolvedorImagem {
 object ExportadorDocumento {
 
     private val referenciaCruzada = Regex("\\[ref:(figura|tabela|quadro|formula):([a-zA-Z0-9_-]+)]", RegexOption.IGNORE_CASE)
+    private val referenciaNota = Regex("\\[nota:([a-zA-Z0-9_-]+)]")
+
+    private fun notasUsadas(doc: DocumentoExport): Map<String, Pair<Int, String>> {
+        val notas = doc.notasRodape.associateBy { it.id }
+        return buildMap {
+            doc.blocos.filter { it.tipo == TipoBlocoExport.PARAGRAFO || it.tipo == TipoBlocoExport.CITACAO }.forEach { bloco ->
+                referenciaNota.findAll(bloco.texto).forEach { marca ->
+                    val id = marca.groupValues[1]
+                    notas[id]?.let { nota -> if (id !in this) put(id, size + 1 to nota.texto) }
+                }
+            }
+        }
+    }
 
     private fun ancoraBloco(id: String) = "b_" + id.replace(Regex("[^a-zA-Z0-9_]"), "_").take(36)
 
@@ -85,14 +101,21 @@ object ExportadorDocumento {
         }
     }
 
-    private fun textoComReferenciasHtml(texto: String, rotulos: Map<String, String>): String = buildString {
+    private fun textoComReferenciasHtml(texto: String, rotulos: Map<String, String>, notas: Map<String, Pair<Int, String>>): String = buildString {
+        val marcas = (referenciaCruzada.findAll(texto) + referenciaNota.findAll(texto)).sortedBy { it.range.first }
         var anterior = 0
-        referenciaCruzada.findAll(texto).forEach { match ->
+        marcas.forEach { match ->
             append(html(texto.substring(anterior, match.range.first)))
-            val id = match.groupValues[2]
-            val rotulo = rotulos[id]
-            if (rotulo == null) append(html(match.value))
-            else append("<a href=\"#${ancoraBloco(id)}\">${html(rotulo)}</a>")
+            if (match.value.startsWith("[nota:")) {
+                val nota = notas[match.groupValues[1]]
+                if (nota == null) append(html(match.value))
+                else append("<sup><a href=\"#nota-${nota.first}\">${nota.first}</a></sup>")
+            } else {
+                val id = match.groupValues[2]
+                val rotulo = rotulos[id]
+                if (rotulo == null) append(html(match.value))
+                else append("<a href=\"#${ancoraBloco(id)}\">${html(rotulo)}</a>")
+            }
             anterior = match.range.last + 1
         }
         append(html(texto.substring(anterior)))
@@ -109,6 +132,7 @@ object ExportadorDocumento {
         val numerosTitulos = NumeracaoSecoes.calcular(titulos.map { it.nivelTitulo })
         val referenciasOrdenadas = Bibliografia.ordenar(doc.referencias, doc.estiloBibliografico)
         val rotulos = rotulos(doc)
+        val notas = notasUsadas(doc)
 
         if (doc.titulo.isNotBlank()) corpo.append(par(doc.titulo, centro = true, negrito = true, tamanho = 32, depois = 120))
         if (doc.subtitulo.isNotBlank()) corpo.append(par(doc.subtitulo, centro = true, italico = true, tamanho = 26, depois = 120))
@@ -133,10 +157,10 @@ object ExportadorDocumento {
                     }
                 }
                 TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) {
-                    corpo.append(par(b.texto, alinhamento = b.alinhamento, recuoPrimeira = 709, citacoes = b.citacoes, rotulos = rotulos))
+                    corpo.append(par(b.texto, alinhamento = b.alinhamento, recuoPrimeira = 709, citacoes = b.citacoes, rotulos = rotulos, notas = notas))
                 }
                 TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) {
-                    corpo.append(par(b.texto, justificado = true, simples = true, tamanho = 20, recuoEsq = 2268, antes = 120, depois = 120, citacoes = b.citacoes, rotulos = rotulos))
+                    corpo.append(par(b.texto, justificado = true, simples = true, tamanho = 20, recuoEsq = 2268, antes = 120, depois = 120, citacoes = b.citacoes, rotulos = rotulos, notas = notas))
                 }
                 TipoBlocoExport.FIGURA -> {
                     if (b.legenda.isNotBlank()) corpo.append(par(b.legenda, centro = true, negrito = true, tamanho = 20, simples = true, antes = 120, depois = 60, mantemProximo = true))
@@ -196,6 +220,7 @@ object ExportadorDocumento {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"""
         )
         if (temLista) relsDoc.append("<Relationship Id=\"rIdNumbering\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering\" Target=\"numbering.xml\"/>")
+        if (notas.isNotEmpty()) relsDoc.append("<Relationship Id=\"rIdFootnotes\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes\" Target=\"footnotes.xml\"/>")
         midias.forEachIndexed { i, (nome, _) ->
             relsDoc.append("<Relationship Id=\"rIdImg${i + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"media/$nome\"/>")
         }
@@ -212,6 +237,7 @@ object ExportadorDocumento {
         tipos.append("<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>")
         tipos.append("<Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/></Types>")
         if (temLista) tipos.insert(tipos.length - "</Types>".length, "<Override PartName=\"/word/numbering.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml\"/>")
+        if (notas.isNotEmpty()) tipos.insert(tipos.length - "</Types>".length, "<Override PartName=\"/word/footnotes.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml\"/>")
 
         val raiz = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"""
@@ -233,6 +259,18 @@ object ExportadorDocumento {
             entrada("word/document.xml", documento.toByteArray())
             entrada("word/styles.xml", estilos.toByteArray())
             if (temLista) entrada("word/numbering.xml", numeracaoDocx.toByteArray())
+            if (notas.isNotEmpty()) {
+                val rodape = buildString {
+                    append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:footnotes xmlns:w=\"$NS_W\">")
+                    append("<w:footnote w:type=\"separator\" w:id=\"-1\"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>")
+                    append("<w:footnote w:type=\"continuationSeparator\" w:id=\"0\"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>")
+                    notas.values.forEach { (numero, conteudo) ->
+                        append("<w:footnote w:id=\"$numero\"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t xml:space=\"preserve\"> ${xml(conteudo)}</w:t></w:r></w:p></w:footnote>")
+                    }
+                    append("</w:footnotes>")
+                }
+                entrada("word/footnotes.xml", rodape.toByteArray())
+            }
             entrada("word/_rels/document.xml.rels", relsDoc.toString().toByteArray())
             midias.forEach { (nome, img) -> entrada("word/media/$nome", img.bytes) }
         }
@@ -270,6 +308,7 @@ object ExportadorDocumento {
         estilo: String? = null,
         citacoes: List<CitacaoInline> = emptyList(),
         rotulos: Map<String, String> = emptyMap(),
+        notas: Map<String, Pair<Int, String>> = emptyMap(),
         marcador: String? = null,
         marcadorId: Int = 0
     ): String {
@@ -303,13 +342,20 @@ object ExportadorDocumento {
             return "<w:r><w:rPr>$rpr</w:rPr>$partes</w:r>"
         }
         fun runsComReferencias(trecho: String): String = buildString {
+            val marcas = (referenciaCruzada.findAll(trecho) + referenciaNota.findAll(trecho)).sortedBy { it.range.first }
             var anterior = 0
-            referenciaCruzada.findAll(trecho).forEach { match ->
+            marcas.forEach { match ->
                 if (match.range.first > anterior) append(run(trecho.substring(anterior, match.range.first)))
-                val id = match.groupValues[2]
-                val rotulo = rotulos[id]
-                if (rotulo == null) append(run(match.value))
-                else append("<w:hyperlink w:anchor=\"${ancoraBloco(id)}\" w:history=\"1\">${run(rotulo)}</w:hyperlink>")
+                if (match.value.startsWith("[nota:")) {
+                    val nota = notas[match.groupValues[1]]
+                    if (nota == null) append(run(match.value))
+                    else append("<w:r><w:rPr><w:vertAlign w:val=\"superscript\"/></w:rPr><w:footnoteReference w:id=\"${nota.first}\"/></w:r>")
+                } else {
+                    val id = match.groupValues[2]
+                    val rotulo = rotulos[id]
+                    if (rotulo == null) append(run(match.value))
+                    else append("<w:hyperlink w:anchor=\"${ancoraBloco(id)}\" w:history=\"1\">${run(rotulo)}</w:hyperlink>")
+                }
                 anterior = match.range.last + 1
             }
             if (anterior < trecho.length || isEmpty()) append(run(trecho.substring(anterior)))
@@ -401,6 +447,7 @@ object ExportadorDocumento {
         val numerosTitulos = NumeracaoSecoes.calcular(titulos.map { it.nivelTitulo })
         val referenciasOrdenadas = Bibliografia.ordenar(doc.referencias, doc.estiloBibliografico)
         val rotulos = rotulos(doc)
+        val notas = notasUsadas(doc)
         fun mm(valor: Double): String = java.lang.String.format(java.util.Locale.US, "%.2f", valor)
         val sb = StringBuilder()
         sb.append(
@@ -462,7 +509,7 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                     val nivelHtml = (b.nivelTitulo + 1).coerceAtMost(6)
                     sb.append("<h$nivelHtml id=\"secao-$secao\">${numerosTitulos[secao - 1]}&nbsp; ${html(b.titulo)}</h$nivelHtml>")
                 }
-                TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha;text-align-last:$ultimaLinha\">${htmlComCitacoes(b.texto, b.citacoes, rotulos)}</p>")
+                TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha;text-align-last:$ultimaLinha\">${htmlComCitacoes(b.texto, b.citacoes, rotulos, notas)}</p>")
                 TipoBlocoExport.LISTA -> if (b.texto.isNotBlank()) {
                     val tag = if (b.listaNumerada) "ol" else "ul"
                     sb.append("<$tag>")
@@ -498,7 +545,7 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> sb.append("<div style=\"break-before:page\"></div>")
                 TipoBlocoExport.ESPACO -> sb.append("<div aria-hidden=\"true\" style=\"height:${b.alturaPt.coerceIn(1.0, 720.0)}pt\"></div>")
-                TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${htmlComCitacoes(b.texto, b.citacoes, rotulos)}</div>")
+                TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${htmlComCitacoes(b.texto, b.citacoes, rotulos, notas)}</div>")
                 TipoBlocoExport.FIGURA -> {
                     sb.append("<figure>")
                     if (b.legenda.isNotBlank()) sb.append("<figcaption>${html(b.legenda)}</figcaption>")
@@ -525,6 +572,11 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                 TipoBlocoExport.DIVISOR -> sb.append("<hr>")
             }
         }
+        if (notas.isNotEmpty()) {
+            sb.append("<section aria-label=\"Notas de rodapé\" style=\"font-size:10pt;border-top:1px solid #64748B;margin-top:12pt\">")
+            notas.values.forEach { (numero, conteudo) -> sb.append("<p id=\"nota-$numero\"><sup>$numero</sup> ${html(conteudo)}</p>") }
+            sb.append("</section>")
+        }
         sb.append("</body></html>")
         return sb.toString()
     }
@@ -539,16 +591,16 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
     private fun html(s: String): String = s
         .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("\n", "<br>")
 
-    private fun htmlComCitacoes(texto: String, citacoes: List<CitacaoInline>, rotulos: Map<String, String>): String = buildString {
+    private fun htmlComCitacoes(texto: String, citacoes: List<CitacaoInline>, rotulos: Map<String, String>, notas: Map<String, Pair<Int, String>>): String = buildString {
         var anterior = 0
         for (c in citacoes.sortedBy { it.inicio }) {
             if (c.inicio < anterior || c.fim > texto.length || c.fim <= c.inicio) continue
-            append(textoComReferenciasHtml(texto.substring(anterior, c.inicio), rotulos))
+            append(textoComReferenciasHtml(texto.substring(anterior, c.inicio), rotulos, notas))
             append("<a href=\"#${Bibliografia.ancora(c.refId)}\" style=\"color:inherit;text-decoration:none\">")
             append(html(texto.substring(c.inicio, c.fim)))
             append("</a>")
             anterior = c.fim
         }
-        append(textoComReferenciasHtml(texto.substring(anterior), rotulos))
+        append(textoComReferenciasHtml(texto.substring(anterior), rotulos, notas))
     }
 }

@@ -9,6 +9,7 @@ import com.athenes.core.export.BlocoExport
 import com.athenes.core.export.DocumentoExport
 import com.athenes.core.export.ExportadorDocumento
 import com.athenes.core.export.ImagemExport
+import com.athenes.core.export.NotaRodapeExport
 import com.athenes.core.export.ResolvedorImagem
 import com.athenes.core.export.TipoBlocoExport
 import com.athenes.core.citacao.AutorReferencia
@@ -25,6 +26,29 @@ import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
 class ExportadorTest {
+
+    @Test fun `notas seguem ordem dos marcadores e viram notas nativas no Word`() {
+        val doc = DocumentoExport("Teste", "", "", "", listOf(
+            BlocoExport(TipoBlocoExport.PARAGRAFO, texto = "Texto[nota:b] e outro[nota:a]."),
+            BlocoExport(TipoBlocoExport.PARAGRAFO, texto = "Repetida[nota:b].")
+        ), notasRodape = listOf(NotaRodapeExport("a", "Nota A & final"), NotaRodapeExport("b", "Nota B"), NotaRodapeExport("orfa", "Não aparece")))
+        val html = ExportadorDocumento.gerarHtml(doc, ResolvedorImagem { null })
+        assertTrue(html.contains("href=\"#nota-1\">1</a>"))
+        assertTrue(html.contains("href=\"#nota-2\">2</a>"))
+        assertTrue(html.indexOf("Nota B") < html.indexOf("Nota A &amp; final"))
+        assertTrue(!html.contains("Não aparece"))
+        val partes = entradas(ExportadorDocumento.gerarDocx(doc, ResolvedorImagem { null }))
+        val corpo = String(partes["word/document.xml"]!!)
+        val notas = String(partes["word/footnotes.xml"]!!)
+        val rels = String(partes["word/_rels/document.xml.rels"]!!)
+        DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(ByteArrayInputStream(corpo.toByteArray()))
+        DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(ByteArrayInputStream(notas.toByteArray()))
+        assertTrue(corpo.contains("<w:footnoteReference w:id=\"1\"/>"))
+        assertTrue(notas.contains("<w:footnote w:id=\"2\">"))
+        assertTrue(notas.contains("Nota A &amp; final"))
+        assertTrue(rels.contains("Target=\"footnotes.xml\""))
+        assertTrue(!notas.contains("Não aparece"))
+    }
 
     @Test fun `referencia cruzada acompanha numeracao e aponta para o bloco em PDF e DOCX`() {
         val doc = DocumentoExport("Teste", "", "", "", listOf(

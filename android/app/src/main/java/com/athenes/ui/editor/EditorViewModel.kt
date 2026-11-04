@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.athenes.core.export.AlinhamentoExport
 import com.athenes.core.export.BlocoExport
 import com.athenes.core.export.DocumentoExport
+import com.athenes.core.export.NotaRodapeExport
 import com.athenes.core.export.TipoBlocoExport
 import com.athenes.core.citacao.Bibliografia
 import com.athenes.core.citacao.BibliografiaCodec
@@ -120,6 +121,8 @@ class EditorViewModel : ViewModel() {
     val estiloBibliografico: StateFlow<EstiloBibliografico> = _estiloBibliografico.asStateFlow()
     private val _referencias = MutableStateFlow<List<ReferenciaAcademica>>(emptyList())
     val referencias: StateFlow<List<ReferenciaAcademica>> = _referencias.asStateFlow()
+    private val _notasRodape = MutableStateFlow<List<NotaRodapeExport>>(emptyList())
+    val notasRodape: StateFlow<List<NotaRodapeExport>> = _notasRodape.asStateFlow()
 
     private val _modoRevisao = MutableStateFlow("edicao") // "edicao" | "sugestao" | "leitura"
     val modoRevisao: StateFlow<String> = _modoRevisao.asStateFlow()
@@ -155,7 +158,8 @@ class EditorViewModel : ViewModel() {
     private data class EstadoHistorico(
         val blocos: List<BlocoEditor>,
         val estiloBibliografico: EstiloBibliografico,
-        val referencias: List<ReferenciaAcademica>
+        val referencias: List<ReferenciaAcademica>,
+        val notasRodape: List<NotaRodapeExport>
     )
     private val historico = mutableListOf<EstadoHistorico>()
     private var indiceHistorico = -1
@@ -186,6 +190,7 @@ class EditorViewModel : ViewModel() {
         _configuracaoPagina.value = ConfiguracaoPagina()
         _estiloBibliografico.value = EstiloBibliografico.ABNT
         _referencias.value = emptyList()
+        _notasRodape.value = emptyList()
         _painelEstruturaAberto.value = false
         _painelInspetorAberto.value = false
         _painelCitacaoAberto.value = false
@@ -200,6 +205,7 @@ class EditorViewModel : ViewModel() {
             _configuracaoPagina.value = lido.pagina
             _estiloBibliografico.value = lido.estiloBibliografico
             _referencias.value = lido.referencias
+            _notasRodape.value = lido.notasRodape
         } else {
             _blocos.value = if (doc.id == ID_DOCUMENTO_EXEMPLO) obterBlocosIniciais() else listOf(blocoParagrafoVazio())
             if (doc.id == ID_DOCUMENTO_EXEMPLO && _resumo.value.isBlank()) _resumo.value = RESUMO_EXEMPLO
@@ -438,6 +444,31 @@ class EditorViewModel : ViewModel() {
         salvarNoHistorico()
     }
 
+    fun inserirNotaRodape(): String {
+        val id = UUID.randomUUID().toString()
+        val marca = "[nota:$id]"
+        salvarNoHistorico()
+        val alvo = _blocos.value.find { it.id == _blocoSelecionadoId.value }
+        if (alvo != null && alvo.tipo in setOf(TipoBlocoEditor.PARAGRAFO, TipoBlocoEditor.CITACAO)) {
+            val posicao = cursorTexto?.takeIf { it.first == alvo.id }?.second?.coerceIn(0, alvo.texto.length) ?: alvo.texto.length
+            val novo = alvo.texto.substring(0, posicao) + marca + alvo.texto.substring(posicao)
+            atualizarBloco(alvo.id) { it.copy(texto = novo, citacoes = CitacoesInline.atualizarDepoisDaEdicao(it.texto, novo, it.citacoes)) }
+            cursorTexto = alvo.id to (posicao + marca.length)
+        } else inserirAposSelecionado(BlocoEditor(tipo = TipoBlocoEditor.PARAGRAFO, texto = marca))
+        _notasRodape.value = _notasRodape.value + NotaRodapeExport(id, "")
+        salvarNoHistorico()
+        marcarAlterado()
+        return id
+    }
+
+    fun atualizarNotaRodape(id: String, texto: String) {
+        if (_notasRodape.value.none { it.id == id }) return
+        salvarNoHistorico()
+        _notasRodape.value = _notasRodape.value.map { if (it.id == id) it.copy(texto = texto) else it }
+        salvarNoHistorico()
+        marcarAlterado()
+    }
+
     /** Transfere um destaque do leitor para um bloco de citação longa com referência vinculada. */
     fun inserirCitacaoLonga(artigo: ArtigoEstudoDetalhado, destaque: CitacaoMarcada) {
         val referencia = ReferenciaAcademica.doArtigo(artigo)
@@ -522,7 +553,7 @@ class EditorViewModel : ViewModel() {
 
     private fun salvarNoHistorico() {
         while (historico.size > indiceHistorico + 1) historico.removeAt(historico.size - 1)
-        val estado = EstadoHistorico(_blocos.value, _estiloBibliografico.value, _referencias.value)
+        val estado = EstadoHistorico(_blocos.value, _estiloBibliografico.value, _referencias.value, _notasRodape.value)
         if (historico.lastOrNull() == estado) return
         historico.add(estado)
         if (historico.size > LIMITE_HISTORICO) historico.removeAt(0)
@@ -533,6 +564,7 @@ class EditorViewModel : ViewModel() {
         _blocos.value = estado.blocos
         _estiloBibliografico.value = estado.estiloBibliografico
         _referencias.value = estado.referencias
+        _notasRodape.value = estado.notasRodape
         if (_blocos.value.none { it.id == _blocoSelecionadoId.value }) _blocoSelecionadoId.value = null
         cursorTexto = null
     }
@@ -546,6 +578,7 @@ class EditorViewModel : ViewModel() {
         pagina = _configuracaoPagina.value,
         estiloBibliografico = _estiloBibliografico.value,
         referencias = _referencias.value,
+        notasRodape = _notasRodape.value,
         blocos = _blocos.value.map { b ->
             BlocoExport(
                 tipo = TipoBlocoExport.valueOf(b.tipo.name),
@@ -625,6 +658,7 @@ class EditorViewModel : ViewModel() {
         raiz.put("pagina", ConfiguracaoPaginaCodec.escrever(_configuracaoPagina.value))
         raiz.put("estiloBibliografico", _estiloBibliografico.value.id)
         raiz.put("referencias", BibliografiaCodec.escrever(_referencias.value))
+        raiz.put("notasRodape", JSONArray(_notasRodape.value.map { JSONObject().put("id", it.id).put("texto", it.texto) }))
         val arr = JSONArray()
         _blocos.value.forEach { b ->
             arr.put(JSONObject().apply {
@@ -646,7 +680,8 @@ class EditorViewModel : ViewModel() {
     private class ConteudoLido(
         val titulo: String, val subtitulo: String, val autores: String, val resumo: String,
         val blocos: List<BlocoEditor>, val pagina: ConfiguracaoPagina,
-        val estiloBibliografico: EstiloBibliografico, val referencias: List<ReferenciaAcademica>
+        val estiloBibliografico: EstiloBibliografico, val referencias: List<ReferenciaAcademica>,
+        val notasRodape: List<NotaRodapeExport>
     )
 
     private fun lerDoDisco(id: String): ConteudoLido? {
@@ -680,7 +715,15 @@ class EditorViewModel : ViewModel() {
                 raiz.optString("autores"), raiz.optString("resumo"), blocos,
                 ConfiguracaoPaginaCodec.ler(raiz.optJSONObject("pagina")),
                 EstiloBibliografico.deId(raiz.optString("estiloBibliografico")),
-                BibliografiaCodec.ler(raiz.optJSONArray("referencias"))
+                BibliografiaCodec.ler(raiz.optJSONArray("referencias")),
+                raiz.optJSONArray("notasRodape")?.let { notas ->
+                    (0 until notas.length()).mapNotNull { indice ->
+                        notas.optJSONObject(indice)?.let { nota ->
+                            val notaId = nota.optString("id")
+                            if (notaId.isBlank()) null else NotaRodapeExport(notaId, nota.optString("texto"))
+                        }
+                    }
+                } ?: emptyList()
             )
         } catch (_: Exception) {
             null

@@ -35,6 +35,24 @@ import org.junit.runner.RunWith
 class NavegacaoAcessibilidadeTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun notaRodapeMantemTextoEHistoricoNoDocumento() {
+        val vm = EditorViewModel()
+        compose.runOnIdle {
+            val paragrafo = vm.blocos.value.first()
+            vm.atualizarTextoBloco(paragrafo.id, "Texto.")
+            vm.selecionarBloco(paragrafo.id)
+            vm.posicionarCursorTexto(paragrafo.id, 5)
+            val id = vm.inserirNotaRodape()
+            vm.atualizarNotaRodape(id, "Fonte da informação")
+            assertTrue(vm.blocos.value.first().texto.contains("[nota:$id]"))
+            assertEquals("Fonte da informação", vm.paraExportacao().notasRodape.single().texto)
+            vm.desfazer()
+            assertEquals("", vm.notasRodape.value.single().texto)
+            vm.desfazer()
+            assertTrue(vm.notasRodape.value.isEmpty())
+        }
+    }
+
     @Test fun referenciaCruzadaEntraNoCursorEPodeSerDesfeita() {
         val vm = EditorViewModel()
         compose.runOnIdle {

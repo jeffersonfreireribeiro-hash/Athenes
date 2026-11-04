@@ -112,6 +112,7 @@ fun EditorDocumentoScreen(
     val configPagina by viewModel.configuracaoPagina.collectAsState()
     val estiloBibliografico by viewModel.estiloBibliografico.collectAsState()
     val referencias by viewModel.referencias.collectAsState()
+    val notasRodape by viewModel.notasRodape.collectAsState()
     var mostrarConfigPagina by remember { mutableStateOf(false) }
     var mostrarConexoes by remember { mutableStateOf(false) }
     val modoRevisao by viewModel.modoRevisao.collectAsState()
@@ -195,6 +196,8 @@ fun EditorDocumentoScreen(
     val editavel = modoRevisao != "leitura"
     val blocoSelecionado = remember(blocos, blocoSelecionadoId) { blocos.find { it.id == blocoSelecionadoId } }
     var mostrarReferenciasCruzadas by remember { mutableStateOf(false) }
+    var mostrarNotasRodape by remember { mutableStateOf(false) }
+    var notaEditandoId by remember { mutableStateOf<String?>(null) }
     val estrutura = remember(blocos) { viewModel.montarEstrutura(blocos) }
     val titulosIlustracoes = remember(blocos) { blocos.filter { it.tipo in setOf(TipoBlocoEditor.FIGURA, TipoBlocoEditor.TABELA, TipoBlocoEditor.QUADRO) && it.legenda.isNotBlank() }.map { it.legenda } }
     val algumPainelAberto = painelEstruturaAberto || painelInspetorAberto
@@ -322,7 +325,8 @@ fun EditorDocumentoScreen(
                             scope.launch { rolarParaSelecionado(listState, viewModel) }
                         },
                         onCitar = viewModel::abrirPainelCitacao,
-                        onReferenciaCruzada = { mostrarReferenciasCruzadas = true }
+                        onReferenciaCruzada = { mostrarReferenciasCruzadas = true },
+                        onNotaRodape = { mostrarNotasRodape = true }
                     )
                 }
             }
@@ -430,6 +434,43 @@ fun EditorDocumentoScreen(
                     }
                 },
                 confirmButton = { TextButton(onClick = { mostrarReferenciasCruzadas = false }) { Text("Fechar") } }
+            )
+        }
+        if (mostrarNotasRodape) {
+            AlertDialog(
+                onDismissRequest = { mostrarNotasRodape = false },
+                title = { Text("Notas de rodapé") },
+                text = {
+                    Column {
+                        Text("Insira a nota na posição atual do texto e edite seu conteúdo aqui.")
+                        Spacer(Modifier.height(8.dp))
+                        LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                            itemsIndexed(notasRodape) { indice, nota ->
+                                TextButton(onClick = { notaEditandoId = nota.id; mostrarNotasRodape = false }) {
+                                    Text("${indice + 1}. ${nota.texto.ifBlank { "Nota sem texto" }}", maxLines = 2)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        notaEditandoId = viewModel.inserirNotaRodape()
+                        mostrarNotasRodape = false
+                    }) { Text("Inserir nota") }
+                },
+                dismissButton = { TextButton(onClick = { mostrarNotasRodape = false }) { Text("Fechar") } }
+            )
+        }
+        val notaEditando = notasRodape.find { it.id == notaEditandoId }
+        if (notaEditando != null) {
+            var rascunho by remember(notaEditando.id) { mutableStateOf(notaEditando.texto) }
+            AlertDialog(
+                onDismissRequest = { notaEditandoId = null },
+                title = { Text("Texto da nota") },
+                text = { OutlinedTextField(value = rascunho, onValueChange = { rascunho = it }, label = { Text("Nota de rodapé") }, minLines = 3) },
+                confirmButton = { TextButton(onClick = { viewModel.atualizarNotaRodape(notaEditando.id, rascunho); notaEditandoId = null }) { Text("Salvar") } },
+                dismissButton = { TextButton(onClick = { notaEditandoId = null }) { Text("Cancelar") } }
             )
         }
     }
