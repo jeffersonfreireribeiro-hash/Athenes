@@ -18,6 +18,10 @@ import {
 } from '../src/ui/athenes_estudo_artigos.js';
 import { ZoteroClient } from '../src/core/athenes_zotero.js';
 
+// o estúdio é dividido em módulos (tela, painel direito, anotações, modais, dados): o código é lido em conjunto
+const lerCodigoEstudo = () => ['', '_dados', '_tela', '_painel_direito', '_anotacoes', '_modais']
+  .map(n => fs.readFileSync(path.resolve(`src/ui/athenes_estudo_artigos${n}.js`), 'utf8')).join('');
+
 test('escapeHtml e sanitizarHtmlEditorial bloqueiam vetores XSS preservando formatação editorial', () => {
   const sujo = `<p onclick="alert(1)">Texto <b>negrito</b> <script>evil()</script> <a href="javascript:alert(2)">link</a></p>`;
   const limpo = sanitizarHtmlEditorial(sujo);
@@ -92,7 +96,7 @@ test('ZoteroClient.sincronizarNotaFilhaNoZotero retorna fallback local quando se
 
 
 test('Estúdio de Artigos Zotero & PDF usa estrutura Full-Screen de 3 colunas idêntica ao Editor (.rm-conteudo / .rm-ed-grade)', () => {
-  const codigoEstudo = fs.readFileSync(path.resolve('src/ui/athenes_estudo_artigos.js'), 'utf8');
+  const codigoEstudo = lerCodigoEstudo();
   const cssDash = fs.readFileSync(path.resolve('src/css/athenes_dashboard.css'), 'utf8');
 
   assert.equal(codigoEstudo.includes('rm-conteudo ath-estudio-full-shell'), true);
@@ -106,7 +110,7 @@ test('Estúdio de Artigos Zotero & PDF usa estrutura Full-Screen de 3 colunas id
 });
 
 test('Estúdio de Artigos renderiza todas as páginas em rolagem contínua, suporta linha reta, editor inline sem prompt nativo e popover de seleção de texto', () => {
-  const codigoEstudo = fs.readFileSync(path.resolve('src/ui/athenes_estudo_artigos.js'), 'utf8');
+  const codigoEstudo = lerCodigoEstudo();
 
   // Sem window.prompt( feio
   assert.equal(codigoEstudo.includes('window.prompt('), false);
@@ -152,7 +156,7 @@ test('Estúdio de Artigos renderiza todas as páginas em rolagem contínua, supo
 });
 
 test('Estúdio de Artigos preserva folhas extras no PDF real e rolarParaPagina usa scroll do palco sem cortar topo', () => {
-  const codigoEstudo = fs.readFileSync(path.resolve('src/ui/athenes_estudo_artigos.js'), 'utf8');
+  const codigoEstudo = lerCodigoEstudo();
   const cssDash = fs.readFileSync(path.resolve('src/css/athenes_dashboard.css'), 'utf8');
 
   // Verifica que rolarParaPagina não usa scrollIntoView genérico no elemento raiz/window
@@ -213,7 +217,7 @@ test('DashboardView possui barra lateral de pastas do Google Drive, subpastas e 
 });
 
 test('Google Drive & PDF no Estúdio de Artigos: popover organizado, extração de ID de pasta e fallback amigável sem embed quebrado', () => {
-  const codigoEstudo = fs.readFileSync(path.resolve('src/ui/athenes_estudo_artigos.js'), 'utf8');
+  const codigoEstudo = lerCodigoEstudo();
   const codigoColab = fs.readFileSync(path.resolve('src/core/athenes_colaboracao.js'), 'utf8');
   const cssEditor = fs.readFileSync(path.resolve('src/css/athenes_editor.css'), 'utf8');
 
@@ -270,7 +274,7 @@ test('Google Drive & PDF no Estúdio de Artigos: popover organizado, extração 
 });
 
 test('Estúdio de Artigos suporta isolamento por pasta, método filtrarPorPasta e vínculo em subpastas', () => {
-  const codigoEstudo = fs.readFileSync(path.resolve('src/ui/athenes_estudo_artigos.js'), 'utf8');
+  const codigoEstudo = lerCodigoEstudo();
 
   // Método e propriedade de filtro
   assert.equal(codigoEstudo.includes('filtrarPorPasta(pastaId)'), true);
@@ -286,6 +290,11 @@ test('Estúdio de Artigos suporta isolamento por pasta, método filtrarPorPasta 
 test('Todos os módulos frontend (UI e Core) importam sem SyntaxError ou referências inválidas', async () => {
   const modulos = [
     'src/core/athenes_documento.js',
+    'src/ui/athenes_estudo_artigos_dados.js',
+    'src/ui/athenes_estudo_artigos_tela.js',
+    'src/ui/athenes_estudo_artigos_painel_direito.js',
+    'src/ui/athenes_estudo_artigos_anotacoes.js',
+    'src/ui/athenes_estudo_artigos_modais.js',
     'src/ui/athenes_editor_barra_contextual.js',
     'src/ui/athenes_editor_menus_topo.js',
     'src/ui/athenes_editor_bloco_folha.js',
