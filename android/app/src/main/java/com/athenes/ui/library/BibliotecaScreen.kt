@@ -1,7 +1,6 @@
 package com.athenes.ui.library
 
 import android.content.Intent
-import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -92,8 +91,8 @@ fun BibliotecaScreen(
         }
     }
     val credenciaisZotero = remember(context) { ZoteroCredentialsStore(context) }
-    var pdfNovoArtigoUri by remember { mutableStateOf<Uri?>(null) }
-    var pdfNovoArtigoNome by remember { mutableStateOf<String?>(null) }
+    var pdfNovoArtigoUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var pdfNovoArtigoNome by rememberSaveable { mutableStateOf<String?>(null) }
     val escolherPdfNovoArtigo = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val permissao = runCatching {
@@ -102,12 +101,18 @@ fun BibliotecaScreen(
             if (permissao.isFailure) {
                 Toast.makeText(context, "Não foi possível manter acesso ao PDF.", Toast.LENGTH_LONG).show()
             } else {
-                pdfNovoArtigoUri = uri
-                pdfNovoArtigoNome = runCatching {
-                    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                pdfNovoArtigoUri = uri.toString()
+                pdfNovoArtigoNome = "PDF selecionado"
+                escopo.launch {
+                    val nome = withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                                if (cursor.moveToFirst()) cursor.getString(0) else null
+                            }
+                        }.getOrNull()
                     }
-                }.getOrNull() ?: "PDF selecionado"
+                    if (pdfNovoArtigoUri == uri.toString()) pdfNovoArtigoNome = nome ?: "PDF selecionado"
+                }
             }
         }
     }
@@ -150,7 +155,7 @@ fun BibliotecaScreen(
     var mostrarConexaoZotero by remember { mutableStateOf(false) }
     var chaveZotero by remember { mutableStateOf("") }
     var usuarioZotero by remember { mutableStateOf("") }
-    var novoArtigoAberto by remember { mutableStateOf(false) }
+    var novoArtigoAberto by rememberSaveable { mutableStateOf(false) }
 
     val dialogNovoAberto by viewModel.dialogNovoAberto.collectAsState()
     val docParaExcluir by viewModel.docParaExcluir.collectAsState()
@@ -535,7 +540,7 @@ fun BibliotecaScreen(
             onCriar = { titulo, autores, ano, publicacao, resumo, chaveZotero ->
                 val artigo = viewModel.criarArtigoLocal(titulo, autores, ano, publicacao, resumo, chaveZotero)
                 pdfNovoArtigoUri?.let { uri ->
-                    context.getSharedPreferences("pdf_artigos", 0).edit().putString(artigo.id, uri.toString()).apply()
+                    context.getSharedPreferences("pdf_artigos", 0).edit().putString(artigo.id, uri).apply()
                 }
                 novoArtigoAberto = false
                 onAbrirLeitorPdf(artigo.id)
