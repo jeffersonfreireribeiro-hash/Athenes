@@ -21,6 +21,7 @@ class ArtigoEstudoRepository {
     private val persistenciaScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var gravacaoPendente: Job? = null
     private var anotacoesPendentes: Job? = null
+    private var resumosPendentes: Job? = null
     private var itensZotero: List<ZoteroItem> = emptyList()
     private var itensBib: List<ZoteroItem> = emptyList()
     private var artigosLocais: List<ArtigoEstudoDetalhado> = emptyList()
@@ -45,6 +46,7 @@ class ArtigoEstudoRepository {
         val preferencias = contexto!!.getSharedPreferences("tracos_pdf", Context.MODE_PRIVATE)
         val anotacoes = contexto!!.getSharedPreferences("anotacoes_pdf", Context.MODE_PRIVATE)
         val notasZoteroPrefs = contexto!!.getSharedPreferences("notas_zotero", Context.MODE_PRIVATE)
+        val resumosPrefs = contexto!!.getSharedPreferences("fichamentos_pdf", Context.MODE_PRIVATE)
         _artigos.value = _artigos.value.map { artigo ->
             val tracos = preferencias.getString(artigo.id, null)?.let { salvo ->
                 runCatching { lerTracos(salvo) }.getOrNull()
@@ -52,8 +54,12 @@ class ArtigoEstudoRepository {
             val dados = anotacoes.getString(artigo.id, null)?.let { salvo ->
                 runCatching { lerAnotacoes(salvo) }.getOrNull()
             }
+            val resumoSalvo = if (artigo.id.startsWith("local_")) null
+                else FichamentoResumoCodec.ler(resumosPrefs.getString(artigo.id, null))
             artigo.copy(
                 tracos = tracos,
+                meuResumo = resumoSalvo?.meuResumo ?: artigo.meuResumo,
+                analiseMetodologica = resumoSalvo?.analiseMetodologica ?: artigo.analiseMetodologica,
                 notas = dados?.first ?: artigo.notas,
                 citacoes = dados?.second ?: artigo.citacoes,
                 notasZotero = notasZoteroPrefs.getString(artigo.id, null)?.let { salvo ->
@@ -77,6 +83,18 @@ class ArtigoEstudoRepository {
             delay(400)
             val editor = ctx.getSharedPreferences("anotacoes_pdf", Context.MODE_PRIVATE).edit()
             estado.forEach { (id, conteudo) -> editor.putString(id, conteudo) }
+            editor.apply()
+        }
+    }
+
+    private fun salvarResumosDepois() {
+        val ctx = contexto ?: return
+        val estado = _artigos.value.map { it.id to FichamentoResumoCodec.escrever(ResumoFichamento(it.meuResumo, it.analiseMetodologica)) }
+        resumosPendentes?.cancel()
+        resumosPendentes = persistenciaScope.launch {
+            delay(320)
+            val editor = ctx.getSharedPreferences("fichamentos_pdf", Context.MODE_PRIVATE).edit()
+            estado.forEach { (id, resumo) -> editor.putString(id, resumo) }
             editor.apply()
         }
     }
@@ -218,17 +236,19 @@ class ArtigoEstudoRepository {
         // Uma gravação adiada anterior não pode recriar as anotações do artigo excluído.
         anotacoesPendentes?.cancel()
         gravacaoPendente?.cancel()
+        resumosPendentes?.cancel()
         artigosLocais = artigosLocais.filterNot { it.id == id }
         _artigos.value = _artigos.value.filterNot { it.id == id }
         if (_artigoAtivoId.value == id) _artigoAtivoId.value = _artigos.value.firstOrNull()?.id.orEmpty()
         salvarArtigosLocais()
         contexto?.let { ctx ->
-            listOf("pdf_artigos", "anotacoes_pdf", "tracos_pdf", "notas_zotero").forEach { nome ->
+            listOf("pdf_artigos", "anotacoes_pdf", "tracos_pdf", "notas_zotero", "fichamentos_pdf").forEach { nome ->
                 ctx.getSharedPreferences(nome, Context.MODE_PRIVATE).edit().remove(id).apply()
             }
         }
         salvarAnotacoesDepois()
         salvarTracosDepois()
+        salvarResumosDepois()
         return true
     }
 
@@ -245,10 +265,12 @@ class ArtigoEstudoRepository {
     fun aplicarBibliotecaZotero(itens: List<ZoteroItem>, colecoes: List<ZoteroColecao>) {
         itensZotero = itens
         val anteriores = _artigos.value.associateBy { it.id }
+        val resumosPrefs = contexto?.getSharedPreferences("fichamentos_pdf", Context.MODE_PRIVATE)
         artigosLocais = artigosLocais.map { anteriores[it.id] ?: it }
         _colecoesZotero.value = colecoes
         val bibliotecaRemota = (itens + itensBib).distinctBy { it.chave }.map { item ->
             val anterior = anteriores[item.chave]
+            val resumoSalvo = FichamentoResumoCodec.ler(resumosPrefs?.getString(item.chave, null))
             val ano = Regex("(?:19|20)\\d{2}").find(item.data)?.value?.toIntOrNull() ?: 0
             ArtigoEstudoDetalhado(
                 id = item.chave,
@@ -260,8 +282,8 @@ class ArtigoEstudoRepository {
                 chaveZotero = item.chave,
                 totalPaginas = anterior?.totalPaginas ?: 0,
                 resumoOficial = item.resumo,
-                meuResumo = anterior?.meuResumo.orEmpty(),
-                analiseMetodologica = anterior?.analiseMetodologica.orEmpty(),
+                meuResumo = anterior?.meuResumo ?: resumoSalvo?.meuResumo.orEmpty(),
+                analiseMetodologica = anterior?.analiseMetodologica ?: resumoSalvo?.analiseMetodologica.orEmpty(),
                 tags = item.tags,
                 paginas = anterior?.paginas.orEmpty(),
                 citacoes = anterior?.citacoes.orEmpty(),
@@ -430,6 +452,7 @@ class ArtigoEstudoRepository {
                 art.copy(meuResumo = meuResumo, analiseMetodologica = analiseMetodologica)
             } else art
         }
+        salvarResumosDepois()
         if (artigoId.startsWith("local_")) {
             artigosLocais = artigosLocais.map { art ->
                 if (art.id == artigoId) art.copy(meuResumo = meuResumo, analiseMetodologica = analiseMetodologica) else art
