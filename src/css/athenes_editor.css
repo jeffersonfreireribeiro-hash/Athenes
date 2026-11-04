@@ -2685,3 +2685,6 @@ ins.ath-sug-ins:hover, del.ath-sug-del:hover { outline: 1.5px solid var(--ath-su
 /* Dicas dos botões da barra: abrem para baixo (em cima o texto era cortado pela borda da área) */
 .rm-barra-blocos .rm-ic-bt[data-tip]::after { top: calc(100% + 7px); bottom: auto; transform: translateX(-50%) translateY(-3px); }
 .rm-barra-blocos .rm-ic-bt[data-tip]:hover::after, .rm-barra-blocos .rm-ic-bt[data-tip]:focus-visible::after { transform: translateX(-50%) translateY(0); }
+
+/* Citação linkada à referência: herda cor e sem sublinhado (a limpeza de estilos remove o style inline) */
+a.ath-citacao-link { color: inherit; text-decoration: none; cursor: pointer; }

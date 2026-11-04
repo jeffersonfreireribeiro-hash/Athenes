@@ -61,7 +61,7 @@ export const FONTES_SISTEMA = {
     id: 'aptos',
     rotulo: 'Aptos (Microsoft 365)',
     // usa a Aptos instalada (Word/Office 365); sem ela, cai em fontes de aparência próxima. Para embutir, importe o arquivo em Fontes.
-    familia: "Aptos, 'Aptos Display', 'Segoe UI Variable Text', 'Segoe UI', Calibri, sans-serif",
+    familia: "Aptos, 'Aptos Display', 'Segoe UI', Calibri, sans-serif",
     serif: false,
     incorporavel: false
   },

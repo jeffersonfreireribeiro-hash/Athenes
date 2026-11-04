@@ -6,7 +6,7 @@
  */
 
 import {
-  registrarFonteImportada, removerFonteImportada, listarFontesImportadas, formatoDoArquivo, nomeSugerido, FORMATOS_FONTE
+  registrarFonteImportada, removerFonteImportada, fonteEhVariavel, faixaDePesos, listarFontesImportadas, formatoDoArquivo, nomeSugerido, FORMATOS_FONTE
 } from '../core/athenes_fontes.js';
 
 const BANCO = 'athenes_fontes'; const LOJA = 'fontes';
@@ -38,7 +38,7 @@ const bufferParaDataUrl = (buffer, mime) => {
 /** Faz o navegador conhecer a família (document.fonts) para telas e medições. */
 async function ativarNoNavegador(meta) {
   if (typeof FontFace === 'undefined') return;
-  const face = new FontFace(meta.nome, `url(${meta.dataUrl})`, { weight: '100 900' });
+  const face = new FontFace(meta.nome, `url(${meta.dataUrl})`, { weight: faixaDePesos({ variavel: fonteEhVariavel(meta) }) }); // estática: 400 (o negrito é sintetizado)
   await face.load();
   document.fonts.add(face);
 }

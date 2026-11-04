@@ -397,6 +397,9 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
     const dimFolha = dimensoesPapelMm(modelo.formato, modelo.orientacao);
     const m = margensEfetivasMm(modelo, dimFolha.largura_mm, dimFolha.altura_mm);
     const cols = modelo.grade?.colunas || 1;
+    // página de uma coluna: o editor usa SEMPRE a grade de 12 colunas (blocos lado a lado por `grupo`, `col` e `span`); o PDF faz o mesmo,
+    // senão cada bloco do grupo vira uma linha inteira e a página cresce além da área útil
+    const grade12 = cols === 1;
     const gap = modelo.grade?.gap_mm || 0;
 
     const geo = geometriaCorpoMm(modelo);
@@ -410,7 +413,7 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
     for (let i = 0; i < blocosPag.length; i++) {
       const b = blocosPag[i];
       const span = Math.min(cols, b.span || 1);
-      const gridCol = cols > 1 ? `grid-column: span ${span};` : '';
+      const gridCol = grade12 ? `grid-column: ${Math.min(12, Math.max(1, b.col || 1))} / span ${Math.min(12, Math.max(1, b.span || 12))};` : (cols > 1 ? `grid-column: span ${span};` : '');
       const contorna = (b.tipo === 'figura' || b.tipo === 'imagem') && ['contornar_esq', 'contornar_dir'].includes(b.fluxo);
       const prox = blocosPag[i + 1];
       // texto contornando: a figura flutuante e o parágrafo seguinte dividem a mesma célula (contexto de fluxo)
@@ -420,7 +423,8 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
         continue;
       }
       // margens colapsadas (maior de "depois" e "antes"), como no Word: sem isso o espaço entre parágrafos dobrava
-      const colapso = cols === 1 ? (i > 0 ? colapsoEntreBlocosPt(blocosPag[i - 1], b, estilosMap) : (margensTextoPt(b, estilosMap)?.antes || 0)) : 0; // topo da página: sem espaço antes
+      const mesmaLinha = grade12 && i > 0 && b.grupo && blocosPag[i - 1].grupo === b.grupo; // lado a lado: sem colapso vertical entre eles
+      const colapso = cols === 1 && !mesmaLinha ? (i > 0 ? colapsoEntreBlocosPt(blocosPag[i - 1], b, estilosMap) : (margensTextoPt(b, estilosMap)?.antes || 0)) : 0; // topo da página: sem espaço antes
       // figuras, tabelas, fórmulas… também ganham o espaço antes/depois do estilo do bloco, como na folha do editor (texto já leva o seu na própria margem)
       const ehTextoB = ['paragrafo', 'texto', 'titulo', 'subtitulo', 'citacao'].includes(b.tipo);
       const estB = estilosMap[b.estiloId] || estilosMap.corpo || {};
@@ -479,11 +483,11 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
       }).join('\n');
     }
     
-return `<section class="ath-pagina" style="position:relative; width:${largura_mm}mm; min-height:${altura_mm}mm; padding:${geo.topoMm}mm ${m.r}mm ${geo.baseMm}mm ${m.l}mm;" data-pagina="${index + 1}">
+return `<section class="ath-pagina" style="position:relative; width:${largura_mm}mm; height:${altura_mm}mm; overflow:hidden; padding:${geo.topoMm}mm ${m.r}mm ${geo.baseMm}mm ${m.l}mm;" data-pagina="${index + 1}">
       ${elemRecHtml}
       ${cabHtml}
       <div class="ath-folha-corpo" style="position:relative; z-index:1; display:flex; flex-direction:column; min-height:${altura_mm - geo.topoMm - geo.baseMm}mm;">
-        <div class="ath-grid" style="display:grid; align-content:start; grid-template-columns:repeat(${cols}, minmax(0, 1fr)); column-gap:${gap}mm; flex:1;">
+        <div class="ath-grid" style="display:grid; align-content:start; grid-template-columns:repeat(${grade12 ? 12 : cols}, minmax(0, 1fr)); column-gap:${grade12 ? 3.175 : gap}mm; flex:1;">
           ${blocosHtml}
         </div>
         ${notasHtml}
@@ -553,6 +557,7 @@ return `<section class="ath-pagina" style="position:relative; width:${largura_mm
     .ath-num-secao { margin-right: .4em; }
     .ath-toc-item { break-inside: avoid; }
     .ath-toc-link { color: inherit; text-decoration: none; }
+    a.ath-citacao-link { color: inherit; text-decoration: none; } /* citação linkada: sem cara de link (a limpeza de estilos tira o style inline) */
 
     ${cssMarcadoresNota(obterConfigNotas(documento), '', id => (FONTES_SISTEMA[id]?.familia || '').replace(/"/g, "'"))}
     ${cssFontesImportadas(documento)}
