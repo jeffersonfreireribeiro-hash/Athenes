@@ -4,11 +4,24 @@
  * Métodos do EstudoArtigosView (usam `this`); são acrescentados ao prototype em athenes_estudo_artigos.js.
  */
 import { obterConfigGoogleDrive } from '../core/athenes_colaboracao.js';
+import { localDoPdfVinculado } from '../core/athenes_zotero_anexos_notas.js';
 import { artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import { registrarPdfLocalNoArtigo, salvarArtigosEstudo, formatarCitacaoAbntDoArtigo, artigoTemPdf, ehArtigoExemploFicticio } from './athenes_estudo_artigos_dados.js';
+
+/** Onde o Zotero guardou o PDF vinculado, com botões para copiar a pasta ou o caminho (para achar o arquivo ao selecioná-lo). */
+function htmlLocalDoPdf(anexo) {
+  const l = localDoPdfVinculado(anexo);
+  if (!l) return '<p class="ath-pdf-local-dica">O Zotero não informou onde o arquivo está. Procure pelo nome: <code>' + escapeHtml(anexo.nomeArquivo || '') + '</code></p>';
+  const copiar = (rot, texto) => texto ? `<button type="button" class="glx-btn glx-btn-soft glx-btn-xs" data-copiar="${escapeHtml(texto)}">${rot}</button>` : '';
+  return `<div class="ath-pdf-local">
+    ${l.pasta ? `<div><span>Pasta</span><code>${escapeHtml(l.pasta)}</code>${copiar('Copiar pasta', l.pasta)}</div>` : ''}
+    <div><span>Arquivo</span><code>${escapeHtml(l.arquivo)}</code>${copiar('Copiar nome', l.arquivo)}</div>
+    ${l.relativo ? '<small>O caminho é relativo à pasta de anexos vinculados configurada no Zotero (Editar › Configurações › Avançado › Arquivos e pastas › Diretório base).</small>' : '<small>Cole a pasta na janela de seleção de arquivo para ir direto até ele.</small>'}
+  </div>`;
+}
 
 export const metodosEstudoTela = {
   renderizarEstudioPdfFullScreen(art, scrollSalvo = 0) {
@@ -506,7 +519,7 @@ export const metodosEstudoTela = {
         : `<strong>Este artigo ainda não tem PDF vinculado</strong>
            <p>O registro veio do Zotero só com os dados da obra. Vincule o arquivo para ler, grifar e citar com página. O resumo e o fichamento ao lado já funcionam.</p>
            ${art.anexoPdfZotero?.baixavel ? '<p><b>PDF disponível no Zotero:</b> baixe-o do armazenamento do Zotero e ele será guardado no seu Google Drive.</p>'
-             : art.anexoPdfZotero ? '<p><b>PDF só no seu computador:</b> no Zotero ele é um arquivo vinculado (não baixável pela web). Selecione o arquivo abaixo.</p>' : ''}
+             : art.anexoPdfZotero ? `<p><b>PDF só no seu computador:</b> no Zotero ele é um arquivo vinculado (não baixável pela web). Selecione o arquivo abaixo.</p>${htmlLocalDoPdf(art.anexoPdfZotero)}` : ''}
            <div class="ath-pdf-sem-arquivo-acoes">
              ${art.anexoPdfZotero?.baixavel ? `<button type="button" class="glx-btn glx-btn-primary glx-btn-sm" data-baixar-pdf-zotero>${svgIcone('drive', 14)} Baixar do Zotero</button>` : ''}
              <label class="glx-btn glx-btn-primary glx-btn-sm" style="cursor:pointer;">${svgIcone('upload', 14)} Selecionar PDF no computador<input type="file" accept="application/pdf,.pdf" hidden></label>
@@ -535,6 +548,13 @@ export const metodosEstudoTela = {
           mostrarAviso(`${err.message} Selecione o PDF no computador ou no Google Drive.`);
         }
       });
+      aviso.querySelectorAll('[data-copiar]').forEach(b => b.addEventListener('click', async () => {
+        const texto = b.dataset.copiar;
+        try { await navigator.clipboard.writeText(texto); } catch (_) { // sem permissão da área de transferência: seleciona o texto para copiar à mão
+          const r = document.createRange(); const alvo = b.closest('.ath-pdf-local')?.querySelector('code'); if (alvo) { r.selectNodeContents(alvo); getSelection().removeAllRanges(); getSelection().addRange(r); }
+        }
+        const rot = b.textContent; b.textContent = 'Copiado ✓'; setTimeout(() => { b.textContent = rot; }, 1500);
+      }));
       aviso.querySelector('[data-sem-pdf-drive]')?.addEventListener('click', () => root.querySelector('#athBtnPopDrive')?.click());
       stack.appendChild(aviso);
       return;

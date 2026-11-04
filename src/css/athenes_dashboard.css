@@ -1970,3 +1970,8 @@ mark.ath-pdf-grifo-texto {
 .ath-zot-info-lista dt { color: #64748B; text-align: right; font-weight: 600; }
 .ath-zot-info-lista dd { margin: 0; color: #1E293B; word-break: break-word; }
 .ath-zot-info-lista a { color: #314F79; }
+.ath-pdf-local { margin: 4px 0 14px; padding: 10px 12px; text-align: left; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; font-size: 12px; }
+.ath-pdf-local > div { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.ath-pdf-local span { font-weight: 700; color: #64748B; min-width: 48px; }
+.ath-pdf-local code { flex: 1; min-width: 0; word-break: break-all; user-select: all; color: #1E293B; }
+.ath-pdf-local small, .ath-pdf-local-dica { display: block; color: #64748B; font-size: 11px; line-height: 1.4; }

@@ -29,7 +29,7 @@ export function organizarFilhosZotero(itensBrutos) {
     if (!/pdf/i.test(String(d.contentType || ''))) continue;
     const chave = it.key || d.key;
     paiDoAnexo.set(chave, d.parentItem);
-    const novo = { chave, nomeArquivo: d.filename || d.title || `${chave}.pdf`, baixavel: anexoPdfBaixavel(d), linkMode: d.linkMode || '' };
+    const novo = { chave, nomeArquivo: d.filename || d.title || `${chave}.pdf`, baixavel: anexoPdfBaixavel(d), linkMode: d.linkMode || '', caminho: String(d.path || '') };
     const atual = anexos.get(d.parentItem);
     if (!atual || (novo.baixavel && !atual.baixavel)) anexos.set(d.parentItem, novo);
   }
@@ -55,6 +55,22 @@ export function organizarFilhosZotero(itensBrutos) {
     }
   }
   return { anexos, notas, anotacoes };
+}
+
+/**
+ * Onde está o PDF vinculado (arquivo só no computador do usuário). A API do Zotero entrega o caminho gravado no anexo:
+ * absoluto ("C:\Users\...\arq.pdf", "/home/...") ou relativo ao diretório-base dos anexos vinculados ("attachments:pasta/arq.pdf"),
+ * cujo local só o Zotero Desktop conhece. Devolve { pasta, arquivo, completo, relativo } ou null quando não há caminho.
+ */
+export function localDoPdfVinculado(anexo) {
+  const bruto = String(anexo?.caminho || '').trim();
+  if (!bruto) return null;
+  const relativo = /^attachments:/i.test(bruto);
+  const completo = bruto.replace(/^(attachments|storage):/i, '');
+  const corte = Math.max(completo.lastIndexOf('/'), completo.lastIndexOf('\\'));
+  const pasta = corte >= 0 ? completo.slice(0, corte) : '';
+  const arquivo = corte >= 0 ? completo.slice(corte + 1) : completo;
+  return { pasta, arquivo, completo, relativo };
 }
 
 /** Texto simples de uma nota HTML (para a cópia e para decidir se está vazia). */
