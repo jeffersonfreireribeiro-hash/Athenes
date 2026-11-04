@@ -2,6 +2,7 @@ package com.athenes.core.data
 
 import android.content.Context
 import com.athenes.core.model.Documento
+import com.athenes.core.model.PastaDocumento
 import com.athenes.core.model.EstadoNuvem
 import com.athenes.core.model.SituacaoDocumento
 import com.athenes.core.model.TipoDocumento
@@ -17,9 +18,69 @@ class DocumentoRepository(private val context: Context? = null) {
 
     private val _documentos = MutableStateFlow<List<Documento>>(emptyList())
     val documentos: StateFlow<List<Documento>> = _documentos.asStateFlow()
+    private val _pastas = MutableStateFlow<List<PastaDocumento>>(emptyList())
+    val pastas: StateFlow<List<PastaDocumento>> = _pastas.asStateFlow()
 
     init {
+        carregarPastas()
         carregarDocumentos()
+    }
+
+    private fun carregarPastas() {
+        val arquivo = context?.filesDir?.let { File(it, "athenes_pastas.json") } ?: return
+        if (!arquivo.exists()) return
+        runCatching {
+            val dados = JSONArray(arquivo.readText())
+            _pastas.value = (0 until dados.length()).map { indice ->
+                val item = dados.getJSONObject(indice)
+                PastaDocumento(item.getString("id"), item.getString("nome"), item.optString("pastaPaiId").ifBlank { null })
+            }
+        }
+    }
+
+    private fun salvarPastas() {
+        val arquivo = context?.filesDir?.let { File(it, "athenes_pastas.json") } ?: return
+        val dados = JSONArray()
+        _pastas.value.forEach { pasta ->
+            dados.put(JSONObject().put("id", pasta.id).put("nome", pasta.nome).put("pastaPaiId", pasta.pastaPaiId ?: ""))
+        }
+        arquivo.writeText(dados.toString())
+    }
+
+    fun criarPasta(nome: String, pastaPaiId: String? = null): PastaDocumento? {
+        val limpo = nome.trim()
+        if (limpo.isEmpty() || (pastaPaiId != null && _pastas.value.none { it.id == pastaPaiId })) return null
+        val pasta = PastaDocumento(UUID.randomUUID().toString(), limpo, pastaPaiId)
+        _pastas.value = _pastas.value + pasta
+        salvarPastas()
+        return pasta
+    }
+
+    fun renomearPasta(id: String, nome: String) {
+        if (nome.isBlank()) return
+        _pastas.value = _pastas.value.map { if (it.id == id) it.copy(nome = nome.trim()) else it }
+        salvarPastas()
+    }
+
+    fun excluirPasta(id: String) {
+        if (_pastas.value.none { it.id == id }) return
+        val ids = mutableSetOf(id)
+        do {
+            val antes = ids.size
+            _pastas.value.filter { it.pastaPaiId in ids }.forEach { ids.add(it.id) }
+        } while (ids.size != antes)
+        _documentos.value = _documentos.value.map { if (it.pastaId in ids) it.copy(pastaId = null) else it }
+        _pastas.value = _pastas.value.filterNot { it.id in ids }
+        salvarEmDisco()
+        salvarPastas()
+    }
+
+    fun moverDocumento(id: String, pastaId: String?): Boolean {
+        if (pastaId != null && _pastas.value.none { it.id == pastaId }) return false
+        if (_documentos.value.none { it.id == id }) return false
+        _documentos.value = _documentos.value.map { if (it.id == id) it.copy(pastaId = pastaId) else it }
+        salvarEmDisco()
+        return true
     }
 
     private fun obterArquivoPersistencia(): File? {
@@ -47,7 +108,8 @@ class DocumentoRepository(private val context: Context? = null) {
                             ano = obj.optInt("ano", 2026),
                             resumo = obj.optString("resumo", ""),
                             modificadoEm = obj.optString("modificadoEm", "01/11/2026"),
-                            disponivelOffline = obj.optBoolean("disponivelOffline", true)
+                            disponivelOffline = obj.optBoolean("disponivelOffline", true),
+                            pastaId = obj.optString("pastaId").ifBlank { null }
                         )
                     )
                 }
@@ -78,6 +140,7 @@ class DocumentoRepository(private val context: Context? = null) {
                     put("resumo", doc.resumo)
                     put("modificadoEm", doc.modificadoEm)
                     put("disponivelOffline", doc.disponivelOffline)
+                    put("pastaId", doc.pastaId ?: "")
                 }
                 array.put(obj)
             }

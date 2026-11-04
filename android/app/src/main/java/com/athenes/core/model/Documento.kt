@@ -15,5 +15,6 @@ data class Documento(
     val modificadoEm: String = "01/11/2026",
     val disponivelOffline: Boolean = true,
     val caminhoPdfVinculado: String? = null,
-    val conteudoJson: String = "{}"
+    val conteudoJson: String = "{}",
+    val pastaId: String? = null
 )

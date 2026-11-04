@@ -3,6 +3,8 @@ package com.athenes.ui.library
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -12,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,6 +46,11 @@ fun BibliotecaScreen(
     val textoBusca by viewModel.textoBusca.collectAsState()
     val tipoFiltro by viewModel.tipoFiltro.collectAsState()
     val documentos by viewModel.documentosFiltrados.collectAsState()
+    val pastas by viewModel.pastas.collectAsState()
+    var pastaAtivaId by rememberSaveable { mutableStateOf<String?>(null) }
+    var criarPastaAberto by remember { mutableStateOf(false) }
+    var nomeNovaPasta by remember { mutableStateOf("") }
+    var documentoParaMover by remember { mutableStateOf<Documento?>(null) }
 
     // Estados da Aba 2 (Artigos / Zotero)
     val textoBuscaArtigos by viewModel.textoBuscaArtigos.collectAsState()
@@ -157,10 +165,30 @@ fun BibliotecaScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilterChip(selected = pastaAtivaId == null, onClick = { pastaAtivaId = null }, label = { Text("Todos") })
+                    pastas.forEach { pasta ->
+                        val pai = pastas.find { it.id == pasta.pastaPaiId }
+                        FilterChip(
+                            selected = pastaAtivaId == pasta.id,
+                            onClick = { pastaAtivaId = pasta.id },
+                            label = { Text(if (pai == null) pasta.nome else "${pai.nome} / ${pasta.nome}") }
+                        )
+                    }
+                    OutlinedButton(onClick = { nomeNovaPasta = ""; criarPastaAberto = true }) { Text("Nova pasta") }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val colunas = if (maxWidth >= 900.dp) GridCells.Fixed(3) else if (maxWidth >= 600.dp) GridCells.Fixed(2) else GridCells.Fixed(1)
+                    val documentosNaPasta = if (pastaAtivaId == null) documentos else documentos.filter { it.pastaId == pastaAtivaId }
 
-                    if (documentos.isEmpty()) {
+                    if (documentosNaPasta.isEmpty()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -168,7 +196,7 @@ fun BibliotecaScreen(
                             contentAlignment = Alignment.TopCenter
                         ) {
                             Text(
-                                text = if (textoBusca.isNotBlank()) "Nenhum documento encontrado para \"$textoBusca\"" else "Nenhum documento cadastrado.",
+                                text = if (textoBusca.isNotBlank()) "Nenhum documento encontrado para \"$textoBusca\"" else "Nenhum documento nesta pasta.",
                                 style = MaterialTheme.typography.bodyMedium.copy(color = AthenesTextMuted)
                             )
                         }
@@ -180,13 +208,14 @@ fun BibliotecaScreen(
                             verticalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(documentos, key = { it.id }) { doc ->
+                            items(documentosNaPasta, key = { it.id }, contentType = { "documento" }) { doc ->
                                 AthenesCard(
                                     documento = doc,
                                     onAbrirClick = { onAbrirDocumento(doc) },
                                     onDuplicarClick = { viewModel.duplicarDocumento(doc.id) },
                                     onRenomearClick = { viewModel.solicitarRenomear(doc) },
-                                    onExcluirClick = { viewModel.solicitarExclusao(doc) }
+                                    onExcluirClick = { viewModel.solicitarExclusao(doc) },
+                                    onMoverClick = { documentoParaMover = doc }
                                 )
                             }
                         }
@@ -322,6 +351,37 @@ fun BibliotecaScreen(
             documento = doc,
             onDismiss = viewModel::fecharDialogRenomear,
             onConfirmar = viewModel::confirmarRenomear
+        )
+    }
+    if (criarPastaAberto) {
+        AlertDialog(
+            onDismissRequest = { criarPastaAberto = false },
+            title = { Text(if (pastaAtivaId == null) "Nova pasta" else "Nova subpasta") },
+            text = { OutlinedTextField(value = nomeNovaPasta, onValueChange = { nomeNovaPasta = it }, label = { Text("Nome") }) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.criarPasta(nomeNovaPasta, pastaAtivaId)
+                    criarPastaAberto = false
+                }, enabled = nomeNovaPasta.isNotBlank()) { Text("Criar") }
+            },
+            dismissButton = { TextButton(onClick = { criarPastaAberto = false }) { Text("Cancelar") } }
+        )
+    }
+    documentoParaMover?.let { doc ->
+        AlertDialog(
+            onDismissRequest = { documentoParaMover = null },
+            title = { Text("Mover para…") },
+            text = {
+                Column {
+                    TextButton(onClick = { viewModel.moverDocumento(doc.id, null); documentoParaMover = null }) { Text("Meus documentos") }
+                    pastas.forEach { pasta ->
+                        TextButton(onClick = { viewModel.moverDocumento(doc.id, pasta.id); documentoParaMover = null }) {
+                            Text(pasta.nome)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { documentoParaMover = null }) { Text("Cancelar") } }
         )
     }
 }

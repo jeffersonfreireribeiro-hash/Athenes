@@ -54,6 +54,7 @@ fun AthenesCard(
     onDuplicarClick: () -> Unit = {},
     onRenomearClick: () -> Unit = {},
     onExcluirClick: () -> Unit = {},
+    onMoverClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var menuAberto by remember { mutableStateOf(false) }
@@ -254,6 +255,10 @@ fun AthenesCard(
                                     menuAberto = false
                                     onDuplicarClick()
                                 }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Mover para…", fontSize = 12.sp) },
+                                onClick = { menuAberto = false; onMoverClick() }
                             )
                             DropdownMenuItem(
                                 text = { Text("Excluir", fontSize = 12.sp, color = Color(0xFFDC2626)) },

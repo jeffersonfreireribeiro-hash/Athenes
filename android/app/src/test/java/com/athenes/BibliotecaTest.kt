@@ -87,4 +87,23 @@ class BibliotecaTest {
         assertEquals(2, docs.size)
         assertTrue(docs.none { it.id == docParaExcluir.id })
     }
+
+    @Test
+    fun `pastas e subpastas movem documentos sem perda ao excluir pasta`() {
+        val pai = repository.criarPasta("Pesquisa")!!
+        val filha = repository.criarPasta("Artigos", pai.id)!!
+        val doc = repository.documentos.value.first()
+        assertTrue(repository.moverDocumento(doc.id, filha.id))
+        assertEquals(filha.id, repository.documentos.value.first { it.id == doc.id }.pastaId)
+        repository.excluirPasta(pai.id)
+        assertTrue(repository.pastas.value.isEmpty())
+        assertEquals(null, repository.documentos.value.first { it.id == doc.id }.pastaId)
+    }
+
+    @Test
+    fun `recusa mover documento para pasta inexistente`() {
+        val doc = repository.documentos.value.first()
+        assertTrue(!repository.moverDocumento(doc.id, "inexistente"))
+        assertEquals(null, repository.documentos.value.first { it.id == doc.id }.pastaId)
+    }
 }

@@ -5,9 +5,9 @@ Inventário de 04/11/2026. A coluna **estado** descreve o código Android atual,
 | Recurso da web | Fonte na web | Estado no APK | Destino Android |
 | --- | --- | --- | --- |
 | Abas Escrita e Artigos Zotero | `src/ui/athenes_dashboard.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: biblioteca e leitor existem, sem as duas abas equivalentes | Documentos / Biblioteca |
-| Árvore de pastas, subpastas, contadores, Todos e compartilhadas | `src/ui/athenes_dashboard_pastas.js`, `src/core/athenes_arquivos.js` | Não | Documentos, painel de pastas |
-| Criar, renomear, excluir e mover pastas; vincular pasta do Drive | `src/ui/athenes_dashboard_pastas.js`, `src/core/athenes_drive_navegar.js` | Não | Documentos, painel de pastas |
-| Mover documentos entre pastas | `src/ui/athenes_dashboard_pastas.js` | Não | Documentos, menu Mover para…; arrastar no tablet |
+| Árvore de pastas, subpastas, contadores, Todos e compartilhadas | `src/ui/athenes_dashboard_pastas.js`, `src/core/athenes_arquivos.js` | Parcial: pastas locais e subpastas em faixa horizontal; faltam árvore lateral, contadores e compartilhadas | Documentos, painel de pastas |
+| Criar, renomear, excluir e mover pastas; vincular pasta do Drive | `src/ui/athenes_dashboard_pastas.js`, `src/core/athenes_drive_navegar.js` | Parcial: criação na tela e operações locais no repositório; faltam controles de renomear/excluir e Drive | Documentos, painel de pastas |
+| Mover documentos entre pastas | `src/ui/athenes_dashboard_pastas.js` | Parcial: menu Mover para… local; falta arrastar no tablet | Documentos, menu Mover para…; arrastar no tablet |
 | Cartões com metadados, busca, ordenação e ações de documento | `src/ui/athenes_dashboard.js`, `src/ui/athenes_arquivos_ui.js`, `src/core/athenes_repositorio.js` | Parcial: cartões e ações básicas em `BibliotecaScreen.kt` | Documentos |
 | Lixeira, duplicação e compartilhamento de documentos | `src/ui/athenes_dashboard_modais.js`, `src/core/athenes_compartilhamento.js` | Parcial | Documentos, menu do cartão |
 | Sincronização de perfil, estado e Google Drive | `src/ui/athenes_dashboard_sincronia.js`, `src/core/athenes_perfil_servidor.js`, `src/core/athenes_drive_sync.js` | Não: estado local não equivale a sincronização | Documentos / Conta |

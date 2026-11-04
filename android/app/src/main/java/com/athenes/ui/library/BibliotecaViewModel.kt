@@ -52,6 +52,12 @@ class BibliotecaViewModel(
     val textoBuscaArtigos: StateFlow<String> = _textoBuscaArtigos.asStateFlow()
 
     val artigos: StateFlow<List<ArtigoEstudoDetalhado>> = artigoRepository.artigos
+    val pastas = repository.pastas
+
+    fun criarPasta(nome: String, pastaPaiId: String? = null) = repository.criarPasta(nome, pastaPaiId)
+    fun moverDocumento(id: String, pastaId: String?) = repository.moverDocumento(id, pastaId)
+    fun renomearPasta(id: String, nome: String) = repository.renomearPasta(id, nome)
+    fun excluirPasta(id: String) = repository.excluirPasta(id)
 
     val artigosFiltrados: StateFlow<List<ArtigoEstudoDetalhado>> = combine(
         artigoRepository.artigos,
