@@ -4,6 +4,7 @@
  * Métodos da classe DashboardView (usam `this`); são acrescentados ao prototype em athenes_dashboard.js.
  */
 import { obterPastasDriveLocais, removerPastaDriveLocal, buscarPastaNaArvore } from '../core/athenes_colaboracao.js';
+import { artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { carregarArtigosEstudo } from './athenes_estudo_artigos.js';
 import { svgIcone } from './athenes_icones.js';
@@ -112,10 +113,7 @@ export const metodosDashboardPastas = {
     let count = 0;
     if (ehAbaBib) {
       const artigos = this.estudoView?.artigos || carregarArtigosEstudo();
-      count = artigos.filter(a => {
-        const pId = a.pastaId || 'pasta_bib_raiz';
-        return pId === pasta.id;
-      }).length;
+      count = artigos.filter(a => artigoEstaNaPasta(a, pasta.id)).length;
     } else {
       count = this.documentos.filter(d => {
         const pId = this.pastaEfetivaDoDoc(d);
@@ -235,10 +233,7 @@ export const metodosDashboardPastas = {
         `;
       } else {
         const artigos = this.estudoView?.artigos || carregarArtigosEstudo();
-        const artigosNaPasta = artigos.filter(a => {
-          const pId = a.pastaId || 'pasta_bib_raiz';
-          return pId === this.pastaAtivaId;
-        });
+        const artigosNaPasta = artigos.filter(a => artigoEstaNaPasta(a, this.pastaAtivaId));
 
         bannerEl.innerHTML = `
           <div style="display:flex; align-items:center; gap:8px; min-width:0;">

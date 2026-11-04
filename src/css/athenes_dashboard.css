@@ -1962,3 +1962,7 @@ mark.ath-pdf-grifo-texto {
 .ath-menu-importar-lista strong { display: block; font-size: 12.5px; }
 .ath-menu-importar-lista small { display: block; font-size: 11px; color: #64748B; margin-top: 1px; }
 .ath-menu-importar-lista svg { margin-top: 2px; color: var(--ath-primary, #314F79); flex: none; }
+.ath-pdf-sem-arquivo { margin: 60px auto; max-width: 460px; padding: 26px 28px; text-align: center; background: #fff; border: 1px dashed #C8D7E6; border-radius: 14px; color: #334155; }
+.ath-pdf-sem-arquivo strong { display: block; font-size: 15px; color: #314F79; margin-bottom: 8px; }
+.ath-pdf-sem-arquivo p { font-size: 12.5px; line-height: 1.5; margin: 0 0 14px; color: #64748B; }
+.ath-pdf-sem-arquivo-acoes { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }

@@ -440,7 +440,14 @@ export class DashboardView {
     } else {
       const boxEstudo = root.querySelector('#athContainerEstudoArtigos');
       this.estudoView = new EstudoArtigosView(boxEstudo, {
-        pastaFiltroId: this.pastaAtivaId
+        pastaFiltroId: this.pastaAtivaId,
+        // coleções do Zotero chegaram como pastas: atualiza a lateral e espelha a estrutura no Drive
+        aoMudarPastas: ({ pastasNovas = 0 } = {}) => {
+          this.pastasDrive = obterPastasDriveLocais();
+          this.renderizarPastasLateral();
+          this.renderizarBannerPasta();
+          if (pastasNovas) this.sincronizarComDrive({ aviso: false, docs: false }).then(() => { this.pastasDrive = obterPastasDriveLocais(); this.renderizarPastasLateral(); }).catch(() => {});
+        }
       });
     }
   }

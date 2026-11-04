@@ -283,7 +283,7 @@ test('Estúdio de Artigos suporta isolamento por pasta, método filtrarPorPasta 
   // Método e propriedade de filtro
   assert.equal(codigoEstudo.includes('filtrarPorPasta(pastaId)'), true);
   assert.equal(codigoEstudo.includes('this.pastaFiltroId ='), true);
-  assert.equal(codigoEstudo.includes("pastaArt !== this.pastaFiltroId"), true);
+  assert.equal(codigoEstudo.includes('artigoEstaNaPasta(art, this.pastaFiltroId)'), true); // um item do Zotero pode estar em várias pastas (coleções)
 
   // Vínculo de artigo com pasta
   assert.equal(codigoEstudo.includes('athNovoArtPasta'), true);

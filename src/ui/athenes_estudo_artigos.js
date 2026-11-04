@@ -20,10 +20,11 @@ import * as bib from '../core/athenes_biblioteca_artigos.js';
 import { lerConta, gravarConta } from '../core/athenes_conta.js';
 import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive } from '../core/athenes_drive_sync.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
-import { obterPerfilColaborador, obterConfigGoogleDrive, salvarArquivoNoGoogleDrive, listarPdfsDoGoogleDrive, salvarDocumentoNoSupabase, obterPastasDriveLocais, buscarPastaNaArvore } from '../core/athenes_colaboracao.js';
+import { obterPerfilColaborador, obterConfigGoogleDrive, salvarArquivoNoGoogleDrive, listarPdfsDoGoogleDrive, salvarDocumentoNoSupabase, obterPastasDriveLocais, salvarPastasDriveLocais, buscarPastaNaArvore } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { svgIcone } from './athenes_icones.js';
-import { ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo } from './athenes_estudo_artigos_dados.js';
+import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
+import { artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo } from './athenes_estudo_artigos_dados.js';
 import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
 import { metodosEstudoAnotacoes } from './athenes_estudo_artigos_anotacoes.js';
@@ -54,6 +55,7 @@ export class EstudoArtigosView {
     this.filtroBusca = '';
     this.filtroLateralEsq = '';
     this.pastaFiltroId = opcoes.pastaFiltroId || 'todas';
+    this.aoMudarPastas = opcoes.aoMudarPastas || null; // a página inicial refaz a lista de pastas quando as coleções do Zotero chegam
     this.zoteroClient = new ZoteroClient();
     this.carregarConfigZotero();
     this.renderizar();
@@ -284,10 +286,10 @@ export class EstudoArtigosView {
       doi: item.doi || '',
       palavrasChave: item.palavrasChave?.length ? item.palavrasChave : ['Zotero'],
       driveFileId: '',
-      driveFileName: `${(item.autores?.[0]?.sobrenome || 'Artigo')}_${item.ano || '2026'}.pdf`,
-      driveStatus: 'Pronto para vincular ao Google Drive',
+      driveFileName: '',
+      driveStatus: 'Sem PDF vinculado',
       corCapa: '#314F79',
-      totalPaginas: 2,
+      totalPaginas: 0,
       resumoOriginal: item.resumo || 'Resumo sincronizado da biblioteca Zotero.',
       fichamento: {
         resumoPessoal: '',
@@ -296,27 +298,7 @@ export class EstudoArtigosView {
         notasPagina: {},
         tracosPorPagina: {}
       },
-      conteudoPaginasPdf: [
-        {
-          numero: 1,
-          cabecalho: `${(item.publicacao || 'PERIÓDICO CIENTÍFICO').toUpperCase()} · ${item.ano || '2026'}`,
-          titulo: (item.titulo || 'ARTIGO CIENTÍFICO').toUpperCase(),
-          autores: (item.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome || ''}`.trim()).join(' · '),
-          paragrafos: [
-            `RESUMO: ${item.resumo || 'Texto integral carregado via vínculo do Google Drive. Selecione qualquer frase desta página para grifar, transformar em citação ABNT ou fixar uma nota adesiva.'}`,
-            '1. INTRODUÇÃO E PROBLEMATIZAÇÃO: Use a barra superior flutuante para alternar entre Seleção de Texto, Caneta Livre, Linha Reta, Marca-Texto ou Notas Adesivas.'
-          ]
-        },
-        {
-          numero: 2,
-          cabecalho: `${(item.autores?.[0]?.sobrenome || 'AUTOR').toUpperCase()} (${item.ano || '2026'}) · p. 2`,
-          titulo: '2. DESENVOLVIMENTO E RESULTADOS PRINCIPAIS',
-          autores: 'Continuação do documento PDF vinculado',
-          paragrafos: [
-            'Todas as páginas do artigo aparecem empilhadas continuamente neste palco. Você pode rolar livremente entre elas, desenhar esquemas com linhas retas ou mão livre e sincronizar tudo com o Zotero e o Google Drive.'
-          ]
-        }
-      ]
+      conteudoPaginasPdf: [] // sem PDF vinculado não há páginas: o estúdio avisa e oferece vincular
     };
   }
 
@@ -327,8 +309,7 @@ export class EstudoArtigosView {
 
     const filtrados = this.artigos.filter(art => {
       if (this.pastaFiltroId && this.pastaFiltroId !== 'todas') {
-        const pastaArt = art.pastaId || 'pasta_bib_raiz';
-        if (pastaArt !== this.pastaFiltroId) return false;
+        if (!artigoEstaNaPasta(art, this.pastaFiltroId)) return false;
       }
       if (!this.filtroBusca) return true;
       const autoresStr = (art.autores || []).map(a => `${a.prenome} ${a.sobrenome}`).join(' ');
@@ -399,7 +380,7 @@ export class EstudoArtigosView {
             <span>·</span>
             <span><strong>${qtdTracos + qtdPins}</strong> marcaç${(qtdTracos + qtdPins) === 1 ? 'ão' : 'ões'} no PDF</span>
             <span>·</span>
-            <span style="color:#059669; font-weight:700;">${escapeHtml(art.driveFileName || 'PDF vinculado')}</span>
+            ${artigoTemPdf(art) ? `<span style="color:#059669; font-weight:700;">${escapeHtml(art.driveFileName || 'PDF vinculado')}</span>` : '<span style="color:#B45309; font-weight:700;">Sem PDF vinculado</span>'}
           </div>
 
           <div class="ath-artigo-card-rodape">
@@ -435,11 +416,14 @@ export class EstudoArtigosView {
       if (document.documentElement?.scrollTop > 0) document.documentElement.scrollTop = 0;
       if (document.body?.scrollTop > 0) document.body.scrollTop = 0;
     }
+    this._carregandoPdf = !art.pdfBlobUrl && artigoTemPdf(art) ? art : null; // PDF no Drive: "Carregando…" em vez de aviso de "sem PDF"
     this.renderizar();
     if (!art.pdfBlobUrl) {
       garantirPdfDoArtigo(art).then(carregou => {
-        if (carregou && this.artigoAberto === art) this.renderizar();
-      });
+        if (this._carregandoPdf === art) this._carregandoPdf = null;
+        if (this.artigoAberto === art) this.renderizar();
+        return carregou;
+      }).catch(() => { if (this._carregandoPdf === art) this._carregandoPdf = null; if (this.artigoAberto === art) this.renderizar(); });
     }
   }
 
@@ -920,14 +904,37 @@ export class EstudoArtigosView {
       this.salvarConfigZotero({ userId: this.zoteroClient.userId });
     }
 
+    // as coleções do Zotero viram pastas de bibliografia (mesmos nomes e hierarquia)
+    let mapaPastas = new Map();
+    let pastasNovas = 0;
+    try {
+      const colecoes = await this.zoteroClient.listarColecoes();
+      if (colecoes.length) {
+        const esp = espelharColecoesNasPastas(obterPastasDriveLocais(), colecoes);
+        mapaPastas = esp.mapa;
+        pastasNovas = esp.criadas;
+        if (esp.criadas || esp.renomeadas) salvarPastasDriveLocais(esp.pastas);
+      }
+    } catch (e) { console.warn('[Athenes] Coleções do Zotero:', e.message); }
+    const naRaizOuZotero = (a) => !a.pastaId || a.pastaId === 'pasta_bib_raiz' || String(a.pastaId).startsWith('zot_col_'); // pasta escolhida à mão não é desfeita
+
     let novos = 0;
     (itens || []).forEach(it => {
-      if (!this.artigos.some(a => a.chaveZotero === it.chave || a.titulo === it.titulo)) {
-        this.artigos.unshift(this.converterItemZoteroParaEstudo(it));
-        novos++;
+      const ids = pastasDoItemZotero(it.colecoes, mapaPastas);
+      const existente = this.artigos.find(a => a.chaveZotero === it.chave || a.titulo === it.titulo);
+      if (existente) {
+        existente.colecoesZotero = it.colecoes || [];
+        if (naRaizOuZotero(existente)) { existente.pastasIds = ids; existente.pastaId = ids[0]; }
+        return;
       }
+      const novo = this.converterItemZoteroParaEstudo(it, ids[0]);
+      novo.pastasIds = ids;
+      novo.colecoesZotero = it.colecoes || [];
+      this.artigos.unshift(novo);
+      novos++;
     });
     salvarArtigosEstudo(this.artigos);
+    if (typeof this.aoMudarPastas === 'function') this.aoMudarPastas({ pastasNovas });
     this.renderizar();
     if (!silencioso) {
       if (!itens || itens.length === 0) {

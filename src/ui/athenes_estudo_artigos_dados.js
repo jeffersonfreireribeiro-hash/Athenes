@@ -18,6 +18,14 @@ export function ehArtigoExemploFicticio(art) {
   return IDS_ARTIGOS_EXEMPLO.has(art.id) || CHAVES_ZOTERO_EXEMPLO.has(art.chaveZotero) || CHAVES_ZOTERO_EXEMPLO.has(art.chave);
 }
 
+/** O artigo tem (ou pode abrir) um PDF de verdade? Sem ele o estúdio avisa, em vez de inventar páginas. */
+export function artigoTemPdf(art) {
+  if (!art) return false;
+  if (ehArtigoExemploFicticio(art) || art.pdfBlobUrl || art.temPdfLocal) return true;
+  const id = String(art.driveFileId || '').trim();
+  return Boolean(id) && !/^drive_pdf_/.test(id);
+}
+
 export function criarArtigosEstudoExemplo() {
   return [
     {

@@ -4,9 +4,10 @@
  * Métodos do EstudoArtigosView (usam `this`); são acrescentados ao prototype em athenes_estudo_artigos.js.
  */
 import { obterConfigGoogleDrive } from '../core/athenes_colaboracao.js';
+import { artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
-import { registrarPdfLocalNoArtigo, salvarArtigosEstudo, formatarCitacaoAbntDoArtigo } from './athenes_estudo_artigos_dados.js';
+import { registrarPdfLocalNoArtigo, salvarArtigosEstudo, formatarCitacaoAbntDoArtigo, artigoTemPdf, ehArtigoExemploFicticio } from './athenes_estudo_artigos_dados.js';
 
 export const metodosEstudoTela = {
   renderizarEstudioPdfFullScreen(art, scrollSalvo = 0) {
@@ -35,14 +36,15 @@ export const metodosEstudoTela = {
       }
     }
 
-    const paginasPdf = Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.length > 0
+    // sem PDF vinculado não se inventam páginas: o palco avisa e oferece vincular (o fichamento e o resumo seguem disponíveis)
+    const semPdf = !art.pdfBlobUrl && !ehArtigoExemploFicticio(art);
+    const paginasPdf = semPdf ? [] : (Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.length > 0
       ? art.conteudoPaginasPdf
-      : [{ numero: 1, cabecalho: art.publicacao || 'Artigo PDF', titulo: art.titulo, autores: '', paragrafos: [art.resumoOriginal || ''] }];
-    art.conteudoPaginasPdf = paginasPdf;
-    art.totalPaginas = paginasPdf.length;
+      : [{ numero: 1, cabecalho: art.publicacao || 'Artigo PDF', titulo: art.titulo, autores: '', paragrafos: [art.resumoOriginal || ''] }]);
+    if (!semPdf) { art.conteudoPaginasPdf = paginasPdf; art.totalPaginas = paginasPdf.length; }
 
     const totalPags = paginasPdf.length;
-    if (this.paginaAtual > totalPags) this.paginaAtual = totalPags;
+    if (this.paginaAtual > totalPags) this.paginaAtual = Math.max(1, totalPags);
     if (this.paginaAtual < 1) this.paginaAtual = 1;
 
     const citacoes = art.fichamento.citacoesMarcadas || [];
@@ -102,7 +104,7 @@ export const metodosEstudoTela = {
             <div class="rm-prev-topo-esq">
               <strong>Estúdio PDF</strong>
               <span class="rm-prev-info">
-                ${totalPags} ${totalPags === 1 ? 'página' : 'páginas'} em rolagem contínua · <b id="athLabelModoRisco">${this.rotuloFerramenta(this.ferramentaAtiva)}${this.modoLinhaReta ? ' (Linha Reta)' : ''}</b>
+                ${semPdf ? 'Sem PDF vinculado' : `${totalPags} ${totalPags === 1 ? 'página' : 'páginas'} em rolagem contínua`} · <b id="athLabelModoRisco">${this.rotuloFerramenta(this.ferramentaAtiva)}${this.modoLinhaReta ? ' (Linha Reta)' : ''}</b>
               </span>
             </div>
 
@@ -202,7 +204,7 @@ export const metodosEstudoTela = {
             <!-- Botão de Adicionar Folha Extra e Indicador de Página à Direita -->
             <div style="margin-left:auto; display:flex; align-items:center; gap:6px;">
               <span id="athIndicadorPagBarra" style="font:800 11.5px var(--glx-font); color:#314F79; background:#EEF4FA; padding:4px 10px; border-radius:999px;">
-                Pág. ${this.paginaAtual} de ${totalPags}
+                ${semPdf ? 'Sem PDF' : `Pág. ${this.paginaAtual} de ${totalPags}`}
               </span>
               <button type="button" class="rm-ic-bt" id="athPdfNovaPag" data-tip="Folha Extra" title="Adicionar folha extra de esquemas/notas ao final do PDF" style="width:32px; height:32px;">
                 ${svgIcone('mais', 14)}
@@ -493,6 +495,32 @@ export const metodosEstudoTela = {
     if (!stack) return;
     stack.innerHTML = '';
 
+    // sem PDF: aviso claro no lugar das páginas (nada de folha inventada)
+    if (!art.pdfBlobUrl && !ehArtigoExemploFicticio(art)) {
+      const carregando = this._carregandoPdf === art;
+      const aviso = document.createElement('div');
+      aviso.className = 'ath-pdf-sem-arquivo';
+      aviso.innerHTML = carregando
+        ? '<strong>Carregando o PDF do Google Drive…</strong>'
+        : `<strong>Este artigo ainda não tem PDF vinculado</strong>
+           <p>O registro veio do Zotero só com os dados da obra. Vincule o arquivo para ler, grifar e citar com página. O resumo e o fichamento ao lado já funcionam.</p>
+           <div class="ath-pdf-sem-arquivo-acoes">
+             <label class="glx-btn glx-btn-primary glx-btn-sm" style="cursor:pointer;">${svgIcone('upload', 14)} Selecionar PDF no computador<input type="file" accept="application/pdf,.pdf" hidden></label>
+             <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" data-sem-pdf-drive>${svgIcone('drive', 14)} Do Google Drive…</button>
+           </div>`;
+      aviso.querySelector('input[type=file]')?.addEventListener('change', (e) => {
+        const arq = e.target.files?.[0];
+        if (!arq) return;
+        registrarPdfLocalNoArtigo(art, arq);
+        if (this._pdfFalhou) this._pdfFalhou.clear();
+        salvarArtigosEstudo(this.artigos);
+        this.renderizar();
+      });
+      aviso.querySelector('[data-sem-pdf-drive]')?.addEventListener('click', () => root.querySelector('#athBtnPopDrive')?.click());
+      stack.appendChild(aviso);
+      return;
+    }
+
     // PDF real: renderiza cada página do arquivo como uma folha própria (no formato original)
     const pdfInfo = art.pdfBlobUrl ? this._pdfDocs?.get(art.pdfBlobUrl) : null;
     if (art.pdfBlobUrl && !pdfInfo && !this._pdfFalhou?.has(art.pdfBlobUrl)) {
@@ -682,8 +710,7 @@ export const metodosEstudoTela = {
     if (!colEsq) return;
     const artigosFiltrados = this.artigos.filter(a => {
       if (this.pastaFiltroId && this.pastaFiltroId !== 'todas') {
-        const pastaArt = a.pastaId || 'pasta_bib_raiz';
-        if (pastaArt !== this.pastaFiltroId) return false;
+        if (!artigoEstaNaPasta(a, this.pastaFiltroId)) return false;
       }
       if (!this.filtroLateralEsq) return true;
       const str = `${a.titulo} ${(a.autores || []).map(x => x.sobrenome).join(' ')} ${a.ano}`.toLowerCase();
