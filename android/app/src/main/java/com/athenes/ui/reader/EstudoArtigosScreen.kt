@@ -72,6 +72,17 @@ fun EstudoArtigosScreen(
     }
     val artigos by viewModel.artigos.collectAsState()
     val artigoAtivoId by viewModel.artigoAtivoId.collectAsState()
+    if (artigos.isEmpty()) {
+        Column(modifier.fillMaxSize().padding(24.dp).semantics { liveRegion = LiveRegionMode.Polite },
+            verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Nenhum artigo disponível", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(8.dp))
+            Text("Adicione um artigo na Biblioteca para começar a leitura.")
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onVoltarBiblioteca, modifier = Modifier.heightIn(min = 48.dp)) { Text("Abrir Biblioteca") }
+        }
+        return
+    }
     val artigoAtivo = remember(artigos, artigoAtivoId) {
         artigos.find { it.id == artigoAtivoId } ?: artigos.first()
     }

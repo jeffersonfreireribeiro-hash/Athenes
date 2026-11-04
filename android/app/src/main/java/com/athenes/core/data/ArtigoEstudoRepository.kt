@@ -196,6 +196,20 @@ class ArtigoEstudoRepository {
             ?.edit()?.putString("dados", ArtigosLocaisCodec.escrever(artigosLocais))?.apply()
     }
 
+    fun excluirArtigoLocal(id: String): Boolean {
+        if (artigosLocais.none { it.id == id }) return false
+        artigosLocais = artigosLocais.filterNot { it.id == id }
+        _artigos.value = _artigos.value.filterNot { it.id == id }
+        if (_artigoAtivoId.value == id) _artigoAtivoId.value = _artigos.value.firstOrNull()?.id.orEmpty()
+        salvarArtigosLocais()
+        contexto?.let { ctx ->
+            listOf("pdf_artigos", "anotacoes_pdf", "tracos_pdf", "notas_zotero").forEach { nome ->
+                ctx.getSharedPreferences(nome, Context.MODE_PRIVATE).edit().remove(id).apply()
+            }
+        }
+        return true
+    }
+
     fun importarBib(conteudo: String): Int {
         val importados = BibtexParser.ler(conteudo)
         require(importados.isNotEmpty()) { "O arquivo BIB não contém referências válidas." }

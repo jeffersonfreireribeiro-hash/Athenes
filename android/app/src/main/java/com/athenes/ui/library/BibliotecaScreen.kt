@@ -156,6 +156,7 @@ fun BibliotecaScreen(
     var chaveZotero by remember { mutableStateOf("") }
     var usuarioZotero by remember { mutableStateOf("") }
     var novoArtigoAberto by rememberSaveable { mutableStateOf(false) }
+    var artigoLocalParaExcluir by remember { mutableStateOf<ArtigoEstudoDetalhado?>(null) }
 
     val dialogNovoAberto by viewModel.dialogNovoAberto.collectAsState()
     val docParaExcluir by viewModel.docParaExcluir.collectAsState()
@@ -520,7 +521,8 @@ fun BibliotecaScreen(
                                     artigo = art,
                                     onAbrirTelaCheiaClick = {
                                         onAbrirLeitorPdf(art.id)
-                                    }
+                                    },
+                                    onExcluirLocal = if (art.id.startsWith("local_")) ({ artigoLocalParaExcluir = art }) else null
                                 )
                             }
                         }
@@ -545,6 +547,18 @@ fun BibliotecaScreen(
                 novoArtigoAberto = false
                 onAbrirLeitorPdf(artigo.id)
             }
+        )
+    }
+    artigoLocalParaExcluir?.let { artigo ->
+        AlertDialog(
+            onDismissRequest = { artigoLocalParaExcluir = null },
+            title = { Text("Excluir artigo local?") },
+            text = { Text("O registro, o vínculo do PDF e as anotações de \"${artigo.titulo}\" serão removidos deste aparelho. O arquivo PDF original não será apagado.") },
+            confirmButton = { TextButton(onClick = {
+                viewModel.excluirArtigoLocal(artigo.id)
+                artigoLocalParaExcluir = null
+            }) { Text("Excluir") } },
+            dismissButton = { TextButton(onClick = { artigoLocalParaExcluir = null }) { Text("Cancelar") } }
         )
     }
     if (dialogNovoAberto) {

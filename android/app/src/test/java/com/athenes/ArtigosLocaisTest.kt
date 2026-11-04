@@ -43,4 +43,18 @@ class ArtigosLocaisTest {
         assertEquals("ITEM1234", restaurado.chaveZotero)
         assertEquals(artigo.id, restaurado.id)
     }
+
+    @Test fun `exclusao local nao remove item Zotero e aceita biblioteca vazia`() {
+        val repositorio = ArtigoEstudoRepository()
+        val local = repositorio.adicionarArtigoLocal("Local", "Ana", 2025, "", "")
+        repositorio.aplicarBibliotecaZotero(emptyList(), emptyList())
+        assertTrue(repositorio.excluirArtigoLocal(local.id))
+        assertTrue(repositorio.artigos.value.isEmpty())
+        assertFalse(repositorio.excluirArtigoLocal(local.id))
+        repositorio.aplicarBibliotecaZotero(listOf(ZoteroItem(
+            "ZOT12345", "journalArticle", "Remoto", emptyList(), "2024", "", "", emptyList(), emptyList(), emptyMap()
+        )), emptyList())
+        assertFalse(repositorio.excluirArtigoLocal("ZOT12345"))
+        assertEquals("ZOT12345", repositorio.artigos.value.single().id)
+    }
 }

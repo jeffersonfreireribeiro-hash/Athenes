@@ -19,6 +19,9 @@ import com.athenes.core.citacao.ReferenciaAcademica
 import com.athenes.ui.editor.components.GrafoConexoesDialog
 import com.athenes.ui.library.DialogNovoArtigoLocal
 import com.athenes.core.model.ArtigoEstudoDetalhado
+import com.athenes.core.data.ArtigoEstudoRepository
+import com.athenes.ui.reader.EstudoArtigosScreen
+import com.athenes.ui.reader.ReaderViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -115,5 +118,16 @@ class NavegacaoAcessibilidadeTest {
         compose.onNodeWithText("Estudo vinculado", substring = true).performClick()
         compose.onNodeWithText("Adicionar e abrir").performClick()
         compose.runOnIdle { assertEquals(listOf("Estudo vinculado", "Ana Silva", "2024", "Revista acadêmica", "Resumo da obra", "ZOT123"), dados) }
+    }
+
+    @Test fun estudioSemArtigosMostraProximaAcao() {
+        val repositorio = ArtigoEstudoRepository().apply { aplicarBibliotecaZotero(emptyList(), emptyList()) }
+        var voltou = false
+        compose.setContent { MaterialTheme {
+            EstudoArtigosScreen(onVoltarBiblioteca = { voltou = true }, viewModel = ReaderViewModel(repositorio))
+        } }
+        compose.onNodeWithText("Nenhum artigo disponível").assertExists()
+        compose.onNodeWithText("Abrir Biblioteca").performClick()
+        compose.runOnIdle { assertTrue(voltou) }
     }
 }

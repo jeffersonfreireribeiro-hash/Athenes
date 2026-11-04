@@ -26,6 +26,7 @@ import com.athenes.ui.theme.*
 fun ArtigoEstudoCard(
     artigo: ArtigoEstudoDetalhado,
     onAbrirTelaCheiaClick: () -> Unit,
+    onExcluirLocal: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -229,12 +230,17 @@ fun ArtigoEstudoCard(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Abrir em Tela Cheia (PDF & Fichamento)",
+                    text = "Abrir estúdio",
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
                     )
                 )
+            }
+            if (onExcluirLocal != null) {
+                TextButton(onClick = onExcluirLocal, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Text("Excluir artigo local")
+                }
             }
         }
     }
