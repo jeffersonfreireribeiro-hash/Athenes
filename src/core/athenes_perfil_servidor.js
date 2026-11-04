@@ -11,6 +11,7 @@
  * Funções puras (`mesclarPerfil`) separadas da rede, e a rede recebe `fetchImpl` (testável sem navegador).
  */
 import { obterConfigSupabase } from './athenes_colaboracao.js';
+import { decidirConfigZotero } from './athenes_zotero_config.js';
 import { cabecalhosSupabase, lerSessaoSupabase } from './athenes_supabase_auth.js';
 
 export const PREFIXO_ID_PERFIL = '__perfil__:';
@@ -134,8 +135,10 @@ export function mesclarPerfil(servidor, local) {
   const temLocal = Boolean(cfgLocal?.apiKey && cfgLocal?.userId);
   const canonZ = (c) => JSON.stringify([c?.userId || '', c?.apiKey || '', c?.username || '', Boolean(c?.isGroup)]);
   let zotero = srv.zotero || null; let aplicarZotero = null;
-  if (temLocal && (!zotero || local.zotero.mudou) && (!zotero || canonZ(zotero.cfg) !== canonZ(cfgLocal))) zotero = { cfg: cfgLocal, atualizadoEm: new Date().toISOString() };
-  else if (zotero?.cfg?.apiKey && canonZ(zotero.cfg) !== canonZ(cfgLocal)) aplicarZotero = zotero.cfg;
+  const diferenteZ = !zotero || canonZ(zotero.cfg) !== canonZ(cfgLocal);
+  const vencedor = !zotero ? 'local' : decidirConfigZotero(cfgLocal, zotero.cfg, { localMudou: Boolean(local.zotero?.mudou), remotoEm: zotero.atualizadoEm || '' });
+  if (temLocal && diferenteZ && vencedor === 'local') zotero = { cfg: cfgLocal, atualizadoEm: cfgLocal.alteradoEm || new Date().toISOString() };
+  else if (zotero?.cfg?.apiKey && canonZ(zotero.cfg) !== canonZ(cfgLocal)) aplicarZotero = { ...zotero.cfg, ...(zotero.atualizadoEm ? { alteradoEm: zotero.atualizadoEm } : {}) };
 
   const indice = { versao: (srv.versao || 0) + 1, pastas, documentos, excluidos, pastasExcluidas, drive, ...(zotero ? { zotero } : {}) };
   const canon = (o) => JSON.stringify(o, (_, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v));

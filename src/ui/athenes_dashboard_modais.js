@@ -4,6 +4,7 @@
  * Métodos da classe DashboardView (usam `this`); são acrescentados ao prototype em athenes_dashboard.js.
  */
 import { lerConta, gravarConta } from '../core/athenes_conta.js';
+import { gravarConfigZotero, lerConfigZotero } from '../core/athenes_zotero_config.js';
 import { obterPerfilColaborador, salvarPerfilColaborador, encerrarSessao, CORES_COLABORADORES, obterConfigGoogleDrive, entrarNaNuvemComGoogle, nuvemAutenticada, autenticarGoogleDrive, obterInfoUsuarioGoogle, obterOuCriarEstruturaPastasAthenes, obterPastasDriveLocais, adicionarSubpastaDriveLocal, adicionarPastaCompartilhadaDriveLocal, buscarPastaNaArvore, extrairIdPastaDrive } from '../core/athenes_colaboracao.js';
 import { salvarArtigosEstudo } from './athenes_estudo_artigos.js';
 import { svgIcone } from './athenes_icones.js';
@@ -101,11 +102,11 @@ export const metodosDashboardModais = {
             <div class="ath-linha2" style="margin-bottom:8px;">
               <div class="ath-prop-grupo" style="margin-bottom:0;">
                 <label style="font-size:11px;">Zotero API Key (Chave Privada)</label>
-                <input type="text" class="ath-input" id="athLoginZoteroKey" value="${zoteroApiKey}" placeholder="Ex.: KNEYoy8RTMlkaTuHx5WPc3bH" style="height:30px; font-size:11.5px;">
+                <input type="text" class="ath-input" id="athLoginZoteroKey" value="${zoteroApiKey}" placeholder="Cole aqui a chave (zotero.org/settings/keys)" style="height:30px; font-size:11.5px;">
               </div>
               <div class="ath-prop-grupo" style="margin-bottom:0;">
                 <label style="font-size:11px;">Zotero User ID</label>
-                <input type="text" class="ath-input" id="athLoginZoteroId" value="${zoteroUserId}" placeholder="Ex.: 18806479" style="height:30px; font-size:11.5px;">
+                <input type="text" class="ath-input" id="athLoginZoteroId" value="${zoteroUserId}" placeholder="Preenchido sozinho pela chave" style="height:30px; font-size:11.5px;">
               </div>
             </div>
             <div class="ath-prop-grupo" style="margin-bottom:8px;">
@@ -247,14 +248,7 @@ export const metodosDashboardModais = {
 
       const zId = modal.querySelector('#athLoginZoteroId').value.trim();
       const zKey = modal.querySelector('#athLoginZoteroKey').value.trim();
-      try {
-        const zAtual = JSON.parse(lerConta('athenes_zotero_cfg') || '{}');
-        gravarConta('athenes_zotero_cfg', JSON.stringify({
-          ...zAtual,
-          userId: zId || zAtual.userId || '',
-          apiKey: zKey !== undefined ? zKey : (zAtual.apiKey || '')
-        }));
-      } catch (_) {}
+      gravarConfigZotero({ userId: zId || lerConfigZotero().userId || '', apiKey: zKey });
       // chave do Zotero digitada aqui vai para o Drive (e vale nos outros computadores)
       obterTokenDrive().then(t => t && sincronizarZoteroComDrive(t)).catch(() => {});
 

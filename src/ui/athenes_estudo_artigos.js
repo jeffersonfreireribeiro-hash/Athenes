@@ -17,6 +17,7 @@
  */
 
 import * as bib from '../core/athenes_biblioteca_artigos.js';
+import { gravarConfigZotero } from '../core/athenes_zotero_config.js';
 import { lerConta, gravarConta } from '../core/athenes_conta.js';
 import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive } from '../core/athenes_drive_sync.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
@@ -78,14 +79,7 @@ export class EstudoArtigosView {
     if (cfg.userId !== undefined) this.zoteroClient.userId = String(cfg.userId).trim();
     if (cfg.apiKey !== undefined) this.zoteroClient.apiKey = String(cfg.apiKey).trim();
     if (cfg.username !== undefined) this.zoteroClient.username = cfg.username;
-    try {
-      gravarConta('athenes_zotero_cfg', JSON.stringify({
-        userId: this.zoteroClient.userId,
-        apiKey: this.zoteroClient.apiKey,
-        username: this.zoteroClient.username || '',
-        isGroup: Boolean(this.zoteroClient.isGroup)
-      }));
-    } catch (_) {}
+    gravarConfigZotero({ userId: this.zoteroClient.userId, apiKey: this.zoteroClient.apiKey, username: this.zoteroClient.username || '', isGroup: Boolean(this.zoteroClient.isGroup) });
     // depois de uma pausa curta, leva a conexão para o Drive (vale nos outros computadores da conta)
     clearTimeout(this._tZoteroDrive);
     this._tZoteroDrive = setTimeout(() => { obterTokenDrive().then(t => t && sincronizarZoteroComDrive(t)).catch(() => {}); }, 1500);

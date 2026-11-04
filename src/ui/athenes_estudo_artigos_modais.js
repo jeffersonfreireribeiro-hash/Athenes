@@ -24,10 +24,10 @@ export const metodosEstudoModais = {
         </div>
         <div class="rm-popover-body">
           <label>Zotero API Key (Chave Privada)
-            <input type="text" id="athPopZoteroKeyInput" value="${escapeHtml(this.zoteroClient.apiKey || '')}" placeholder="Ex.: KNEYoy8RTMlkaTuHx5WPc3bH">
+            <input type="text" id="athPopZoteroKeyInput" value="${escapeHtml(this.zoteroClient.apiKey || '')}" placeholder="Cole aqui a chave (zotero.org/settings/keys)">
           </label>
           <label>Zotero User ID (opcional — detectado pela Key)
-            <input type="text" id="athPopZoteroUserInput" value="${escapeHtml(this.zoteroClient.userId || '')}" placeholder="Ex.: 18806479">
+            <input type="text" id="athPopZoteroUserInput" value="${escapeHtml(this.zoteroClient.userId || '')}" placeholder="Preenchido sozinho pela chave">
           </label>
           <div style="display:flex; gap:6px; margin-top:4px;">
             <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="athBtnPopTestarESincronizarZot" style="flex:1; justify-content:center;">
@@ -718,17 +718,17 @@ export const metodosEstudoModais = {
         </div>
         <div class="ath-modal-corpo">
           <p style="font-size:12.5px; color:#475569; margin:0;">
-            Cole abaixo a sua <b>Chave Privada (API Key)</b> gerada em <code>zotero.org/settings/keys</code>. O Athenes descobre automaticamente o seu <b>User ID</b> (ex.: <code>18806479</code>) pela própria chave!
+            Cole abaixo a sua <b>Chave Privada (API Key)</b> gerada em <code>zotero.org/settings/keys</code>. O Athenes descobre automaticamente o seu <b>User ID</b> (um número, como <code>1234567</code>) pela própria chave!
           </p>
 
           <div class="ath-prop-grupo">
             <label>Chave de API do Zotero (Private Key)</label>
-            <input type="text" class="ath-input" id="athInputModalZotKey" value="${escapeHtml(this.zoteroClient.apiKey || '')}" placeholder="Ex.: KNEYoy8RTMlkaTuHx5WPc3bH" autofocus>
+            <input type="text" class="ath-input" id="athInputModalZotKey" value="${escapeHtml(this.zoteroClient.apiKey || '')}" placeholder="Cole aqui a chave (zotero.org/settings/keys)" autofocus>
           </div>
 
           <div class="ath-prop-grupo">
             <label>Zotero User ID (Opcional — preenchido automaticamente pela Key)</label>
-            <input type="text" class="ath-input" id="athInputModalZotUser" value="${escapeHtml(this.zoteroClient.userId || '')}" placeholder="Ex.: 18806479">
+            <input type="text" class="ath-input" id="athInputModalZotUser" value="${escapeHtml(this.zoteroClient.userId || '')}" placeholder="Preenchido sozinho pela chave">
           </div>
 
           <div id="athModalZotStatusFeedback" style="font-size:12px; font-weight:700; min-height:18px;"></div>

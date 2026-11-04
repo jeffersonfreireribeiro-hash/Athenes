@@ -6,6 +6,7 @@
  */
 
 import { lerConta, gravarConta } from '../core/athenes_conta.js';
+import { gravarConfigZotero } from '../core/athenes_zotero_config.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import * as bib from '../core/athenes_biblioteca_artigos.js';
 import { svgIcone } from './athenes_icones.js';
@@ -65,13 +66,7 @@ export class PainelZotero {
   }
 
   salvarCredenciais() {
-    try {
-      gravarConta('athenes_zotero_cfg', JSON.stringify({
-        userId: this.client.userId,
-        apiKey: this.client.apiKey,
-        isGroup: this.client.isGroup
-      }));
-    } catch (_) {}
+    gravarConfigZotero({ userId: this.client.userId, apiKey: this.client.apiKey, isGroup: this.client.isGroup });
   }
 
   setDocumento(doc) {

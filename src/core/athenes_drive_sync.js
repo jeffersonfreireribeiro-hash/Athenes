@@ -15,6 +15,7 @@ import {
   listarArquivosDoGoogleDrive, baixarArquivoDoGoogleDrive
 } from './athenes_colaboracao.js';
 import { lerConta, gravarConta } from './athenes_conta.js';
+import { decidirConfigZotero } from './athenes_zotero_config.js';
 
 const API = 'https://www.googleapis.com/drive/v3/files';
 const NOME_RAIZ = 'Athenes';
@@ -377,11 +378,11 @@ export async function sincronizarZoteroComDrive(token, { fetchImpl = globalThis.
   const marcar = (cfg, em) => gravarConta(CHAVE_ZOTERO_MARCA, JSON.stringify({ hash: chaveZotero(cfg), em: em || new Date().toISOString() }));
   const enviar = async () => {
     const em = new Date().toISOString();
-    await salvarArquivoNoGoogleDrive({ nomeArquivo: NOME_CONFIG_DRIVE, conteudoBlobOuTexto: JSON.stringify({ zotero: local, atualizadoEm: em }), mimeType: 'application/json', accessToken: token, driveFileId: arquivo?.id || null, pastaId: raizId }, fetchImpl);
+    await salvarArquivoNoGoogleDrive({ nomeArquivo: NOME_CONFIG_DRIVE, conteudoBlobOuTexto: JSON.stringify({ zotero: local, atualizadoEm: local.alteradoEm || em }), mimeType: 'application/json', accessToken: token, driveFileId: arquivo?.id || null, pastaId: raizId }, fetchImpl);
     marcar(local, em);
     return 'enviou';
   };
-  const baixar = () => { gravarConta(CHAVE_ZOTERO, JSON.stringify({ ...local, ...remoto })); marcar(remoto, remotoEm); return 'baixou'; };
+  const baixar = () => { gravarConta(CHAVE_ZOTERO, JSON.stringify({ ...local, ...remoto, ...(remotoEm ? { alteradoEm: remotoEm } : {}) })); marcar(remoto, remotoEm); return 'baixou'; };
 
   const temLocal = zoteroCompleto(local); const temRemoto = zoteroCompleto(remoto);
   if (!temLocal && temRemoto) return baixar();
@@ -389,7 +390,7 @@ export async function sincronizarZoteroComDrive(token, { fetchImpl = globalThis.
   if (!temLocal && !temRemoto) return 'nada';
   if (chaveZotero(local) === chaveZotero(remoto)) { marcar(local, remotoEm); return 'igual'; }
   const localMudou = Boolean(marca.hash) && chaveZotero(local) !== marca.hash;
-  return localMudou ? enviar() : baixar();
+  return decidirConfigZotero(local, remoto, { localMudou, remotoEm }) === 'local' ? enviar() : baixar(); // vale a mudança mais recente
 }
 
 /**
