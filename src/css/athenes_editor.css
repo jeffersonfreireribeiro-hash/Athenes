@@ -1109,7 +1109,7 @@ html, body, button, input, select, textarea, option, summary, label, table,
 .rm-ic-bt.on { background: #314F79; border-color: #314F79; color: #fff; box-shadow: 0 4px 10px rgba(49, 79, 121, 0.16); }
 
 /* Alça lateral de mover, na própria folha */
-.ath-bloco-alca { position: absolute; left: -22px; top: 0; width: 18px; height: clamp(26px, 100%, 72px); padding: 0; display: grid; place-items: center; border: 0; border-radius: 6px 0 0 6px; background: #fff; color: #94A3B8; cursor: grab; opacity: 0; box-shadow: -1px 1px 4px rgba(15,23,42,.16); transition: opacity .12s, color .12s, background .12s; z-index: 5; } /* acompanha a altura do bloco (com teto), colada na borda dele */
+.ath-bloco-alca { position: absolute; left: -22px; top: 0; width: 18px; height: max(26px, 100%); padding: 0; display: grid; place-items: center; border: 0; border-radius: 6px 0 0 6px; background: #fff; color: #94A3B8; cursor: grab; opacity: 0; box-shadow: -1px 1px 4px rgba(15,23,42,.16); transition: opacity .12s, color .12s, background .12s; z-index: 5; } /* acompanha a altura inteira do bloco, colada na borda dele */
 .ath-bloco-alca:active { cursor: grabbing; }
 .ath-bloco-alca:hover { color: #314F79; background: #EEF4FA; }
 .ath-bloco-folha.sel > .ath-bloco-alca { color: #314F79; background: #EEF4FA; }
