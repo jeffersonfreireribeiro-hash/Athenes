@@ -90,7 +90,7 @@ export class PainelZotero {
     root.style.height = '100%';
     root.style.boxSizing = 'border-box';
     root.style.padding = '12px 16px';
-    root.style.overflowY = 'auto';
+    root.style.overflowY = 'hidden';
     root.style.gap = '8px';
 
     // Calcula contagens para as badges das abas
@@ -145,6 +145,9 @@ export class PainelZotero {
         </label>
       </div>
 
+      <!-- Duas colunas: obras à esquerda; resumo, fichamento e citação longa à direita (uma só em tela estreita) -->
+      <div class="ath-zotero-colunas">
+      <div class="ath-zotero-col-esq">
       <!-- Barra de Pesquisa Rápida -->
       <div style="position:relative; width:100%; box-sizing:border-box;">
         <input type="text" class="ath-input" id="athZoteroBusca" value="${this.filtroTermo}" placeholder="Pesquisar referências (autor, título, ano, resumo)..." style="width:100%; box-sizing:border-box; padding-right:26px; height:32px; font-size:12px;">
@@ -194,12 +197,14 @@ export class PainelZotero {
       </div>
 
       <!-- Lista de Referências Filtradas e Ordenadas -->
-      <div class="ath-zotero-lista" id="athZoteroLista" style="flex:none; overflow-y:auto; min-height:120px; max-height:min(300px, 38vh); display:flex; flex-direction:column; gap:8px;">
+      <div class="ath-zotero-lista" id="athZoteroLista" style="display:flex; flex-direction:column; gap:8px;">
         <!-- Itens da biblioteca injetados dinamicamente -->
+      </div>
       </div>
 
       <!-- Fichamento e Notas de Leitura -->
-      <div id="athZoteroDetalhesBox"></div>
+      <div class="ath-zotero-col-dir"><div id="athZoteroDetalhesBox"><div class="ath-zotero-vazio">Escolha uma obra na lista para ver o resumo, escrever o fichamento ou montar uma citação longa.</div></div></div>
+      </div>
     `;
 
     // Eventos de Filtro e Busca
