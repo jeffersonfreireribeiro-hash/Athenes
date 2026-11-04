@@ -39,6 +39,7 @@ fun EditorTopBar(
     onSalvar: () -> Unit,
     onExportarDocx: () -> Unit,
     onExportarPdf: () -> Unit,
+    onConfigurarPagina: () -> Unit,
     onVoltar: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -110,6 +111,9 @@ fun EditorTopBar(
                             onTipoAlterado(tipo); menuAberto = false
                         }
                     }
+                    HorizontalDivider()
+                    CabecalhoMenu("Página")
+                    ItemMenu("Formato e margens", Icons.Rounded.CropPortrait, false) { onConfigurarPagina(); menuAberto = false }
                     HorizontalDivider()
                     CabecalhoMenu("Exportar")
                     ItemMenu("Word (.docx)", Icons.Rounded.Description, false) { onExportarDocx(); menuAberto = false }

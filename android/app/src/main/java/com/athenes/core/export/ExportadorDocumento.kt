@@ -1,5 +1,6 @@
 package com.athenes.core.export
 
+import com.athenes.core.model.ConfiguracaoPagina
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.zip.ZipEntry
@@ -26,7 +27,8 @@ data class DocumentoExport(
     val subtitulo: String,
     val autores: String,
     val resumo: String,
-    val blocos: List<BlocoExport>
+    val blocos: List<BlocoExport>,
+    val pagina: ConfiguracaoPagina = ConfiguracaoPagina()
 )
 
 /** Imagem já resolvida para exportação. */
@@ -48,6 +50,7 @@ object ExportadorDocumento {
     // ------------------------------------------------------------------ DOCX
 
     fun gerarDocx(doc: DocumentoExport, imagens: ResolvedorImagem): ByteArray {
+        require(doc.pagina.validar()) { "Configuração de página inválida." }
         val midias = mutableListOf<Pair<String, ImagemExport>>() // nome no zip -> imagem
         val corpo = StringBuilder()
 
@@ -79,13 +82,13 @@ object ExportadorDocumento {
                     if (img != null) {
                         val indice = midias.size + 1
                         midias += "image$indice.${img.extensao}" to img
-                        corpo.append(paragrafoImagem(indice, img))
+                        corpo.append(paragrafoImagem(indice, img, doc.pagina))
                     }
                     if (b.fonte.isNotBlank()) corpo.append(par(b.fonte, centro = true, italico = true, tamanho = 20, simples = true, depois = 120))
                 }
                 TipoBlocoExport.TABELA -> {
                     if (b.legenda.isNotBlank()) corpo.append(par(b.legenda, centro = true, negrito = true, tamanho = 20, simples = true, antes = 120, depois = 60, mantemProximo = true))
-                    corpo.append(tabela(b.tabela))
+                    corpo.append(tabela(b.tabela, doc.pagina))
                     if (b.fonte.isNotBlank()) corpo.append(par(b.fonte, centro = true, italico = true, tamanho = 20, simples = true, antes = 60, depois = 120))
                 }
                 TipoBlocoExport.FORMULA -> {
@@ -99,7 +102,7 @@ object ExportadorDocumento {
         }
 
         val documento = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="$NS_W" xmlns:r="$NS_R" xmlns:wp="$NS_WP" xmlns:a="$NS_A" xmlns:pic="$NS_PIC"><w:body>$corpo<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1701" w:right="1134" w:bottom="1134" w:left="1701" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>"""
+<w:document xmlns:w="$NS_W" xmlns:r="$NS_R" xmlns:wp="$NS_WP" xmlns:a="$NS_A" xmlns:pic="$NS_PIC"><w:body>$corpo<w:sectPr><w:pgSz w:w="${ConfiguracaoPagina.mmParaTwips(doc.pagina.larguraMm)}" w:h="${ConfiguracaoPagina.mmParaTwips(doc.pagina.alturaMm)}"${if (doc.pagina.paisagem) " w:orient=\"landscape\"" else ""}/><w:pgMar w:top="${ConfiguracaoPagina.mmParaTwips(doc.pagina.margemSuperiorMm)}" w:right="${ConfiguracaoPagina.mmParaTwips(doc.pagina.margemDireitaMm)}" w:bottom="${ConfiguracaoPagina.mmParaTwips(doc.pagina.margemInferiorMm)}" w:left="${ConfiguracaoPagina.mmParaTwips(doc.pagina.margemEsquerdaMm)}" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>"""
 
         val relsDoc = StringBuilder(
             """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -193,10 +196,10 @@ object ExportadorDocumento {
         return "<w:p><w:pPr>$ppr</w:pPr><w:r><w:rPr>$rpr</w:rPr>$partes</w:r></w:p>"
     }
 
-    private fun tabela(linhas: List<List<String>>): String {
+    private fun tabela(linhas: List<List<String>>, pagina: ConfiguracaoPagina): String {
         if (linhas.isEmpty()) return ""
         val colunas = linhas.maxOf { it.size }.coerceAtLeast(1)
-        val largura = 9071 / colunas // área útil em twips (A4 menos margens)
+        val largura = ConfiguracaoPagina.mmParaTwips(pagina.larguraCorpoMm) / colunas
         val sb = StringBuilder("<w:tbl><w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/><w:tblBorders><w:top w:val=\"single\" w:sz=\"8\" w:color=\"1E293B\"/><w:bottom w:val=\"single\" w:sz=\"8\" w:color=\"1E293B\"/></w:tblBorders></w:tblPr><w:tblGrid>")
         repeat(colunas) { sb.append("<w:gridCol w:w=\"$largura\"/>") }
         sb.append("</w:tblGrid>")
@@ -215,9 +218,9 @@ object ExportadorDocumento {
         return sb.toString()
     }
 
-    private fun paragrafoImagem(indice: Int, img: ImagemExport): String {
-        val larguraMaxEmu = 5_400_000L // 15 cm
-        val alturaMaxEmu = 6_480_000L // 18 cm
+    private fun paragrafoImagem(indice: Int, img: ImagemExport, pagina: ConfiguracaoPagina): String {
+        val larguraMaxEmu = (minOf(150.0, pagina.larguraCorpoMm) * 36_000).toLong()
+        val alturaMaxEmu = (minOf(180.0, pagina.alturaCorpoMm) * 36_000).toLong()
         val proporcao = img.altura.toDouble() / img.largura.coerceAtLeast(1)
         var cx = larguraMaxEmu
         var cy = (cx * proporcao).toLong()
@@ -234,10 +237,12 @@ object ExportadorDocumento {
     // ------------------------------------------------------------------ HTML (PDF via impressão)
 
     fun gerarHtml(doc: DocumentoExport, imagens: ResolvedorImagem): String {
+        require(doc.pagina.validar()) { "Configuração de página inválida." }
+        fun mm(valor: Double): String = java.lang.String.format(java.util.Locale.US, "%.2f", valor)
         val sb = StringBuilder()
         sb.append(
             """<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${html(doc.titulo)}</title><style>
-@page { size: A4; margin: 3cm 2cm 2cm 3cm; }
+@page { size: ${mm(doc.pagina.larguraMm)}mm ${mm(doc.pagina.alturaMm)}mm; margin: ${mm(doc.pagina.margemSuperiorMm)}mm ${mm(doc.pagina.margemDireitaMm)}mm ${mm(doc.pagina.margemInferiorMm)}mm ${mm(doc.pagina.margemEsquerdaMm)}mm; }
 body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #000; margin: 0; }
 h1.t { text-align: center; font-size: 16pt; margin: 0 0 6pt; }
 p.st { text-align: center; font-style: italic; font-size: 13pt; margin: 0 0 6pt; }

@@ -8,6 +8,8 @@ import com.athenes.core.export.DocumentoExport
 import com.athenes.core.export.TipoBlocoExport
 import com.athenes.core.model.ArtigoEstudoDetalhado
 import com.athenes.core.model.Documento
+import com.athenes.core.model.ConfiguracaoPagina
+import com.athenes.core.model.ConfiguracaoPaginaCodec
 import com.athenes.core.model.TipoDocumento
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -89,6 +91,8 @@ class EditorViewModel : ViewModel() {
 
     private val _tipoDocumento = MutableStateFlow(TipoDocumento.ARTIGO)
     val tipoDocumento: StateFlow<TipoDocumento> = _tipoDocumento.asStateFlow()
+    private val _configuracaoPagina = MutableStateFlow(ConfiguracaoPagina())
+    val configuracaoPagina: StateFlow<ConfiguracaoPagina> = _configuracaoPagina.asStateFlow()
 
     private val _modoRevisao = MutableStateFlow("edicao") // "edicao" | "sugestao" | "leitura"
     val modoRevisao: StateFlow<String> = _modoRevisao.asStateFlow()
@@ -145,6 +149,7 @@ class EditorViewModel : ViewModel() {
         _autores.value = doc.autor
         _resumo.value = doc.resumo
         _tipoDocumento.value = doc.tipo
+        _configuracaoPagina.value = ConfiguracaoPagina()
         _painelEstruturaAberto.value = false
         _painelInspetorAberto.value = false
         _painelCitacaoAberto.value = false
@@ -156,6 +161,7 @@ class EditorViewModel : ViewModel() {
             _autores.value = lido.autores
             _resumo.value = lido.resumo
             _blocos.value = lido.blocos.ifEmpty { listOf(blocoParagrafoVazio()) }
+            _configuracaoPagina.value = lido.pagina
         } else {
             _blocos.value = if (doc.id == ID_DOCUMENTO_EXEMPLO) obterBlocosIniciais() else listOf(blocoParagrafoVazio())
             if (doc.id == ID_DOCUMENTO_EXEMPLO && _resumo.value.isBlank()) _resumo.value = RESUMO_EXEMPLO
@@ -171,6 +177,11 @@ class EditorViewModel : ViewModel() {
     fun definirSubtitulo(novo: String) { _subtitulo.value = novo; marcarAlterado() }
     fun definirResumo(novo: String) { _resumo.value = novo; marcarAlterado() }
     fun definirTipoDocumento(tipo: TipoDocumento) { _tipoDocumento.value = tipo; marcarAlterado() }
+    fun definirConfiguracaoPagina(config: ConfiguracaoPagina) {
+        require(config.validar()) { "Configuração de página inválida." }
+        _configuracaoPagina.value = config
+        marcarAlterado()
+    }
     fun definirModoRevisao(modo: String) { _modoRevisao.value = modo }
 
     fun alternarPainelEstrutura() {
@@ -340,6 +351,7 @@ class EditorViewModel : ViewModel() {
         subtitulo = _subtitulo.value,
         autores = _autores.value,
         resumo = _resumo.value,
+        pagina = _configuracaoPagina.value,
         blocos = _blocos.value.map { b ->
             BlocoExport(
                 tipo = TipoBlocoExport.valueOf(b.tipo.name),
@@ -407,6 +419,7 @@ class EditorViewModel : ViewModel() {
         raiz.put("subtitulo", _subtitulo.value)
         raiz.put("autores", _autores.value)
         raiz.put("resumo", _resumo.value)
+        raiz.put("pagina", ConfiguracaoPaginaCodec.escrever(_configuracaoPagina.value))
         val arr = JSONArray()
         _blocos.value.forEach { b ->
             arr.put(JSONObject().apply {
@@ -421,7 +434,8 @@ class EditorViewModel : ViewModel() {
     }
 
     private class ConteudoLido(
-        val titulo: String, val subtitulo: String, val autores: String, val resumo: String, val blocos: List<BlocoEditor>
+        val titulo: String, val subtitulo: String, val autores: String, val resumo: String,
+        val blocos: List<BlocoEditor>, val pagina: ConfiguracaoPagina
     )
 
     private fun lerDoDisco(id: String): ConteudoLido? {
@@ -448,7 +462,8 @@ class EditorViewModel : ViewModel() {
             }
             ConteudoLido(
                 raiz.optString("titulo"), raiz.optString("subtitulo"),
-                raiz.optString("autores"), raiz.optString("resumo"), blocos
+                raiz.optString("autores"), raiz.optString("resumo"), blocos,
+                ConfiguracaoPaginaCodec.ler(raiz.optJSONObject("pagina"))
             )
         } catch (_: Exception) {
             null

@@ -1,5 +1,8 @@
 package com.athenes
 
+import com.athenes.core.model.ConfiguracaoPagina
+import com.athenes.core.model.ConfiguracaoPaginaCodec
+import com.athenes.core.model.FormatoPagina
 import com.athenes.core.export.AlinhamentoExport
 import com.athenes.core.export.BlocoExport
 import com.athenes.core.export.DocumentoExport
@@ -81,9 +84,39 @@ class ExportadorTest {
     @Test
     fun `html paginado traz pagina A4 margens ABNT e imagem em data uri`() {
         val html = ExportadorDocumento.gerarHtml(documento(), imagens)
-        assertTrue(html.contains("@page { size: A4; margin: 3cm 2cm 2cm 3cm; }"))
+        assertTrue(html.contains("@page { size: 210.00mm 297.00mm; margin: 30.00mm 20.00mm 20.00mm 30.00mm; }"))
         assertTrue(html.contains("data:image/png;base64,"))
         assertTrue(html.contains("Análise &amp; Diretrizes &lt;2026&gt;"))
         assertTrue(html.contains("<table>"))
+    }
+
+    @Test
+    fun `pdf e docx usam formato e margens personalizados`() {
+        val pagina = ConfiguracaoPagina(
+            formato = FormatoPagina.CARTA, paisagem = true,
+            margemSuperiorMm = 15.0, margemDireitaMm = 12.0,
+            margemInferiorMm = 18.0, margemEsquerdaMm = 22.0
+        )
+        val doc = documento().copy(pagina = pagina)
+        val html = ExportadorDocumento.gerarHtml(doc, imagens)
+        assertTrue(html.contains("size: 279.40mm 215.90mm"))
+        assertTrue(html.contains("margin: 15.00mm 12.00mm 18.00mm 22.00mm"))
+        val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/document.xml"]!!)
+        assertTrue(xml.contains("w:orient=\"landscape\""))
+        assertTrue(xml.contains("w:w=\"${ConfiguracaoPagina.mmParaTwips(279.4)}\""))
+        assertTrue(xml.contains("w:left=\"${ConfiguracaoPagina.mmParaTwips(22.0)}\""))
+    }
+
+    @Test
+    fun `configuracao de pagina preserva medidas e rejeita corpo impossivel`() {
+        val pagina = ConfiguracaoPagina(
+            formato = FormatoPagina.PERSONALIZADO,
+            larguraPersonalizadaMm = 160.0,
+            alturaPersonalizadaMm = 230.0,
+            margemEsquerdaMm = 24.0
+        )
+        assertEquals(pagina, ConfiguracaoPaginaCodec.ler(ConfiguracaoPaginaCodec.escrever(pagina)))
+        assertTrue(!pagina.copy(margemEsquerdaMm = 100.0, margemDireitaMm = 100.0).validar())
+        assertEquals(ConfiguracaoPagina(), ConfiguracaoPaginaCodec.ler(null))
     }
 }

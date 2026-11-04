@@ -48,6 +48,7 @@ import com.athenes.ui.editor.components.EditorPainelEsquerdo
 import com.athenes.ui.editor.components.EditorPainelInspetor
 import com.athenes.ui.editor.components.EditorPainelCitacao
 import com.athenes.ui.editor.components.EditorTopBar
+import com.athenes.ui.editor.components.DialogConfiguracaoPagina
 import com.athenes.ui.theme.AthenesPrimary
 import com.athenes.ui.theme.AthenesTextMuted
 import androidx.compose.foundation.Image
@@ -84,6 +85,8 @@ fun EditorDocumentoScreen(
     val autores by viewModel.autores.collectAsState()
     val resumo by viewModel.resumo.collectAsState()
     val tipoDoc by viewModel.tipoDocumento.collectAsState()
+    val configPagina by viewModel.configuracaoPagina.collectAsState()
+    var mostrarConfigPagina by remember { mutableStateOf(false) }
     val modoRevisao by viewModel.modoRevisao.collectAsState()
     val salvo by viewModel.salvo.collectAsState()
     val blocos by viewModel.blocos.collectAsState()
@@ -186,7 +189,8 @@ fun EditorDocumentoScreen(
     ) {
         val compacto = maxWidth < LARGURA_COMPACTA_DP.dp
         val larguraFolha = if (compacto) maxWidth - 8.dp else minOf(820.dp, maxWidth - 32.dp)
-        val margemFolha = if (compacto) 16.dp else 34.dp
+        val margemEsquerda = maxOf(12.dp, larguraFolha * (configPagina.margemEsquerdaMm / configPagina.larguraMm).toFloat())
+        val margemDireita = maxOf(12.dp, larguraFolha * (configPagina.margemDireitaMm / configPagina.larguraMm).toFloat())
         // Gavetas e scrim começam abaixo da barra de título: voltar/estrutura/inspetor seguem acessíveis.
         val topoHud = 52.dp + WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
@@ -202,7 +206,7 @@ fun EditorDocumentoScreen(
                 .shadow(2.dp)
                 .background(Color.White),
             contentPadding = PaddingValues(
-                start = margemFolha, end = margemFolha,
+                start = margemEsquerda, end = margemDireita,
                 top = 52.dp + 52.dp + 8.dp, bottom = 32.dp
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -252,6 +256,7 @@ fun EditorDocumentoScreen(
                     onSalvar = viewModel::salvarDocumento,
                     onExportarDocx = exportarDocx,
                     onExportarPdf = exportarPdf,
+                    onConfigurarPagina = { mostrarConfigPagina = true },
                     onVoltar = ::sair
                 )
                 // Barra de inserção de blocos logo abaixo do título (preferência do usuário: no topo)
@@ -339,6 +344,14 @@ fun EditorDocumentoScreen(
         ) {
             EditorPainelCitacao(onCitar = viewModel::inserirCitacao, onFechar = viewModel::fecharPainelCitacao)
         }
+    }
+
+    if (mostrarConfigPagina) {
+        DialogConfiguracaoPagina(
+            atual = configPagina,
+            onSalvar = { viewModel.definirConfiguracaoPagina(it); mostrarConfigPagina = false },
+            onFechar = { mostrarConfigPagina = false }
+        )
     }
 
 
