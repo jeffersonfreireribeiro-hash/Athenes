@@ -71,6 +71,7 @@ fun EditorBarraBlocos(
                 BotaoBloco(Icons.AutoMirrored.Rounded.MenuBook, "Inserir sumário", TipoBlocoEditor.SUMARIO, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.Collections, "Inserir lista de ilustrações", TipoBlocoEditor.LISTA_ILUSTRACOES, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.FormatListNumbered, "Inserir referências", TipoBlocoEditor.REFERENCIAS, onAdicionarBloco)
+                BotaoBloco(Icons.Rounded.ViewColumn, "Inserir campos", TipoBlocoEditor.CAMPOS, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.InsertPageBreak, "Inserir quebra de página", TipoBlocoEditor.QUEBRA_PAGINA, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.Height, "Inserir espaço", TipoBlocoEditor.ESPACO, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.HorizontalRule, "Inserir divisor", TipoBlocoEditor.DIVISOR, onAdicionarBloco)

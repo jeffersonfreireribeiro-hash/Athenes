@@ -162,4 +162,21 @@ class NavegacaoAcessibilidadeTest {
             assertEquals(36.5, vm.paraExportacao().blocos.last().alturaPt, 0.001)
         }
     }
+
+    @Test fun camposEditadosMantemParesNoDocumento() {
+        val vm = EditorViewModel()
+        compose.runOnIdle {
+            vm.adicionarBloco(TipoBlocoEditor.CAMPOS)
+            val id = vm.blocos.value.last().id
+            vm.atualizarCelulaTabela(id, 0, 0, "Titular")
+            vm.atualizarCelulaTabela(id, 0, 1, "Ana")
+            vm.adicionarCampo(id)
+            vm.atualizarCelulaTabela(id, 1, 0, "Área")
+            vm.atualizarCelulaTabela(id, 1, 1, "250 m²")
+            vm.definirColunasCampos(id, 2)
+            val campos = vm.paraExportacao().blocos.last()
+            assertEquals(listOf(listOf("Titular", "Ana"), listOf("Área", "250 m²")), campos.tabela)
+            assertEquals(2, campos.camposColunas)
+        }
+    }
 }

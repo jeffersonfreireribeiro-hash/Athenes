@@ -169,6 +169,13 @@ class BibliotecaTest {
             val docEspaco = repositorio.importarDocumentoJson(comEspaco.toString())
             assertEquals(36.5, JSONObject(File(pasta, "editor_${docEspaco.id}.json").readText())
                 .getJSONArray("blocos").getJSONObject(0).getDouble("alturaPt"), 0.001)
+            val comCampos = JSONObject().put("titulo", "Cadastro")
+                .put("blocos", org.json.JSONArray().put(JSONObject().put("tipo", "CAMPOS")
+                    .put("titulo", "Identificação").put("camposColunas", 2)
+                    .put("tabela", org.json.JSONArray().put(org.json.JSONArray().put("Titular").put("Ana")))))
+            val docCampos = repositorio.importarDocumentoJson(comCampos.toString())
+            assertEquals("CAMPOS", JSONObject(File(pasta, "editor_${docCampos.id}.json").readText())
+                .getJSONArray("blocos").getJSONObject(0).getString("tipo"))
             assertTrue(runCatching { repositorio.importarDocumentoJson(json.put("blocos", org.json.JSONArray().put(JSONObject().put("tipo", "DESCONHECIDO"))).toString()) }.isFailure)
             assertTrue(runCatching { repositorio.importarDocumentoJson(json.put("blocos", org.json.JSONArray().put(JSONObject().put("tipo", "FIGURA").put("imagem", "ausente.png"))).toString()) }.isFailure)
         } finally {

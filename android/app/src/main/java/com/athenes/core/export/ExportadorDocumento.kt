@@ -25,10 +25,11 @@ data class BlocoExport(
     val listaNumerada: Boolean = false,
     val nivelTitulo: Int = 1,
     val citacoes: List<CitacaoInline> = emptyList(),
-    val alturaPt: Double = 24.0
+    val alturaPt: Double = 24.0,
+    val camposColunas: Int = 2
 )
 
-enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, SUMARIO, LISTA_ILUSTRACOES, REFERENCIAS, QUEBRA_PAGINA, ESPACO, DIVISOR }
+enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, SUMARIO, LISTA_ILUSTRACOES, REFERENCIAS, CAMPOS, QUEBRA_PAGINA, ESPACO, DIVISOR }
 enum class AlinhamentoExport {
     ESQUERDA, CENTRO, DIREITA, JUSTIFICADO,
     JUSTIFICADO_ESQUERDA, JUSTIFICADO_CENTRO, JUSTIFICADO_DIREITA
@@ -133,6 +134,10 @@ object ExportadorDocumento {
                         corpo.append(par(Bibliografia.formatar(ref, doc.estiloBibliografico, indice + 1), simples = true,
                             depois = 120, marcador = Bibliografia.ancora(ref.id), marcadorId = indice + 1))
                     }
+                }
+                TipoBlocoExport.CAMPOS -> {
+                    if (b.titulo.isNotBlank()) corpo.append(par(b.titulo, negrito = true, antes = 120, depois = 80))
+                    corpo.append(tabelaCampos(b.tabela, b.camposColunas, doc.pagina))
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> corpo.append("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>")
                 TipoBlocoExport.ESPACO -> corpo.append("<w:p><w:pPr><w:spacing w:before=\"0\" w:after=\"0\" w:line=\"${(b.alturaPt.coerceIn(1.0, 720.0) * 20).toInt()}\" w:lineRule=\"exact\"/></w:pPr><w:r><w:t xml:space=\"preserve\"> </w:t></w:r></w:p>")
@@ -294,6 +299,30 @@ object ExportadorDocumento {
         return sb.toString()
     }
 
+    private fun tabelaCampos(campos: List<List<String>>, colunas: Int, pagina: ConfiguracaoPagina): String {
+        if (campos.isEmpty()) return ""
+        val pares = colunas.coerceIn(1, 4)
+        val largura = ConfiguracaoPagina.mmParaTwips(pagina.larguraCorpoMm) / (pares * 2)
+        return buildString {
+            append("<w:tbl><w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/></w:tblPr><w:tblGrid>")
+            repeat(pares * 2) { append("<w:gridCol w:w=\"$largura\"/>") }
+            append("</w:tblGrid>")
+            campos.chunked(pares).forEach { grupo ->
+                append("<w:tr>")
+                repeat(pares) { indice ->
+                    val campo = grupo.getOrNull(indice)
+                    for (parte in 0..1) {
+                        append("<w:tc><w:tcPr><w:tcW w:w=\"$largura\" w:type=\"dxa\"/></w:tcPr>")
+                        append(par(campo?.getOrNull(parte).orEmpty(), negrito = parte == 0, tamanho = 20, simples = true, antes = 30, depois = 30))
+                        append("</w:tc>")
+                    }
+                }
+                append("</w:tr>")
+            }
+            append("</w:tbl>")
+        }
+    }
+
     private fun paragrafoImagem(indice: Int, img: ImagemExport, pagina: ConfiguracaoPagina): String {
         val larguraMaxEmu = (minOf(150.0, pagina.larguraCorpoMm) * 36_000).toLong()
         val alturaMaxEmu = (minOf(180.0, pagina.alturaCorpoMm) * 36_000).toLong()
@@ -336,6 +365,8 @@ figure img { max-width: 100%; max-height: 18cm; }
 figcaption, .leg { font-size: 10pt; line-height: 1.15; text-align: center; font-weight: bold; margin: 4pt 0; break-after: avoid; }
 .fonte { font-size: 10pt; line-height: 1.15; text-align: center; font-style: italic; margin: 4pt 0 8pt; }
 table { width: 100%; border-collapse: collapse; border-top: 1.2pt solid #1e293b; border-bottom: 1.2pt solid #1e293b; font-size: 11pt; line-height: 1.15; break-inside: avoid; }
+.campos-grid { display: grid; gap: 4pt 10pt; margin: 6pt 0 10pt; break-inside: avoid; }
+.campo-par { display: flex; gap: 4pt; font-size: 10pt; line-height: 1.2; }
 th, td { padding: 3pt 4pt; text-align: left; }
 th { border-bottom: 0.8pt solid #94a3b8; }
 .formula { text-align: center; margin: 8pt 0; }
@@ -397,6 +428,15 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                         sb.append("<p id=\"${Bibliografia.ancora(ref.id)}\">${html(Bibliografia.formatar(ref, doc.estiloBibliografico, indice + 1))}</p>")
                     }
                     sb.append("</section>")
+                }
+                TipoBlocoExport.CAMPOS -> {
+                    sb.append("<section class=\"campos\">")
+                    if (b.titulo.isNotBlank()) sb.append("<h2>${html(b.titulo)}</h2>")
+                    sb.append("<div class=\"campos-grid\" style=\"grid-template-columns:repeat(${b.camposColunas.coerceIn(1, 4)},minmax(0,1fr))\">")
+                    b.tabela.forEach { campo ->
+                        sb.append("<div class=\"campo-par\"><strong>${html(campo.getOrNull(0).orEmpty())}</strong><span>${html(campo.getOrNull(1).orEmpty())}</span></div>")
+                    }
+                    sb.append("</div></section>")
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> sb.append("<div style=\"break-before:page\"></div>")
                 TipoBlocoExport.ESPACO -> sb.append("<div aria-hidden=\"true\" style=\"height:${b.alturaPt.coerceIn(1.0, 720.0)}pt\"></div>")

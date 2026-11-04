@@ -35,6 +35,18 @@ class ExportadorTest {
         DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(ByteArrayInputStream(xml.toByteArray()))
     }
 
+    @Test fun `campos mantem rotulos valores e duas colunas nas exportacoes`() {
+        val doc = DocumentoExport("Teste", "", "", "", listOf(BlocoExport(TipoBlocoExport.CAMPOS,
+            titulo = "Identificação", tabela = listOf(listOf("Titular", "Ana & Bruno"), listOf("Área", "250 m²")), camposColunas = 2)))
+        val html = ExportadorDocumento.gerarHtml(doc, ResolvedorImagem { null })
+        val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, ResolvedorImagem { null }))["word/document.xml"]!!)
+        assertTrue(html.contains("grid-template-columns:repeat(2"))
+        assertTrue(html.contains("Ana &amp; Bruno"))
+        assertTrue(xml.contains("Ana &amp; Bruno"))
+        assertTrue(xml.contains("250 m²"))
+        DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(ByteArrayInputStream(xml.toByteArray()))
+    }
+
     @Test
     fun `citacao aponta para a referencia em HTML e DOCX`() {
         val ref = ReferenciaAcademica("obra-1", "book", "Livro", listOf(AutorReferencia("Silva", "Ana")), "2025")

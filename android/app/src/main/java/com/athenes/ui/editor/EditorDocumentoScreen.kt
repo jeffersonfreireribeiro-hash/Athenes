@@ -628,6 +628,43 @@ private fun ItemBlocoFolha(
                 if (referencias.isEmpty()) Text("Cite obras da biblioteca para gerar as referências.", fontSize = 12.sp, color = AthenesTextMuted)
             }
 
+            TipoBlocoEditor.CAMPOS -> Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                CampoFolha(value = bloco.titulo, onValueChange = { vm.atualizarTituloBloco(bloco.id, it) },
+                    editavel = editavel, placeholder = "Título dos campos", onFocused = selecionar,
+                    style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextoCor))
+                if (selecionado && editavel) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        (1..4).forEach { n ->
+                            FilterChip(selected = bloco.camposColunas == n, onClick = { vm.definirColunasCampos(bloco.id, n) },
+                                label = { Text("$n col.") })
+                        }
+                    }
+                }
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val colunasVisuais = if (maxWidth < 600.dp) 1 else bloco.camposColunas
+                    Column {
+                        bloco.tabelaLinhas.chunked(colunasVisuais).forEachIndexed { linhaIndice, grupo ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                grupo.forEachIndexed { grupoIndice, campo ->
+                                    val indice = linhaIndice * colunasVisuais + grupoIndice
+                                    Column(Modifier.weight(1f)) {
+                                        OutlinedTextField(campo.getOrNull(0).orEmpty(),
+                                            { vm.atualizarCelulaTabela(bloco.id, indice, 0, it) },
+                                            label = { Text("Rótulo") }, enabled = editavel, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                        OutlinedTextField(campo.getOrNull(1).orEmpty(),
+                                            { vm.atualizarCelulaTabela(bloco.id, indice, 1, it) },
+                                            label = { Text("Valor") }, enabled = editavel, modifier = Modifier.fillMaxWidth())
+                                        if (selecionado && editavel) TextButton(onClick = { vm.removerCampo(bloco.id, indice) }) { Text("Remover campo") }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if (selecionado && editavel) TextButton(onClick = { vm.adicionarCampo(bloco.id) },
+                    modifier = Modifier.heightIn(min = 48.dp)) { Text("Adicionar campo") }
+            }
+
             TipoBlocoEditor.QUEBRA_PAGINA -> Column {
                 HorizontalDivider(color = AthenesPrimary.copy(alpha = 0.5f), modifier = Modifier.padding(top = 12.dp))
                 Text("Quebra de página", fontSize = 11.sp, color = AthenesTextMuted)

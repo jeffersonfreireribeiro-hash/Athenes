@@ -61,6 +61,7 @@ enum class TipoBlocoEditor(val rotulo: String, val desc: String) {
     SUMARIO("Sumário", "Títulos gerados automaticamente"),
     LISTA_ILUSTRACOES("Lista de ilustrações", "Legendas geradas automaticamente"),
     REFERENCIAS("Referências", "Obras citadas no estilo do documento"),
+    CAMPOS("Campos", "Pares de rótulo e valor em colunas"),
     QUEBRA_PAGINA("Quebra de página", "Inicia uma nova página na exportação"),
     ESPACO("Espaço", "Altura vertical configurável em pontos"),
     DIVISOR("Divisor", "Linha divisória ou espaçamento")
@@ -82,7 +83,8 @@ data class BlocoEditor(
     val listaNumerada: Boolean = false,
     val nivelTitulo: Int = 1,
     val citacoes: List<CitacaoInline> = emptyList(),
-    val alturaPt: Double = 24.0
+    val alturaPt: Double = 24.0,
+    val camposColunas: Int = 2
 )
 
 data class SecaoEstrutura(
@@ -302,6 +304,28 @@ class EditorViewModel : ViewModel() {
         }
     }
 
+    fun adicionarCampo(id: String) {
+        salvarNoHistorico()
+        atualizarBloco(id) { if (it.tipo == TipoBlocoEditor.CAMPOS) it.copy(tabelaLinhas = it.tabelaLinhas + listOf(listOf("", ""))) else it }
+        salvarNoHistorico()
+    }
+
+    fun removerCampo(id: String, indice: Int) {
+        val bloco = _blocos.value.find { it.id == id && it.tipo == TipoBlocoEditor.CAMPOS } ?: return
+        if (indice !in bloco.tabelaLinhas.indices) return
+        salvarNoHistorico()
+        atualizarBloco(id) { it.copy(tabelaLinhas = it.tabelaLinhas.filterIndexed { i, _ -> i != indice }) }
+        salvarNoHistorico()
+    }
+
+    fun definirColunasCampos(id: String, colunas: Int) {
+        val novo = colunas.coerceIn(1, 4)
+        if (_blocos.value.none { it.id == id && it.tipo == TipoBlocoEditor.CAMPOS && it.camposColunas != novo }) return
+        salvarNoHistorico()
+        atualizarBloco(id) { it.copy(camposColunas = novo) }
+        salvarNoHistorico()
+    }
+
     fun definirAlinhamentoBloco(id: String, alinhamento: AlinhamentoTexto) {
         salvarNoHistorico()
         atualizarBloco(id) { it.copy(alinhamento = alinhamento) }
@@ -354,6 +378,8 @@ class EditorViewModel : ViewModel() {
             TipoBlocoEditor.SUMARIO -> BlocoEditor(tipo = tipo, alinhamento = AlinhamentoTexto.ESQUERDA)
             TipoBlocoEditor.LISTA_ILUSTRACOES -> BlocoEditor(tipo = tipo, alinhamento = AlinhamentoTexto.ESQUERDA)
             TipoBlocoEditor.REFERENCIAS -> BlocoEditor(tipo = tipo, alinhamento = AlinhamentoTexto.ESQUERDA)
+            TipoBlocoEditor.CAMPOS -> BlocoEditor(tipo = tipo, titulo = "Identificação e parâmetros",
+                tabelaLinhas = listOf(listOf("", "")), alinhamento = AlinhamentoTexto.ESQUERDA)
             TipoBlocoEditor.QUEBRA_PAGINA -> BlocoEditor(tipo = tipo)
             TipoBlocoEditor.ESPACO -> BlocoEditor(tipo = tipo)
             TipoBlocoEditor.DIVISOR -> BlocoEditor(tipo = tipo)
@@ -503,7 +529,7 @@ class EditorViewModel : ViewModel() {
                 formula = b.formulaLatex, imagem = b.imagem,
                 alinhamento = AlinhamentoExport.valueOf(b.alinhamento.name),
                 tabela = b.tabelaLinhas, listaNumerada = b.listaNumerada, nivelTitulo = b.nivelTitulo,
-                citacoes = b.citacoes, alturaPt = b.alturaPt
+                citacoes = b.citacoes, alturaPt = b.alturaPt, camposColunas = b.camposColunas
             )
         }
     )
@@ -584,6 +610,7 @@ class EditorViewModel : ViewModel() {
                 put("listaNumerada", b.listaNumerada)
                 put("nivelTitulo", b.nivelTitulo)
                 put("alturaPt", b.alturaPt)
+                put("camposColunas", b.camposColunas)
                 put("citacoes", BibliografiaCodec.escreverCitacoes(b.citacoes))
             })
         }
@@ -615,6 +642,7 @@ class EditorViewModel : ViewModel() {
                     estiloId = o.optString("estiloId", "texto"), listaNumerada = o.optBoolean("listaNumerada"),
                     nivelTitulo = o.optInt("nivelTitulo", 1).coerceIn(1, 9),
                     alturaPt = o.optDouble("alturaPt", 24.0).takeIf { it.isFinite() && it in 1.0..720.0 } ?: 24.0,
+                    camposColunas = o.optInt("camposColunas", 2).coerceIn(1, 4),
                     citacoes = BibliografiaCodec.lerCitacoes(o.optJSONArray("citacoes"), o.optString("texto")),
                     tabelaLinhas = if (tab == null) emptyList() else (0 until tab.length()).map { r ->
                         val l = tab.getJSONArray(r)
