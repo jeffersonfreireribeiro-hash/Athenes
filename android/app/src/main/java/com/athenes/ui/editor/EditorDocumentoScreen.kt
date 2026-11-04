@@ -472,7 +472,8 @@ private fun ItemBlocoFolha(
         AlinhamentoTexto.ESQUERDA -> TextAlign.Left
         AlinhamentoTexto.CENTRO -> TextAlign.Center
         AlinhamentoTexto.DIREITA -> TextAlign.Right
-        AlinhamentoTexto.JUSTIFICADO -> TextAlign.Justify
+        AlinhamentoTexto.JUSTIFICADO, AlinhamentoTexto.JUSTIFICADO_ESQUERDA,
+        AlinhamentoTexto.JUSTIFICADO_CENTRO, AlinhamentoTexto.JUSTIFICADO_DIREITA -> TextAlign.Justify
     }
 
     Box(

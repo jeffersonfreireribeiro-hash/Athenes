@@ -119,4 +119,30 @@ class ExportadorTest {
         assertTrue(!pagina.copy(margemEsquerdaMm = 100.0, margemDireitaMm = 100.0).validar())
         assertEquals(ConfiguracaoPagina(), ConfiguracaoPaginaCodec.ler(null))
     }
+
+    @Test
+    fun `sete alinhamentos editoriais saem no html e docx`() {
+        val casos = listOf(
+            AlinhamentoExport.ESQUERDA to Pair("left", "left"),
+            AlinhamentoExport.CENTRO to Pair("center", "center"),
+            AlinhamentoExport.DIREITA to Pair("right", "right"),
+            AlinhamentoExport.JUSTIFICADO to Pair("justify", "auto"),
+            AlinhamentoExport.JUSTIFICADO_ESQUERDA to Pair("justify", "left"),
+            AlinhamentoExport.JUSTIFICADO_CENTRO to Pair("justify", "center"),
+            AlinhamentoExport.JUSTIFICADO_DIREITA to Pair("justify", "right")
+        )
+        for ((alinhamento, css) in casos) {
+            val doc = documento().copy(blocos = listOf(BlocoExport(TipoBlocoExport.PARAGRAFO, texto = "Texto de teste", alinhamento = alinhamento)))
+            val html = ExportadorDocumento.gerarHtml(doc, imagens)
+            assertTrue("HTML: $alinhamento", html.contains("text-align:${css.first};text-align-last:${css.second}"))
+            val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/document.xml"]!!)
+            val jc = when (alinhamento) {
+                AlinhamentoExport.ESQUERDA -> "left"
+                AlinhamentoExport.CENTRO, AlinhamentoExport.JUSTIFICADO_CENTRO -> "center"
+                AlinhamentoExport.DIREITA, AlinhamentoExport.JUSTIFICADO_DIREITA -> "right"
+                else -> "both"
+            }
+            assertTrue("DOCX: $alinhamento", xml.contains("<w:jc w:val=\"$jc\"/>"))
+        }
+    }
 }

@@ -20,7 +20,10 @@ data class BlocoExport(
 )
 
 enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, FORMULA, DIVISOR }
-enum class AlinhamentoExport { ESQUERDA, CENTRO, DIREITA, JUSTIFICADO }
+enum class AlinhamentoExport {
+    ESQUERDA, CENTRO, DIREITA, JUSTIFICADO,
+    JUSTIFICADO_ESQUERDA, JUSTIFICADO_CENTRO, JUSTIFICADO_DIREITA
+}
 
 data class DocumentoExport(
     val titulo: String,
@@ -170,10 +173,10 @@ object ExportadorDocumento {
         val jc = when {
             centro -> "center"
             justificado -> "both"
-            alinhamento == AlinhamentoExport.CENTRO -> "center"
-            alinhamento == AlinhamentoExport.DIREITA -> "right"
+            alinhamento == AlinhamentoExport.CENTRO || alinhamento == AlinhamentoExport.JUSTIFICADO_CENTRO -> "center"
+            alinhamento == AlinhamentoExport.DIREITA || alinhamento == AlinhamentoExport.JUSTIFICADO_DIREITA -> "right"
             alinhamento == AlinhamentoExport.ESQUERDA -> "left"
-            alinhamento == AlinhamentoExport.JUSTIFICADO -> "both"
+            alinhamento == AlinhamentoExport.JUSTIFICADO || alinhamento == AlinhamentoExport.JUSTIFICADO_ESQUERDA -> "both"
             else -> "left"
         }
         val linha = if (simples) 240 else 360
@@ -272,12 +275,20 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
         var formula = 0
         for (b in doc.blocos) {
             val alinha = when (b.alinhamento) {
-                AlinhamentoExport.ESQUERDA -> "left"; AlinhamentoExport.CENTRO -> "center"
-                AlinhamentoExport.DIREITA -> "right"; AlinhamentoExport.JUSTIFICADO -> "justify"
+                AlinhamentoExport.ESQUERDA -> "left"
+                AlinhamentoExport.CENTRO -> "center"
+                AlinhamentoExport.DIREITA -> "right"
+                else -> "justify"
+            }
+            val ultimaLinha = when (b.alinhamento) {
+                AlinhamentoExport.ESQUERDA, AlinhamentoExport.JUSTIFICADO_ESQUERDA -> "left"
+                AlinhamentoExport.CENTRO, AlinhamentoExport.JUSTIFICADO_CENTRO -> "center"
+                AlinhamentoExport.DIREITA, AlinhamentoExport.JUSTIFICADO_DIREITA -> "right"
+                AlinhamentoExport.JUSTIFICADO -> "auto"
             }
             when (b.tipo) {
                 TipoBlocoExport.TITULO -> { secao++; sb.append("<h2>$secao&nbsp; ${html(b.titulo)}</h2>") }
-                TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha\">${html(b.texto)}</p>")
+                TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha;text-align-last:$ultimaLinha\">${html(b.texto)}</p>")
                 TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${html(b.texto)}</div>")
                 TipoBlocoExport.FIGURA -> {
                     sb.append("<figure>")

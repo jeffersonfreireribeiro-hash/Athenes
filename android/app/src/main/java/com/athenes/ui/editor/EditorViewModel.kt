@@ -36,7 +36,8 @@ enum class EstiloTexto(val rotulo: String, val tamanhoPt: Int, val ehNegrito: Bo
 }
 
 enum class AlinhamentoTexto {
-    ESQUERDA, CENTRO, DIREITA, JUSTIFICADO
+    ESQUERDA, CENTRO, DIREITA, JUSTIFICADO,
+    JUSTIFICADO_ESQUERDA, JUSTIFICADO_CENTRO, JUSTIFICADO_DIREITA
 }
 
 enum class TipoBlocoEditor(val rotulo: String, val desc: String) {

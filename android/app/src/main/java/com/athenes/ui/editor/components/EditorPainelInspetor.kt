@@ -201,16 +201,21 @@ fun EditorPainelInspetor(
                             )
                         )
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            listOf(
-                                Pair(AlinhamentoTexto.ESQUERDA, Icons.Rounded.FormatAlignLeft),
-                                Pair(AlinhamentoTexto.CENTRO, Icons.Rounded.FormatAlignCenter),
-                                Pair(AlinhamentoTexto.DIREITA, Icons.Rounded.FormatAlignRight),
-                                Pair(AlinhamentoTexto.JUSTIFICADO, Icons.Rounded.FormatAlignJustify)
-                            ).forEach { (alinhamento, icone) ->
+                        val opcoesAlinhamento = listOf(
+                            Triple(AlinhamentoTexto.ESQUERDA, Icons.Rounded.FormatAlignLeft, "Esquerda"),
+                            Triple(AlinhamentoTexto.CENTRO, Icons.Rounded.FormatAlignCenter, "Centro"),
+                            Triple(AlinhamentoTexto.DIREITA, Icons.Rounded.FormatAlignRight, "Direita"),
+                            Triple(AlinhamentoTexto.JUSTIFICADO, Icons.Rounded.FormatAlignJustify, "Justificado"),
+                            Triple(AlinhamentoTexto.JUSTIFICADO_ESQUERDA, Icons.Rounded.FormatAlignJustify, "Justificado, última linha à esquerda"),
+                            Triple(AlinhamentoTexto.JUSTIFICADO_CENTRO, Icons.Rounded.FormatAlignJustify, "Justificado, última linha centralizada"),
+                            Triple(AlinhamentoTexto.JUSTIFICADO_DIREITA, Icons.Rounded.FormatAlignJustify, "Justificado, última linha à direita")
+                        )
+                        opcoesAlinhamento.chunked(4).forEach { linha ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                            linha.forEach { (alinhamento, icone, descricao) ->
                                 val ativo = bloco.alinhamento == alinhamento
                                 Surface(
                                     onClick = { onAlinhamentoAlterado(alinhamento) },
@@ -228,12 +233,14 @@ fun EditorPainelInspetor(
                                     ) {
                                         Icon(
                                             imageVector = icone,
-                                            contentDescription = null,
+                                            contentDescription = descricao,
                                             tint = if (ativo) Color.White else AthenesTextDark,
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
+                            }
+                            repeat(4 - linha.size) { Spacer(Modifier.weight(1f)) }
                             }
                         }
                     }
