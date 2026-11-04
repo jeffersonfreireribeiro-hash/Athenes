@@ -57,7 +57,7 @@ import { escapeHtml } from '../core/athenes_seguranca.js';
 import { montarCitacao, indiceNaLista } from '../core/athenes_citacao.js';
 import { mapaMarcadores, marcadorEfetivo } from '../core/athenes_marcadores.js';
 
-import { linhasEstimadas, porLinhaUsadoNoTexto, calibracaoDoTexto, definirCalibracaoTexto } from '../core/athenes_fragmentos.js';
+import { linhasEstimadas, porLinhaUsadoNoTexto, calibracaoDoTexto, definirCalibracaoTexto, definirAlturaMedida, TIPOS_COM_ALTURA_MEDIDA } from '../core/athenes_fragmentos.js';
 import { removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
 import { cssAvancadoDosEstilos, removerPalavrasIniciais } from '../core/athenes_estilo_avancado.js';
 import { ModalEditorMestra } from './athenes_editor_mestra.js';
@@ -1819,18 +1819,24 @@ export class EditorView {
     const paisagem = mestra?.orientacao === 'paisagem';
 
     if (infoPrev) {
-      infoPrev.textContent = `A4 ${paisagem ? 'paisagem' : 'retrato'} · ${paisagem ? '297 × 210' : '210 × 297'} mm · este documento ocupa ${paginas.length} página${paginas.length > 1 ? 's' : ''}`;
+      const dimInfo = dimensoesPapelMm(mestra?.formato, mestra?.orientacao, mestra?.dimensoes_personalizadas);
+      infoPrev.textContent = `${mestra?.formato || 'A4'} ${paisagem ? 'paisagem' : 'retrato'} · ${dimInfo.largura_mm} × ${dimInfo.altura_mm} mm · este documento ocupa ${paginas.length} página${paginas.length > 1 ? 's' : ''}`;
     }
 
     paginas.forEach(pag => {
       try {
       const mestraPag = modeloDaPagina(this.doc, pag);
-      const dimPag = dimensoesPapelMm(mestraPag?.formato, mestraPag?.orientacao);
+      const dimPag = dimensoesPapelMm(mestraPag?.formato, mestraPag?.orientacao, mestraPag?.dimensoes_personalizadas);
       const margens = margensEfetivasMm(mestraPag || {}, dimPag.largura_mm, dimPag.altura_mm);
 
       const folha = document.createElement('div');
       folha.className = `ath-folha-a4 ${mestraPag?.orientacao === 'paisagem' ? 'paisagem' : ''}`;
       folha.dataset.paginaId = pag.id;
+      folha.dataset.largMm = String(dimPag.largura_mm); // base para medir alturas na folha (calibração)
+      folha.dataset.altMm = String(dimPag.altura_mm);
+      // o tamanho vem do papel da mestra (A4, Carta, A3, Executivo, personalizado), não de um valor fixo de A4 no CSS
+      folha.style.width = `${dimPag.largura_mm * 3.7795}px`;
+      folha.style.minHeight = `${dimPag.altura_mm * 3.7795}px`;
 
       // Margem interna proporcional (conversão mm para px a ~3.78 px/mm)
       const pxPorMm = 3.7795;
@@ -1870,8 +1876,8 @@ export class EditorView {
           if (elem.tipo === 'foto_capa') {
             const sangria = !!elem.sangria;
             const respRecuo = !sangria && !!elem.respeitar_recuo;
-            const folhaW = (paisagem ? 297 : 210) * pxPorMm;
-            const folhaH = (paisagem ? 210 : 297) * pxPorMm;
+            const folhaW = dimPag.largura_mm * pxPorMm;
+            const folhaH = dimPag.altura_mm * pxPorMm;
             const topPx = sangria ? 0 : (respRecuo ? padTop + (elem.y_mm || 0) * pxPorMm : (elem.y_mm || 0) * pxPorMm);
             const leftPx = sangria ? 0 : (respRecuo ? padLeft + (elem.x_mm || 0) * pxPorMm : (elem.x_mm || 0) * pxPorMm);
             const wPx = sangria ? folhaW : (respRecuo ? (folhaW - padLeft - padRight) : (elem.largura_mm || 210) * pxPorMm);
@@ -1960,8 +1966,8 @@ export class EditorView {
 
             if (elem.posicionamento_modo === 'coordenadas') {
               const sangria = !!elem.sangria;
-              const folhaW = (paisagem ? 297 : 210) * pxPorMm;
-              const folhaH = (paisagem ? 210 : 297) * pxPorMm;
+              const folhaW = dimPag.largura_mm * pxPorMm;
+              const folhaH = dimPag.altura_mm * pxPorMm;
               const topPx = sangria ? 0 : (elem.y_mm || 20) * pxPorMm;
               const leftPx = sangria ? 0 : (elem.x_mm || 20) * pxPorMm;
               const wPx = sangria ? folhaW : (elem.largura_mm || 170) * pxPorMm;
@@ -1973,8 +1979,8 @@ export class EditorView {
             } else {
               const lin = mestraPag.grade_2d?.linhas || 3;
               const col = mestraPag.grade_2d?.colunas || 3;
-              const alturaUtil = (paisagem ? 210 : 297) * pxPorMm - padTop - padBottom;
-              const larguraUtil = (paisagem ? 297 : 210) * pxPorMm - padLeft - padRight;
+              const alturaUtil = dimPag.altura_mm * pxPorMm - padTop - padBottom;
+              const larguraUtil = dimPag.largura_mm * pxPorMm - padLeft - padRight;
               const cellH = alturaUtil / lin;
               const cellW = larguraUtil / col;
               molduraEl.style.top = `${padTop + ((elem.linha || 1) - 1) * cellH}px`;
@@ -2263,8 +2269,7 @@ export class EditorView {
     const mestra = this.obterMestraAtiva();
     const m = mestra.margens_mm || { t: 25, r: 20, b: 20, l: 25 };
     const paisagem = mestra.orientacao === 'paisagem';
-    const W = paisagem ? 297 : 210;
-    const H = paisagem ? 210 : 297;
+    const { largura_mm: W, altura_mm: H } = dimensoesPapelMm(mestra.formato, mestra.orientacao, mestra.dimensoes_personalizadas);
 
     const diag = this.container.querySelector('#rmMDiag');
     if (!diag) return;
@@ -2481,18 +2486,40 @@ export class EditorView {
       const reais = this.contarLinhasReais(el);
       const porLinha = porLinhaUsadoNoTexto(id);
       if (!reais || !porLinha) return;
-      const acc = porBloco.get(id) || { reais: 0, est: 0 };
+      const acc = porBloco.get(id) || { reais: 0, est: 0, textos: [], porLinha };
       acc.reais += reais;
       acc.est += linhasEstimadas(b.texto, porLinha);
+      acc.textos.push(b.texto);
       porBloco.set(id, acc);
     });
     let mudou = false;
     for (const [id, a] of porBloco) {
       if (!a.est) continue;
       const atual = calibracaoDoTexto(id);
-      const novo = Math.min(2, Math.max(0.5, atual * a.reais / a.est));
-      if (Math.abs(novo - atual) / atual > 0.04) { definirCalibracaoTexto(id, novo); mudou = true; }
+      let novo = Math.min(2, Math.max(0.5, atual * a.reais / a.est));
+      // a razão média pode ainda estimar UMA linha a menos (arredondamento): ajusta até a contagem bater com a real, senão o último parágrafo da página invade a margem
+      const linhasCom = (k) => a.textos.reduce((t, tx) => t + linhasEstimadas(tx, Math.max(6, Math.floor(a.porLinha * atual / k))), 0);
+      for (let i = 0; i < 40 && linhasCom(novo) < a.reais && novo < 2; i++) novo *= 1.01;
+      for (let i = 0; i < 40 && linhasCom(novo) > a.reais && novo > 0.5; i++) novo /= 1.01;
+      if (linhasCom(novo) !== a.est || Math.abs(novo - atual) / atual > 0.04) { if (Math.abs(novo - atual) / atual > 0.002) { definirCalibracaoTexto(id, novo); mudou = true; } }
     }
+    // blocos que não são texto (figura, tabela, fórmula…): a altura REAL da folha substitui a estimativa da paginação
+    this.container.querySelectorAll('.ath-folha-area-util').forEach(area => {
+      const folha = area.parentElement;
+      const grade = area.firstElementChild;
+      if (!grade) return;
+      const k = folha.getBoundingClientRect().width / ((Number(folha.dataset.largMm) || 210) * 3.7795) || 1;
+      const itens = [...grade.children].filter(el => el.classList?.contains('ath-bloco-folha'));
+      itens.forEach(el => { el.style.alignSelf = 'start'; }); // sem isso o bloco estica até a altura da linha (o vizinho do grupo)
+      // a altura que a paginação soma inclui o espaço antes/depois do bloco, que fica fora do retângulo
+      const medidas = itens.map(el => { const cs = getComputedStyle(el); return [el, el.getBoundingClientRect().height / k * 0.75 + (parseFloat(cs.marginTop) + parseFloat(cs.marginBottom)) * 0.75]; });
+      itens.forEach(el => { el.style.alignSelf = ''; });
+      for (const [el, pt] of medidas) {
+        const b = achar(el);
+        if (!b || b._frag || el.classList.contains('sel') || !TIPOS_COM_ALTURA_MEDIDA.has(b.tipo)) continue; // o selecionado tem a barra rápida no fluxo
+        if (definirAlturaMedida(b, pt)) mudou = true;
+      }
+    });
     // texto dividido: compara o fim do trecho com o limite real da folha
     this.container.querySelectorAll('.ath-folha-area-util').forEach(area => {
       const folhaA4 = area.parentElement;
@@ -2502,7 +2529,7 @@ export class EditorView {
       const el = ultimo?.querySelector('.ath-texto-editable');
       if (!b?._frag?.continuaNaProxima || !el) return;
       const f = folhaA4.getBoundingClientRect();
-      const nominal = f.height >= f.width ? f.width * 297 / 210 : f.width * 210 / 297;
+      const nominal = f.width * ((Number(folhaA4.dataset.altMm) || 297) / (Number(folhaA4.dataset.largMm) || 210));
       const lh = parseFloat(getComputedStyle(el).lineHeight) || 16;
       const transbordo = f.height - nominal;
       const sobra = transbordo > 1 ? 0 : area.getBoundingClientRect().bottom - ultimo.getBoundingClientRect().bottom;

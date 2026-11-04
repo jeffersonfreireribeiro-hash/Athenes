@@ -6,7 +6,7 @@
 
 import { extrairItensSumario, nivelDe } from './athenes_sumario.js';
 import { TIPOS_BLOCO_TEXTO, sanearHtmlTexto, ajusteDeFragmento } from './athenes_estilo_exclusivo.js';
-import { parametrosTextoPt, linhasEstimadas, lacunasInternasPt, alturaTabelaPt, dividirParaPagina, podeDividir } from './athenes_fragmentos.js';
+import { parametrosTextoPt, linhasEstimadas, lacunasInternasPt, alturaTabelaPt, dividirParaPagina, podeDividir, alturaMedidaDoBloco } from './athenes_fragmentos.js';
 import { garantirEstilosDeTitulos } from './athenes_estilos.js';
 import { aplicarRegrasMestraNasPaginas, vincularOverridesAsPaginas } from './athenes_mestra_canvas.js';
 import { criarEstilosPadrao, PERFIS_FORMATACAO } from './athenes_estilos.js';
@@ -526,6 +526,8 @@ function alturaTextoPorEstilo(bloco, ctx) {
 
 export function estimarAlturaBlocoPt(bloco, ctx = null) {
   if (!bloco) return 20;
+  const medida = alturaMedidaDoBloco(bloco); // a altura medida na folha vale mais que a estimativa
+  if (medida) return medida;
   if (ctx?.larguraPt && (bloco.tipo === 'tabela' || bloco.tipo === 'quadro')) return alturaTabelaPt(bloco, ctx.larguraPt);
   if (ctx?.estilos && (bloco.tipo === 'paragrafo' || bloco.tipo === 'titulo' || bloco.tipo === 'citacao')) {
     const h = alturaTextoPorEstilo(bloco, ctx);

@@ -285,7 +285,7 @@ export function alturaAreaMm(area) {
  * da folha; se não couberem (com o respiro) a margem cresce — o corpo nunca é invadido.
  */
 export function geometriaCorpoMm(mestra) {
-  const dim = dimensoesPapelMm(mestra?.formato, mestra?.orientacao, mestra?.formato_personalizado);
+  const dim = dimensoesPapelMm(mestra?.formato, mestra?.orientacao, mestra?.dimensoes_personalizadas);
   const m = margensEfetivasMm(mestra, dim.largura_mm, dim.altura_mm); // um quadro de texto na mestra define o corpo
   const cab = normalizarArea(mestra?.cabecalho);
   const rod = normalizarArea(mestra?.rodape);

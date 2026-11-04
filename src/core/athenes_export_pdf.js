@@ -394,7 +394,7 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
   const marcadores = mapaMarcadores(documento);
   const paginasHtml = (documento.paginas || []).map((pag, index) => {
     const modelo = modeloDaPagina(documento, pag);
-    const dimFolha = dimensoesPapelMm(modelo.formato, modelo.orientacao);
+    const dimFolha = dimensoesPapelMm(modelo.formato, modelo.orientacao, modelo.dimensoes_personalizadas);
     const m = margensEfetivasMm(modelo, dimFolha.largura_mm, dimFolha.altura_mm);
     const cols = modelo.grade?.colunas || 1;
     // página de uma coluna: o editor usa SEMPRE a grade de 12 colunas (blocos lado a lado por `grupo`, `col` e `span`); o PDF faz o mesmo,
@@ -437,7 +437,7 @@ export function gerarDocumentoHtmlPdf(documento, opcoes = {}) {
     const notasHtml = notasPaginaHtml(pag, documento);
     const rodHtml = areaPaginaHtml(areas.rodape, m);
 
-    const { largura_mm, altura_mm } = dimensoesPapelMm(modelo.formato, modelo.orientacao);
+    const { largura_mm, altura_mm } = dimensoesPapelMm(modelo.formato, modelo.orientacao, modelo.dimensoes_personalizadas);
 
     // Elementos recorrentes da página mestra (coordenadas mm, sangria total, capas e tarjas)
     let elemRecHtml = '';
@@ -557,6 +557,7 @@ return `<section class="ath-pagina" style="position:relative; width:${largura_mm
     .ath-num-secao { margin-right: .4em; }
     .ath-toc-item { break-inside: avoid; }
     .ath-toc-link { color: inherit; text-decoration: none; }
+    .ath-bloco-grid:not([style*="flow-root"]) > :is(.ath-figura, .ath-figura-composta, .ath-mapa-wrap, .ath-tabela-wrap, .ath-quadro-wrap) { margin-top: 0 !important; margin-bottom: 0 !important; } /* o espaço antes/depois vem do contêiner (igual ao editor); margem própria da figura/tabela somava ~5 mm por bloco e empurrava o texto para a margem inferior */
     a.ath-citacao-link { color: inherit; text-decoration: none; } /* citação linkada: sem cara de link (a limpeza de estilos tira o style inline) */
 
     ${cssMarcadoresNota(obterConfigNotas(documento), '', id => (FONTES_SISTEMA[id]?.familia || '').replace(/"/g, "'"))}

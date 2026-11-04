@@ -94,6 +94,28 @@ const CALIBRACAO = new Map();
 export const definirCalibracaoTexto = (id, razao) => { if (razao && Number.isFinite(razao)) CALIBRACAO.set(id, Math.min(2, Math.max(0.5, razao))); else CALIBRACAO.delete(id); };
 export const calibracaoDoTexto = (id) => CALIBRACAO.get(id) || 1;
 export const limparCalibracaoTexto = () => CALIBRACAO.clear();
+/**
+ * Altura REAL (medida na folha do editor) de blocos que não são texto — figura, tabela, quadro, fórmula…: a estimativa por fórmula
+ * erra com a proporção da imagem e as legendas, e uma página lotada passava do limite. A medida só vale enquanto o conteúdo que
+ * define a altura (assinatura) não muda.
+ */
+const ALTURA_MEDIDA = new Map();
+export const TIPOS_COM_ALTURA_MEDIDA = new Set(['figura', 'imagem', 'mapa', 'formula', 'campos', 'tabela', 'quadro']);
+const assinaturaAltura = (b) => [b.tipo, b.layout, b.span, b.col, (b.itens || []).length, (b.linhas || []).length, (b.colunas || []).length, String(b.titulo || '').length, String(b.legenda || '').length, String(b.legenda_geral || '').length, String(b.fonte || '').length, String(b.latex || '').length, b.proporcao, b.altura_mm, b.fluxo].join('|');
+/** Guarda a altura medida (pt). Devolve true se mudou o suficiente para a paginação precisar ser refeita. */
+export function definirAlturaMedida(bloco, pt) {
+  if (!bloco?.id || !Number.isFinite(pt) || pt <= 0) return false;
+  const atual = ALTURA_MEDIDA.get(bloco.id);
+  const assin = assinaturaAltura(bloco);
+  if (atual && atual.assin === assin && Math.abs(atual.pt - pt) < 1.5) return false;
+  ALTURA_MEDIDA.set(bloco.id, { pt, assin });
+  return true;
+}
+export function alturaMedidaDoBloco(bloco) {
+  const m = bloco?.id ? ALTURA_MEDIDA.get(bloco.id) : null;
+  return m && m.assin === assinaturaAltura(bloco) ? m.pt : null;
+}
+export const limparAlturasMedidas = () => ALTURA_MEDIDA.clear();
 const POR_LINHA_USADO = new Map(); // caracteres por linha usados na última paginação de cada bloco (base da medição)
 export const porLinhaUsadoNoTexto = (id) => POR_LINHA_USADO.get(id) || 0;
 

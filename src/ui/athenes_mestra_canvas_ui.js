@@ -100,7 +100,7 @@ export class CanvasMestra {
     this.snap = true;
     this.guiasInteligentes = [];
     this.inserido = false;
-    const dim = dimensoesPapelMm(this.r.formato, this.r.orientacao);
+    const dim = dimensoesPapelMm(this.r.formato, this.r.orientacao, this.r.dimensoes_personalizadas);
     this.W = dim.largura_mm; this.H = dim.altura_mm;
     this.montar();
   }
