@@ -176,12 +176,12 @@ class ArtigoEstudoRepository {
     private val _colecoesZotero = MutableStateFlow<List<ZoteroColecao>>(emptyList())
     val colecoesZotero: StateFlow<List<ZoteroColecao>> = _colecoesZotero.asStateFlow()
 
-    fun adicionarArtigoLocal(titulo: String, autores: String, ano: Int, publicacao: String, resumo: String): ArtigoEstudoDetalhado {
+    fun adicionarArtigoLocal(titulo: String, autores: String, ano: Int, publicacao: String, resumo: String, chaveZotero: String = ""): ArtigoEstudoDetalhado {
         require(titulo.trim().isNotEmpty()) { "Informe o título do artigo." }
         require(ano in 1500..2100) { "Informe um ano válido." }
         val artigo = ArtigoEstudoDetalhado(
             id = "local_${UUID.randomUUID()}", titulo = titulo.trim(), autores = autores.trim(),
-            ano = ano, chaveZotero = "", totalPaginas = 0, resumoOficial = resumo.trim(),
+            ano = ano, chaveZotero = chaveZotero.trim(), totalPaginas = 0, resumoOficial = resumo.trim(),
             tipoZotero = "journalArticle", camposZotero = mapOf("publicationTitle" to publicacao.trim())
         )
         artigosLocais = listOf(artigo) + artigosLocais

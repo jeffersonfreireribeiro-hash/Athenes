@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.core.model.Documento
+import com.athenes.core.model.ArtigoEstudoDetalhado
 import com.athenes.core.data.ZoteroCredentialsStore
 import com.athenes.core.data.ZoteroColecoes
 import com.athenes.core.data.PastasDocumento
@@ -135,6 +136,7 @@ fun BibliotecaScreen(
     // Estados da Aba 2 (Artigos / Zotero)
     val textoBuscaArtigos by viewModel.textoBuscaArtigos.collectAsState()
     val artigos by viewModel.artigosFiltrados.collectAsState()
+    val acervoCompleto by viewModel.artigos.collectAsState()
     val estadoZotero by viewModel.estadoZotero.collectAsState()
     val sincronizandoZotero by viewModel.sincronizandoZotero.collectAsState()
     val conectadoZotero by viewModel.conectadoZotero.collectAsState()
@@ -527,10 +529,11 @@ fun BibliotecaScreen(
     if (novoArtigoAberto) {
         DialogNovoArtigoLocal(
             onFechar = { novoArtigoAberto = false },
+            referencias = acervoCompleto.filter { it.chaveZotero.isNotBlank() && !it.id.startsWith("local_") },
             pdfNome = pdfNovoArtigoNome,
             onSelecionarPdf = { escolherPdfNovoArtigo.launch(arrayOf("application/pdf")) },
-            onCriar = { titulo, autores, ano, publicacao, resumo ->
-                val artigo = viewModel.criarArtigoLocal(titulo, autores, ano, publicacao, resumo)
+            onCriar = { titulo, autores, ano, publicacao, resumo, chaveZotero ->
+                val artigo = viewModel.criarArtigoLocal(titulo, autores, ano, publicacao, resumo, chaveZotero)
                 pdfNovoArtigoUri?.let { uri ->
                     context.getSharedPreferences("pdf_artigos", 0).edit().putString(artigo.id, uri.toString()).apply()
                 }
@@ -721,22 +724,52 @@ fun BibliotecaScreen(
 @Composable
 fun DialogNovoArtigoLocal(
     onFechar: () -> Unit,
+    referencias: List<ArtigoEstudoDetalhado> = emptyList(),
     pdfNome: String? = null,
     onSelecionarPdf: () -> Unit = {},
-    onCriar: (String, String, Int, String, String) -> Unit
+    onCriar: (String, String, Int, String, String, String) -> Unit
 ) {
     var titulo by rememberSaveable { mutableStateOf("") }
     var autores by rememberSaveable { mutableStateOf("") }
     var ano by rememberSaveable { mutableStateOf(java.time.Year.now().value.toString()) }
     var publicacao by rememberSaveable { mutableStateOf("") }
     var resumo by rememberSaveable { mutableStateOf("") }
+    var chaveZotero by rememberSaveable { mutableStateOf("") }
+    var escolhendoReferencia by remember { mutableStateOf(false) }
+    var buscaReferencia by remember { mutableStateOf("") }
     val anoValor = ano.toIntOrNull()
     AlertDialog(
-        onDismissRequest = onFechar,
-        title = { Text("Novo artigo") },
+        onDismissRequest = { if (escolhendoReferencia) escolhendoReferencia = false else onFechar() },
+        title = { Text(if (escolhendoReferencia) "Escolher referência Zotero" else "Novo artigo") },
         text = {
+            if (escolhendoReferencia) {
+                Column {
+                    OutlinedTextField(buscaReferencia, { buscaReferencia = it }, label = { Text("Buscar referência") },
+                        singleLine = true, modifier = Modifier.fillMaxWidth())
+                    val filtradas = referencias.filter { buscaReferencia.isBlank() ||
+                        it.titulo.contains(buscaReferencia, ignoreCase = true) || it.autores.contains(buscaReferencia, ignoreCase = true) }
+                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+                        items(filtradas, key = { it.id }) { ref ->
+                            TextButton(onClick = {
+                                titulo = ref.titulo
+                                autores = ref.autores
+                                if (ref.ano in 1500..2100) ano = ref.ano.toString()
+                                publicacao = ref.camposZotero["publicationTitle"].orEmpty()
+                                resumo = ref.resumoOficial
+                                chaveZotero = ref.chaveZotero
+                                escolhendoReferencia = false
+                            }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                Text("${ref.titulo} · ${ref.ano}", modifier = Modifier.fillMaxWidth())
+                            }
+                        }
+                    }
+                }
+            } else {
             Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Crie um registro local. Você pode vincular um PDF agora ou no estúdio.", style = MaterialTheme.typography.bodySmall)
+                if (referencias.isNotEmpty()) TextButton(onClick = { escolhendoReferencia = true }) {
+                    Text(if (chaveZotero.isBlank()) "Usar referência Zotero" else "Referência Zotero vinculada")
+                }
                 OutlinedTextField(titulo, { titulo = it }, label = { Text("Título") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(autores, { autores = it }, label = { Text("Autores") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(ano, { ano = it.filter(Char::isDigit).take(4) }, label = { Text("Ano") }, singleLine = true, modifier = Modifier.fillMaxWidth(), isError = anoValor == null || anoValor !in 1500..2100)
@@ -746,11 +779,14 @@ fun DialogNovoArtigoLocal(
                     Text(pdfNome ?: "Selecionar PDF")
                 }
             }
+            }
         },
         confirmButton = {
-            TextButton(onClick = { onCriar(titulo.trim(), autores.trim(), anoValor!!, publicacao.trim(), resumo.trim()) },
+            if (!escolhendoReferencia) TextButton(onClick = { onCriar(titulo.trim(), autores.trim(), anoValor!!, publicacao.trim(), resumo.trim(), chaveZotero) },
                 enabled = titulo.isNotBlank() && anoValor != null && anoValor in 1500..2100) { Text("Adicionar e abrir") }
         },
-        dismissButton = { TextButton(onClick = onFechar) { Text("Cancelar") } }
+        dismissButton = { TextButton(onClick = { if (escolhendoReferencia) escolhendoReferencia = false else onFechar() }) {
+            Text(if (escolhendoReferencia) "Voltar" else "Cancelar")
+        } }
     )
 }

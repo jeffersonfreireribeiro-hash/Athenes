@@ -35,4 +35,12 @@ class ArtigosLocaisTest {
         assertTrue(runCatching { repositorio.adicionarArtigoLocal("Título", "", 1200, "", "") }.isFailure)
         assertFalse(repositorio.artigos.value.any { it.id.startsWith("local_") })
     }
+
+    @Test fun `vinculo zotero do artigo local persiste sem criar chave de acesso`() {
+        val repositorio = ArtigoEstudoRepository()
+        val artigo = repositorio.adicionarArtigoLocal("Obra", "Ana", 2025, "Revista", "", "ITEM1234")
+        val restaurado = ArtigosLocaisCodec.ler(ArtigosLocaisCodec.escrever(listOf(artigo))).single()
+        assertEquals("ITEM1234", restaurado.chaveZotero)
+        assertEquals(artigo.id, restaurado.id)
+    }
 }

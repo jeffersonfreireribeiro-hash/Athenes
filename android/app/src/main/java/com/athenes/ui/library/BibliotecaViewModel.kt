@@ -115,8 +115,8 @@ class BibliotecaViewModel(
     fun excluirDefinitivamente(id: String) = repository.excluirDefinitivamente(id)
     fun importarDocumentoJson(conteudo: String) = repository.importarDocumentoJson(conteudo)
     fun importarBib(conteudo: String) = artigoRepository.importarBib(conteudo)
-    fun criarArtigoLocal(titulo: String, autores: String, ano: Int, publicacao: String, resumo: String) =
-        artigoRepository.adicionarArtigoLocal(titulo, autores, ano, publicacao, resumo)
+    fun criarArtigoLocal(titulo: String, autores: String, ano: Int, publicacao: String, resumo: String, chaveZotero: String = "") =
+        artigoRepository.adicionarArtigoLocal(titulo, autores, ano, publicacao, resumo, chaveZotero)
 
     fun criarPasta(nome: String, pastaPaiId: String? = null) = repository.criarPasta(nome, pastaPaiId)
     fun moverDocumento(id: String, pastaId: String?) = repository.moverDocumento(id, pastaId)

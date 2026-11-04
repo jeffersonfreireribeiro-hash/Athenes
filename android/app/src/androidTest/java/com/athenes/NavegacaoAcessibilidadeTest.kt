@@ -18,6 +18,7 @@ import com.athenes.core.citacao.AutorReferencia
 import com.athenes.core.citacao.ReferenciaAcademica
 import com.athenes.ui.editor.components.GrafoConexoesDialog
 import com.athenes.ui.library.DialogNovoArtigoLocal
+import com.athenes.core.model.ArtigoEstudoDetalhado
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -84,8 +85,8 @@ class NavegacaoAcessibilidadeTest {
         var selecionarPdf = false
         compose.setContent {
             MaterialTheme {
-                DialogNovoArtigoLocal(onFechar = {}, onSelecionarPdf = { selecionarPdf = true }, onCriar = { titulo, autores, ano, publicacao, resumo ->
-                    resultado = listOf(titulo, autores, ano.toString(), publicacao, resumo)
+                DialogNovoArtigoLocal(onFechar = {}, onSelecionarPdf = { selecionarPdf = true }, onCriar = { titulo, autores, ano, publicacao, resumo, chave ->
+                    resultado = listOf(titulo, autores, ano.toString(), publicacao, resumo, chave)
                 })
             }
         }
@@ -98,5 +99,21 @@ class NavegacaoAcessibilidadeTest {
             assertEquals("Pesquisa local", resultado?.get(0))
             assertEquals("Ana Silva", resultado?.get(1))
         }
+    }
+
+    @Test fun referenciaZoteroPreencheNovoArtigo() {
+        val referencia = ArtigoEstudoDetalhado(id = "ZOT123", titulo = "Estudo vinculado", autores = "Ana Silva",
+            ano = 2024, chaveZotero = "ZOT123", resumoOficial = "Resumo da obra",
+            camposZotero = mapOf("publicationTitle" to "Revista acadêmica"))
+        var dados: List<String>? = null
+        compose.setContent { MaterialTheme {
+            DialogNovoArtigoLocal(onFechar = {}, referencias = listOf(referencia), onCriar = { t, a, ano, p, r, chave ->
+                dados = listOf(t, a, ano.toString(), p, r, chave)
+            })
+        } }
+        compose.onNodeWithText("Usar referência Zotero").performClick()
+        compose.onNodeWithText("Estudo vinculado", substring = true).performClick()
+        compose.onNodeWithText("Adicionar e abrir").performClick()
+        compose.runOnIdle { assertEquals(listOf("Estudo vinculado", "Ana Silva", "2024", "Revista acadêmica", "Resumo da obra", "ZOT123"), dados) }
     }
 }

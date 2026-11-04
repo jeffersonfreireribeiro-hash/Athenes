@@ -12,6 +12,7 @@ object ArtigosLocaisCodec {
             put("titulo", artigo.titulo)
             put("autores", artigo.autores)
             put("ano", artigo.ano)
+            put("chaveZotero", artigo.chaveZotero)
             put("resumoOficial", artigo.resumoOficial)
             put("meuResumo", artigo.meuResumo)
             put("analiseMetodologica", artigo.analiseMetodologica)
@@ -33,7 +34,7 @@ object ArtigosLocaisCodec {
             }.orEmpty()
             ArtigoEstudoDetalhado(
                 id = id, titulo = titulo, autores = item.optString("autores"),
-                ano = item.optInt("ano"), chaveZotero = "", totalPaginas = 0,
+                ano = item.optInt("ano"), chaveZotero = item.optString("chaveZotero"), totalPaginas = 0,
                 resumoOficial = item.optString("resumoOficial"),
                 meuResumo = item.optString("meuResumo"),
                 analiseMetodologica = item.optString("analiseMetodologica"),
