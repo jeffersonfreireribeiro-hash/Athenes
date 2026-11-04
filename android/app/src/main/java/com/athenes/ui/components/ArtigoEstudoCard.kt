@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,6 +28,10 @@ fun ArtigoEstudoCard(
     onAbrirTelaCheiaClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val temPdfLocal = remember(artigo.id) {
+        context.getSharedPreferences("pdf_artigos", 0).getString(artigo.id, null) != null
+    }
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = AthenesSurface),
@@ -153,14 +158,14 @@ fun ArtigoEstudoCard(
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.CloudOff,
+                            imageVector = if (temPdfLocal) Icons.Rounded.PictureAsPdf else Icons.Rounded.CloudOff,
                             contentDescription = null,
                             tint = Color(0xFF475569),
                             modifier = Modifier.size(11.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = "Sem PDF",
+                            text = if (temPdfLocal) "PDF local" else "Sem PDF",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
