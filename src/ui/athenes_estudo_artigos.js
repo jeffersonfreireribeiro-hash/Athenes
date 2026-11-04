@@ -25,6 +25,7 @@ import { obterPerfilColaborador, obterConfigGoogleDrive, salvarArquivoNoGoogleDr
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { svgIcone } from './athenes_icones.js';
 import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
+import { aplicarFilhosZoteroAoArtigo } from '../core/athenes_zotero_anexos_notas.js';
 import { artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo } from './athenes_estudo_artigos_dados.js';
 import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
@@ -377,7 +378,7 @@ export class EstudoArtigosView {
             <span>·</span>
             <span><strong>${qtdTracos + qtdPins}</strong> marcaç${(qtdTracos + qtdPins) === 1 ? 'ão' : 'ões'} no PDF</span>
             <span>·</span>
-            ${artigoTemPdf(art) ? `<span style="color:#059669; font-weight:700;">${escapeHtml(art.driveFileName || 'PDF vinculado')}</span>` : '<span style="color:#B45309; font-weight:700;">Sem PDF vinculado</span>'}
+            ${artigoTemPdf(art) ? `<span style="color:#059669; font-weight:700;">${escapeHtml(art.driveFileName || 'PDF vinculado')}</span>` : (art.anexoPdfZotero?.baixavel ? '<span style="color:#314F79; font-weight:700;">PDF disponível no Zotero</span>' : art.anexoPdfZotero ? '<span style="color:#B45309; font-weight:700;" title="Arquivo vinculado: só existe no seu computador e o Zotero não o envia">PDF só no seu computador (vinculado, não baixável)</span>' : '<span style="color:#B45309; font-weight:700;">Sem PDF vinculado</span>')}
           </div>
 
           <div class="ath-artigo-card-rodape">
@@ -933,6 +934,11 @@ export class EstudoArtigosView {
       this.artigos.unshift(novo);
       novos++;
     });
+    // PDFs vinculados, notas e anotações de PDF do Zotero (só metadados: o arquivo é baixado sob demanda)
+    try {
+      const filhos = await this.zoteroClient.listarFilhos();
+      this.artigos.forEach(a => { if (a.chaveZotero) aplicarFilhosZoteroAoArtigo(a, a.chaveZotero, filhos); });
+    } catch (e) { console.warn('[Athenes] Anexos e notas do Zotero:', e.message); }
     salvarArtigosEstudo(this.artigos);
     if (typeof this.aoMudarPastas === 'function') this.aoMudarPastas({ pastasNovas });
     this.renderizar();

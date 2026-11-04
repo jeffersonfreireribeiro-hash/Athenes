@@ -5,6 +5,7 @@
  */
 
 import { parseBibTeX } from './athenes_bibliografia.js';
+import { organizarFilhosZotero } from './athenes_zotero_anexos_notas.js';
 
 const ZOTERO_API_BASE = 'https://api.zotero.org';
 
@@ -237,6 +238,60 @@ export class ZoteroClient {
       console.warn('Athenes Zotero — busca com falha ou offline:', err);
       return Array.from(this.cacheItens.values());
     }
+  }
+
+  /**
+   * Lista os itens filhos da biblioteca do usuário (anexos, notas e anotações de PDF do Zotero 7), em páginas de 100,
+   * e os organiza por item pai. Não baixa nenhum arquivo. Falha de rede/permissão devolve estruturas vazias.
+   */
+  async listarFilhos({ fetchImpl = globalThis.fetch } = {}) {
+    await this.garantirUserId();
+    const vazio = organizarFilhosZotero([]);
+    if (!this.userId || !this.apiKey || this.isGroup) return vazio;
+    const brutos = [];
+    try {
+      for (const tipo of ['attachment', 'note', 'annotation']) {
+        for (let pg = 0; pg < 100; pg++) {
+          const res = await fetchImpl(`${this.getBaseUrl()}/items?${new URLSearchParams({ itemType: tipo, limit: '100', start: String(pg * 100) })}`, { headers: this.getHeaders() });
+          if (!res.ok) break; // sem permissão para este tipo: ignora sem erro
+          const parte = await res.json();
+          if (!Array.isArray(parte) || !parte.length) break;
+          brutos.push(...parte);
+          if (parte.length < 100) break;
+        }
+      }
+    } catch (err) {
+      console.warn('Athenes Zotero — anexos e notas indisponíveis agora:', err);
+    }
+    return organizarFilhosZotero(brutos);
+  }
+
+  /**
+   * Baixa o PDF guardado no Zotero (anexo importado). Devolve um Blob; em caso de falha lança Error com `.codigo`:
+   * 'sem_arquivo' (404: o arquivo não está no armazenamento do Zotero), 'sem_permissao' (403), 'rede_ou_cors'
+   * (o navegador bloqueou o redirecionamento do arquivo ou não há rede) ou 'http'.
+   */
+  async baixarAnexoPdf(chaveAnexo, { fetchImpl = globalThis.fetch } = {}) {
+    await this.garantirUserId();
+    const erro = (codigo, msg) => Object.assign(new Error(msg), { codigo });
+    if (!this.userId || !this.apiKey) throw erro('sem_permissao', 'Configure a chave de API do Zotero para baixar o PDF.');
+    const url = `${this.getBaseUrl()}/items/${encodeURIComponent(chaveAnexo)}/file`;
+    let res;
+    try {
+      res = await fetchImpl(url, { headers: this.getHeaders({ Accept: '*/*' }) });
+    } catch (_) {
+      try { // sem cabeçalhos personalizados não há pré-verificação (preflight) no armazenamento para onde o Zotero redireciona
+        res = await fetchImpl(`${url}?${new URLSearchParams({ key: this.apiKey })}`);
+      } catch (e2) {
+        throw erro('rede_ou_cors', 'O navegador não conseguiu baixar o arquivo do Zotero (rede ou bloqueio CORS no armazenamento de arquivos).');
+      }
+    }
+    if (res.status === 404) throw erro('sem_arquivo', 'Este PDF não está no armazenamento de arquivos do Zotero (arquivo só no computador ou sem sincronizar).');
+    if (res.status === 403) throw erro('sem_permissao', 'A chave do Zotero não tem permissão para baixar arquivos.');
+    if (!res.ok) throw erro('http', `O Zotero respondeu ${res.status} ao baixar o PDF.`);
+    const blob = await res.blob();
+    if (!blob || !blob.size) throw erro('sem_arquivo', 'O Zotero devolveu um arquivo vazio.');
+    return blob;
   }
 
   /**

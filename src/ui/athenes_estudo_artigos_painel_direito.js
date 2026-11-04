@@ -5,7 +5,7 @@
  */
 import { obterTokenOuConectar, obterTokenDrive } from '../core/athenes_drive_sync.js';
 import { obterConfigGoogleDrive, autenticarGoogleDrive, salvarArquivoNoGoogleDrive } from '../core/athenes_colaboracao.js';
-import { escapeHtml } from '../core/athenes_seguranca.js';
+import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { linhasInformacoesZotero, informacoesDoArtigo } from '../core/athenes_zotero_campos.js';
 import { svgIcone } from './athenes_icones.js';
 import { obterPdfLocal, registrarPdfLocalNoArtigo, garantirPdfDoArtigo, salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo } from './athenes_estudo_artigos_dados.js';
@@ -19,6 +19,19 @@ export const metodosEstudoPainelDireito = {
       <summary class="ath-fichamento-rotulo" style="cursor:pointer; margin-top:14px;">Informações do Zotero</summary>
       <dl class="ath-zot-info-lista">${linhas.map(l => `<dt>${escapeHtml(l.rotulo)}</dt><dd>${l.valor.startsWith('http://') || l.valor.startsWith('https://') ? `<a href="${escapeHtml(l.valor)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.valor)}</a>` : escapeHtml(l.valor)}</dd>`).join('')}</dl>
     </details>`;
+  },
+
+  /** Notas e anotações do Zotero: somente leitura, HTML sanitizado, com a data da última alteração. */
+  htmlNotasDoZotero(art) {
+    const notas = Array.isArray(art.notasZotero) ? art.notasZotero : [];
+    if (!notas.length) return '';
+    const data = (s) => { const d = new Date(s); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('pt-BR'); };
+    return `<label class="ath-fichamento-rotulo" style="margin-top:10px;">Notas do Zotero (${notas.length})</label>
+      <div class="ath-zot-notas">${notas.map(n => `
+        <div class="ath-citacao-pdf-card" style="border-left:4px solid #314F79; padding:8px 10px; margin-bottom:6px;">
+          <div style="font-size:10px; color:#64748B; margin-bottom:3px;">Zotero${data(n.data) ? ` · ${escapeHtml(data(n.data))}` : ''} · somente leitura</div>
+          <div style="font-size:11.5px; color:#1E293B; line-height:1.38;">${sanitizarHtmlEditorial(n.html)}</div>
+        </div>`).join('')}</div>`;
   },
 
   renderizarPainelDireitoEstudio(box, art) {
@@ -86,6 +99,8 @@ export const metodosEstudoPainelDireito = {
 
           <label class="ath-fichamento-rotulo" style="margin-top:10px;">Tags / Palavras-Chave (Zotero)</label>
           <input type="text" id="athEstudoTagsInput" class="ath-input" value="${escapeHtml((art.palavrasChave || []).join(', '))}" placeholder="Ex.: REURB, Morfologia, SIG">
+
+          ${this.htmlNotasDoZotero(art)}
 
           ${this.htmlInformacoesZotero(art)}
         </div>

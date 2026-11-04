@@ -7,6 +7,7 @@ import { obterConfigGoogleDrive } from '../core/athenes_colaboracao.js';
 import { artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
+import { mostrarAviso } from './athenes_aviso.js';
 import { registrarPdfLocalNoArtigo, salvarArtigosEstudo, formatarCitacaoAbntDoArtigo, artigoTemPdf, ehArtigoExemploFicticio } from './athenes_estudo_artigos_dados.js';
 
 export const metodosEstudoTela = {
@@ -504,7 +505,10 @@ export const metodosEstudoTela = {
         ? '<strong>Carregando o PDF do Google Drive…</strong>'
         : `<strong>Este artigo ainda não tem PDF vinculado</strong>
            <p>O registro veio do Zotero só com os dados da obra. Vincule o arquivo para ler, grifar e citar com página. O resumo e o fichamento ao lado já funcionam.</p>
+           ${art.anexoPdfZotero?.baixavel ? '<p><b>PDF disponível no Zotero:</b> baixe-o do armazenamento do Zotero e ele será guardado no seu Google Drive.</p>'
+             : art.anexoPdfZotero ? '<p><b>PDF só no seu computador:</b> no Zotero ele é um arquivo vinculado (não baixável pela web). Selecione o arquivo abaixo.</p>' : ''}
            <div class="ath-pdf-sem-arquivo-acoes">
+             ${art.anexoPdfZotero?.baixavel ? `<button type="button" class="glx-btn glx-btn-primary glx-btn-sm" data-baixar-pdf-zotero>${svgIcone('drive', 14)} Baixar do Zotero</button>` : ''}
              <label class="glx-btn glx-btn-primary glx-btn-sm" style="cursor:pointer;">${svgIcone('upload', 14)} Selecionar PDF no computador<input type="file" accept="application/pdf,.pdf" hidden></label>
              <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" data-sem-pdf-drive>${svgIcone('drive', 14)} Do Google Drive…</button>
            </div>`;
@@ -515,6 +519,21 @@ export const metodosEstudoTela = {
         if (this._pdfFalhou) this._pdfFalhou.clear();
         salvarArtigosEstudo(this.artigos);
         this.renderizar();
+      });
+      aviso.querySelector('[data-baixar-pdf-zotero]')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Baixando do Zotero…';
+        try {
+          this.carregarConfigZotero();
+          const blob = await this.zoteroClient.baixarAnexoPdf(art.anexoPdfZotero.chave);
+          const nome = String(art.anexoPdfZotero.nomeArquivo || `${art.id}.pdf`).replace(/(\.pdf)?$/i, '.pdf');
+          registrarPdfLocalNoArtigo(art, new File([blob], nome, { type: 'application/pdf' })); // abre e envia ao Drive
+          if (this._pdfFalhou) this._pdfFalhou.clear();
+          salvarArtigosEstudo(this.artigos);
+          this.renderizar();
+        } catch (err) {
+          btn.disabled = false; btn.textContent = 'Baixar do Zotero';
+          mostrarAviso(`${err.message} Selecione o PDF no computador ou no Google Drive.`);
+        }
       });
       aviso.querySelector('[data-sem-pdf-drive]')?.addEventListener('click', () => root.querySelector('#athBtnPopDrive')?.click());
       stack.appendChild(aviso);
