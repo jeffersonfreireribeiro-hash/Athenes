@@ -48,6 +48,7 @@ import com.athenes.core.model.FerramentaLeitura
 import com.athenes.core.model.PontoTraco
 import com.athenes.core.model.TracoDesenho
 import com.athenes.core.model.NotaAdesiva
+import com.athenes.core.model.CitacaoMarcada
 
 private val cachePaginas = object : LruCache<String, Bitmap>(24 * 1024) {
     override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
@@ -88,6 +89,7 @@ fun PdfRealViewer(
     modoSomenteStylus: Boolean,
     tracos: List<TracoDesenho>,
     notas: List<NotaAdesiva>,
+    citacoes: List<CitacaoMarcada>,
     onAdicionarTraco: (Int, List<PontoTraco>) -> Unit,
     onApagarTraco: (Int, Float, Float) -> Unit,
     onStylusDetectada: () -> Unit,
@@ -97,6 +99,7 @@ fun PdfRealViewer(
     val lista = rememberLazyListState()
     var zoom by rememberSaveable(uri.toString()) { mutableFloatStateOf(1f) }
     var notaAberta by remember { mutableStateOf<NotaAdesiva?>(null) }
+    var citacaoAberta by remember { mutableStateOf<CitacaoMarcada?>(null) }
     val contagem by produceState<Int?>(initialValue = null, uri) {
         value = withContext(Dispatchers.IO) {
             runCatching { numeroPaginas(context, uri) }.getOrDefault(0)
@@ -128,6 +131,11 @@ fun PdfRealViewer(
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Página ${indice + 1} de $total", style = MaterialTheme.typography.labelSmall)
+                        citacoes.filter { it.pagina == indice + 1 }.forEach { citacao ->
+                            TextButton(onClick = { citacaoAberta = citacao }) {
+                                Text("Citação desta página: ${citacao.texto.take(50)}")
+                            }
+                        }
                         Spacer(Modifier.height(8.dp))
                         if (imagem == null) {
                             CircularProgressIndicator()
@@ -184,6 +192,14 @@ fun PdfRealViewer(
                 title = { Text(nota.titulo) },
                 text = { Text(nota.texto) },
                 confirmButton = { TextButton(onClick = { notaAberta = null }) { Text("Fechar") } }
+            )
+        }
+        citacaoAberta?.let { citacao ->
+            AlertDialog(
+                onDismissRequest = { citacaoAberta = null },
+                title = { Text("Citação da página ${citacao.pagina}") },
+                text = { Text(citacao.texto + "\n\n" + citacao.referenciaAbnt) },
+                confirmButton = { TextButton(onClick = { citacaoAberta = null }) { Text("Fechar") } }
             )
         }
         Row(

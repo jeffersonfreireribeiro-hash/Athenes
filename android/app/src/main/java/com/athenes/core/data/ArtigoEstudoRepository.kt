@@ -20,15 +20,80 @@ class ArtigoEstudoRepository {
     private var contexto: Context? = null
     private val persistenciaScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var gravacaoPendente: Job? = null
+    private var anotacoesPendentes: Job? = null
 
     fun ativarPersistencia(context: Context) {
         if (contexto != null) return
         contexto = context.applicationContext
         val preferencias = contexto!!.getSharedPreferences("tracos_pdf", Context.MODE_PRIVATE)
+        val anotacoes = contexto!!.getSharedPreferences("anotacoes_pdf", Context.MODE_PRIVATE)
         _artigos.value = _artigos.value.map { artigo ->
-            val salvo = preferencias.getString(artigo.id, null) ?: return@map artigo
-            artigo.copy(tracos = runCatching { lerTracos(salvo) }.getOrDefault(artigo.tracos))
+            val tracos = preferencias.getString(artigo.id, null)?.let { salvo ->
+                runCatching { lerTracos(salvo) }.getOrNull()
+            } ?: artigo.tracos
+            val dados = anotacoes.getString(artigo.id, null)?.let { salvo ->
+                runCatching { lerAnotacoes(salvo) }.getOrNull()
+            }
+            artigo.copy(
+                tracos = tracos,
+                notas = dados?.first ?: artigo.notas,
+                citacoes = dados?.second ?: artigo.citacoes
+            )
         }
+    }
+
+    private fun salvarAnotacoesDepois() {
+        val ctx = contexto ?: return
+        val estado = _artigos.value.map { it.id to serializarAnotacoes(it.notas, it.citacoes) }
+        anotacoesPendentes?.cancel()
+        anotacoesPendentes = persistenciaScope.launch {
+            delay(400)
+            val editor = ctx.getSharedPreferences("anotacoes_pdf", Context.MODE_PRIVATE).edit()
+            estado.forEach { (id, conteudo) -> editor.putString(id, conteudo) }
+            editor.apply()
+        }
+    }
+
+    internal fun serializarAnotacoes(notas: List<NotaAdesiva>, citacoes: List<CitacaoMarcada>): String = JSONObject().apply {
+        put("notas", JSONArray().apply {
+            notas.forEach { nota -> put(JSONObject().apply {
+                put("id", nota.id); put("pagina", nota.pagina)
+                put("xPct", nota.xPct.toDouble()); put("yPct", nota.yPct.toDouble())
+                put("titulo", nota.titulo); put("texto", nota.texto)
+                put("corHex", nota.corHex); put("autor", nota.autor)
+            }) }
+        })
+        put("citacoes", JSONArray().apply {
+            citacoes.forEach { citacao -> put(JSONObject().apply {
+                put("id", citacao.id); put("pagina", citacao.pagina)
+                put("texto", citacao.texto); put("comentario", citacao.comentario)
+                put("referenciaAbnt", citacao.referenciaAbnt)
+                put("corHex", citacao.corHex); put("criadoEm", citacao.criadoEm)
+            }) }
+        })
+    }.toString()
+
+    internal fun lerAnotacoes(json: String): Pair<List<NotaAdesiva>, List<CitacaoMarcada>> {
+        val dados = JSONObject(json)
+        val notas = dados.getJSONArray("notas").let { array -> (0 until array.length()).map { indice ->
+            val item = array.getJSONObject(indice)
+            NotaAdesiva(
+                id = item.getString("id"), pagina = item.getInt("pagina"),
+                xPct = item.getDouble("xPct").toFloat(), yPct = item.getDouble("yPct").toFloat(),
+                titulo = item.getString("titulo"), texto = item.getString("texto"),
+                corHex = item.getString("corHex"), autor = item.getString("autor")
+            )
+        } }
+        val citacoes = dados.getJSONArray("citacoes").let { array -> (0 until array.length()).map { indice ->
+            val item = array.getJSONObject(indice)
+            CitacaoMarcada(
+                id = item.getString("id"), pagina = item.getInt("pagina"),
+                texto = item.getString("texto"), comentario = item.getString("comentario"),
+                referenciaAbnt = item.getString("referenciaAbnt"),
+                corHex = item.getString("corHex"), criadoEm = item.getString("criadoEm")
+            )
+        } }
+        return notas to citacoes
     }
 
     private fun salvarTracosDepois() {
@@ -101,6 +166,7 @@ class ArtigoEstudoRepository {
                 art.copy(citacoes = art.citacoes + citacao)
             } else art
         }
+        salvarAnotacoesDepois()
     }
 
     fun removerCitacao(artigoId: String, citacaoId: String) {
@@ -109,6 +175,7 @@ class ArtigoEstudoRepository {
                 art.copy(citacoes = art.citacoes.filterNot { it.id == citacaoId })
             } else art
         }
+        salvarAnotacoesDepois()
     }
 
     fun adicionarNota(artigoId: String, nota: NotaAdesiva) {
@@ -117,6 +184,7 @@ class ArtigoEstudoRepository {
                 art.copy(notas = art.notas + nota)
             } else art
         }
+        salvarAnotacoesDepois()
     }
 
     fun removerNota(artigoId: String, notaId: String) {
@@ -125,6 +193,7 @@ class ArtigoEstudoRepository {
                 art.copy(notas = art.notas.filterNot { it.id == notaId })
             } else art
         }
+        salvarAnotacoesDepois()
     }
 
     fun adicionarTraco(artigoId: String, traco: TracoDesenho) {
@@ -240,29 +309,8 @@ class ArtigoEstudoRepository {
                 analiseMetodologica = "Levantamento de estudos de caso e análise comparativa de workflows paramétricos integrados no Rhinoceros/Grasshopper com algoritmos genéticos.",
                 tags = listOf("Performance-Based Design", "Acústica", "Grasshopper", "Galapagos", "Otimização"),
                 paginas = paginasArtigo1,
-                citacoes = listOf(
-                    CitacaoMarcada(
-                        id = "cit_radino_17",
-                        pagina = 17,
-                        texto = "'s (Figure 12). The design process was enabled by the combined use of Grasshopper, a custom acoustic simulation tool and Galapagos solver, which allowed one to combine acoustic goals with production and assembly criteria...",
-                        comentario = "Trecho grifado na leitura",
-                        referenciaAbnt = "(RADINO, 2020, p. 17)",
-                        corHex = "#FDE047",
-                        criadoEm = "01/11/2026"
-                    )
-                ),
-                notas = listOf(
-                    NotaAdesiva(
-                        id = "nota_radino_1",
-                        pagina = 17,
-                        xPct = 50f,
-                        yPct = 40f,
-                        titulo = "Conexão com Algoritmos Genéticos",
-                        texto = "Verificar parâmetros de convergência do Galapagos para superfícies refletoras convexas.",
-                        corHex = "#FDBA74",
-                        autor = "Autor Principal"
-                    )
-                ),
+                citacoes = emptyList(),
+                notas = emptyList(),
                 zoteroConfig = ZoteroVinculoConfig(
                     apiKey = "",
                     userId = "",

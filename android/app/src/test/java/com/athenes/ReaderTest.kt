@@ -5,6 +5,8 @@ import com.athenes.core.model.AbaInspetorDireito
 import com.athenes.core.model.FerramentaLeitura
 import com.athenes.core.model.PontoTraco
 import com.athenes.core.model.TracoDesenho
+import com.athenes.core.model.NotaAdesiva
+import com.athenes.core.model.CitacaoMarcada
 import com.athenes.core.model.ZoteroVinculoConfig
 import com.athenes.ui.reader.ReaderViewModel
 import org.junit.Assert.*
@@ -27,6 +29,14 @@ class ReaderTest {
         assertEquals(entrada, restaurado)
     }
 
+    @Test
+    fun testNotasECitacoesSobrevivemSerializacao() {
+        val notas = listOf(NotaAdesiva(id = "nota_teste", pagina = 2, xPct = 25f, yPct = 50f, titulo = "Nota", texto = "Texto"))
+        val citacoes = listOf(CitacaoMarcada(id = "citacao_teste", pagina = 2, texto = "Trecho", referenciaAbnt = "(AUTOR, 2026, p. 2)"))
+        val repo = ArtigoEstudoRepository()
+        assertEquals(notas to citacoes, repo.lerAnotacoes(repo.serializarAnotacoes(notas, citacoes)))
+    }
+
     private lateinit var repository: ArtigoEstudoRepository
     private lateinit var viewModel: ReaderViewModel
 
@@ -47,7 +57,7 @@ class ReaderTest {
         assertTrue("Exemplo não deve conter chave Zotero", artigoAtivo.chaveZotero.isEmpty())
         assertTrue("Exemplo não deve conter User ID Zotero", artigoAtivo.zoteroConfig.userId.isEmpty())
         assertTrue("Exemplo não deve conter API key", artigoAtivo.zoteroConfig.apiKey.isEmpty())
-        assertTrue("Deve possuir citação inicial marcada", artigoAtivo.citacoes.isNotEmpty())
+        assertTrue("Exemplo não deve inventar citações do PDF", artigoAtivo.citacoes.isEmpty())
     }
 
     @Test
