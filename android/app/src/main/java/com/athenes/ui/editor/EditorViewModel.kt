@@ -345,22 +345,24 @@ class EditorViewModel : ViewModel() {
     }
 
     /** Insere uma citação estruturada no cursor e mantém a obra na lista do documento. */
-    fun inserirCitacao(artigo: ArtigoEstudoDetalhado) {
+    fun inserirCitacao(artigo: ArtigoEstudoDetalhado, pagina: String = "", narrativa: Boolean = false) {
         val referencia = ReferenciaAcademica.doArtigo(artigo)
+        val paginaValidada = Bibliografia.validarPagina(pagina, referencia.paginas, artigo.totalPaginas)
+        require(paginaValidada.valida) { paginaValidada.mensagem }
         if (_referencias.value.none { it.id == referencia.id }) _referencias.value = _referencias.value + referencia
         val indice = _referencias.value.indexOfFirst { it.id == referencia.id } + 1
-        val marca = Bibliografia.citacao(referencia, _estiloBibliografico.value, indice)
+        val marca = Bibliografia.citacao(referencia, _estiloBibliografico.value, indice, paginaValidada.valor, narrativa)
         val alvo = _blocos.value.find { it.id == _blocoSelecionadoId.value }
         salvarNoHistorico()
         if (alvo != null && (alvo.tipo == TipoBlocoEditor.PARAGRAFO || alvo.tipo == TipoBlocoEditor.CITACAO)) {
             val posicao = cursorTexto?.takeIf { it.first == alvo.id }?.second?.coerceIn(0, alvo.texto.length) ?: alvo.texto.length
-            val novo = CitacoesInline.inserir(TextoComCitacoes(alvo.texto, alvo.citacoes), posicao, referencia.id, marca)
+            val novo = CitacoesInline.inserir(TextoComCitacoes(alvo.texto, alvo.citacoes), posicao, referencia.id, marca, paginaValidada.valor, narrativa)
             atualizarBloco(alvo.id) { it.copy(texto = novo.texto, citacoes = novo.citacoes) }
             val prefixo = if (posicao > 0 && !alvo.texto[posicao - 1].isWhitespace()) 1 else 0
             cursorTexto = alvo.id to (posicao + prefixo + marca.length)
         } else {
             inserirAposSelecionado(BlocoEditor(tipo = TipoBlocoEditor.PARAGRAFO, texto = marca,
-                citacoes = listOf(CitacaoInline(referencia.id, 0, marca.length))))
+                citacoes = listOf(CitacaoInline(referencia.id, 0, marca.length, paginaValidada.valor, narrativa))))
         }
         if (_blocos.value.none { it.tipo == TipoBlocoEditor.REFERENCIAS }) {
             _blocos.value = _blocos.value + BlocoEditor(tipo = TipoBlocoEditor.REFERENCIAS)

@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.core.data.ArtigoEstudoRepository
 import com.athenes.core.citacao.EstiloBibliografico
+import com.athenes.core.citacao.Bibliografia
+import com.athenes.core.citacao.ReferenciaAcademica
 import com.athenes.core.model.ArtigoEstudoDetalhado
 import com.athenes.ui.theme.AthenesPrimary
 import com.athenes.ui.theme.AthenesTextDark
@@ -32,7 +34,7 @@ import com.athenes.ui.theme.AthenesTextMuted
  */
 @Composable
 fun EditorPainelCitacao(
-    onCitar: (ArtigoEstudoDetalhado) -> Unit,
+    onCitar: (ArtigoEstudoDetalhado, String, Boolean) -> Unit,
     estilo: EstiloBibliografico,
     onEstiloAlterado: (EstiloBibliografico) -> Unit,
     onFechar: () -> Unit,
@@ -40,6 +42,9 @@ fun EditorPainelCitacao(
 ) {
     val artigos by ArtigoEstudoRepository.compartilhado.artigos.collectAsState()
     var busca by remember { mutableStateOf("") }
+    var artigoSelecionado by remember { mutableStateOf<ArtigoEstudoDetalhado?>(null) }
+    var pagina by remember { mutableStateOf("") }
+    var narrativa by remember { mutableStateOf(false) }
     val filtrados = remember(busca, artigos) {
         if (busca.isBlank()) artigos
         else artigos.filter {
@@ -95,7 +100,7 @@ fun EditorPainelCitacao(
             ) {
                 items(filtrados, key = { it.id }) { art ->
                     Surface(
-                        onClick = { onCitar(art) },
+                        onClick = { artigoSelecionado = art; pagina = ""; narrativa = false },
                         color = Color(0xFFF8FAFC),
                         shape = RoundedCornerShape(10.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
@@ -125,5 +130,35 @@ fun EditorPainelCitacao(
             }
             Spacer(Modifier.height(12.dp))
         }
+    }
+
+    artigoSelecionado?.let { artigo ->
+        val referencia = ReferenciaAcademica.doArtigo(artigo)
+        val validacao = Bibliografia.validarPagina(pagina, referencia.paginas, artigo.totalPaginas)
+        AlertDialog(
+            onDismissRequest = { artigoSelecionado = null },
+            title = { Text("Citar obra") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(artigo.titulo, style = MaterialTheme.typography.bodyMedium)
+                    OutlinedTextField(
+                        value = pagina, onValueChange = { pagina = it }, label = { Text("Página (opcional)") },
+                        isError = !validacao.valida, supportingText = { if (!validacao.valida) Text(validacao.mensagem) },
+                        singleLine = true
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = !narrativa, onClick = { narrativa = false }, label = { Text("Entre parênteses") })
+                        FilterChip(selected = narrativa, onClick = { narrativa = true }, label = { Text("Narrativa") })
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = validacao.valida, onClick = {
+                    onCitar(artigo, validacao.valor, narrativa)
+                    artigoSelecionado = null
+                }) { Text("Inserir citação") }
+            },
+            dismissButton = { TextButton(onClick = { artigoSelecionado = null }) { Text("Cancelar") } }
+        )
     }
 }

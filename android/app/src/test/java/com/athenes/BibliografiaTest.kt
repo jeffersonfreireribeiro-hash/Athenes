@@ -61,4 +61,12 @@ class BibliografiaTest {
         assertEquals("4", ref.volume)
         assertEquals("10.1/teste", ref.doi)
     }
+
+    @Test fun `pagina aceita faixas validas e respeita intervalo da obra`() {
+        assertEquals("15–17, 20", Bibliografia.validarPagina("15-17; 20", "15-20", 33).valor)
+        assertTrue(Bibliografia.validarPagina("21", "15-20", 33).valida.not())
+        assertTrue(Bibliografia.validarPagina("17-15", "15-20", 33).valida.not())
+        assertTrue(Bibliografia.validarPagina("abc", "15-20", 33).valida.not())
+        assertTrue(Bibliografia.validarPagina("33", "", 33).valida)
+    }
 }

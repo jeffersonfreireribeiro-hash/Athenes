@@ -20,6 +20,7 @@ enum class EstiloBibliografico(val id: String, val rotulo: String, val numerico:
 }
 
 data class AutorReferencia(val sobrenome: String, val prenome: String = "")
+data class ValidacaoPagina(val valida: Boolean, val valor: String = "", val mensagem: String = "")
 
 data class ReferenciaAcademica(
     val id: String,
@@ -63,6 +64,26 @@ object Bibliografia {
     private val pt = Locale.forLanguageTag("pt-BR")
     fun ancora(refId: String): String = "ref_" + refId.replace(Regex("[^A-Za-z0-9_]"), "_").take(27) +
         "_" + refId.hashCode().toUInt().toString(16)
+
+    fun validarPagina(valor: String, paginasPublicacao: String = "", totalPaginasPdf: Int = 0): ValidacaoPagina {
+        val texto = valor.trim()
+        if (texto.isEmpty()) return ValidacaoPagina(true)
+        val faixa = Regex("(\\d+)\\D+(\\d+)").find(paginasPublicacao)
+        val minimo = faixa?.groupValues?.get(1)?.toIntOrNull() ?: if (totalPaginasPdf > 0) 1 else null
+        val maximo = faixa?.groupValues?.get(2)?.toIntOrNull() ?: totalPaginasPdf.takeIf { it > 0 }
+        val normalizados = mutableListOf<String>()
+        for (parte in texto.split(Regex("\\s*[,;]\\s*"))) {
+            val match = Regex("^(\\d+)(?:\\s*[-–]\\s*(\\d+))?$").matchEntire(parte)
+                ?: return ValidacaoPagina(false, mensagem = "Use números: 15, 15-17 ou 15, 17")
+            val inicio = match.groupValues[1].toIntOrNull() ?: return ValidacaoPagina(false, mensagem = "Página inválida")
+            val fim = match.groupValues[2].takeIf(String::isNotBlank)?.toIntOrNull() ?: inicio
+            if (fim < inicio) return ValidacaoPagina(false, mensagem = "O intervalo está invertido")
+            if (minimo != null && maximo != null && (inicio < minimo || fim > maximo))
+                return ValidacaoPagina(false, mensagem = "Fora do intervalo da obra ($minimo–$maximo)")
+            normalizados += if (fim == inicio) "$inicio" else "$inicio–$fim"
+        }
+        return ValidacaoPagina(true, normalizados.joinToString(", "))
+    }
     private fun ponto(texto: String): String = texto.trim().let { if (it.isBlank() || it.last() in ".!?") it else "$it." }
     private fun juntar(vararg partes: String): String = partes.filter(String::isNotBlank).joinToString(" ").replace(Regex("\\s+([,.;:])"), "$1").replace("..", ".").trim()
     private fun primeiroAutor(ref: ReferenciaAcademica): String = ref.autores.firstOrNull()?.sobrenome.orEmpty().ifBlank { ref.titulo }
