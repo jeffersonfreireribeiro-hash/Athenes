@@ -164,6 +164,11 @@ class BibliotecaTest {
             assertEquals("apa", conteudo.getString("estiloBibliografico"))
             assertEquals("zotero-1", conteudo.getJSONArray("referencias").getJSONObject(0).getString("id"))
             assertEquals("REFERENCIAS", conteudo.getJSONArray("blocos").getJSONObject(0).getString("tipo"))
+            val comEspaco = JSONObject().put("titulo", "Diagramação")
+                .put("blocos", org.json.JSONArray().put(JSONObject().put("tipo", "ESPACO").put("alturaPt", 36.5)))
+            val docEspaco = repositorio.importarDocumentoJson(comEspaco.toString())
+            assertEquals(36.5, JSONObject(File(pasta, "editor_${docEspaco.id}.json").readText())
+                .getJSONArray("blocos").getJSONObject(0).getDouble("alturaPt"), 0.001)
             assertTrue(runCatching { repositorio.importarDocumentoJson(json.put("blocos", org.json.JSONArray().put(JSONObject().put("tipo", "DESCONHECIDO"))).toString()) }.isFailure)
             assertTrue(runCatching { repositorio.importarDocumentoJson(json.put("blocos", org.json.JSONArray().put(JSONObject().put("tipo", "FIGURA").put("imagem", "ausente.png"))).toString()) }.isFailure)
         } finally {

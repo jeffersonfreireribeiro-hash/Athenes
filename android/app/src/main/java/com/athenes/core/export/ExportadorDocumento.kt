@@ -24,10 +24,11 @@ data class BlocoExport(
     val tabela: List<List<String>> = emptyList(),
     val listaNumerada: Boolean = false,
     val nivelTitulo: Int = 1,
-    val citacoes: List<CitacaoInline> = emptyList()
+    val citacoes: List<CitacaoInline> = emptyList(),
+    val alturaPt: Double = 24.0
 )
 
-enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, SUMARIO, LISTA_ILUSTRACOES, REFERENCIAS, QUEBRA_PAGINA, DIVISOR }
+enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, SUMARIO, LISTA_ILUSTRACOES, REFERENCIAS, QUEBRA_PAGINA, ESPACO, DIVISOR }
 enum class AlinhamentoExport {
     ESQUERDA, CENTRO, DIREITA, JUSTIFICADO,
     JUSTIFICADO_ESQUERDA, JUSTIFICADO_CENTRO, JUSTIFICADO_DIREITA
@@ -134,6 +135,7 @@ object ExportadorDocumento {
                     }
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> corpo.append("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>")
+                TipoBlocoExport.ESPACO -> corpo.append("<w:p><w:pPr><w:spacing w:before=\"0\" w:after=\"0\" w:line=\"${(b.alturaPt.coerceIn(1.0, 720.0) * 20).toInt()}\" w:lineRule=\"exact\"/></w:pPr><w:r><w:t xml:space=\"preserve\"> </w:t></w:r></w:p>")
                 TipoBlocoExport.DIVISOR -> corpo.append(
                     "<w:p><w:pPr><w:pBdr><w:bottom w:val=\"single\" w:sz=\"4\" w:space=\"1\" w:color=\"94A3B8\"/></w:pBdr></w:pPr></w:p>"
                 )
@@ -397,6 +399,7 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                     sb.append("</section>")
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> sb.append("<div style=\"break-before:page\"></div>")
+                TipoBlocoExport.ESPACO -> sb.append("<div aria-hidden=\"true\" style=\"height:${b.alturaPt.coerceIn(1.0, 720.0)}pt\"></div>")
                 TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${htmlComCitacoes(b.texto, b.citacoes)}</div>")
                 TipoBlocoExport.FIGURA -> {
                     sb.append("<figure>")

@@ -62,6 +62,7 @@ enum class TipoBlocoEditor(val rotulo: String, val desc: String) {
     LISTA_ILUSTRACOES("Lista de ilustrações", "Legendas geradas automaticamente"),
     REFERENCIAS("Referências", "Obras citadas no estilo do documento"),
     QUEBRA_PAGINA("Quebra de página", "Inicia uma nova página na exportação"),
+    ESPACO("Espaço", "Altura vertical configurável em pontos"),
     DIVISOR("Divisor", "Linha divisória ou espaçamento")
 }
 
@@ -80,7 +81,8 @@ data class BlocoEditor(
     val tabelaLinhas: List<List<String>> = emptyList(),
     val listaNumerada: Boolean = false,
     val nivelTitulo: Int = 1,
-    val citacoes: List<CitacaoInline> = emptyList()
+    val citacoes: List<CitacaoInline> = emptyList(),
+    val alturaPt: Double = 24.0
 )
 
 data class SecaoEstrutura(
@@ -309,6 +311,13 @@ class EditorViewModel : ViewModel() {
         salvarNoHistorico()
         atualizarBloco(id) { it.copy(colunas = colunas.coerceIn(1, 12)) }
     }
+    fun definirAlturaEspacoBloco(id: String, alturaPt: Double) {
+        require(alturaPt.isFinite() && alturaPt in 1.0..720.0) { "Altura deve ficar entre 1 e 720 pt." }
+        if (_blocos.value.none { it.id == id && it.tipo == TipoBlocoEditor.ESPACO && it.alturaPt != alturaPt }) return
+        salvarNoHistorico()
+        atualizarBloco(id) { if (it.tipo == TipoBlocoEditor.ESPACO) it.copy(alturaPt = alturaPt) else it }
+        salvarNoHistorico()
+    }
 
     fun definirListaNumerada(id: String, numerada: Boolean) = atualizarBloco(id) { it.copy(listaNumerada = numerada) }
     fun definirNivelTitulo(id: String, nivel: Int) = atualizarBloco(id) { it.copy(nivelTitulo = nivel.coerceIn(1, 9)) }
@@ -346,6 +355,7 @@ class EditorViewModel : ViewModel() {
             TipoBlocoEditor.LISTA_ILUSTRACOES -> BlocoEditor(tipo = tipo, alinhamento = AlinhamentoTexto.ESQUERDA)
             TipoBlocoEditor.REFERENCIAS -> BlocoEditor(tipo = tipo, alinhamento = AlinhamentoTexto.ESQUERDA)
             TipoBlocoEditor.QUEBRA_PAGINA -> BlocoEditor(tipo = tipo)
+            TipoBlocoEditor.ESPACO -> BlocoEditor(tipo = tipo)
             TipoBlocoEditor.DIVISOR -> BlocoEditor(tipo = tipo)
         }
         inserirAposSelecionado(novo)
@@ -493,7 +503,7 @@ class EditorViewModel : ViewModel() {
                 formula = b.formulaLatex, imagem = b.imagem,
                 alinhamento = AlinhamentoExport.valueOf(b.alinhamento.name),
                 tabela = b.tabelaLinhas, listaNumerada = b.listaNumerada, nivelTitulo = b.nivelTitulo,
-                citacoes = b.citacoes
+                citacoes = b.citacoes, alturaPt = b.alturaPt
             )
         }
     )
@@ -573,6 +583,7 @@ class EditorViewModel : ViewModel() {
                 put("tabela", JSONArray(b.tabelaLinhas.map { JSONArray(it) }))
                 put("listaNumerada", b.listaNumerada)
                 put("nivelTitulo", b.nivelTitulo)
+                put("alturaPt", b.alturaPt)
                 put("citacoes", BibliografiaCodec.escreverCitacoes(b.citacoes))
             })
         }
@@ -603,6 +614,7 @@ class EditorViewModel : ViewModel() {
                     alinhamento = runCatching { AlinhamentoTexto.valueOf(o.optString("alinhamento")) }.getOrDefault(AlinhamentoTexto.JUSTIFICADO),
                     estiloId = o.optString("estiloId", "texto"), listaNumerada = o.optBoolean("listaNumerada"),
                     nivelTitulo = o.optInt("nivelTitulo", 1).coerceIn(1, 9),
+                    alturaPt = o.optDouble("alturaPt", 24.0).takeIf { it.isFinite() && it in 1.0..720.0 } ?: 24.0,
                     citacoes = BibliografiaCodec.lerCitacoes(o.optJSONArray("citacoes"), o.optString("texto")),
                     tabelaLinhas = if (tab == null) emptyList() else (0 until tab.length()).map { r ->
                         val l = tab.getJSONArray(r)

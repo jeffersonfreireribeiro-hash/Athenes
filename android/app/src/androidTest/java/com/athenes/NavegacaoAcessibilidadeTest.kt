@@ -23,6 +23,8 @@ import com.athenes.core.model.ArtigoEstudoDetalhado
 import com.athenes.core.data.ArtigoEstudoRepository
 import com.athenes.ui.reader.EstudoArtigosScreen
 import com.athenes.ui.reader.ReaderViewModel
+import com.athenes.ui.editor.EditorViewModel
+import com.athenes.ui.editor.TipoBlocoEditor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -145,5 +147,19 @@ class NavegacaoAcessibilidadeTest {
         compose.onNodeWithText("Título antigo").performTextReplacement("Título corrigido")
         compose.onNodeWithText("Salvar alterações").performClick()
         compose.runOnIdle { assertEquals(listOf("Título corrigido", "Ana", "2025", "Revista", "Resumo", "ITEM1"), salvo) }
+    }
+
+    @Test fun espacoEditadoPodeSerDesfeitoEExportado() {
+        val vm = EditorViewModel()
+        compose.runOnIdle {
+            vm.adicionarBloco(TipoBlocoEditor.ESPACO)
+            val id = vm.blocos.value.last().id
+            vm.definirAlturaEspacoBloco(id, 36.5)
+            assertEquals(36.5, vm.blocos.value.last().alturaPt, 0.001)
+            vm.desfazer()
+            assertEquals(24.0, vm.blocos.value.last().alturaPt, 0.001)
+            vm.refazer()
+            assertEquals(36.5, vm.paraExportacao().blocos.last().alturaPt, 0.001)
+        }
     }
 }

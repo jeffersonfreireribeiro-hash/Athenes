@@ -633,6 +633,28 @@ private fun ItemBlocoFolha(
                 Text("Quebra de página", fontSize = 11.sp, color = AthenesTextMuted)
             }
 
+            TipoBlocoEditor.ESPACO -> Column {
+                var campoFocado by remember(bloco.id) { mutableStateOf(false) }
+                var alturaEntrada by remember(bloco.id) { mutableStateOf(bloco.alturaPt.toString()) }
+                LaunchedEffect(bloco.alturaPt, campoFocado) {
+                    if (!campoFocado) alturaEntrada = bloco.alturaPt.toString()
+                }
+                Text("Espaço vertical (pt)", fontSize = 11.sp, color = AthenesTextMuted)
+                OutlinedTextField(
+                    value = alturaEntrada,
+                    onValueChange = { entrada ->
+                        alturaEntrada = entrada.take(8)
+                        entrada.replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() && it in 1.0..720.0 }
+                            ?.let { vm.definirAlturaEspacoBloco(bloco.id, it) }
+                    },
+                    enabled = editavel,
+                    singleLine = true,
+                    modifier = Modifier.width(110.dp).onFocusChanged { campoFocado = it.isFocused },
+                    label = { Text("Altura") }
+                )
+                Spacer(Modifier.height((bloco.alturaPt * 4.0 / 3.0).toFloat().dp))
+            }
+
             TipoBlocoEditor.CITACAO -> Column {
                 Row(modifier = Modifier.fillMaxWidth().padding(start = if (compacto) 28.dp else 50.dp).height(IntrinsicSize.Min)) {
                     Box(Modifier.width(3.dp).fillMaxHeight().background(AthenesPrimary))

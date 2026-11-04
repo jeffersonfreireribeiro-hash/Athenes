@@ -26,6 +26,15 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class ExportadorTest {
 
+    @Test fun `espaco em pontos mantém altura no PDF e no DOCX`() {
+        val doc = DocumentoExport("Teste", "", "", "", listOf(BlocoExport(TipoBlocoExport.ESPACO, alturaPt = 36.5)))
+        val html = ExportadorDocumento.gerarHtml(doc, ResolvedorImagem { null })
+        val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, ResolvedorImagem { null }))["word/document.xml"]!!)
+        assertTrue(html.contains("height:36.5pt"))
+        assertTrue(xml.contains("w:line=\"730\" w:lineRule=\"exact\""))
+        DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(ByteArrayInputStream(xml.toByteArray()))
+    }
+
     @Test
     fun `citacao aponta para a referencia em HTML e DOCX`() {
         val ref = ReferenciaAcademica("obra-1", "book", "Livro", listOf(AutorReferencia("Silva", "Ana")), "2025")
