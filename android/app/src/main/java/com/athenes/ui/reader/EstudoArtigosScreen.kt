@@ -1,6 +1,10 @@
 package com.athenes.ui.reader
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,12 +19,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import com.athenes.core.model.AbaInspetorDireito
+import com.athenes.core.model.PaginaPdfInfo
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.reader.components.*
 
@@ -46,6 +54,28 @@ fun EstudoArtigosScreen(
     val artigoAtivo = remember(artigos, artigoAtivoId) {
         artigos.find { it.id == artigoAtivoId } ?: artigos.first()
     }
+    var pdfUriTexto by remember(artigoAtivo.id) {
+        mutableStateOf(context.getSharedPreferences("pdf_artigos", 0).getString(artigoAtivo.id, null))
+    }
+    var totalPdf by remember(artigoAtivo.id) { mutableIntStateOf(0) }
+    val artigoExibido = remember(artigoAtivo, pdfUriTexto, totalPdf) {
+        if (pdfUriTexto == null) artigoAtivo.copy(totalPaginas = 0, paginas = emptyList())
+        else if (totalPdf > 0) artigoAtivo.copy(
+            totalPaginas = totalPdf,
+            paginas = (1..totalPdf).map { PaginaPdfInfo(numero = it) }
+        ) else artigoAtivo.copy(totalPaginas = 0, paginas = emptyList())
+    }
+    val seletorPdf = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.getSharedPreferences("pdf_artigos", 0).edit().putString(artigoAtivo.id, uri.toString()).apply()
+            pdfUriTexto = uri.toString()
+            totalPdf = 0
+            viewModel.definirTotalPaginasPdf(0)
+        }
+    }
     val paginaAtiva by viewModel.paginaAtiva.collectAsState()
     val ferramentaAtiva by viewModel.ferramentaAtiva.collectAsState()
     val modoLinhaReta by viewModel.modoLinhaReta.collectAsState()
@@ -65,13 +95,13 @@ fun EstudoArtigosScreen(
     Scaffold(
         topBar = {
             ReaderTopBar(
-                artigo = artigoAtivo,
+                artigo = artigoExibido,
                 painelEsquerdoAberto = painelEsquerdoAberto,
                 painelDireitoAberto = painelDireitoAberto,
                 onAlternarEsquerdo = { viewModel.alternarPainelEsquerdo() },
                 onAlternarDireito = { viewModel.alternarPainelDireito() },
                 onAbrirPdfClick = {
-                    Toast.makeText(context, "A abertura do PDF ainda não está disponível.", Toast.LENGTH_SHORT).show()
+                    seletorPdf.launch(arrayOf("application/pdf"))
                 },
                 onSalvarDriveZoteroClick = {
                     Toast.makeText(context, "A sincronização com Drive e Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
@@ -93,33 +123,31 @@ fun EstudoArtigosScreen(
             // ========================================================
             // PALCO CENTRAL DE LEITURA & ANOTAÇÃO (100% DA LARGURA)
             // ========================================================
-            PdfContinuousCanvas(
-                artigo = artigoAtivo,
-                paginaAtual = paginaAtiva,
-                ferramentaAtiva = ferramentaAtiva,
-                corAtiva = corAtiva,
-                modoSomenteStylus = modoSomenteStylus,
-                textoSelecionado = textoSelecionado,
-                onTextoSelecionado = { txt, pag, x, y ->
-                    viewModel.selecionarTexto(txt, pag, x, y)
-                },
-                onFecharPopupSelecao = { viewModel.fecharPopupSelecao() },
-                onGrifarTexto = { viewModel.grifarTextoSelecionado() },
-                onCriarCitacao = { viewModel.abrirCriacaoCitacao() },
-                onCriarNota = { viewModel.abrirCriacaoNota() },
-                onAdicionarTraco = { pag, pontos -> viewModel.adicionarTracoLivre(pag, pontos) },
-                onApagarTracoProximo = { pag, x, y -> viewModel.apagarTracosProximos(pag, x, y) },
-                onStylusDetectada = { viewModel.registrarStylusDetectada() },
-                onPaginaAnterior = { viewModel.paginaAnterior() },
-                onProximaPagina = { viewModel.proximaPagina() },
-                modifier = Modifier.fillMaxSize()
-            )
-
+            if (pdfUriTexto != null) {
+                PdfRealViewer(
+                    uri = Uri.parse(pdfUriTexto!!),
+                    paginaAtual = paginaAtiva,
+                    onTotalPaginas = { totalPdf = it; viewModel.definirTotalPaginasPdf(it) },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxSize().semantics { liveRegion = LiveRegionMode.Polite },
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Sem PDF vinculado", style = MaterialTheme.typography.titleLarge)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Selecione o arquivo deste artigo para ler as páginas reais.")
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = { seletorPdf.launch(arrayOf("application/pdf")) }) { Text("Selecionar PDF") }
+                }
+            }
             // BARRA DE PÍLULA FLUTUANTE (.rm-barra-blocos)
             // Fiel ao web Athenes: [ ← ] [ 💾 ] | [ ↶ ] [ 🗑 ] | [ ☰ ] [ ✏ ] [ 🖊 ] [ ⚬—⚬ ] [ ▱ ] [ 📝 ] [ ❝ ] | ● ● ● ● ● ●
             // Some enquanto uma gaveta está aberta, para não ficar cortada atrás dela.
             AnimatedVisibility(
-                visible = !painelEsquerdoAberto && !painelDireitoAberto,
+                visible = pdfUriTexto != null && !painelEsquerdoAberto && !painelDireitoAberto,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier
@@ -182,7 +210,7 @@ fun EstudoArtigosScreen(
                 ) {
                     PainelEsquerdoLeitura(
                         artigos = artigos,
-                        artigoAtivo = artigoAtivo,
+                        artigoAtivo = artigoExibido,
                         filtroArtigos = filtroArtigos,
                         paginaAtiva = paginaAtiva,
                         onFiltroArtigosAlterado = { viewModel.definirFiltroArtigos(it) },
@@ -226,7 +254,7 @@ fun EstudoArtigosScreen(
                         .widthIn(max = 370.dp)
                 ) {
                     PainelDireitoInspetor(
-                        artigo = artigoAtivo,
+                        artigo = artigoExibido,
                         abaAtiva = abaDireitaAtiva,
                         modoSomenteStylus = modoSomenteStylus,
                         stylusDetectada = stylusDetectada,

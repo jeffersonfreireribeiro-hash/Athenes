@@ -35,9 +35,9 @@ Inventário de 04/11/2026. A coluna **estado** descreve o código Android atual,
 | Biblioteca Zotero paginada, filtros, busca, período e ordenação | `src/core/athenes_zotero.js`, `src/core/athenes_biblioteca_artigos.js` | Não: artigos de demonstração locais | Biblioteca |
 | Coleções Zotero como pastas de bibliografia | `src/core/athenes_zotero_pastas.js` | Não | Biblioteca, pastas |
 | Campos Zotero por tipo e autores com função | `src/core/athenes_zotero_campos.js`, `src/ui/athenes_estudo_artigos_dados.js` | Não | Biblioteca, detalhes do item |
-| PDF real em rolagem contínua, zoom e cache | `src/ui/athenes_estudo_artigos_tela.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: `PdfContinuousCanvas.kt` usa páginas de demonstração; falta vínculo ao PDF real | Estudo |
+| PDF real em rolagem contínua, zoom e cache | `src/ui/athenes_estudo_artigos_tela.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: seleção local e renderização sob demanda em `PdfRealViewer.kt`; faltam zoom e vínculo ao Drive | Estudo |
 | Grifos, seis cores, caneta, linha, borracha, notas, citações e fichamento | `src/ui/athenes_estudo_artigos_anotacoes.js`, `src/ui/athenes_estudo_artigos_painel_direito.js` | Parcial: ferramentas e dados locais | Estudo |
-| Selecionar PDF, baixar anexo e importar notas do Zotero | `src/core/athenes_zotero_anexos_notas.js`, `src/ui/athenes_estudo_artigos_modais.js` | Não | Estudo, PDF |
+| Selecionar PDF, baixar anexo e importar notas do Zotero | `src/core/athenes_zotero_anexos_notas.js`, `src/ui/athenes_estudo_artigos_modais.js` | Parcial: seleção local; anexos e notas Zotero ausentes | Estudo, PDF |
 | Citação direta longa a partir de destaque | `src/core/athenes_citacao.js`, `src/ui/athenes_estudo_artigos_anotacoes.js` | Não | Estudo, Citar |
 | Grafo de obras, autores, temas e anos | `src/core/athenes_conexoes.js`, `src/ui/athenes_painel_conexoes.js` | Não | Biblioteca, Conexões |
 
@@ -54,3 +54,7 @@ Nenhuma linha marcada `Não` ou `Parcial` deve ser tratada como paridade conclu�
 ## Interface adaptativa
 
 A navegação principal agora oferece Documentos, Biblioteca, Estudo e Conta. Em largura Compact usa barra inferior; em Medium e Expanded usa trilho lateral, segundo `WindowSizeClass`. A tela selecionada e os IDs do documento/artigo sobrevivem à rotação. O editor continua imersivo. Ainda faltam os painéis simultâneos de lista/detalhe, painéis redimensionáveis, controles completos da conta e testes de interface em aparelho.
+
+## Leitor de PDF
+
+Sem arquivo vinculado, o leitor mostra o estado vazio e a ação **Selecionar PDF**. A escolha usa o seletor de documentos do Android e guarda a URI por artigo. `PdfRenderer` abre o arquivo fora da thread principal; `LazyColumn` compõe as páginas visíveis e um cache LRU limita os bitmaps a aproximadamente 24 MiB. A contagem de páginas vem do PDF. As ferramentas de anotação e citação existentes ainda não desenham sobre a página real; esta parte permanece pendente.

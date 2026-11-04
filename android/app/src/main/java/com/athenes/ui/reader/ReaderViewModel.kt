@@ -26,6 +26,12 @@ class ReaderViewModel(
 
     private val _paginaAtiva = MutableStateFlow(1)
     val paginaAtiva: StateFlow<Int> = _paginaAtiva.asStateFlow()
+    private val _totalPaginasPdf = MutableStateFlow(0)
+
+    fun definirTotalPaginasPdf(total: Int) {
+        _totalPaginasPdf.value = total.coerceAtLeast(0)
+        if (total > 0 && _paginaAtiva.value > total) _paginaAtiva.value = 1
+    }
 
     private val _zoom = MutableStateFlow(1.0f)
     val zoom: StateFlow<Float> = _zoom.asStateFlow()
@@ -97,11 +103,12 @@ class ReaderViewModel(
     fun selecionarArtigo(id: String) {
         _artigoAtivoId.value = id
         _paginaAtiva.value = 1
+        _totalPaginasPdf.value = 0
         repository.selecionarArtigo(id)
     }
 
     fun navegarParaPagina(num: Int) {
-        val total = obterArtigoAtivo().totalPaginas
+        val total = _totalPaginasPdf.value.takeIf { it > 0 } ?: obterArtigoAtivo().totalPaginas
         if (num in 1..total) {
             _paginaAtiva.value = num
         }
@@ -114,7 +121,7 @@ class ReaderViewModel(
     }
 
     fun proximaPagina() {
-        val total = obterArtigoAtivo().totalPaginas
+        val total = _totalPaginasPdf.value.takeIf { it > 0 } ?: obterArtigoAtivo().totalPaginas
         if (_paginaAtiva.value < total) {
             _paginaAtiva.value += 1
         }
