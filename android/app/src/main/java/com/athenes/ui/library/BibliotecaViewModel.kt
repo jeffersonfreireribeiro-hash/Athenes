@@ -118,6 +118,8 @@ class BibliotecaViewModel(
     fun criarArtigoLocal(titulo: String, autores: String, ano: Int, publicacao: String, resumo: String, chaveZotero: String = "") =
         artigoRepository.adicionarArtigoLocal(titulo, autores, ano, publicacao, resumo, chaveZotero)
     fun excluirArtigoLocal(id: String) = artigoRepository.excluirArtigoLocal(id)
+    fun atualizarArtigoLocal(id: String, titulo: String, autores: String, ano: Int, publicacao: String, resumo: String, chaveZotero: String) =
+        artigoRepository.atualizarArtigoLocal(id, titulo, autores, ano, publicacao, resumo, chaveZotero)
 
     fun criarPasta(nome: String, pastaPaiId: String? = null) = repository.criarPasta(nome, pastaPaiId)
     fun moverDocumento(id: String, pastaId: String?) = repository.moverDocumento(id, pastaId)

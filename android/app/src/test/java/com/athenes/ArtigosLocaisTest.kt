@@ -57,4 +57,18 @@ class ArtigosLocaisTest {
         assertFalse(repositorio.excluirArtigoLocal("ZOT12345"))
         assertEquals("ZOT12345", repositorio.artigos.value.single().id)
     }
+
+    @Test fun `edicao local preserva id e fichamento apos sincronizar`() {
+        val repositorio = ArtigoEstudoRepository()
+        val original = repositorio.adicionarArtigoLocal("Rascunho", "Ana", 2025, "Revista", "Resumo")
+        repositorio.atualizarResumos(original.id, "Fichamento", "Método")
+        assertTrue(repositorio.atualizarArtigoLocal(original.id, "  Título final  ", "Ana e Bruno", 2026, "Nova revista", "Novo resumo", "ITEM2"))
+        repositorio.aplicarBibliotecaZotero(emptyList(), emptyList())
+        val editado = repositorio.artigos.value.single()
+        assertEquals(original.id, editado.id)
+        assertEquals("Título final", editado.titulo)
+        assertEquals("Fichamento", editado.meuResumo)
+        assertEquals("Nova revista", ArtigosLocaisCodec.ler(ArtigosLocaisCodec.escrever(listOf(editado))).single().camposZotero["publicationTitle"])
+        assertFalse(repositorio.atualizarArtigoLocal("ZOT123", "Não", "", 2025, "", "", ""))
+    }
 }

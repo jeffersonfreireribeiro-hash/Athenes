@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.athenes.ui.components.AthenesSearchBar
 import com.athenes.ui.components.NavegacaoPrincipal
@@ -129,5 +130,20 @@ class NavegacaoAcessibilidadeTest {
         compose.onNodeWithText("Nenhum artigo disponível").assertExists()
         compose.onNodeWithText("Abrir Biblioteca").performClick()
         compose.runOnIdle { assertTrue(voltou) }
+    }
+
+    @Test fun formularioDeEdicaoIniciaComDadosDoArtigo() {
+        val artigo = ArtigoEstudoDetalhado(id = "local_1", titulo = "Título antigo", autores = "Ana",
+            ano = 2025, chaveZotero = "ITEM1", resumoOficial = "Resumo",
+            camposZotero = mapOf("publicationTitle" to "Revista"))
+        var salvo: List<String>? = null
+        compose.setContent { MaterialTheme {
+            DialogNovoArtigoLocal(onFechar = {}, artigoInicial = artigo, onCriar = { t, a, ano, p, r, chave ->
+                salvo = listOf(t, a, ano.toString(), p, r, chave)
+            })
+        } }
+        compose.onNodeWithText("Título antigo").performTextReplacement("Título corrigido")
+        compose.onNodeWithText("Salvar alterações").performClick()
+        compose.runOnIdle { assertEquals(listOf("Título corrigido", "Ana", "2025", "Revista", "Resumo", "ITEM1"), salvo) }
     }
 }

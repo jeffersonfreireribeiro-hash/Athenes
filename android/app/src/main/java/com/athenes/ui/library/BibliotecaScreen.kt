@@ -142,6 +142,8 @@ fun BibliotecaScreen(
     val textoBuscaArtigos by viewModel.textoBuscaArtigos.collectAsState()
     val artigos by viewModel.artigosFiltrados.collectAsState()
     val acervoCompleto by viewModel.artigos.collectAsState()
+    var artigoLocalParaEditarId by rememberSaveable { mutableStateOf<String?>(null) }
+    val artigoLocalParaEditar = acervoCompleto.find { it.id == artigoLocalParaEditarId }
     val estadoZotero by viewModel.estadoZotero.collectAsState()
     val sincronizandoZotero by viewModel.sincronizandoZotero.collectAsState()
     val conectadoZotero by viewModel.conectadoZotero.collectAsState()
@@ -221,7 +223,7 @@ fun BibliotecaScreen(
                         }
 
                         Button(
-                            onClick = { pdfNovoArtigoUri = null; pdfNovoArtigoNome = null; novoArtigoAberto = true },
+                            onClick = { pdfNovoArtigoUri = null; pdfNovoArtigoNome = null; artigoLocalParaEditarId = null; novoArtigoAberto = true },
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             modifier = Modifier.heightIn(min = 48.dp).weight(1f),
@@ -522,6 +524,11 @@ fun BibliotecaScreen(
                                     onAbrirTelaCheiaClick = {
                                         onAbrirLeitorPdf(art.id)
                                     },
+                                    onEditarLocal = if (art.id.startsWith("local_")) ({
+                                        pdfNovoArtigoUri = null
+                                        pdfNovoArtigoNome = null
+                                        artigoLocalParaEditarId = art.id
+                                    }) else null,
                                     onExcluirLocal = if (art.id.startsWith("local_")) ({ artigoLocalParaExcluir = art }) else null
                                 )
                             }
@@ -533,19 +540,28 @@ fun BibliotecaScreen(
     }
 
     // Diálogos Modais Contextuais
-    if (novoArtigoAberto) {
+    if (novoArtigoAberto || artigoLocalParaEditar != null) {
         DialogNovoArtigoLocal(
-            onFechar = { novoArtigoAberto = false },
+            onFechar = { novoArtigoAberto = false; artigoLocalParaEditarId = null },
+            artigoInicial = artigoLocalParaEditar,
             referencias = acervoCompleto.filter { it.chaveZotero.isNotBlank() && !it.id.startsWith("local_") },
             pdfNome = pdfNovoArtigoNome,
             onSelecionarPdf = { escolherPdfNovoArtigo.launch(arrayOf("application/pdf")) },
             onCriar = { titulo, autores, ano, publicacao, resumo, chaveZotero ->
-                val artigo = viewModel.criarArtigoLocal(titulo, autores, ano, publicacao, resumo, chaveZotero)
-                pdfNovoArtigoUri?.let { uri ->
-                    context.getSharedPreferences("pdf_artigos", 0).edit().putString(artigo.id, uri).apply()
+                if (artigoLocalParaEditar != null) {
+                    viewModel.atualizarArtigoLocal(artigoLocalParaEditar.id, titulo, autores, ano, publicacao, resumo, chaveZotero)
+                    pdfNovoArtigoUri?.let { uri ->
+                        context.getSharedPreferences("pdf_artigos", 0).edit().putString(artigoLocalParaEditar.id, uri).apply()
+                    }
+                } else {
+                    val artigo = viewModel.criarArtigoLocal(titulo, autores, ano, publicacao, resumo, chaveZotero)
+                    pdfNovoArtigoUri?.let { uri ->
+                        context.getSharedPreferences("pdf_artigos", 0).edit().putString(artigo.id, uri).apply()
+                    }
+                    onAbrirLeitorPdf(artigo.id)
                 }
                 novoArtigoAberto = false
-                onAbrirLeitorPdf(artigo.id)
+                artigoLocalParaEditarId = null
             }
         )
     }
@@ -743,23 +759,24 @@ fun BibliotecaScreen(
 @Composable
 fun DialogNovoArtigoLocal(
     onFechar: () -> Unit,
+    artigoInicial: ArtigoEstudoDetalhado? = null,
     referencias: List<ArtigoEstudoDetalhado> = emptyList(),
     pdfNome: String? = null,
     onSelecionarPdf: () -> Unit = {},
     onCriar: (String, String, Int, String, String, String) -> Unit
 ) {
-    var titulo by rememberSaveable { mutableStateOf("") }
-    var autores by rememberSaveable { mutableStateOf("") }
-    var ano by rememberSaveable { mutableStateOf(java.time.Year.now().value.toString()) }
-    var publicacao by rememberSaveable { mutableStateOf("") }
-    var resumo by rememberSaveable { mutableStateOf("") }
-    var chaveZotero by rememberSaveable { mutableStateOf("") }
+    var titulo by rememberSaveable(artigoInicial?.id) { mutableStateOf(artigoInicial?.titulo.orEmpty()) }
+    var autores by rememberSaveable(artigoInicial?.id) { mutableStateOf(artigoInicial?.autores.orEmpty()) }
+    var ano by rememberSaveable(artigoInicial?.id) { mutableStateOf(artigoInicial?.ano?.toString() ?: java.time.Year.now().value.toString()) }
+    var publicacao by rememberSaveable(artigoInicial?.id) { mutableStateOf(artigoInicial?.camposZotero?.get("publicationTitle").orEmpty()) }
+    var resumo by rememberSaveable(artigoInicial?.id) { mutableStateOf(artigoInicial?.resumoOficial.orEmpty()) }
+    var chaveZotero by rememberSaveable(artigoInicial?.id) { mutableStateOf(artigoInicial?.chaveZotero.orEmpty()) }
     var escolhendoReferencia by remember { mutableStateOf(false) }
     var buscaReferencia by remember { mutableStateOf("") }
     val anoValor = ano.toIntOrNull()
     AlertDialog(
         onDismissRequest = { if (escolhendoReferencia) escolhendoReferencia = false else onFechar() },
-        title = { Text(if (escolhendoReferencia) "Escolher referência Zotero" else "Novo artigo") },
+        title = { Text(if (escolhendoReferencia) "Escolher referência Zotero" else if (artigoInicial != null) "Editar artigo" else "Novo artigo") },
         text = {
             if (escolhendoReferencia) {
                 Column {
@@ -785,7 +802,8 @@ fun DialogNovoArtigoLocal(
                 }
             } else {
             Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Crie um registro local. Você pode vincular um PDF agora ou no estúdio.", style = MaterialTheme.typography.bodySmall)
+                Text(if (artigoInicial == null) "Crie um registro local. Você pode vincular um PDF agora ou no estúdio."
+                    else "Atualize os dados do artigo. O PDF e as anotações permanecem vinculados.", style = MaterialTheme.typography.bodySmall)
                 if (referencias.isNotEmpty()) TextButton(onClick = { escolhendoReferencia = true }) {
                     Text(if (chaveZotero.isBlank()) "Usar referência Zotero" else "Referência Zotero vinculada")
                 }
@@ -802,7 +820,9 @@ fun DialogNovoArtigoLocal(
         },
         confirmButton = {
             if (!escolhendoReferencia) TextButton(onClick = { onCriar(titulo.trim(), autores.trim(), anoValor!!, publicacao.trim(), resumo.trim(), chaveZotero) },
-                enabled = titulo.isNotBlank() && anoValor != null && anoValor in 1500..2100) { Text("Adicionar e abrir") }
+                enabled = titulo.isNotBlank() && anoValor != null && anoValor in 1500..2100) {
+                Text(if (artigoInicial == null) "Adicionar e abrir" else "Salvar alterações")
+            }
         },
         dismissButton = { TextButton(onClick = { if (escolhendoReferencia) escolhendoReferencia = false else onFechar() }) {
             Text(if (escolhendoReferencia) "Voltar" else "Cancelar")

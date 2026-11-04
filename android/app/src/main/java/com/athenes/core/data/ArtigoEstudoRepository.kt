@@ -191,6 +191,23 @@ class ArtigoEstudoRepository {
         return artigo
     }
 
+    fun atualizarArtigoLocal(id: String, titulo: String, autores: String, ano: Int, publicacao: String, resumo: String, chaveZotero: String): Boolean {
+        require(titulo.trim().isNotEmpty()) { "Informe o título do artigo." }
+        require(ano in 1500..2100) { "Informe um ano válido." }
+        if (artigosLocais.none { it.id == id }) return false
+        val alterar: (ArtigoEstudoDetalhado) -> ArtigoEstudoDetalhado = { art ->
+            if (art.id != id) art else art.copy(
+                titulo = titulo.trim(), autores = autores.trim(), ano = ano,
+                resumoOficial = resumo.trim(), chaveZotero = chaveZotero.trim(),
+                camposZotero = art.camposZotero + ("publicationTitle" to publicacao.trim())
+            )
+        }
+        artigosLocais = artigosLocais.map(alterar)
+        _artigos.value = _artigos.value.map(alterar)
+        salvarArtigosLocais()
+        return true
+    }
+
     private fun salvarArtigosLocais() {
         contexto?.getSharedPreferences("biblioteca_artigos_locais", Context.MODE_PRIVATE)
             ?.edit()?.putString("dados", ArtigosLocaisCodec.escrever(artigosLocais))?.apply()

@@ -26,6 +26,7 @@ import com.athenes.ui.theme.*
 fun ArtigoEstudoCard(
     artigo: ArtigoEstudoDetalhado,
     onAbrirTelaCheiaClick: () -> Unit,
+    onEditarLocal: (() -> Unit)? = null,
     onExcluirLocal: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -237,9 +238,14 @@ fun ArtigoEstudoCard(
                     )
                 )
             }
-            if (onExcluirLocal != null) {
-                TextButton(onClick = onExcluirLocal, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Text("Excluir artigo local")
+            if (onEditarLocal != null || onExcluirLocal != null) {
+                Row(Modifier.fillMaxWidth()) {
+                    if (onEditarLocal != null) TextButton(onClick = onEditarLocal, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Text("Editar artigo")
+                    }
+                    if (onExcluirLocal != null) TextButton(onClick = onExcluirLocal, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Text("Excluir artigo")
+                    }
                 }
             }
         }
