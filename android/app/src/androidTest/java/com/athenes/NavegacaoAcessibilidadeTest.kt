@@ -14,6 +14,9 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.athenes.ui.components.AthenesSearchBar
 import com.athenes.ui.components.NavegacaoPrincipal
+import com.athenes.core.citacao.AutorReferencia
+import com.athenes.core.citacao.ReferenciaAcademica
+import com.athenes.ui.editor.components.GrafoConexoesDialog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -63,5 +66,15 @@ class NavegacaoAcessibilidadeTest {
         compose.onNodeWithText("Conta").performClick()
         compose.runOnIdle { assertEquals(DestinoPrincipal.CONTA, destino) }
         compose.onNodeWithText("Conta").assertIsSelected()
+    }
+
+    @Test fun grafoComMaisDeCemObrasMantemListaCompleta() {
+        val referencias = (1..140).map { i ->
+            ReferenciaAcademica("obra-$i", "book", "Obra $i", listOf(AutorReferencia("Silva", "Ana")), "2025")
+        }
+        compose.setContent { MaterialTheme { GrafoConexoesDialog(referencias, onFechar = {}) } }
+        compose.onNodeWithText("140 obras", substring = true).assertExists()
+        compose.onNodeWithText("Mapa: 60 de", substring = true).assertExists()
+        compose.onNodeWithText("A lista abaixo contém todos.", substring = true).assertExists()
     }
 }

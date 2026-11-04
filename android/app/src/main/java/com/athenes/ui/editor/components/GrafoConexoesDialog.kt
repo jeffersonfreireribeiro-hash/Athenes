@@ -34,6 +34,8 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
+private const val MAX_NOS_MAPA = 60
+
 private fun corNo(tipo: TipoNoConexao, ausente: Boolean): Color = if (ausente) Color(0xFF94A3B8) else when (tipo) {
     TipoNoConexao.OBRA -> AthenesPrimary
     TipoNoConexao.AUTOR -> Color(0xFF3B82F6)
@@ -68,7 +70,11 @@ fun GrafoConexoesDialog(referencias: List<ReferenciaAcademica>, onFechar: () -> 
     var tamanho by remember { mutableStateOf(IntSize.Zero) }
     val densidade = LocalDensity.current
     val nosVisiveis = remember(grafo, filtro) { grafo.nos.filter { filtro == null || it.tipo == filtro || it.tipo == TipoNoConexao.OBRA } }
-    val pos = remember(nosVisiveis, tamanho) { posicoes(nosVisiveis, tamanho) }
+    // O mapa serve para exploração visual; a lista mantém acesso a todos os nós do acervo.
+    val nosMapa = remember(nosVisiveis) { nosVisiveis.take(MAX_NOS_MAPA) }
+    val idsMapa = remember(nosMapa) { nosMapa.mapTo(hashSetOf()) { it.id } }
+    val arestasMapa = remember(grafo, idsMapa) { grafo.arestas.filter { it.origem in idsMapa && it.destino in idsMapa } }
+    val pos = remember(nosMapa, tamanho) { posicoes(nosMapa, tamanho) }
 
     Dialog(onDismissRequest = onFechar, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(modifier = Modifier.fillMaxWidth().widthIn(max = 900.dp).padding(16.dp), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
@@ -84,6 +90,8 @@ fun GrafoConexoesDialog(referencias: List<ReferenciaAcademica>, onFechar: () -> 
                 if (grafo.nos.isEmpty()) {
                     Text("Nenhuma referência vinculada para gerar conexões.", modifier = Modifier.padding(vertical = 24.dp))
                 } else {
+                    if (nosVisiveis.size > MAX_NOS_MAPA)
+                        Text("Mapa: ${nosMapa.size} de ${nosVisiveis.size} nós. A lista abaixo contém todos.", style = MaterialTheme.typography.bodySmall)
                     Canvas(Modifier.fillMaxWidth().height(320.dp).onSizeChanged { tamanho = it }.pointerInput(pos) {
                         detectTapGestures { toque ->
                             val proximo = pos.minByOrNull { (_, ponto) -> (ponto - toque).getDistance() }
@@ -91,17 +99,18 @@ fun GrafoConexoesDialog(referencias: List<ReferenciaAcademica>, onFechar: () -> 
                                 ?.let { (id, _) -> grafo.nos.find { it.id == id } }
                         }
                     }) {
-                        val ids = pos.keys
-                        grafo.arestas.filter { it.origem in ids && it.destino in ids }.forEach { a ->
+                        arestasMapa.forEach { a ->
+                            val origem = pos[a.origem] ?: return@forEach
+                            val destino = pos[a.destino] ?: return@forEach
                             drawLine(if (a.tipo == "coautoria") Color(0xAA3B82F6) else Color(0xFFCBD5E1),
-                                pos.getValue(a.origem), pos.getValue(a.destino), strokeWidth = if (a.tipo == "coautoria") 2.dp.toPx() else 1.dp.toPx())
+                                origem, destino, strokeWidth = if (a.tipo == "coautoria") 2.dp.toPx() else 1.dp.toPx())
                         }
                         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                             color = Color(0xFF1F2733).toArgb()
                             textSize = with(densidade) { 10.sp.toPx() }
                             textAlign = Paint.Align.CENTER
                         }
-                        nosVisiveis.forEach { no ->
+                        nosMapa.forEach { no ->
                             val ponto = pos[no.id] ?: return@forEach
                             val raio = if (no.tipo == TipoNoConexao.OBRA) 8.dp.toPx() else 6.dp.toPx()
                             drawCircle(corNo(no.tipo, no.dadoAusente), raio, ponto)
