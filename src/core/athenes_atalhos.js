@@ -45,6 +45,10 @@ export const CATALOGO = [
   // E. Estrutura
   { id: 'quebra_pagina', cat: 'estrutura', rotulo: 'Quebra de página', atalhos: ['Mod+Enter'], escopo: 'global' },
   { id: 'quebra_linha', cat: 'estrutura', rotulo: 'Quebra de linha suave', atalhos: ['Shift+Enter'], escopo: 'edicao', nativo: true },
+  { id: 'bloco_duplicar', cat: 'estrutura', rotulo: 'Duplicar o bloco selecionado', atalhos: ['Mod+Shift+D'], escopo: 'global' },
+  { id: 'bloco_excluir', cat: 'estrutura', rotulo: 'Excluir o bloco selecionado', atalhos: ['Mod+Shift+Backspace'], escopo: 'global' },
+  { id: 'bloco_subir', cat: 'estrutura', rotulo: 'Mover o bloco para cima', atalhos: ['Alt+ArrowUp'], mac: ['Mod+Alt+ArrowUp'], escopo: 'global' },
+  { id: 'bloco_descer', cat: 'estrutura', rotulo: 'Mover o bloco para baixo', atalhos: ['Alt+ArrowDown'], mac: ['Mod+Alt+ArrowDown'], escopo: 'global' },
   { id: 'nota_rodape', cat: 'estrutura', rotulo: 'Inserir nota de rodapé', atalhos: ['Mod+Alt+F'], escopo: 'edicao' },
   { id: 'titulo1', cat: 'estrutura', rotulo: 'Título 1', atalhos: ['Mod+Alt+1'], escopo: 'global' },
   { id: 'titulo2', cat: 'estrutura', rotulo: 'Título 2', atalhos: ['Mod+Alt+2'], escopo: 'global' },
@@ -161,8 +165,8 @@ export function resolverAcao(e, { mac = false, contexto = {}, indice = null, per
 
 // ───────────────────────────── Apresentação ─────────────────────────────
 
-const GLIFOS_MAC = { Mod: '⌘', Ctrl: '⌃', Alt: '⌥', Shift: '⇧', Enter: '↵', Tab: '⇥', Escape: 'Esc', Space: 'Espaço', Backspace: '⌫' };
-const NOMES_WIN = { Mod: 'Ctrl', Alt: 'Alt', Shift: 'Shift', Enter: 'Enter', Tab: 'Tab', Escape: 'Esc', Space: 'Espaço', Backspace: 'Backspace' };
+const GLIFOS_MAC = { ArrowUp: '↑', ArrowDown: '↓', Mod: '⌘', Ctrl: '⌃', Alt: '⌥', Shift: '⇧', Enter: '↵', Tab: '⇥', Escape: 'Esc', Space: 'Espaço', Backspace: '⌫' };
+const NOMES_WIN = { ArrowUp: '↑', ArrowDown: '↓', Mod: 'Ctrl', Alt: 'Alt', Shift: 'Shift', Enter: 'Enter', Tab: 'Tab', Escape: 'Esc', Space: 'Espaço', Backspace: 'Backspace' };
 
 /** "Mod+Shift+Z" → "Ctrl+Shift+Z" (Windows/Linux) ou "⇧⌘Z" (macOS, ordem ⌃⌥⇧⌘ como no sistema). */
 export function formatarAtalho(s, mac = false) {

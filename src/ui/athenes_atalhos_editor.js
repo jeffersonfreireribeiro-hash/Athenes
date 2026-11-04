@@ -8,7 +8,7 @@ import { GerenciadorAtalhos } from './athenes_atalhos_engine.js';
 import {
   filtrarCatalogo, CATEGORIAS, localizarOcorrencias, ehAtalhoDeFormatacaoDireta, acaoPorId, atalhosDaAcao, formatarAtalho
 } from '../core/athenes_atalhos.js';
-import { criarNovoBloco, dividirBlocoTexto } from '../core/athenes_documento.js';
+import { criarNovoBloco, dividirBlocoTexto, duplicarBlocoNaSecao, removerBlocoDaSecao, moverBlocoPorLinha, buscarSecaoDoBloco } from '../core/athenes_documento.js';
 import { modoSomenteLeitura } from '../core/athenes_colaboracao.js';
 
 const MAPA_TOOLTIPS = [
@@ -135,6 +135,10 @@ export class AtalhosDoEditor {
     g.registrar('ocorrencia_anterior', () => { this.navegarBusca(-1); });
     g.registrar('ir_para', () => { this.abrirIrPara(); });
     g.registrar('quebra_pagina', () => this.quebraPagina());
+    g.registrar('bloco_duplicar', () => this.duplicarBlocoSelecionado());
+    g.registrar('bloco_excluir', () => this.excluirBlocoSelecionado());
+    g.registrar('bloco_subir', () => this.moverBlocoSelecionado(-1));
+    g.registrar('bloco_descer', () => this.moverBlocoSelecionado(1));
     g.registrar('nota_rodape', () => { if (this.somenteLeitura()) return false; ed.inserirNotaRodapeNoCursor(); });
     const nivel = (n) => () => this.converterBloco('titulo', n);
     g.registrar('titulo1', nivel(1)); g.registrar('titulo2', nivel(2)); g.registrar('titulo3', nivel(3));
@@ -218,6 +222,32 @@ export class AtalhosDoEditor {
       if (tipo === 'titulo') { x.nivel = nivel; x.estiloId = 'titulo' + nivel; x.manterComProximo = true; }
       else { delete x.nivel; x.estiloId = 'corpo'; x.manterComProximo = false; }
     }) ? undefined : false;
+  }
+
+  /** Duplicar / excluir / mover o bloco em que está o cursor (ou o selecionado): os mesmos efeitos dos botões da barra rápida. */
+  duplicarBlocoSelecionado() {
+    if (this.somenteLeitura()) return false;
+    const b = this.blocoAtual(); if (!b) return false;
+    const copia = duplicarBlocoNaSecao(this.ed.doc, b.id);
+    if (!copia) return false;
+    this.ed.aposEstrutura(copia);
+  }
+
+  excluirBlocoSelecionado() {
+    if (this.somenteLeitura()) return false;
+    const b = this.blocoAtual(); if (!b) return false;
+    const sec = buscarSecaoDoBloco(this.ed.doc, b.id); if (!sec) return false;
+    const idx = (sec.blocos || []).findIndex(x => x.id === b.id);
+    removerBlocoDaSecao(this.ed.doc, sec.id, b.id);
+    const resto = sec.blocos || [];
+    this.ed.aposEstrutura(resto[Math.min(Math.max(0, idx), resto.length - 1)] || null); // seleciona o vizinho, para poder seguir editando
+  }
+
+  moverBlocoSelecionado(delta) {
+    if (this.somenteLeitura()) return false;
+    const b = this.blocoAtual(); if (!b) return false;
+    if (!moverBlocoPorLinha(this.ed.doc, b.id, delta)) return false;
+    this.ed.aposEstrutura(b);
   }
 
   quebraPagina() {
