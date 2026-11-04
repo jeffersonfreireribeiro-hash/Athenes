@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.athenes.core.data.DocumentoRepository
+import com.athenes.core.data.ArtigoEstudoRepository
 import com.athenes.core.model.Documento
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.core.updater.AppUpdater
@@ -61,6 +62,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ArtigoEstudoRepository.compartilhado.ativarPersistencia(applicationContext)
         setContent {
             AthenesTheme {
                 var telaAtual by rememberSaveable { mutableStateOf(AppTela.BIBLIOTECA) }

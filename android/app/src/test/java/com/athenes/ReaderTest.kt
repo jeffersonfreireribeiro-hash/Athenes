@@ -4,6 +4,7 @@ import com.athenes.core.data.ArtigoEstudoRepository
 import com.athenes.core.model.AbaInspetorDireito
 import com.athenes.core.model.FerramentaLeitura
 import com.athenes.core.model.PontoTraco
+import com.athenes.core.model.TracoDesenho
 import com.athenes.core.model.ZoteroVinculoConfig
 import com.athenes.ui.reader.ReaderViewModel
 import org.junit.Assert.*
@@ -11,6 +12,20 @@ import org.junit.Before
 import org.junit.Test
 
 class ReaderTest {
+
+    @Test
+    fun testTracoPdfSobreviveSerializacao() {
+        val entrada = listOf(TracoDesenho(
+            id = "traco_teste",
+            pagina = 3,
+            corHex = "#314F79",
+            espessura = 3f,
+            pontos = listOf(PontoTraco(0.1f, 0.2f), PontoTraco(0.9f, 0.8f)),
+            ehLinhaReta = true
+        ))
+        val restaurado = ArtigoEstudoRepository().let { it.lerTracos(it.serializarTracos(entrada)) }
+        assertEquals(entrada, restaurado)
+    }
 
     private lateinit var repository: ArtigoEstudoRepository
     private lateinit var viewModel: ReaderViewModel

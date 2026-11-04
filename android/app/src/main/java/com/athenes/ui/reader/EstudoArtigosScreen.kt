@@ -132,6 +132,7 @@ fun EstudoArtigosScreen(
                     cor = corAtiva,
                     modoSomenteStylus = modoSomenteStylus,
                     tracos = artigoAtivo.tracos,
+                    notas = artigoAtivo.notas,
                     onAdicionarTraco = { pagina, pontos -> viewModel.adicionarTracoLivre(pagina, pontos) },
                     onApagarTraco = { pagina, x, y -> viewModel.apagarTracosProximos(pagina, x, y, 0.03f) },
                     onStylusDetectada = { viewModel.registrarStylusDetectada() },

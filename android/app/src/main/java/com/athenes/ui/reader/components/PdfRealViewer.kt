@@ -17,6 +17,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.StickyNote2
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -41,6 +47,7 @@ import kotlinx.coroutines.withContext
 import com.athenes.core.model.FerramentaLeitura
 import com.athenes.core.model.PontoTraco
 import com.athenes.core.model.TracoDesenho
+import com.athenes.core.model.NotaAdesiva
 
 private val cachePaginas = object : LruCache<String, Bitmap>(24 * 1024) {
     override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
@@ -80,6 +87,7 @@ fun PdfRealViewer(
     cor: String,
     modoSomenteStylus: Boolean,
     tracos: List<TracoDesenho>,
+    notas: List<NotaAdesiva>,
     onAdicionarTraco: (Int, List<PontoTraco>) -> Unit,
     onApagarTraco: (Int, Float, Float) -> Unit,
     onStylusDetectada: () -> Unit,
@@ -88,6 +96,7 @@ fun PdfRealViewer(
     val context = LocalContext.current
     val lista = rememberLazyListState()
     var zoom by rememberSaveable(uri.toString()) { mutableFloatStateOf(1f) }
+    var notaAberta by remember { mutableStateOf<NotaAdesiva?>(null) }
     val contagem by produceState<Int?>(initialValue = null, uri) {
         value = withContext(Dispatchers.IO) {
             runCatching { numeroPaginas(context, uri) }.getOrDefault(0)
@@ -144,6 +153,23 @@ fun PdfRealViewer(
                                     onStylusDetectada = onStylusDetectada,
                                     modifier = Modifier.matchParentSize()
                                 )
+                                BoxWithConstraints(Modifier.matchParentSize()) {
+                                    notas.filter { it.pagina == indice + 1 }.forEach { nota ->
+                                        IconButton(
+                                            onClick = { notaAberta = nota },
+                                            modifier = Modifier.offset(
+                                                x = maxWidth * (nota.xPct / 100f),
+                                                y = maxHeight * (nota.yPct / 100f)
+                                            )
+                                        ) {
+                                            Icon(
+                                                Icons.AutoMirrored.Rounded.StickyNote2,
+                                                contentDescription = "Nota: ${nota.titulo}",
+                                                tint = parseHexColor(nota.corHex)
+                                            )
+                                        }
+                                    }
+                                }
                                 }
                             }
                         }
@@ -151,6 +177,14 @@ fun PdfRealViewer(
                     }
                 }
             }
+        }
+        notaAberta?.let { nota ->
+            AlertDialog(
+                onDismissRequest = { notaAberta = null },
+                title = { Text(nota.titulo) },
+                text = { Text(nota.texto) },
+                confirmButton = { TextButton(onClick = { notaAberta = null }) { Text("Fechar") } }
+            )
         }
         Row(
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),

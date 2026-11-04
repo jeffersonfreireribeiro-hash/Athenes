@@ -1,12 +1,83 @@
 package com.athenes.core.data
 
+import android.content.Context
 import com.athenes.core.model.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
+import org.json.JSONArray
+import org.json.JSONObject
 
 class ArtigoEstudoRepository {
+
+    private var contexto: Context? = null
+    private val persistenciaScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var gravacaoPendente: Job? = null
+
+    fun ativarPersistencia(context: Context) {
+        if (contexto != null) return
+        contexto = context.applicationContext
+        val preferencias = contexto!!.getSharedPreferences("tracos_pdf", Context.MODE_PRIVATE)
+        _artigos.value = _artigos.value.map { artigo ->
+            val salvo = preferencias.getString(artigo.id, null) ?: return@map artigo
+            artigo.copy(tracos = runCatching { lerTracos(salvo) }.getOrDefault(artigo.tracos))
+        }
+    }
+
+    private fun salvarTracosDepois() {
+        val ctx = contexto ?: return
+        val estado = _artigos.value.map { it.id to it.tracos }
+        gravacaoPendente?.cancel()
+        gravacaoPendente = persistenciaScope.launch {
+            delay(400)
+            val editor = ctx.getSharedPreferences("tracos_pdf", Context.MODE_PRIVATE).edit()
+            estado.forEach { (id, tracos) -> editor.putString(id, serializarTracos(tracos)) }
+            editor.apply()
+        }
+    }
+
+    internal fun serializarTracos(tracos: List<TracoDesenho>): String = JSONArray().apply {
+        tracos.forEach { traco ->
+            put(JSONObject().apply {
+                put("id", traco.id)
+                put("pagina", traco.pagina)
+                put("corHex", traco.corHex)
+                put("espessura", traco.espessura.toDouble())
+                put("ehLinhaReta", traco.ehLinhaReta)
+                put("ehMarcaTexto", traco.ehMarcaTexto)
+                put("pontos", JSONArray().apply {
+                    traco.pontos.forEach { ponto -> put(JSONArray().put(ponto.x.toDouble()).put(ponto.y.toDouble())) }
+                })
+            })
+        }
+    }.toString()
+
+    internal fun lerTracos(json: String): List<TracoDesenho> {
+        val array = JSONArray(json)
+        return (0 until array.length()).map { indice ->
+            val item = array.getJSONObject(indice)
+            val pontos = item.getJSONArray("pontos")
+            TracoDesenho(
+                id = item.getString("id"),
+                pagina = item.getInt("pagina"),
+                corHex = item.getString("corHex"),
+                espessura = item.getDouble("espessura").toFloat(),
+                ehLinhaReta = item.optBoolean("ehLinhaReta"),
+                ehMarcaTexto = item.optBoolean("ehMarcaTexto"),
+                pontos = (0 until pontos.length()).map { p ->
+                    val par = pontos.getJSONArray(p)
+                    PontoTraco(par.getDouble(0).toFloat(), par.getDouble(1).toFloat())
+                }
+            )
+        }
+    }
 
     private val _artigos = MutableStateFlow<List<ArtigoEstudoDetalhado>>(obterArtigosIniciais())
     val artigos: StateFlow<List<ArtigoEstudoDetalhado>> = _artigos.asStateFlow()
@@ -62,6 +133,7 @@ class ArtigoEstudoRepository {
                 art.copy(tracos = art.tracos + traco)
             } else art
         }
+        salvarTracosDepois()
     }
 
     fun desfazerUltimoTraco(artigoId: String, pagina: Int) {
@@ -74,6 +146,7 @@ class ArtigoEstudoRepository {
                 } else art
             } else art
         }
+        salvarTracosDepois()
     }
 
     fun limparTracosPagina(artigoId: String, pagina: Int) {
@@ -82,6 +155,7 @@ class ArtigoEstudoRepository {
                 art.copy(tracos = art.tracos.filterNot { it.pagina == pagina })
             } else art
         }
+        salvarTracosDepois()
     }
 
     fun apagarTracosProximos(artigoId: String, pagina: Int, x: Float, y: Float, raio: Float = 28f) {
@@ -100,6 +174,7 @@ class ArtigoEstudoRepository {
                 art.copy(tracos = tracosFiltrados)
             } else art
         }
+        salvarTracosDepois()
     }
 
     fun atualizarResumos(artigoId: String, meuResumo: String, analiseMetodologica: String) {
