@@ -4,7 +4,7 @@ Inventário de 04/11/2026. A coluna **estado** descreve o código Android atual,
 
 | Recurso da web | Fonte na web | Estado no APK | Destino Android |
 | --- | --- | --- | --- |
-| Abas Escrita e Artigos Zotero | `src/ui/athenes_dashboard.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: biblioteca e leitor existem, sem as duas abas equivalentes | Documentos / Biblioteca |
+| Abas Escrita e Artigos Zotero | `src/ui/athenes_dashboard.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: Documentos e Biblioteca/Estudo são destinos da navegação principal; faltam fluxos completos das abas web | Documentos / Biblioteca |
 | Árvore de pastas, subpastas, contadores, Todos e compartilhadas | `src/ui/athenes_dashboard_pastas.js`, `src/core/athenes_arquivos.js` | Parcial: pastas locais, subpastas e contadores em árvore na folha inferior e painel lateral em janelas largas; faltam pastas compartilhadas e ações de arrastar | Documentos, painel de pastas |
 | Criar, renomear, excluir e mover pastas; vincular pasta do Drive | `src/ui/athenes_dashboard_pastas.js`, `src/core/athenes_drive_navegar.js` | Parcial: criação, renomeação e exclusão locais; faltam arrastar pastas e vínculo ao Drive | Documentos, painel de pastas |
 | Mover documentos entre pastas | `src/ui/athenes_dashboard_pastas.js` | Parcial: menu Mover para… local; falta arrastar no tablet | Documentos, menu Mover para…; arrastar no tablet |
@@ -53,7 +53,7 @@ Nenhuma linha marcada `Não` ou `Parcial` deve ser tratada como paridade conclu�
 
 ## Interface adaptativa
 
-A navegação principal agora oferece Documentos, Biblioteca, Estudo e Conta. Em largura Compact usa barra inferior; em Medium e Expanded usa trilho lateral, segundo `WindowSizeClass`. A tela selecionada e os IDs do documento/artigo sobrevivem à rotação. O editor continua imersivo. Ainda faltam os painéis simultâneos de lista/detalhe, painéis redimensionáveis, controles completos da conta e testes de interface em aparelho.
+A navegação principal agora oferece Documentos, Biblioteca, Estudo e Conta. Em largura Compact usa barra inferior; em Medium e Expanded usa trilho lateral, segundo `WindowSizeClass`. A tela selecionada e os IDs do documento/artigo sobrevivem à rotação. O editor continua imersivo. Na tela compacta, busca e Novo documento ocupam linhas próprias com alvo de pelo menos 48 dp; o menu superior abre as pastas ou coleções conforme o destino. Um teste visual no emulador confirmou a abertura da folha de pastas. Ainda faltam os painéis simultâneos de lista/detalhe, painéis redimensionáveis, controles completos da conta e testes de interface em aparelho real.
 
 ## Leitor de PDF
 

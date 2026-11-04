@@ -135,7 +135,7 @@ fun BibliotecaScreen(
             AthenesTopBar(
                 modoAtivo = modoAtivo,
                 onModoAlterado = onModoAlterado,
-                onMenuClick = { /* Abertura de gaveta lateral */ }
+                onMenuClick = { if (modoAtivo == 0) mostrarPastas = true else mostrarColecoes = true }
             )
         },
         containerColor = AthenesBg,

@@ -45,6 +45,7 @@ fun AthenesTopBar(
     onModoAlterado: (Int) -> Unit,
     onMenuClick: () -> Unit = {},
     usuarioIniciais: String = "AP",
+    mostrarSeletorModo: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -117,9 +118,10 @@ fun AthenesTopBar(
                 }
             }
 
+            if (mostrarSeletorModo) {
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Seletor de Modo Pílula: 1. Escrita & Documentos | 2. Leitura de Artigos, PDF & Zotero
+            // Alternância opcional quando a navegação principal não fornece os dois destinos.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -186,6 +188,7 @@ fun AthenesTopBar(
                         }
                     }
                 }
+            }
             }
         }
     }
