@@ -35,7 +35,7 @@ Inventário de 04/11/2026. A coluna **estado** descreve o código Android atual,
 | Biblioteca Zotero paginada, filtros, busca, período e ordenação | `src/core/athenes_zotero.js`, `src/core/athenes_biblioteca_artigos.js` | Não: artigos de demonstração locais | Biblioteca |
 | Coleções Zotero como pastas de bibliografia | `src/core/athenes_zotero_pastas.js` | Não | Biblioteca, pastas |
 | Campos Zotero por tipo e autores com função | `src/core/athenes_zotero_campos.js`, `src/ui/athenes_estudo_artigos_dados.js` | Não | Biblioteca, detalhes do item |
-| PDF real em rolagem contínua, zoom e cache | `src/ui/athenes_estudo_artigos_tela.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: seleção local e renderização sob demanda em `PdfRealViewer.kt`; faltam zoom e vínculo ao Drive | Estudo |
+| PDF real em rolagem contínua, zoom e cache | `src/ui/athenes_estudo_artigos_tela.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: seleção local, renderização sob demanda, zoom de 75% a 200% e cache em `PdfRealViewer.kt`; falta vínculo ao Drive | Estudo |
 | Grifos, seis cores, caneta, linha, borracha, notas, citações e fichamento | `src/ui/athenes_estudo_artigos_anotacoes.js`, `src/ui/athenes_estudo_artigos_painel_direito.js` | Parcial: ferramentas e dados locais | Estudo |
 | Selecionar PDF, baixar anexo e importar notas do Zotero | `src/core/athenes_zotero_anexos_notas.js`, `src/ui/athenes_estudo_artigos_modais.js` | Parcial: seleção local; anexos e notas Zotero ausentes | Estudo, PDF |
 | Citação direta longa a partir de destaque | `src/core/athenes_citacao.js`, `src/ui/athenes_estudo_artigos_anotacoes.js` | Não | Estudo, Citar |

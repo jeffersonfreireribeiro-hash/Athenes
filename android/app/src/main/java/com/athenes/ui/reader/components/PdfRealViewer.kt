@@ -6,14 +6,18 @@ import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.util.LruCache
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -62,13 +66,15 @@ fun PdfRealViewer(
 ) {
     val context = LocalContext.current
     val lista = rememberLazyListState()
+    var zoom by rememberSaveable(uri.toString()) { mutableFloatStateOf(1f) }
     val contagem by produceState<Int?>(initialValue = null, uri) {
         value = withContext(Dispatchers.IO) {
             runCatching { numeroPaginas(context, uri) }.getOrDefault(0)
         }
     }
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val largura = with(LocalDensity.current) { maxWidth.toPx().toInt() }.coerceIn(320, 1600)
+        val larguraDisponivel = maxWidth
+        val largura = with(LocalDensity.current) { (maxWidth * zoom).toPx().toInt() }.coerceIn(320, 2400)
         when (val total = contagem) {
             null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
             0 -> Text("Não foi possível abrir este PDF. Selecione outro arquivo.", modifier = Modifier.align(Alignment.Center))
@@ -96,16 +102,29 @@ fun PdfRealViewer(
                         if (imagem == null) {
                             CircularProgressIndicator()
                         } else {
-                            Image(
-                                bitmap = imagem!!.asImageBitmap(),
-                                contentDescription = "Página ${indice + 1} do PDF",
-                                modifier = Modifier.fillMaxWidth(),
-                                contentScale = ContentScale.FillWidth
-                            )
+                            Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                                Image(
+                                    bitmap = imagem!!.asImageBitmap(),
+                                    contentDescription = "Página ${indice + 1} do PDF",
+                                    modifier = Modifier.width(larguraDisponivel * zoom),
+                                    contentScale = ContentScale.FillWidth
+                                )
+                            }
                         }
                     }
                     }
                 }
+            }
+        }
+        Row(
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(onClick = { zoom = (zoom - 0.25f).coerceAtLeast(0.75f) }, enabled = zoom > 0.75f) {
+                Text("− Zoom")
+            }
+            Button(onClick = { zoom = (zoom + 0.25f).coerceAtMost(2f) }, enabled = zoom < 2f) {
+                Text("+ Zoom")
             }
         }
     }
