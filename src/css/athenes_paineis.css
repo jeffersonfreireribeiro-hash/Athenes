@@ -177,7 +177,7 @@ body:has(.ath-modal-backdrop) .ath-barra-contextual {
 .ath-zotero-col-esq, .ath-zotero-col-dir { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .ath-zotero-vazio { font-size: 12px; color: #64748B; padding: 18px 12px; border: 1px dashed #CBD5E1; border-radius: 10px; text-align: center; background: #F8FAFC; }
 .ath-zotero-col-dir .ath-leitura-detalhes { margin-top: 0 !important; padding-top: 0 !important; border-top: 0 !important; }
-@container (min-width: 720px) {
+@container (min-width: 460px) {
   .ath-zotero-colunas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); align-items: start; }
   .ath-zotero-col-dir { border-left: 1px solid #E2E8F0; padding-left: 14px; align-self: stretch; }
 }
