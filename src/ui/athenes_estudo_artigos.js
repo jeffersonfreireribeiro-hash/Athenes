@@ -27,7 +27,8 @@ import { svgIcone } from './athenes_icones.js';
 import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { aplicarFilhosZoteroAoArtigo } from '../core/athenes_zotero_anexos_notas.js';
 import { tokenPodeLerTodoODrive, listarConteudoDoDrive, copiarPdfDoDriveParaAthenes, ESCOPOS_COM_LEITURA } from '../core/athenes_drive_navegar.js';
-import { PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo } from './athenes_estudo_artigos_dados.js';
+import { mostrarAviso } from './athenes_aviso.js';
+import { removerPdfLocal, PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo } from './athenes_estudo_artigos_dados.js';
 import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
 import { metodosEstudoAnotacoes } from './athenes_estudo_artigos_anotacoes.js';
@@ -998,6 +999,30 @@ export class EstudoArtigosView {
         alert(`Sincronização Zotero concluída! ${novos} novo(s) artigo(s) trazido(s) da sua biblioteca (${itens.length} itens lidos).`);
       }
     }
+  }
+
+  /**
+   * Desfaz o vínculo do PDF com a referência (vinculou o arquivo errado). O arquivo NÃO é apagado do Drive nem do Zotero: só deixa de
+   * estar ligado a este artigo, que volta a "sem PDF" e pode receber outro. Citações, notas e riscos já feitos ficam guardados.
+   */
+  async desvincularPdfDoArtigo(art) {
+    if (!art) return false;
+    const marcas = (art.fichamento?.citacoesMarcadas?.length || 0) + Object.values(art.fichamento?.notasPagina || {}).reduce((t, l) => t + (l?.length || 0), 0) + Object.values(art.fichamento?.tracosPorPagina || {}).reduce((t, l) => t + (l?.length || 0), 0);
+    const aviso = `Desvincular o PDF "${art.driveFileName || 'deste artigo'}" da referência?\n\nO arquivo continua no seu Drive (nada é apagado) e você poderá vincular outro PDF.${marcas ? `\n\nAs ${marcas} marcação(ões) já feitas (citações, notas e riscos) ficam guardadas, mas estão ligadas às páginas do PDF antigo.` : ''}`;
+    if (!window.confirm(aviso)) return false;
+    const url = art.pdfBlobUrl;
+    this._pdfDocs?.delete(url);
+    if (url) { try { URL.revokeObjectURL(url); } catch (_) {} }
+    this._pdfFalhou?.clear();
+    art.pdfBlobUrl = null; art.temPdfLocal = false; art.pdfBlob = null;
+    art.driveFileId = ''; art.driveFileName = ''; art.driveStatus = 'Sem PDF vinculado';
+    art.conteudoPaginasPdf = []; art.totalPaginas = 0; // as páginas vinham do arquivo antigo
+    try { await removerPdfLocal(art.id); } catch (_) {} // sobra de versões antigas: sem isso o arquivo voltaria sozinho
+    salvarArtigosEstudo(this.artigos);
+    this.paginaAtual = 1;
+    this.renderizar();
+    mostrarAviso('PDF desvinculado. Escolha outro arquivo quando quiser.', { tipo: 'info', ms: 5000 });
+    return true;
   }
 
   /** Escolhe um PDF no Drive e o liga ao artigo (a cópia já está na pasta do Athenes): abre na folha e guarda o vínculo. */

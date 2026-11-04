@@ -8,7 +8,7 @@ import { obterConfigGoogleDrive, autenticarGoogleDrive, salvarArquivoNoGoogleDri
 import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { linhasInformacoesZotero, informacoesDoArtigo } from '../core/athenes_zotero_campos.js';
 import { svgIcone } from './athenes_icones.js';
-import { obterPdfLocal, registrarPdfLocalNoArtigo, garantirPdfDoArtigo, salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, artigoTemPdf } from './athenes_estudo_artigos_dados.js';
+import { obterPdfLocal, registrarPdfLocalNoArtigo, garantirPdfDoArtigo, salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, artigoTemPdf, ehArtigoExemploFicticio } from './athenes_estudo_artigos_dados.js';
 
 export const metodosEstudoPainelDireito = {
   /** "Informações" do item no Zotero (tipo, campos do tipo, autores com função, datas), só os preenchidos. */
@@ -292,6 +292,7 @@ export const metodosEstudoPainelDireito = {
             <button type="button" class="ath-btn ath-btn-sm" id="athBtnPainelEscolherPdfDrive">${svgIcone('drive', 13)} Buscar no Drive</button>
             <button type="button" class="ath-btn ${driveConectadoPainel ? 'ath-btn-zotero-ok' : ''} ath-btn-sm" id="athBtnPainelConectarDrive" title="Conectar ou autorizar o Google Drive">${driveConectadoPainel ? 'Drive conectado ✓' : 'Conectar Drive'}</button>
           </div>
+          ${temPdfPainel && !ehArtigoExemploFicticio(art) ? `<button type="button" class="ath-btn ath-btn-sm ath-zd-desvincular" id="athBtnDesvincularPdf" title="Vinculou o PDF errado? Solta o arquivo desta referência (nada é apagado)">${svgIcone('lixeira', 13)} Desvincular este PDF</button>` : ''}
           ${art.pdfBlobUrl ? `<button type="button" class="ath-btn ath-btn-sm ath-zd-salvar" id="athBtnSalvarPdfNoDriveDireto" title="Guardar este PDF na pasta do Google Drive">${svgIcone('drive', 13)} Guardar este PDF no Drive</button>` : ''}
           <details class="ath-zd-det">
             <summary>Detalhes do arquivo</summary>
@@ -342,6 +343,8 @@ export const metodosEstudoPainelDireito = {
         </div>
       </div>
     `;
+
+    box.querySelector('#athBtnDesvincularPdf')?.addEventListener('click', () => this.desvincularPdfDoArtigo(art));
 
     box.querySelector('#athBtnVerChaveZotero')?.addEventListener('click', (e) => {
       const campo = box.querySelector('#athDirZoteroApiKey');
