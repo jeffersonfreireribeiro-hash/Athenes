@@ -55,6 +55,7 @@ fun EstudoArtigosScreen(
     val anexosClient = remember { ZoteroAnexosClient() }
     val zoteroClient = remember { ZoteroApiClient() }
     var baixandoZotero by remember { mutableStateOf(false) }
+    var importandoNotasZotero by remember { mutableStateOf(false) }
 
     LaunchedEffect(artigoIdInicial) {
         if (!artigoIdInicial.isNullOrBlank()) {
@@ -121,6 +122,31 @@ fun EstudoArtigosScreen(
                     }
                     baixandoZotero = false
                     Toast.makeText(context, resultado.fold({ "PDF baixado do Zotero." }, { it.message ?: "Não foi possível baixar o PDF." }), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+    val importarNotasZotero: () -> Unit = {
+        if (!importandoNotasZotero) {
+            val artigoId = artigoAtivo.id
+            val itemKey = artigoAtivo.chaveZotero
+            val credenciais = runCatching { ZoteroCredentialsStore(context).carregar() }.getOrNull()
+            when {
+                credenciais == null -> Toast.makeText(context, "Conecte sua conta Zotero na Biblioteca.", Toast.LENGTH_LONG).show()
+                itemKey.isBlank() -> Toast.makeText(context, "Este artigo não tem chave do Zotero.", Toast.LENGTH_LONG).show()
+                else -> escopo.launch {
+                    importandoNotasZotero = true
+                    val resultado = runCatching {
+                        val (chave, usuarioSalvo) = credenciais
+                        val usuario = if (usuarioSalvo.isBlank()) zoteroClient.descobrirUsuario(chave) else usuarioSalvo
+                        val importacao = anexosClient.listarNotasAnotacoes(usuario, chave, itemKey)
+                        viewModel.importarNotasAnotacoesZotero(artigoId, importacao)
+                    }
+                    importandoNotasZotero = false
+                    Toast.makeText(context, resultado.fold(
+                        { (notas, citacoes) -> "$notas notas e $citacoes destaques importados do Zotero." },
+                        { it.message ?: "Não foi possível importar as notas do Zotero." }
+                    ), Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -329,6 +355,8 @@ fun EstudoArtigosScreen(
                         onRemoverCitacao = { viewModel.removerCitacao(it) },
                         onNovaNotaClick = { viewModel.abrirCriacaoNota() },
                         onRemoverNota = { viewModel.removerNota(it) },
+                        onImportarNotasZotero = importarNotasZotero,
+                        importandoNotasZotero = importandoNotasZotero,
                         onSalvarConfigZoteroDrive = { cfg -> viewModel.salvarConfigZoteroDrive(cfg) }
                     )
                 }

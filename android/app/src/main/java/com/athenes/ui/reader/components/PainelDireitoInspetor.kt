@@ -46,6 +46,8 @@ fun PainelDireitoInspetor(
     onRemoverCitacao: (String) -> Unit,
     onNovaNotaClick: () -> Unit,
     onRemoverNota: (String) -> Unit,
+    onImportarNotasZotero: () -> Unit,
+    importandoNotasZotero: Boolean = false,
     onSalvarConfigZoteroDrive: (ZoteroVinculoConfig) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -118,7 +120,9 @@ fun PainelDireitoInspetor(
                     AbaInspetorDireito.SUMARIO -> ConteudoAbaResumoNotas(
                         artigo = artigo,
                         onNovaNotaClick = onNovaNotaClick,
-                        onRemoverNota = onRemoverNota
+                        onRemoverNota = onRemoverNota,
+                        onImportarNotasZotero = onImportarNotasZotero,
+                        importandoNotasZotero = importandoNotasZotero
                     )
                     AbaInspetorDireito.CITACOES -> ConteudoAbaCitacoes(
                         citacoes = artigo.citacoes,
@@ -205,7 +209,9 @@ private fun ItemAbaInspetor(
 private fun ConteudoAbaResumoNotas(
     artigo: ArtigoEstudoDetalhado,
     onNovaNotaClick: () -> Unit,
-    onRemoverNota: (String) -> Unit
+    onRemoverNota: (String) -> Unit,
+    onImportarNotasZotero: () -> Unit,
+    importandoNotasZotero: Boolean
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -300,6 +306,19 @@ private fun ConteudoAbaResumoNotas(
             items(artigo.notas, key = { it.id }) { nota ->
                 CardNotaAdesiva(nota = nota, onRemover = { onRemoverNota(nota.id) })
             }
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("NOTAS DO ZOTERO (${artigo.notasZotero.size})", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                TextButton(onClick = onImportarNotasZotero, enabled = !importandoNotasZotero) {
+                    Text(if (importandoNotasZotero) "Importando…" else "Importar notas")
+                }
+            }
+        }
+        if (artigo.notasZotero.isEmpty()) item { Text("Nenhuma nota importada.", fontSize = 11.sp, color = AthenesTextMuted) }
+        else items(artigo.notasZotero, key = { it.id }) { nota ->
+            CardSecaoInspetor(titulo = "Nota do Zotero") { Text(nota.texto, fontSize = 11.sp, color = AthenesTextDark) }
         }
 
         // Tags e Palavras-chave

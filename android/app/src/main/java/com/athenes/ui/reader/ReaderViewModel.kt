@@ -2,6 +2,7 @@ package com.athenes.ui.reader
 
 import androidx.lifecycle.ViewModel
 import com.athenes.core.data.ArtigoEstudoRepository
+import com.athenes.core.data.ZoteroImportacao
 import com.athenes.core.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,9 @@ class ReaderViewModel(
 ) : ViewModel() {
 
     val artigos = repository.artigos
+
+    fun importarNotasAnotacoesZotero(artigoId: String, importacao: ZoteroImportacao): Pair<Int, Int> =
+        repository.importarNotasAnotacoesZotero(artigoId, importacao)
 
     private val _artigoAtivoId = MutableStateFlow(repository.artigoAtivoId.value)
     val artigoAtivoId: StateFlow<String> = _artigoAtivoId.asStateFlow()

@@ -8,6 +8,9 @@ import java.net.URL
 import java.net.URLEncoder
 
 data class ZoteroAnexoPdf(val chave: String, val nomeArquivo: String, val baixavel: Boolean)
+data class ZoteroNota(val chave: String, val texto: String)
+data class ZoteroAnotacao(val chave: String, val pagina: Int, val texto: String, val comentario: String, val corHex: String)
+data class ZoteroImportacao(val notas: List<ZoteroNota>, val anotacoes: List<ZoteroAnotacao>)
 
 class ZoteroAnexosClient(
     private val requisitarJson: suspend (String, String) -> String = ::requisitar,
@@ -15,25 +18,66 @@ class ZoteroAnexosClient(
 ) {
     suspend fun listarPdf(usuarioId: String, chave: String, itemKey: String): List<ZoteroAnexoPdf> {
         require(usuarioId.isNotBlank() && chave.isNotBlank() && itemKey.isNotBlank())
+        return extrairAnexos(listarFilhos(usuarioId, chave, itemKey))
+    }
+
+    private fun extrairAnexos(itens: List<org.json.JSONObject>): List<ZoteroAnexoPdf> {
         val resultado = mutableListOf<ZoteroAnexoPdf>()
+        for (item in itens) {
+            val dados = item.optJSONObject("data") ?: continue
+            if (dados.optString("itemType") != "attachment" || !dados.optString("contentType").contains("pdf", ignoreCase = true)) continue
+            val chaveAnexo = item.optString("key", dados.optString("key"))
+            if (chaveAnexo.isBlank()) continue
+            resultado += ZoteroAnexoPdf(
+                chaveAnexo,
+                dados.optString("filename", dados.optString("title", "$chaveAnexo.pdf")),
+                dados.optString("linkMode") in setOf("imported_file", "imported_url")
+            )
+        }
+        return resultado.sortedByDescending { it.baixavel }
+    }
+
+    suspend fun listarNotasAnotacoes(usuarioId: String, chave: String, itemKey: String): ZoteroImportacao {
+        val filhos = listarFilhos(usuarioId, chave, itemKey)
+        val notas = filhos.mapNotNull { item ->
+            val dados = item.optJSONObject("data") ?: return@mapNotNull null
+            if (dados.optString("itemType") != "note") return@mapNotNull null
+            val texto = dados.optString("note")
+                .replace(Regex("(?i)<br\\s*/?>|</p>|</div>|</li>"), "\n")
+                .replace(Regex("<[^>]+>"), "")
+                .replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+                .trim()
+            if (texto.isBlank()) null else ZoteroNota(item.optString("key", dados.optString("key")), texto)
+        }
+        val anexos = extrairAnexos(filhos)
+        val anotacoes = anexos.flatMap { anexo ->
+            listarFilhos(usuarioId, chave, anexo.chave).mapNotNull { item ->
+                val dados = item.optJSONObject("data") ?: return@mapNotNull null
+                if (dados.optString("itemType") != "annotation") return@mapNotNull null
+                val texto = dados.optString("annotationText").trim()
+                val comentario = dados.optString("annotationComment").trim()
+                if (texto.isBlank() && comentario.isBlank()) return@mapNotNull null
+                ZoteroAnotacao(
+                    chave = item.optString("key", dados.optString("key")),
+                    pagina = dados.optString("annotationPageLabel").toIntOrNull()?.coerceAtLeast(1) ?: 1,
+                    texto = texto, comentario = comentario,
+                    corHex = dados.optString("annotationColor", "#FFD400")
+                )
+            }
+        }
+        return ZoteroImportacao(notas, anotacoes)
+    }
+
+    private suspend fun listarFilhos(usuarioId: String, chave: String, itemKey: String): List<org.json.JSONObject> {
+        require(usuarioId.isNotBlank() && chave.isNotBlank() && itemKey.isNotBlank())
+        val resultado = mutableListOf<org.json.JSONObject>()
         for (pagina in 0 until 20) {
             val url = "https://api.zotero.org/users/${codificar(usuarioId)}/items/${codificar(itemKey)}/children?limit=100&start=${pagina * 100}"
             val itens = JSONArray(requisitarJson(url, chave))
-            for (i in 0 until itens.length()) {
-                val item = itens.getJSONObject(i)
-                val dados = item.optJSONObject("data") ?: continue
-                if (dados.optString("itemType") != "attachment" || !dados.optString("contentType").contains("pdf", ignoreCase = true)) continue
-                val chaveAnexo = item.optString("key", dados.optString("key"))
-                if (chaveAnexo.isBlank()) continue
-                resultado += ZoteroAnexoPdf(
-                    chaveAnexo,
-                    dados.optString("filename", dados.optString("title", "$chaveAnexo.pdf")),
-                    dados.optString("linkMode") in setOf("imported_file", "imported_url")
-                )
-            }
+            for (i in 0 until itens.length()) resultado += itens.getJSONObject(i)
             if (itens.length() < 100) break
         }
-        return resultado.sortedByDescending { it.baixavel }
+        return resultado
     }
 
     suspend fun baixarPdf(usuarioId: String, chave: String, anexo: ZoteroAnexoPdf): ByteArray {

@@ -33,6 +33,7 @@ class ArtigoEstudoRepository {
             }
         val preferencias = contexto!!.getSharedPreferences("tracos_pdf", Context.MODE_PRIVATE)
         val anotacoes = contexto!!.getSharedPreferences("anotacoes_pdf", Context.MODE_PRIVATE)
+        val notasZoteroPrefs = contexto!!.getSharedPreferences("notas_zotero", Context.MODE_PRIVATE)
         _artigos.value = _artigos.value.map { artigo ->
             val tracos = preferencias.getString(artigo.id, null)?.let { salvo ->
                 runCatching { lerTracos(salvo) }.getOrNull()
@@ -43,7 +44,16 @@ class ArtigoEstudoRepository {
             artigo.copy(
                 tracos = tracos,
                 notas = dados?.first ?: artigo.notas,
-                citacoes = dados?.second ?: artigo.citacoes
+                citacoes = dados?.second ?: artigo.citacoes,
+                notasZotero = notasZoteroPrefs.getString(artigo.id, null)?.let { salvo ->
+                    runCatching {
+                        val array = JSONArray(salvo)
+                        (0 until array.length()).map { i ->
+                            val nota = array.getJSONObject(i)
+                            NotaZoteroImportada(nota.getString("id"), nota.getString("texto"))
+                        }
+                    }.getOrNull()
+                } ?: artigo.notasZotero
             )
         }
     }
@@ -177,6 +187,7 @@ class ArtigoEstudoRepository {
                 paginas = anterior?.paginas.orEmpty(),
                 citacoes = anterior?.citacoes.orEmpty(),
                 notas = anterior?.notas.orEmpty(),
+                notasZotero = anterior?.notasZotero.orEmpty(),
                 tracos = anterior?.tracos.orEmpty(),
                 tipoZotero = item.tipo,
                 camposZotero = item.campos,
@@ -191,6 +202,47 @@ class ArtigoEstudoRepository {
         }
         contexto?.getSharedPreferences("biblioteca_zotero", Context.MODE_PRIVATE)
             ?.edit()?.putString("dados", ZoteroCacheCodec.escrever(itens, colecoes))?.apply()
+    }
+
+    fun importarNotasAnotacoesZotero(artigoId: String, importacao: ZoteroImportacao): Pair<Int, Int> {
+        var novasNotas = 0
+        var novasCitacoes = 0
+        _artigos.value = _artigos.value.map { artigo ->
+            if (artigo.id != artigoId) return@map artigo
+            val notasExistentes = artigo.notasZotero.map { it.id }.toMutableSet()
+            val citacoesExistentes = artigo.citacoes.map { it.id }.toMutableSet()
+            val notasNovas = mutableListOf<NotaZoteroImportada>()
+            val citacoesNovas = mutableListOf<CitacaoMarcada>()
+            importacao.notas.forEach { nota ->
+                val id = "zot_nota_${nota.chave}"
+                if (nota.texto.isNotBlank() && notasExistentes.add(id)) notasNovas += NotaZoteroImportada(id, nota.texto)
+            }
+            importacao.anotacoes.forEach { anotacao ->
+                if (anotacao.texto.isNotBlank()) {
+                    val id = "zot_ann_${anotacao.chave}"
+                    if (citacoesExistentes.add(id)) citacoesNovas += CitacaoMarcada(
+                        id = id, pagina = anotacao.pagina, texto = anotacao.texto,
+                        comentario = anotacao.comentario, corHex = anotacao.corHex
+                    )
+                } else if (anotacao.comentario.isNotBlank()) {
+                    val id = "zot_nota_${anotacao.chave}"
+                    if (notasExistentes.add(id)) notasNovas += NotaZoteroImportada(id, anotacao.comentario)
+                }
+            }
+            novasNotas = notasNovas.size
+            novasCitacoes = citacoesNovas.size
+            artigo.copy(notasZotero = artigo.notasZotero + notasNovas, citacoes = artigo.citacoes + citacoesNovas)
+        }
+        if (novasCitacoes > 0) salvarAnotacoesDepois()
+        if (novasNotas > 0) {
+            val ctx = contexto
+            val artigo = _artigos.value.find { it.id == artigoId }
+            if (ctx != null && artigo != null) {
+                val dados = JSONArray(artigo.notasZotero.map { JSONObject().put("id", it.id).put("texto", it.texto) })
+                ctx.getSharedPreferences("notas_zotero", Context.MODE_PRIVATE).edit().putString(artigoId, dados.toString()).apply()
+            }
+        }
+        return novasNotas to novasCitacoes
     }
 
     private val _artigoAtivoId = MutableStateFlow<String>(_artigos.value.first().id)

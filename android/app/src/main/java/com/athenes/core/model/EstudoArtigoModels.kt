@@ -62,6 +62,8 @@ data class NotaAdesiva(
     val autor: String = "Autor Principal"
 )
 
+data class NotaZoteroImportada(val id: String, val texto: String)
+
 data class PontoTraco(
     val x: Float,
     val y: Float
@@ -110,6 +112,7 @@ data class ArtigoEstudoDetalhado(
     val paginas: List<PaginaPdfInfo> = emptyList(),
     val citacoes: List<CitacaoMarcada> = emptyList(),
     val notas: List<NotaAdesiva> = emptyList(),
+    val notasZotero: List<NotaZoteroImportada> = emptyList(),
     val tracos: List<TracoDesenho> = emptyList(),
     val tipoZotero: String = "",
     val camposZotero: Map<String, String> = emptyMap(),
