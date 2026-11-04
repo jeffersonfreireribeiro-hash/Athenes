@@ -431,14 +431,7 @@ export const metodosEstudoPainelDireito = {
     });
 
     box.querySelector('#athBtnPainelEscolherPdfDrive')?.addEventListener('click', () => {
-      this.abrirModalEscolherPdfDoGoogleDrive((arqDrive) => {
-        art.driveFileName = arqDrive.name;
-        art.driveFileId = arqDrive.id;
-        art.pdfBlobUrl = null;
-        salvarArtigosEstudo(this.artigos);
-        this.renderizar();
-        garantirPdfDoArtigo(art).then(ok => { if (ok) this.renderizar(); });
-      });
+      this.escolherPdfNoDrive(art); // navega por todo o Drive e copia o PDF escolhido para a pasta do Athenes
     });
 
     box.querySelector('#athBtnPainelConectarDrive').addEventListener('click', async () => {

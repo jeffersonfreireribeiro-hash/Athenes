@@ -21,12 +21,13 @@ import { gravarConfigZotero } from '../core/athenes_zotero_config.js';
 import { lerConta, gravarConta } from '../core/athenes_conta.js';
 import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive } from '../core/athenes_drive_sync.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
-import { obterPerfilColaborador, obterConfigGoogleDrive, salvarArquivoNoGoogleDrive, listarPdfsDoGoogleDrive, salvarDocumentoNoSupabase, obterPastasDriveLocais, salvarPastasDriveLocais, buscarPastaNaArvore } from '../core/athenes_colaboracao.js';
+import { obterPerfilColaborador, obterConfigGoogleDrive, salvarArquivoNoGoogleDrive, autenticarGoogleDrive, listarPdfsDoGoogleDrive, salvarDocumentoNoSupabase, obterPastasDriveLocais, salvarPastasDriveLocais, buscarPastaNaArvore } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { svgIcone } from './athenes_icones.js';
 import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { aplicarFilhosZoteroAoArtigo } from '../core/athenes_zotero_anexos_notas.js';
-import { artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo } from './athenes_estudo_artigos_dados.js';
+import { listarConteudoDoDrive, copiarPdfDoDriveParaAthenes, ESCOPOS_COM_LEITURA } from '../core/athenes_drive_navegar.js';
+import { PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo } from './athenes_estudo_artigos_dados.js';
 import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
 import { metodosEstudoAnotacoes } from './athenes_estudo_artigos_anotacoes.js';
@@ -954,24 +955,49 @@ export class EstudoArtigosView {
     }
   }
 
+  /** Escolhe um PDF no Drive e o liga ao artigo (a cópia já está na pasta do Athenes): abre na folha e guarda o vínculo. */
+  escolherPdfNoDrive(art) {
+    this.abrirModalEscolherPdfDoGoogleDrive((arq) => {
+      art.driveFileName = arq.name;
+      art.driveFileId = arq.id;
+      art.driveStatus = 'PDF no Google Drive';
+      art.pdfBlobUrl = null;
+      if (this._pdfFalhou) this._pdfFalhou.clear();
+      salvarArtigosEstudo(this.artigos);
+      this.renderizar();
+      garantirPdfDoArtigo(art).then(ok => { if (ok) this.renderizar(); });
+    });
+  }
+
   /**
-   * Modal para escolher um arquivo PDF diretamente da nuvem do Google Drive do usuário.
+   * Navega por TODAS as pastas do Google Drive (Meu Drive, Compartilhados comigo e a pasta do Athenes), com busca por nome. Ao escolher
+   * um PDF de fora do Athenes, ele é COPIADO para a pasta do Athenes (o original não é tocado) e `onEscolhido({ id, name })` recebe a
+   * cópia. Ler as pastas do resto do Drive exige o acesso de leitura, pedido aqui na primeira vez (o Athenes sozinho só vê o que criou).
    */
   async abrirModalEscolherPdfDoGoogleDrive(onEscolhido) {
     const cfg = obterConfigGoogleDrive();
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
     modal.innerHTML = `
-      <div class="ath-modal" style="max-width:540px;">
+      <div class="ath-modal ath-drive-nav" style="max-width:640px; width:94vw;">
         <div class="ath-modal-head">
-          <h2>Escolher Arquivo PDF do Google Drive</h2>
-          <button type="button" class="ath-btn ath-btn-icon" id="athModalEscPdfDriveFechar">${svgIcone('fechar', 16)}</button>
+          <h2>Escolher PDF do Google Drive</h2>
+          <button type="button" class="ath-btn ath-btn-icon" id="athModalEscPdfDriveFechar" aria-label="Fechar">${svgIcone('fechar', 16)}</button>
         </div>
         <div class="ath-modal-corpo">
-          <div id="athStatusPdfDriveModal" style="font-size:12px; color:#314F79; font-weight:700;">Conectando ao seu Google Drive...</div>
-          <div id="athListaPdfDriveModal" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+          <div class="ath-dn-abas" role="tablist">
+            <button type="button" role="tab" class="on" data-aba="meu">Meu Drive</button>
+            <button type="button" role="tab" data-aba="comigo">Compartilhados comigo</button>
+            <button type="button" role="tab" data-aba="athenes">Pasta do Athenes</button>
+          </div>
+          <input type="search" class="ath-input ath-dn-busca" placeholder="Buscar PDF ou pasta pelo nome em todo o Drive…" aria-label="Buscar no Drive">
+          <nav class="ath-dn-trilha" aria-label="Caminho"></nav>
+          <div class="ath-dn-status" role="status" aria-live="polite">Conectando ao seu Google Drive…</div>
+          <div class="ath-dn-lista"></div>
+          <button type="button" class="ath-btn ath-btn-sm ath-dn-mais" hidden>Carregar mais</button>
         </div>
         <div class="ath-modal-foot">
+          <small class="ath-dn-dica">O PDF escolhido é copiado para a pasta do Athenes; o original fica onde está.</small>
           <button type="button" class="ath-btn" id="athModalEscPdfDriveCancelar">Fechar</button>
         </div>
       </div>
@@ -982,39 +1008,101 @@ export class EstudoArtigosView {
     modal.querySelector('#athModalEscPdfDriveCancelar').addEventListener('click', fechar);
     modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
 
-    const statusEl = modal.querySelector('#athStatusPdfDriveModal');
-    const listaEl = modal.querySelector('#athListaPdfDriveModal');
+    const q = (s) => modal.querySelector(s);
+    const statusEl = q('.ath-dn-status'); const listaEl = q('.ath-dn-lista'); const trilhaEl = q('.ath-dn-trilha'); const maisEl = q('.ath-dn-mais'); const buscaEl = q('.ath-dn-busca');
+    const estado = { aba: 'meu', trilha: [{ id: 'root', nome: 'Meu Drive' }], busca: '', proximo: '', req: 0, itens: { pastas: [], pdfs: [] } };
+    const aviso = (t, erro = false) => { statusEl.style.color = erro ? '#B42318' : '#314F79'; statusEl.textContent = t; };
+    const fmtTam = (n) => { const b = Number(n) || 0; return b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : b ? `${Math.max(1, Math.round(b / 1024))} KB` : ''; };
+    const fmtData = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('pt-BR'); };
 
-    try {
-      const token = await obterTokenOuConectar(cfg);
-      statusEl.textContent = 'Listando seus arquivos PDF no Google Drive...';
-      const arquivos = await listarPdfsDoGoogleDrive(token);
-      if (!arquivos || arquivos.length === 0) {
-        statusEl.textContent = 'Nenhum PDF listado via API. Use o botão "Selecionar Arquivo PDF" para abrir da sua pasta do Google Drive ou computador.';
-        return;
-      }
-      statusEl.textContent = `${arquivos.length} arquivo(s) PDF encontrado(s) no seu Google Drive:`;
-      listaEl.innerHTML = arquivos.map((arq, idx) => `
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border:1px solid #CBD5E1; border-radius:10px; background:#F8FAFC;">
-          <div style="min-width:0; flex:1;">
-            <div style="font-size:12.5px; font-weight:800; color:#0F172A; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(arq.name)}</div>
-            <div style="font-size:10.5px; color:#64748B;">ID Drive: <code>${escapeHtml(arq.id)}</code></div>
-          </div>
-          <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" data-sel-pdf-drive="${idx}">Selecionar PDF</button>
-        </div>
-      `).join('');
+    const desenharTrilha = () => {
+      trilhaEl.hidden = estado.aba !== 'meu' || Boolean(estado.busca);
+      trilhaEl.innerHTML = estado.trilha.map((p, i) => i === estado.trilha.length - 1
+        ? `<strong>${escapeHtml(p.nome)}</strong>`
+        : `<button type="button" data-nivel="${i}">${escapeHtml(p.nome)}</button><span aria-hidden="true">›</span>`).join('');
+      trilhaEl.querySelectorAll('[data-nivel]').forEach(b => b.addEventListener('click', () => { estado.trilha = estado.trilha.slice(0, Number(b.dataset.nivel) + 1); carregar(); }));
+    };
 
-      listaEl.querySelectorAll('[data-sel-pdf-drive]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const arq = arquivos[parseInt(btn.dataset.selPdfDrive, 10)];
-          if (arq && onEscolhido) onEscolhido(arq);
-          fechar();
-        });
+    const desenharLista = () => {
+      const { pastas, pdfs } = estado.itens;
+      if (!pastas.length && !pdfs.length) { listaEl.innerHTML = '<div class="ath-dn-vazio">Nada por aqui: nenhuma pasta nem PDF.</div>'; return; }
+      listaEl.innerHTML = [
+        ...pastas.map((p, i) => `<button type="button" class="ath-dn-item ath-dn-pasta" data-pasta="${i}"><span class="ath-dn-ic">📁</span><span class="ath-dn-nome">${escapeHtml(p.name)}</span><span class="ath-dn-seta" aria-hidden="true">›</span></button>`),
+        ...pdfs.map((a, i) => `<div class="ath-dn-item ath-dn-pdf"><span class="ath-dn-ic">📄</span><span class="ath-dn-nome" title="${escapeHtml(a.name)}">${escapeHtml(a.name)}<small>${[fmtData(a.modifiedTime), fmtTam(a.size)].filter(Boolean).join(' · ')}</small></span><button type="button" class="ath-btn ath-btn-primary ath-btn-sm" data-pdf="${i}">${estado.aba === 'athenes' ? 'Usar este PDF' : 'Copiar e usar'}</button></div>`)
+      ].join('');
+      listaEl.querySelectorAll('[data-pasta]').forEach(b => b.addEventListener('click', () => { const p = estado.itens.pastas[Number(b.dataset.pasta)]; buscaEl.value = ''; estado.busca = ''; estado.trilha.push({ id: p.id, nome: p.name }); carregar(); }));
+      listaEl.querySelectorAll('[data-pdf]').forEach(b => b.addEventListener('click', () => escolher(estado.itens.pdfs[Number(b.dataset.pdf)], b)));
+    };
+
+    const pedirPermissao = () => {
+      statusEl.textContent = '';
+      listaEl.innerHTML = `<div class="ath-dn-permissao">
+        <strong>Permitir que o Athenes leia as pastas do seu Drive</strong>
+        <p>Por padrão o Athenes só enxerga o que ele mesmo criou. Para escolher um PDF que está em qualquer pasta sua, o Google pede uma permissão de <b>somente leitura</b>. O Athenes não altera nem apaga nada nos seus arquivos: ele apenas copia o PDF escolhido para a pasta do Athenes.</p>
+        <button type="button" class="ath-btn ath-btn-primary" data-permitir>Permitir leitura do Drive</button>
+      </div>`;
+      listaEl.querySelector('[data-permitir]').addEventListener('click', async (e) => {
+        e.currentTarget.disabled = true; aviso('Abrindo a autorização do Google…');
+        try { await autenticarGoogleDrive(cfg.clientId, ESCOPOS_COM_LEITURA); carregar(); }
+        catch (err) { aviso(`Não foi possível autorizar: ${err.message || err}`, true); pedirPermissao(); }
       });
-    } catch (err) {
-      statusEl.style.color = '#B42318';
-      statusEl.textContent = `Não foi possível listar da nuvem (${err.message || 'autorize o domínio no Google Cloud'}). Você pode selecionar o PDF direto pela janela de arquivo do computador/pasta Google Drive.`;
-    }
+    };
+
+    const carregar = async ({ mais = false } = {}) => {
+      desenharTrilha(); maisEl.hidden = true;
+      if (!mais) { listaEl.innerHTML = ''; estado.itens = { pastas: [], pdfs: [] }; estado.proximo = ''; }
+      const req = ++estado.req; // resposta de uma consulta antiga (troca rápida de aba/pasta) é descartada
+      aviso(mais ? 'Carregando mais…' : 'Listando seu Google Drive…');
+      try {
+        const token = await obterTokenOuConectar(obterConfigGoogleDrive());
+        let r;
+        if (estado.aba === 'athenes') {
+          const pdfs = await listarPdfsDoGoogleDrive(token);
+          r = { pastas: [], pdfs, proximo: '' };
+        } else {
+          r = await listarConteudoDoDrive(token, { pastaId: estado.trilha[estado.trilha.length - 1].id, busca: estado.busca, compartilhados: estado.aba === 'comigo', pageToken: mais ? estado.proximo : '' });
+        }
+        if (req !== estado.req) return;
+        estado.itens = { pastas: [...estado.itens.pastas, ...r.pastas], pdfs: [...estado.itens.pdfs, ...r.pdfs] };
+        estado.proximo = r.proximo;
+        maisEl.hidden = !r.proximo;
+        const n = estado.itens.pdfs.length; const m = estado.itens.pastas.length;
+        aviso(estado.busca ? `${n} PDF(s) e ${m} pasta(s) com "${estado.busca}"` : `${m} pasta(s) e ${n} PDF(s)`);
+        desenharLista();
+      } catch (err) {
+        if (req !== estado.req) return;
+        if (err.semPermissao && estado.aba !== 'athenes') { pedirPermissao(); return; }
+        aviso(`Não foi possível listar o Drive: ${err.message || err}. Use "Selecionar PDF no computador" se preferir.`, true);
+      }
+    };
+
+    const escolher = async (arq, botao) => {
+      if (!arq) return;
+      if (estado.aba === 'athenes') { onEscolhido?.({ id: arq.id, name: arq.name }); fechar(); return; }
+      modal.querySelectorAll('button').forEach(b => { b.disabled = true; });
+      aviso(`Copiando "${arq.name}" para a pasta do Athenes…`);
+      try {
+        const token = await obterTokenOuConectar(obterConfigGoogleDrive());
+        const copia = await copiarPdfDoDriveParaAthenes(token, arq, { pastaNome: PASTA_PDFS_DRIVE });
+        onEscolhido?.({ id: copia.id, name: copia.name, jaExistia: copia.jaExistia });
+        fechar();
+      } catch (err) {
+        modal.querySelectorAll('button').forEach(b => { b.disabled = false; });
+        aviso(`Não foi possível copiar o PDF: ${err.message || err}`, true);
+      }
+    };
+
+    modal.querySelectorAll('[data-aba]').forEach(b => b.addEventListener('click', () => {
+      estado.aba = b.dataset.aba; estado.busca = ''; buscaEl.value = ''; estado.trilha = [{ id: 'root', nome: 'Meu Drive' }];
+      modal.querySelectorAll('[data-aba]').forEach(x => x.classList.toggle('on', x === b));
+      buscaEl.disabled = estado.aba === 'athenes';
+      carregar();
+    }));
+    let tBusca = null;
+    buscaEl.addEventListener('input', () => { clearTimeout(tBusca); tBusca = setTimeout(() => { estado.busca = buscaEl.value.trim(); carregar(); }, 350); });
+    maisEl.addEventListener('click', () => carregar({ mais: true }));
+
+    carregar();
   }
 
 }

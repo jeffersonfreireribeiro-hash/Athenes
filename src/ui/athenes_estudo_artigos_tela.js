@@ -572,7 +572,7 @@ export const metodosEstudoTela = {
         }
         const rot = b.textContent; b.textContent = 'Copiado ✓'; setTimeout(() => { b.textContent = rot; }, 1500);
       }));
-      aviso.querySelector('[data-sem-pdf-drive]')?.addEventListener('click', () => root.querySelector('#athBtnPopDrive')?.click());
+      aviso.querySelector('[data-sem-pdf-drive]')?.addEventListener('click', () => this.escolherPdfNoDrive(art));
       stack.appendChild(aviso);
       return;
     }
