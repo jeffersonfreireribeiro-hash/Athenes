@@ -30,12 +30,13 @@ fun BibliotecaScreen(
     viewModel: BibliotecaViewModel,
     onAbrirDocumento: (Documento) -> Unit,
     onAbrirLeitorPdf: (String) -> Unit = {},
+    modoAtivo: Int = 0,
+    onModoAlterado: (Int) -> Unit = {},
     updateInfo: AppUpdateInfo? = null,
     onOpenUpdateDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var modoAtivo by remember { mutableIntStateOf(0) } // 0 = Escrita & Documentos, 1 = Leitura de Artigos & Zotero
     var updateBannerDismissed by remember { mutableStateOf(false) }
 
     // Estados da Aba 1 (Escrita)
@@ -55,9 +56,7 @@ fun BibliotecaScreen(
         topBar = {
             AthenesTopBar(
                 modoAtivo = modoAtivo,
-                onModoAlterado = { novoModo ->
-                    modoAtivo = novoModo
-                },
+                onModoAlterado = onModoAlterado,
                 onMenuClick = { /* Abertura de gaveta lateral */ }
             )
         },

@@ -50,3 +50,7 @@ Inventário de 04/11/2026. A coluna **estado** descreve o código Android atual,
 5. Revisão, colaboração, acessibilidade e medição de desempenho em aparelhos reais.
 
 Nenhuma linha marcada `Não` ou `Parcial` deve ser tratada como paridade concluída. A implementação completa requer contratos de dados compatíveis com a web e testes de integração para importação, sincronização, renderização e exportação.
+
+## Interface adaptativa
+
+A navegação principal agora oferece Documentos, Biblioteca, Estudo e Conta. Em largura Compact usa barra inferior; em Medium e Expanded usa trilho lateral, segundo `WindowSizeClass`. A tela selecionada e os IDs do documento/artigo sobrevivem à rotação. O editor continua imersivo. Ainda faltam os painéis simultâneos de lista/detalhe, painéis redimensionáveis, controles completos da conta e testes de interface em aparelho.

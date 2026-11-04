@@ -6,6 +6,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.athenes.core.data.DocumentoRepository
@@ -28,6 +41,11 @@ enum class AppTela {
     LEITURA_ESTUDO
 }
 
+enum class DestinoPrincipal(val rotulo: String) {
+    DOCUMENTOS("Documentos"), BIBLIOTECA("Biblioteca"), ESTUDO("Estudo"), CONTA("Conta")
+}
+
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 class MainActivity : ComponentActivity() {
 
     private val repository by lazy { DocumentoRepository(applicationContext) }
@@ -45,9 +63,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             AthenesTheme {
-                var telaAtual by remember { mutableStateOf(AppTela.BIBLIOTECA) }
-                var documentoSelecionado by remember { mutableStateOf<Documento?>(null) }
-                var artigoSelecionadoId by remember { mutableStateOf("art_radino_2020") }
+                var telaAtual by rememberSaveable { mutableStateOf(AppTela.BIBLIOTECA) }
+                var destino by rememberSaveable { mutableStateOf(DestinoPrincipal.DOCUMENTOS) }
+                var documentoSelecionadoId by rememberSaveable { mutableStateOf<String?>(null) }
+                var artigoSelecionadoId by rememberSaveable { mutableStateOf("art_radino_2020") }
                 var appUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
                 var showUpdateDialog by remember { mutableStateOf(false) }
                 val scope = rememberCoroutineScope()
@@ -86,27 +105,73 @@ class MainActivity : ComponentActivity() {
 
                 when (telaAtual) {
                     AppTela.BIBLIOTECA -> {
-                        BibliotecaScreen(
-                            viewModel = viewModel,
-                            updateInfo = appUpdateInfo,
-                            onOpenUpdateDialog = { showUpdateDialog = true },
-                            onAbrirDocumento = { doc ->
-                                documentoSelecionado = doc
-                                telaAtual = AppTela.EDITOR_DOCUMENTO
-                            },
-                            onAbrirLeitorPdf = { artId ->
-                                if (artId.isNotBlank()) {
-                                    artigoSelecionadoId = artId
+                        val largura = calculateWindowSizeClass(this@MainActivity).widthSizeClass
+                        Row(Modifier.fillMaxSize()) {
+                            if (largura != WindowWidthSizeClass.Compact) {
+                                NavigationRail {
+                                    DestinoPrincipal.entries.forEach { item ->
+                                        NavigationRailItem(
+                                            selected = destino == item,
+                                            onClick = { destino = item },
+                                            icon = { Icon(iconeDestino(item), contentDescription = item.rotulo) },
+                                            label = { Text(item.rotulo) }
+                                        )
+                                    }
                                 }
-                                telaAtual = AppTela.LEITURA_ESTUDO
                             }
-                        )
+                            Scaffold(
+                                modifier = Modifier.weight(1f),
+                                bottomBar = {
+                                    if (largura == WindowWidthSizeClass.Compact) {
+                                        NavigationBar {
+                                            DestinoPrincipal.entries.forEach { item ->
+                                                NavigationBarItem(
+                                                    selected = destino == item,
+                                                    onClick = { destino = item },
+                                                    icon = { Icon(iconeDestino(item), contentDescription = item.rotulo) },
+                                                    label = { Text(item.rotulo) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            ) { padding ->
+                                when (destino) {
+                                    DestinoPrincipal.DOCUMENTOS, DestinoPrincipal.BIBLIOTECA -> BibliotecaScreen(
+                                        viewModel = viewModel,
+                                        modoAtivo = if (destino == DestinoPrincipal.DOCUMENTOS) 0 else 1,
+                                        onModoAlterado = { destino = if (it == 0) DestinoPrincipal.DOCUMENTOS else DestinoPrincipal.BIBLIOTECA },
+                                        updateInfo = appUpdateInfo,
+                                        onOpenUpdateDialog = { showUpdateDialog = true },
+                                        onAbrirDocumento = { doc ->
+                                            documentoSelecionadoId = doc.id
+                                            telaAtual = AppTela.EDITOR_DOCUMENTO
+                                        },
+                                        onAbrirLeitorPdf = { artId ->
+                                            if (artId.isNotBlank()) artigoSelecionadoId = artId
+                                            telaAtual = AppTela.LEITURA_ESTUDO
+                                        },
+                                        modifier = Modifier.padding(padding)
+                                    )
+                                    DestinoPrincipal.ESTUDO -> EstudoArtigosScreen(
+                                        artigoIdInicial = artigoSelecionadoId,
+                                        updateInfo = appUpdateInfo,
+                                        onOpenUpdateDialog = { showUpdateDialog = true },
+                                        onCheckUpdateManual = { scope.launch { checkAppUpdate(forced = true) } },
+                                        onVoltarBiblioteca = { destino = DestinoPrincipal.BIBLIOTECA },
+                                        modifier = Modifier.padding(padding)
+                                    )
+                                    DestinoPrincipal.CONTA -> ContaScreen(Modifier.padding(padding))
+                                }
+                            }
+                        }
                     }
 
                     AppTela.EDITOR_DOCUMENTO -> {
                         EditorDocumentoScreen(
-                            documentoInicial = documentoSelecionado,
+                            documentoInicial = repository.documentos.value.find { it.id == documentoSelecionadoId },
                             onVoltarBiblioteca = {
+                                destino = DestinoPrincipal.DOCUMENTOS
                                 telaAtual = AppTela.BIBLIOTECA
                             }
                         )
@@ -119,6 +184,7 @@ class MainActivity : ComponentActivity() {
                             onOpenUpdateDialog = { showUpdateDialog = true },
                             onCheckUpdateManual = { scope.launch { checkAppUpdate(forced = true) } },
                             onVoltarBiblioteca = {
+                                destino = DestinoPrincipal.BIBLIOTECA
                                 telaAtual = AppTela.BIBLIOTECA
                             }
                         )
@@ -134,5 +200,23 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+private fun iconeDestino(destino: DestinoPrincipal): ImageVector = when (destino) {
+    DestinoPrincipal.DOCUMENTOS -> Icons.Rounded.Description
+    DestinoPrincipal.BIBLIOTECA -> Icons.Rounded.MenuBook
+    DestinoPrincipal.ESTUDO -> Icons.Rounded.Draw
+    DestinoPrincipal.CONTA -> Icons.Rounded.Person
+}
+
+@Composable
+private fun ContaScreen(modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxSize().padding(24.dp)) {
+        Text("Conta", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(16.dp))
+        Text("Perfil e sincronização", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        Text("Nenhuma conta conectada. A conexão com Google Drive e Zotero ainda não está disponível neste aplicativo.")
     }
 }
