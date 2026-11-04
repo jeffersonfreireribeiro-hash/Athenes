@@ -179,7 +179,7 @@ class DocumentoRepository(private val context: Context? = null, private val stor
         val raiz = JSONObject(conteudo)
         val blocos = raiz.optJSONArray("blocos") ?: throw IllegalArgumentException("Arquivo sem blocos do editor Android.")
         require(blocos.length() <= 20_000) { "Documento com blocos demais." }
-        val tipos = setOf("TITULO", "PARAGRAFO", "CITACAO", "FIGURA", "TABELA", "QUADRO", "FORMULA", "LISTA", "SUMARIO", "LISTA_ILUSTRACOES", "QUEBRA_PAGINA", "DIVISOR")
+        val tipos = setOf("TITULO", "PARAGRAFO", "CITACAO", "FIGURA", "TABELA", "QUADRO", "FORMULA", "LISTA", "SUMARIO", "LISTA_ILUSTRACOES", "REFERENCIAS", "QUEBRA_PAGINA", "DIVISOR")
         for (i in 0 until blocos.length()) {
             val bloco = blocos.getJSONObject(i)
             require(bloco.optString("tipo") in tipos) { "Tipo de bloco não reconhecido." }
