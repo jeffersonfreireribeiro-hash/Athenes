@@ -59,6 +59,9 @@ import android.widget.Toast
 import com.athenes.core.data.ImagemRepositorio
 import com.athenes.core.export.ExportadorDocumento
 import com.athenes.core.export.ResolvedorImagem
+import com.athenes.core.citacao.Bibliografia
+import com.athenes.core.citacao.EstiloBibliografico
+import com.athenes.core.citacao.ReferenciaAcademica
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -89,6 +92,7 @@ fun EditorDocumentoScreen(
     val tipoDoc by viewModel.tipoDocumento.collectAsState()
     val configPagina by viewModel.configuracaoPagina.collectAsState()
     val estiloBibliografico by viewModel.estiloBibliografico.collectAsState()
+    val referencias by viewModel.referencias.collectAsState()
     var mostrarConfigPagina by remember { mutableStateOf(false) }
     val modoRevisao by viewModel.modoRevisao.collectAsState()
     val salvo by viewModel.salvo.collectAsState()
@@ -251,6 +255,8 @@ fun EditorDocumentoScreen(
                     numeroFormula = numeroFormula,
                     estrutura = estrutura,
                     titulosIlustracoes = titulosIlustracoes,
+                    referencias = referencias,
+                    estiloBibliografico = estiloBibliografico,
                     onEscolherImagem = escolherImagem,
                     vm = viewModel
                 )
@@ -502,6 +508,8 @@ private fun ItemBlocoFolha(
     numeroFormula: Int,
     estrutura: List<SecaoEstrutura>,
     titulosIlustracoes: List<String>,
+    referencias: List<ReferenciaAcademica>,
+    estiloBibliografico: EstiloBibliografico,
     onEscolherImagem: (String) -> Unit,
     vm: EditorViewModel
 ) {
@@ -585,6 +593,15 @@ private fun ItemBlocoFolha(
                 Text("LISTA DE ILUSTRAÇÕES", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextoCor)
                 titulosIlustracoes.forEach { titulo -> Text(titulo, fontSize = 12.sp, color = TextoCor, modifier = Modifier.padding(top = 4.dp)) }
                 if (titulosIlustracoes.isEmpty()) Text("Adicione figuras, tabelas ou quadros com legenda.", fontSize = 12.sp, color = AthenesTextMuted)
+            }
+
+            TipoBlocoEditor.REFERENCIAS -> Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                Text("REFERÊNCIAS", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextoCor)
+                Bibliografia.ordenar(referencias, estiloBibliografico).forEachIndexed { indice, ref ->
+                    Text(Bibliografia.formatar(ref, estiloBibliografico, indice + 1), fontSize = 12.sp,
+                        color = TextoCor, modifier = Modifier.padding(top = 8.dp))
+                }
+                if (referencias.isEmpty()) Text("Cite obras da biblioteca para gerar as referências.", fontSize = 12.sp, color = AthenesTextMuted)
             }
 
             TipoBlocoEditor.QUEBRA_PAGINA -> Column {

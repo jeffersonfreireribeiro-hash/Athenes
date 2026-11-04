@@ -59,6 +59,7 @@ enum class TipoBlocoEditor(val rotulo: String, val desc: String) {
     LISTA("Lista", "Itens em lista"),
     SUMARIO("Sumário", "Títulos gerados automaticamente"),
     LISTA_ILUSTRACOES("Lista de ilustrações", "Legendas geradas automaticamente"),
+    REFERENCIAS("Referências", "Obras citadas no estilo do documento"),
     QUEBRA_PAGINA("Quebra de página", "Inicia uma nova página na exportação"),
     DIVISOR("Divisor", "Linha divisória ou espaçamento")
 }
@@ -333,6 +334,7 @@ class EditorViewModel : ViewModel() {
             TipoBlocoEditor.LISTA -> BlocoEditor(tipo = tipo, texto = "Primeiro item\nSegundo item", alinhamento = AlinhamentoTexto.ESQUERDA)
             TipoBlocoEditor.SUMARIO -> BlocoEditor(tipo = tipo, alinhamento = AlinhamentoTexto.ESQUERDA)
             TipoBlocoEditor.LISTA_ILUSTRACOES -> BlocoEditor(tipo = tipo, alinhamento = AlinhamentoTexto.ESQUERDA)
+            TipoBlocoEditor.REFERENCIAS -> BlocoEditor(tipo = tipo, alinhamento = AlinhamentoTexto.ESQUERDA)
             TipoBlocoEditor.QUEBRA_PAGINA -> BlocoEditor(tipo = tipo)
             TipoBlocoEditor.DIVISOR -> BlocoEditor(tipo = tipo)
         }
@@ -441,13 +443,16 @@ class EditorViewModel : ViewModel() {
         autores = _autores.value,
         resumo = _resumo.value,
         pagina = _configuracaoPagina.value,
+        estiloBibliografico = _estiloBibliografico.value,
+        referencias = _referencias.value,
         blocos = _blocos.value.map { b ->
             BlocoExport(
                 tipo = TipoBlocoExport.valueOf(b.tipo.name),
                 titulo = b.titulo, texto = b.texto, legenda = b.legenda, fonte = b.fonte,
                 formula = b.formulaLatex, imagem = b.imagem,
                 alinhamento = AlinhamentoExport.valueOf(b.alinhamento.name),
-                tabela = b.tabelaLinhas, listaNumerada = b.listaNumerada, nivelTitulo = b.nivelTitulo
+                tabela = b.tabelaLinhas, listaNumerada = b.listaNumerada, nivelTitulo = b.nivelTitulo,
+                citacoes = b.citacoes
             )
         }
     )

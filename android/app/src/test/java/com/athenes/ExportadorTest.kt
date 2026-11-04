@@ -11,6 +11,9 @@ import com.athenes.core.export.ExportadorDocumento
 import com.athenes.core.export.ImagemExport
 import com.athenes.core.export.ResolvedorImagem
 import com.athenes.core.export.TipoBlocoExport
+import com.athenes.core.citacao.AutorReferencia
+import com.athenes.core.citacao.EstiloBibliografico
+import com.athenes.core.citacao.ReferenciaAcademica
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -20,6 +23,19 @@ import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
 class ExportadorTest {
+
+    @Test
+    fun `bloco de referencias segue estilo e ordem na tela e nas exportacoes`() {
+        val zeta = ReferenciaAcademica("z", "book", "Livro Z", listOf(AutorReferencia("Zeta", "Zoe")), "2025")
+        val alfa = ReferenciaAcademica("a", "book", "Livro A", listOf(AutorReferencia("Alfa", "Ana")), "2024")
+        val doc = DocumentoExport("Teste", "", "", "", listOf(BlocoExport(TipoBlocoExport.REFERENCIAS)),
+            estiloBibliografico = EstiloBibliografico.ABNT, referencias = listOf(zeta, alfa))
+        val html = ExportadorDocumento.gerarHtml(doc, ResolvedorImagem { null })
+        val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, ResolvedorImagem { null }))["word/document.xml"]!!)
+        assertTrue(html.indexOf("Livro A") < html.indexOf("Livro Z"))
+        assertTrue(xml.indexOf("Livro A") < xml.indexOf("Livro Z"))
+        assertTrue(html.contains("REFERÊNCIAS"))
+    }
 
     private val pixelPng = byteArrayOf(
         0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A // cabeçalho PNG (conteúdo irrelevante para o teste)

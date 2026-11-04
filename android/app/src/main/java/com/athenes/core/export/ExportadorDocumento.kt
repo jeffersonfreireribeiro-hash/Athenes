@@ -2,6 +2,10 @@ package com.athenes.core.export
 
 import com.athenes.core.model.ConfiguracaoPagina
 import com.athenes.core.model.NumeracaoSecoes
+import com.athenes.core.citacao.Bibliografia
+import com.athenes.core.citacao.CitacaoInline
+import com.athenes.core.citacao.EstiloBibliografico
+import com.athenes.core.citacao.ReferenciaAcademica
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.zip.ZipEntry
@@ -19,10 +23,11 @@ data class BlocoExport(
     val alinhamento: AlinhamentoExport = AlinhamentoExport.JUSTIFICADO,
     val tabela: List<List<String>> = emptyList(),
     val listaNumerada: Boolean = false,
-    val nivelTitulo: Int = 1
+    val nivelTitulo: Int = 1,
+    val citacoes: List<CitacaoInline> = emptyList()
 )
 
-enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, SUMARIO, LISTA_ILUSTRACOES, QUEBRA_PAGINA, DIVISOR }
+enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, SUMARIO, LISTA_ILUSTRACOES, REFERENCIAS, QUEBRA_PAGINA, DIVISOR }
 enum class AlinhamentoExport {
     ESQUERDA, CENTRO, DIREITA, JUSTIFICADO,
     JUSTIFICADO_ESQUERDA, JUSTIFICADO_CENTRO, JUSTIFICADO_DIREITA
@@ -34,7 +39,9 @@ data class DocumentoExport(
     val autores: String,
     val resumo: String,
     val blocos: List<BlocoExport>,
-    val pagina: ConfiguracaoPagina = ConfiguracaoPagina()
+    val pagina: ConfiguracaoPagina = ConfiguracaoPagina(),
+    val estiloBibliografico: EstiloBibliografico = EstiloBibliografico.ABNT,
+    val referencias: List<ReferenciaAcademica> = emptyList()
 )
 
 /** Imagem já resolvida para exportação. */
@@ -62,6 +69,7 @@ object ExportadorDocumento {
         val temLista = doc.blocos.any { it.tipo == TipoBlocoExport.LISTA }
         val titulos = doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
         val numerosTitulos = NumeracaoSecoes.calcular(titulos.map { it.nivelTitulo })
+        val referenciasOrdenadas = Bibliografia.ordenar(doc.referencias, doc.estiloBibliografico)
 
         if (doc.titulo.isNotBlank()) corpo.append(par(doc.titulo, centro = true, negrito = true, tamanho = 32, depois = 120))
         if (doc.subtitulo.isNotBlank()) corpo.append(par(doc.subtitulo, centro = true, italico = true, tamanho = 26, depois = 120))
@@ -117,6 +125,12 @@ object ExportadorDocumento {
                     corpo.append(par("LISTA DE ILUSTRAÇÕES", negrito = true, antes = 120, depois = 120))
                     doc.blocos.filter { it.tipo in setOf(TipoBlocoExport.FIGURA, TipoBlocoExport.TABELA, TipoBlocoExport.QUADRO) && it.legenda.isNotBlank() }
                         .forEach { figura -> corpo.append(par(figura.legenda, depois = 60)) }
+                }
+                TipoBlocoExport.REFERENCIAS -> {
+                    corpo.append(par("REFERÊNCIAS", negrito = true, antes = 120, depois = 120))
+                    referenciasOrdenadas.forEachIndexed { indice, ref ->
+                        corpo.append(par(Bibliografia.formatar(ref, doc.estiloBibliografico, indice + 1), simples = true, depois = 120))
+                    }
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> corpo.append("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>")
                 TipoBlocoExport.DIVISOR -> corpo.append(
@@ -280,6 +294,7 @@ object ExportadorDocumento {
         require(doc.pagina.validar()) { "Configuração de página inválida." }
         val titulos = doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
         val numerosTitulos = NumeracaoSecoes.calcular(titulos.map { it.nivelTitulo })
+        val referenciasOrdenadas = Bibliografia.ordenar(doc.referencias, doc.estiloBibliografico)
         fun mm(valor: Double): String = java.lang.String.format(java.util.Locale.US, "%.2f", valor)
         val sb = StringBuilder()
         sb.append(
@@ -353,6 +368,13 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                     doc.blocos.filter { it.tipo in setOf(TipoBlocoExport.FIGURA, TipoBlocoExport.TABELA, TipoBlocoExport.QUADRO) && it.legenda.isNotBlank() }
                         .forEachIndexed { indice, figura -> sb.append("<li><a href=\"#ilustracao-${indice + 1}\">${html(figura.legenda)}</a></li>") }
                     sb.append("</ul></nav>")
+                }
+                TipoBlocoExport.REFERENCIAS -> {
+                    sb.append("<section aria-label=\"Referências\"><h2>REFERÊNCIAS</h2>")
+                    referenciasOrdenadas.forEachIndexed { indice, ref ->
+                        sb.append("<p>${html(Bibliografia.formatar(ref, doc.estiloBibliografico, indice + 1))}</p>")
+                    }
+                    sb.append("</section>")
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> sb.append("<div style=\"break-before:page\"></div>")
                 TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${html(b.texto)}</div>")
