@@ -201,4 +201,21 @@ class ExportadorTest {
         assertTrue(xml.contains("1  Introdução"))
         assertTrue(xml.contains("2  Método"))
     }
+
+    @Test
+    fun `lista de ilustracoes acompanha legendas e cria links no html`() {
+        val doc = documento().copy(blocos = listOf(
+            BlocoExport(TipoBlocoExport.LISTA_ILUSTRACOES),
+            BlocoExport(TipoBlocoExport.FIGURA, legenda = "Figura 1 — Mapa"),
+            BlocoExport(TipoBlocoExport.TABELA, legenda = "Tabela 1 — Dados", tabela = listOf(listOf("A")))
+        ))
+        val html = ExportadorDocumento.gerarHtml(doc, imagens)
+        assertTrue(html.contains("href=\"#ilustracao-1\">Figura 1 — Mapa</a>"))
+        assertTrue(html.contains("href=\"#ilustracao-2\">Tabela 1 — Dados</a>"))
+        assertTrue(html.contains("id=\"ilustracao-2\""))
+        val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/document.xml"]!!)
+        assertTrue(xml.contains("LISTA DE ILUSTRAÇÕES"))
+        assertTrue(xml.contains("Figura 1 — Mapa"))
+        assertTrue(xml.contains("Tabela 1 — Dados"))
+    }
 }

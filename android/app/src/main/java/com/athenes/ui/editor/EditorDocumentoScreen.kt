@@ -169,6 +169,7 @@ fun EditorDocumentoScreen(
     val blocoSelecionado = remember(blocos, blocoSelecionadoId) { blocos.find { it.id == blocoSelecionadoId } }
     val estrutura = remember(blocos) { viewModel.montarEstrutura(blocos) }
     val titulosSumario = remember(blocos) { blocos.filter { it.tipo == TipoBlocoEditor.TITULO && it.titulo.isNotBlank() }.map { it.titulo } }
+    val titulosIlustracoes = remember(blocos) { blocos.filter { it.tipo in setOf(TipoBlocoEditor.FIGURA, TipoBlocoEditor.TABELA, TipoBlocoEditor.QUADRO) && it.legenda.isNotBlank() }.map { it.legenda } }
     val algumPainelAberto = painelEstruturaAberto || painelInspetorAberto
 
     fun sair() {
@@ -247,6 +248,7 @@ fun EditorDocumentoScreen(
                     compacto = compacto,
                     numeroFormula = numeroFormula,
                     titulosSumario = titulosSumario,
+                    titulosIlustracoes = titulosIlustracoes,
                     onEscolherImagem = escolherImagem,
                     vm = viewModel
                 )
@@ -484,6 +486,7 @@ private fun ItemBlocoFolha(
     compacto: Boolean,
     numeroFormula: Int,
     titulosSumario: List<String>,
+    titulosIlustracoes: List<String>,
     onEscolherImagem: (String) -> Unit,
     vm: EditorViewModel
 ) {
@@ -549,6 +552,12 @@ private fun ItemBlocoFolha(
                     Text("${indice + 1}  $titulo", fontSize = 12.sp, color = TextoCor, modifier = Modifier.padding(top = 4.dp))
                 }
                 if (titulosSumario.isEmpty()) Text("Adicione títulos para gerar o sumário.", fontSize = 12.sp, color = AthenesTextMuted)
+            }
+
+            TipoBlocoEditor.LISTA_ILUSTRACOES -> Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                Text("LISTA DE ILUSTRAÇÕES", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextoCor)
+                titulosIlustracoes.forEach { titulo -> Text(titulo, fontSize = 12.sp, color = TextoCor, modifier = Modifier.padding(top = 4.dp)) }
+                if (titulosIlustracoes.isEmpty()) Text("Adicione figuras, tabelas ou quadros com legenda.", fontSize = 12.sp, color = AthenesTextMuted)
             }
 
             TipoBlocoEditor.QUEBRA_PAGINA -> Column {

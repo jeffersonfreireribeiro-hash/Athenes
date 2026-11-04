@@ -20,7 +20,7 @@ data class BlocoExport(
     val listaNumerada: Boolean = false
 )
 
-enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, SUMARIO, QUEBRA_PAGINA, DIVISOR }
+enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, SUMARIO, LISTA_ILUSTRACOES, QUEBRA_PAGINA, DIVISOR }
 enum class AlinhamentoExport {
     ESQUERDA, CENTRO, DIREITA, JUSTIFICADO,
     JUSTIFICADO_ESQUERDA, JUSTIFICADO_CENTRO, JUSTIFICADO_DIREITA
@@ -109,6 +109,11 @@ object ExportadorDocumento {
                     corpo.append(par("SUMÁRIO", negrito = true, antes = 120, depois = 120))
                     doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
                         .forEachIndexed { indice, titulo -> corpo.append(par("${indice + 1}  ${titulo.titulo}", depois = 60)) }
+                }
+                TipoBlocoExport.LISTA_ILUSTRACOES -> {
+                    corpo.append(par("LISTA DE ILUSTRAÇÕES", negrito = true, antes = 120, depois = 120))
+                    doc.blocos.filter { it.tipo in setOf(TipoBlocoExport.FIGURA, TipoBlocoExport.TABELA, TipoBlocoExport.QUADRO) && it.legenda.isNotBlank() }
+                        .forEach { figura -> corpo.append(par(figura.legenda, depois = 60)) }
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> corpo.append("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>")
                 TipoBlocoExport.DIVISOR -> corpo.append(
@@ -298,7 +303,12 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
 
         var secao = 0
         var formula = 0
+        var ilustracao = 0
         for (b in doc.blocos) {
+            if (b.tipo in setOf(TipoBlocoExport.FIGURA, TipoBlocoExport.TABELA, TipoBlocoExport.QUADRO) && b.legenda.isNotBlank()) {
+                ilustracao++
+                sb.append("<span id=\"ilustracao-$ilustracao\"></span>")
+            }
             val alinha = when (b.alinhamento) {
                 AlinhamentoExport.ESQUERDA -> "left"
                 AlinhamentoExport.CENTRO -> "center"
@@ -325,6 +335,12 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                     doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
                         .forEachIndexed { indice, titulo -> sb.append("<li><a href=\"#secao-${indice + 1}\">${html(titulo.titulo)}</a></li>") }
                     sb.append("</ol></nav>")
+                }
+                TipoBlocoExport.LISTA_ILUSTRACOES -> {
+                    sb.append("<nav aria-label=\"Lista de ilustrações\"><h2>LISTA DE ILUSTRAÇÕES</h2><ul>")
+                    doc.blocos.filter { it.tipo in setOf(TipoBlocoExport.FIGURA, TipoBlocoExport.TABELA, TipoBlocoExport.QUADRO) && it.legenda.isNotBlank() }
+                        .forEachIndexed { indice, figura -> sb.append("<li><a href=\"#ilustracao-${indice + 1}\">${html(figura.legenda)}</a></li>") }
+                    sb.append("</ul></nav>")
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> sb.append("<div style=\"break-before:page\"></div>")
                 TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${html(b.texto)}</div>")
