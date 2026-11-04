@@ -517,6 +517,29 @@ private fun ItemBlocoFolha(
                 style = TextStyle(fontSize = if (compacto) 14.sp else 12.5.sp, lineHeight = if (compacto) 22.sp else 19.sp, color = TextoCor, textAlign = alinhamento)
             )
 
+            TipoBlocoEditor.LISTA -> Column {
+                val itens = bloco.texto.lines()
+                itens.forEachIndexed { indice, item ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                        Text("•", modifier = Modifier.padding(top = 2.dp, end = 8.dp), color = TextoCor)
+                        CampoFolha(
+                            value = item,
+                            onValueChange = { novo ->
+                                vm.atualizarTextoBloco(bloco.id, itens.toMutableList().apply { this[indice] = novo.replace("\n", " ") }.joinToString("\n"))
+                            },
+                            editavel = editavel, placeholder = "Item da lista…", onFocused = selecionar,
+                            style = TextStyle(fontSize = if (compacto) 14.sp else 12.5.sp, lineHeight = 21.sp, color = TextoCor)
+                        )
+                    }
+                }
+                if (editavel) TextButton(onClick = { vm.atualizarTextoBloco(bloco.id, bloco.texto + "\n") }) { Text("Adicionar item") }
+            }
+
+            TipoBlocoEditor.QUEBRA_PAGINA -> Column {
+                HorizontalDivider(color = AthenesPrimary.copy(alpha = 0.5f), modifier = Modifier.padding(top = 12.dp))
+                Text("Quebra de página", fontSize = 11.sp, color = AthenesTextMuted)
+            }
+
             TipoBlocoEditor.CITACAO -> Row(
                 modifier = Modifier.fillMaxWidth().padding(start = if (compacto) 28.dp else 50.dp).height(IntrinsicSize.Min)
             ) {

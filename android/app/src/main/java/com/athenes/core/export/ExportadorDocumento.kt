@@ -19,7 +19,7 @@ data class BlocoExport(
     val tabela: List<List<String>> = emptyList()
 )
 
-enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, FORMULA, DIVISOR }
+enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, FORMULA, LISTA, QUEBRA_PAGINA, DIVISOR }
 enum class AlinhamentoExport {
     ESQUERDA, CENTRO, DIREITA, JUSTIFICADO,
     JUSTIFICADO_ESQUERDA, JUSTIFICADO_CENTRO, JUSTIFICADO_DIREITA
@@ -98,6 +98,10 @@ object ExportadorDocumento {
                     formula++
                     corpo.append(par("${b.formula}          ($formula)", centro = true, antes = 120, depois = 120))
                 }
+                TipoBlocoExport.LISTA -> b.texto.lines().filter { it.isNotBlank() }.forEach { item ->
+                    corpo.append(par("•  ${item.trim()}", recuoEsq = 709, depois = 60))
+                }
+                TipoBlocoExport.QUEBRA_PAGINA -> corpo.append("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>")
                 TipoBlocoExport.DIVISOR -> corpo.append(
                     "<w:p><w:pPr><w:pBdr><w:bottom w:val=\"single\" w:sz=\"4\" w:space=\"1\" w:color=\"94A3B8\"/></w:pBdr></w:pPr></w:p>"
                 )
@@ -289,6 +293,12 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
             when (b.tipo) {
                 TipoBlocoExport.TITULO -> { secao++; sb.append("<h2>$secao&nbsp; ${html(b.titulo)}</h2>") }
                 TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha;text-align-last:$ultimaLinha\">${html(b.texto)}</p>")
+                TipoBlocoExport.LISTA -> if (b.texto.isNotBlank()) {
+                    sb.append("<ul>")
+                    b.texto.lines().filter { it.isNotBlank() }.forEach { sb.append("<li>${html(it.trim())}</li>") }
+                    sb.append("</ul>")
+                }
+                TipoBlocoExport.QUEBRA_PAGINA -> sb.append("<div style=\"break-before:page\"></div>")
                 TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${html(b.texto)}</div>")
                 TipoBlocoExport.FIGURA -> {
                     sb.append("<figure>")

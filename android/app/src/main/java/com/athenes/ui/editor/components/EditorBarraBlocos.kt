@@ -66,6 +66,8 @@ fun EditorBarraBlocos(
                 BotaoBloco(Icons.Rounded.TableChart, "Inserir tabela", TipoBlocoEditor.TABELA, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.FormatQuote, "Inserir citação direta longa", TipoBlocoEditor.CITACAO, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.Functions, "Inserir fórmula", TipoBlocoEditor.FORMULA, onAdicionarBloco)
+                BotaoBloco(Icons.Rounded.FormatListBulleted, "Inserir lista", TipoBlocoEditor.LISTA, onAdicionarBloco)
+                BotaoBloco(Icons.Rounded.InsertPageBreak, "Inserir quebra de página", TipoBlocoEditor.QUEBRA_PAGINA, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.HorizontalRule, "Inserir divisor", TipoBlocoEditor.DIVISOR, onAdicionarBloco)
                 Separador()
 

@@ -145,4 +145,20 @@ class ExportadorTest {
             assertTrue("DOCX: $alinhamento", xml.contains("<w:jc w:val=\"$jc\"/>"))
         }
     }
+
+    @Test
+    fun `lista e quebra de pagina aparecem no pdf e no word`() {
+        val doc = documento().copy(blocos = listOf(
+            BlocoExport(TipoBlocoExport.LISTA, texto = "Primeiro item\nSegundo item"),
+            BlocoExport(TipoBlocoExport.QUEBRA_PAGINA),
+            BlocoExport(TipoBlocoExport.PARAGRAFO, texto = "Página seguinte")
+        ))
+        val html = ExportadorDocumento.gerarHtml(doc, imagens)
+        assertTrue(html.contains("<li>Primeiro item</li><li>Segundo item</li>"))
+        assertTrue(html.contains("break-before:page"))
+        val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/document.xml"]!!)
+        assertTrue(xml.contains("•  Primeiro item"))
+        assertTrue(xml.contains("•  Segundo item"))
+        assertTrue(xml.contains("<w:br w:type=\"page\"/>"))
+    }
 }

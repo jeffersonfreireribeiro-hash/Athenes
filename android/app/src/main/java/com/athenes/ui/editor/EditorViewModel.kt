@@ -47,6 +47,8 @@ enum class TipoBlocoEditor(val rotulo: String, val desc: String) {
     FIGURA("Figura", "Ilustração numerada com legenda e fonte"),
     TABELA("Tabela", "Tabela de dados norma IBGE"),
     FORMULA("Fórmula", "Expressão matemática numerada"),
+    LISTA("Lista", "Itens em lista"),
+    QUEBRA_PAGINA("Quebra de página", "Inicia uma nova página na exportação"),
     DIVISOR("Divisor", "Linha divisória ou espaçamento")
 }
 
@@ -273,6 +275,8 @@ class EditorViewModel : ViewModel() {
                 tabelaLinhas = listOf(listOf("Coluna 1", "Coluna 2", "Coluna 3"), listOf("", "", ""))
             )
             TipoBlocoEditor.FORMULA -> BlocoEditor(tipo = tipo, formulaLatex = "x = y", alinhamento = AlinhamentoTexto.CENTRO)
+            TipoBlocoEditor.LISTA -> BlocoEditor(tipo = tipo, texto = "Primeiro item\nSegundo item", alinhamento = AlinhamentoTexto.ESQUERDA)
+            TipoBlocoEditor.QUEBRA_PAGINA -> BlocoEditor(tipo = tipo)
             TipoBlocoEditor.DIVISOR -> BlocoEditor(tipo = tipo)
         }
         inserirAposSelecionado(novo)
