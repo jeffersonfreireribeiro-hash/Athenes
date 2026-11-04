@@ -53,7 +53,7 @@ Nenhuma linha marcada `Não` ou `Parcial` deve ser tratada como paridade conclu�
 
 ## Interface adaptativa
 
-A navegação principal agora oferece Documentos, Biblioteca, Estudo e Conta. Em largura Compact usa barra inferior; em Medium e Expanded usa trilho lateral, segundo `WindowSizeClass`. A tela selecionada e os IDs do documento/artigo sobrevivem à rotação. O editor continua imersivo. Na tela compacta, busca e Novo documento ocupam linhas próprias com alvo de pelo menos 48 dp; o menu superior abre as pastas ou coleções conforme o destino. Um teste visual no emulador confirmou a abertura da folha de pastas. Ainda faltam os painéis simultâneos de lista/detalhe, painéis redimensionáveis, controles completos da conta e testes de interface em aparelho real.
+A navegação principal agora oferece Documentos, Biblioteca, Estudo e Conta. Em largura Compact usa barra inferior; em Medium e Expanded usa trilho lateral, segundo `WindowSizeClass`. A tela selecionada e os IDs do documento/artigo sobrevivem à rotação. O editor continua imersivo. Na tela compacta, busca e Novo documento ocupam linhas próprias com alvo de pelo menos 48 dp; o menu superior abre as pastas ou coleções conforme o destino. Testes Compose no emulador exercitam seleção dos destinos na barra e no trilho, busca, limpeza e ação principal; um teste visual confirmou a abertura da folha de pastas. Ainda faltam os painéis simultâneos de lista/detalhe, painéis redimensionáveis, controles completos da conta, testes de estados vazios/erro e testes em aparelho real.
 
 ## Leitor de PDF
 

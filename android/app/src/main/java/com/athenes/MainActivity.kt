@@ -10,14 +10,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -33,6 +30,7 @@ import com.athenes.core.model.CitacaoMarcada
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.core.updater.AppUpdater
 import com.athenes.ui.editor.EditorDocumentoScreen
+import com.athenes.ui.components.NavegacaoPrincipal
 import com.athenes.ui.library.BibliotecaScreen
 import com.athenes.ui.library.BibliotecaViewModel
 import com.athenes.ui.reader.EstudoArtigosScreen
@@ -125,33 +123,13 @@ class MainActivity : ComponentActivity() {
                     AppTela.BIBLIOTECA -> {
                         val largura = calculateWindowSizeClass(this@MainActivity).widthSizeClass
                         Row(Modifier.fillMaxSize()) {
-                            if (largura != WindowWidthSizeClass.Compact) {
-                                NavigationRail {
-                                    DestinoPrincipal.entries.forEach { item ->
-                                        NavigationRailItem(
-                                            selected = destino == item,
-                                            onClick = { destino = item },
-                                            icon = { Icon(iconeDestino(item), contentDescription = item.rotulo) },
-                                            label = { Text(item.rotulo) }
-                                        )
-                                    }
-                                }
-                            }
+                            if (largura != WindowWidthSizeClass.Compact)
+                                NavegacaoPrincipal(destino, compacta = false, onDestino = { destino = it })
                             Scaffold(
                                 modifier = Modifier.weight(1f),
                                 bottomBar = {
-                                    if (largura == WindowWidthSizeClass.Compact) {
-                                        NavigationBar {
-                                            DestinoPrincipal.entries.forEach { item ->
-                                                NavigationBarItem(
-                                                    selected = destino == item,
-                                                    onClick = { destino = item },
-                                                    icon = { Icon(iconeDestino(item), contentDescription = item.rotulo) },
-                                                    label = { Text(item.rotulo) }
-                                                )
-                                            }
-                                        }
-                                    }
+                                    if (largura == WindowWidthSizeClass.Compact)
+                                        NavegacaoPrincipal(destino, compacta = true, onDestino = { destino = it })
                                 }
                             ) { padding ->
                                 when (destino) {
@@ -259,13 +237,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}
-
-private fun iconeDestino(destino: DestinoPrincipal): ImageVector = when (destino) {
-    DestinoPrincipal.DOCUMENTOS -> Icons.Rounded.Description
-    DestinoPrincipal.BIBLIOTECA -> Icons.Rounded.MenuBook
-    DestinoPrincipal.ESTUDO -> Icons.Rounded.Draw
-    DestinoPrincipal.CONTA -> Icons.Rounded.Person
 }
 
 @Composable

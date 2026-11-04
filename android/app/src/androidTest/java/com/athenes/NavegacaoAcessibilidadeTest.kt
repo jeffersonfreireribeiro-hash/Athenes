@@ -1,0 +1,67 @@
+package com.athenes
+
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.athenes.ui.components.AthenesSearchBar
+import com.athenes.ui.components.NavegacaoPrincipal
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class NavegacaoAcessibilidadeTest {
+    @get:Rule val compose = createComposeRule()
+
+    @Test fun buscaEAcaoPrincipalFuncionamEmTelaCompacta() {
+        var busca by mutableStateOf("")
+        var novoDocumento = false
+        compose.setContent {
+            MaterialTheme {
+                AthenesSearchBar(
+                    textoBusca = busca,
+                    onBuscaAlterada = { busca = it },
+                    tipoFiltro = null,
+                    onTipoFiltroAlterado = {},
+                    onNovoDocumentoClick = { novoDocumento = true }
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("Buscar documentos").performTextInput("pesquisa")
+        compose.runOnIdle { assertEquals("pesquisa", busca) }
+        compose.onNodeWithContentDescription("Limpar busca").performClick()
+        compose.runOnIdle { assertEquals("", busca) }
+        compose.onNodeWithText("Novo documento").assertHasClickAction().performClick()
+        compose.runOnIdle { assertTrue(novoDocumento) }
+        compose.onNodeWithText("Todos os Documentos").assertExists()
+    }
+
+    @Test fun destinosPreservamSelecaoNaBarraENoTrilho() {
+        var destino by mutableStateOf(DestinoPrincipal.DOCUMENTOS)
+        var compacta by mutableStateOf(true)
+        compose.setContent {
+            MaterialTheme {
+                NavegacaoPrincipal(destino, compacta, onDestino = { destino = it })
+            }
+        }
+        compose.onNodeWithText("Biblioteca").performClick()
+        compose.runOnIdle { assertEquals(DestinoPrincipal.BIBLIOTECA, destino) }
+        compose.onNodeWithText("Biblioteca").assertIsSelected()
+        compose.runOnIdle { compacta = false }
+        compose.onNodeWithText("Conta").performClick()
+        compose.runOnIdle { assertEquals(DestinoPrincipal.CONTA, destino) }
+        compose.onNodeWithText("Conta").assertIsSelected()
+    }
+}
