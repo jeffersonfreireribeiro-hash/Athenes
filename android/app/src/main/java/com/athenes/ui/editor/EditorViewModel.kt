@@ -469,6 +469,28 @@ class EditorViewModel : ViewModel() {
         marcarAlterado()
     }
 
+    fun removerNotaRodape(id: String) {
+        if (_notasRodape.value.none { it.id == id }) return
+        salvarNoHistorico()
+        val marca = "[nota:$id]"
+        _blocos.value = _blocos.value.map { bloco ->
+            if (!bloco.texto.contains(marca)) bloco else {
+                var texto = bloco.texto
+                var citacoes = bloco.citacoes
+                while (marca in texto) {
+                    val posicao = texto.indexOf(marca)
+                    val novo = texto.removeRange(posicao, posicao + marca.length)
+                    citacoes = CitacoesInline.atualizarDepoisDaEdicao(texto, novo, citacoes)
+                    texto = novo
+                }
+                bloco.copy(texto = texto, citacoes = citacoes)
+            }
+        }
+        _notasRodape.value = _notasRodape.value.filterNot { it.id == id }
+        salvarNoHistorico()
+        marcarAlterado()
+    }
+
     /** Transfere um destaque do leitor para um bloco de citação longa com referência vinculada. */
     fun inserirCitacaoLonga(artigo: ArtigoEstudoDetalhado, destaque: CitacaoMarcada) {
         val referencia = ReferenciaAcademica.doArtigo(artigo)

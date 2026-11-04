@@ -470,7 +470,12 @@ fun EditorDocumentoScreen(
                 title = { Text("Texto da nota") },
                 text = { OutlinedTextField(value = rascunho, onValueChange = { rascunho = it }, label = { Text("Nota de rodapé") }, minLines = 3) },
                 confirmButton = { TextButton(onClick = { viewModel.atualizarNotaRodape(notaEditando.id, rascunho); notaEditandoId = null }) { Text("Salvar") } },
-                dismissButton = { TextButton(onClick = { notaEditandoId = null }) { Text("Cancelar") } }
+                dismissButton = {
+                    Row {
+                        TextButton(onClick = { viewModel.removerNotaRodape(notaEditando.id); notaEditandoId = null }) { Text("Excluir") }
+                        TextButton(onClick = { notaEditandoId = null }) { Text("Cancelar") }
+                    }
+                }
             )
         }
     }

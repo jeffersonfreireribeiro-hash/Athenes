@@ -53,6 +53,20 @@ class NavegacaoAcessibilidadeTest {
         }
     }
 
+    @Test fun excluirNotaRetiraMarcadorEPodeSerDesfeito() {
+        val vm = EditorViewModel()
+        compose.runOnIdle {
+            val id = vm.inserirNotaRodape()
+            vm.atualizarNotaRodape(id, "Nota")
+            vm.removerNotaRodape(id)
+            assertTrue(vm.notasRodape.value.isEmpty())
+            assertTrue(vm.blocos.value.none { it.texto.contains("[nota:$id]") })
+            vm.desfazer()
+            assertEquals("Nota", vm.notasRodape.value.single().texto)
+            assertTrue(vm.blocos.value.any { it.texto.contains("[nota:$id]") })
+        }
+    }
+
     @Test fun referenciaCruzadaEntraNoCursorEPodeSerDesfeita() {
         val vm = EditorViewModel()
         compose.runOnIdle {
