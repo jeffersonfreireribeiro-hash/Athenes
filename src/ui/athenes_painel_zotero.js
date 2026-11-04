@@ -87,7 +87,7 @@ export class PainelZotero {
     root.className = 'ath-zotero-painel';
     root.style.display = 'flex';
     root.style.flexDirection = 'column';
-    root.style.height = '100%';
+    root.style.flex = '1 1 auto'; root.style.minHeight = '0'; // a janela acompanha o conteúdo (até 85% da tela)
     root.style.boxSizing = 'border-box';
     root.style.padding = '12px 16px';
     root.style.overflowY = 'hidden';
@@ -260,7 +260,7 @@ export class PainelZotero {
     const inputBib = root.querySelector('#athInputBibtex');
     inputBib?.addEventListener('change', e => this.processarArquivoBibtex(e.target.files[0]));
 
-    [...root.children].forEach(c => { c.style.flexShrink = '0'; });
+    [...root.children].forEach(c => { if (!c.classList.contains('ath-zotero-colunas')) c.style.flexShrink = '0'; }); // a área de colunas é a que rola
     this.container.appendChild(root);
 
     // Carrega dados iniciais e integra artigos com fichamento do estúdio
