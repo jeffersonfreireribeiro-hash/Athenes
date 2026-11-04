@@ -20,7 +20,6 @@ export const metodosMenusTopo = {
     const estilos = this.doc.estilos || [];
 
     const popArquivo = root.querySelector('#athPopoverArquivo');
-    const popCabRod = root.querySelector('#athPopoverCabRod');
     const popEstilos = root.querySelector('#athPopoverEstilos');
     const popNuvem = root.querySelector('#athPopoverNuvem');
     const popConfig = root.querySelector('#athPopoverConfig');
@@ -30,8 +29,8 @@ export const metodosMenusTopo = {
     const btnEstilos = root.querySelector('#athBtnMenuEstilos');
     const btnConfig = root.querySelector('#athBtnMenuConfig'); // a engrenagem abre o menu e também "acende" quando a Nuvem está aberta
 
-    const popovers = { arquivo: popArquivo, cabrod: popCabRod, estilos: popEstilos, config: popConfig, nuvem: popNuvem };
-    const botoes = { arquivo: btnArquivo, cabrod: btnCabRod, estilos: btnEstilos, config: btnConfig, nuvem: btnConfig };
+    const popovers = { arquivo: popArquivo, estilos: popEstilos, config: popConfig, nuvem: popNuvem };
+    const botoes = { arquivo: btnArquivo, estilos: btnEstilos, config: btnConfig, nuvem: btnConfig };
 
     const fecharTodos = () => {
       Object.values(popovers).forEach(p => { if (p) p.hidden = true; });
@@ -66,9 +65,17 @@ export const metodosMenusTopo = {
       togglePopover('arquivo');
     });
 
+    // cabeçalho, rodapé, paginação e notas ficam só na janela "Configuração de Página" (sem um segundo painel com os mesmos campos)
     btnCabRod.addEventListener('click', (e) => {
       e.stopPropagation();
-      togglePopover('cabrod');
+      fecharTodos();
+      new ModalConfigPagina(this.doc, this.obterMestraAtiva(), {
+        onSalvar: () => {
+          this.menuTopoAberto = null;
+          this.notificarMudanca();
+          this.renderizar();
+        }
+      });
     });
 
     btnEstilos.addEventListener('click', (e) => {
@@ -205,112 +212,6 @@ export const metodosMenusTopo = {
         this.renderizarFolhasPaginas();
         this.notificarMudanca();
       }
-    });
-
-    // 2. Popover Cabeçalho e Rodapé
-    popCabRod.innerHTML = `
-      <div class="rm-popover-topo-head">
-        <strong>Cabeçalho e Rodapé</strong>
-        <button type="button" class="rm-ic" data-fechar-popover title="Fechar">${svgIcone('fechar', 13)}</button>
-      </div>
-      <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="rmAbrirConfigPagina" style="width:100%; margin-bottom:8px;" title="Zonas, tipografia, paginação, regras de seção e notas de rodapé, com prévia ao vivo">
-        ${svgIcone('grade', 14)} Configuração de Página…
-      </button>
-      <span id="rmAvisoConfigPagina" style="display:none; font-size:11px; color:#64748B; margin-bottom:6px;">Cabeçalho e rodapé desta mestra são gerenciados em <b>Configuração de Página</b>.</span>
-      <label class="rm-chk"><input type="checkbox" id="rmCabAtivo" ${mestra.cabecalho?.ativo ? 'checked' : ''}> Mostrar cabeçalho</label>
-      <span class="rm-rot">Logo da empresa</span>
-      <label class="rm-arquivo glx-btn glx-btn-soft glx-btn-sm" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
-        ${svgIcone('imagem', 14)}
-        <span>Escolher imagem</span>
-        <input type="file" id="rmLogoArq" accept="image/png,image/jpeg,image/webp" hidden>
-      </label>
-      <span class="rm-dica">PNG, JPEG ou WebP, até 400 KB.</span>
-      <label>Linhas do cabeçalho (uma por linha; aceita variáveis)
-        <textarea id="rmCabLinhas" rows="3">${mestra.cabecalho?.texto || '{{documento.titulo}}\n{{documento.instituicao}}'}</textarea>
-      </label>
-      <label>Alinhamento do cabeçalho
-        <select id="rmCabAlinha" class="glx-select">
-          <option value="esquerda" ${mestra.cabecalho?.alinhamento === 'esquerda' ? 'selected' : ''}>Logo à esquerda</option>
-          <option value="direita" ${mestra.cabecalho?.alinhamento === 'direita' ? 'selected' : ''}>Logo à direita</option>
-          <option value="centro" ${mestra.cabecalho?.alinhamento === 'centro' ? 'selected' : ''}>Centralizado</option>
-        </select>
-      </label>
-      <label class="rm-chk" style="margin-top:6px;"><input type="checkbox" id="rmRodAtivo" ${mestra.rodape?.ativo ? 'checked' : ''}> Mostrar rodapé</label>
-      <label>Texto do rodapé
-        <textarea id="rmRodTexto" rows="2">${mestra.rodape?.texto || 'Athenes · Editor Científico e Acadêmico'}</textarea>
-      </label>
-      <label class="rm-chk"><input type="checkbox" id="rmRodNum" ${mestra.rodape?.numeracao ? 'checked' : ''}> Numerar páginas ("Página 1 de 3")</label>
-    `;
-
-    popCabRod.querySelector('#rmAbrirConfigPagina').addEventListener('click', () => {
-      popCabRod.hidden = true;
-      new ModalConfigPagina(this.doc, mestra, {
-        onSalvar: () => {
-          this.menuTopoAberto = null; // o popover não deve reabrir depois de salvar
-          this.notificarMudanca();
-          this.renderizar();
-        }
-      });
-    });
-    // com zonas definidas, os campos de texto/alinhamento antigos deixam de valer: evita duas fontes de verdade
-    if (mestra.cabecalho?.zonas || mestra.rodape?.zonas) {
-      popCabRod.querySelector('#rmAvisoConfigPagina').style.display = 'block';
-      ['#rmCabLinhas', '#rmCabAlinha', '#rmRodTexto'].forEach(q => { const n = popCabRod.querySelector(q); if (n) n.disabled = true; });
-    }
-
-    popCabRod.querySelector('#rmCabAtivo').addEventListener('change', e => {
-      mestra.cabecalho = mestra.cabecalho || {};
-      mestra.cabecalho.ativo = e.target.checked;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
-    });
-
-    popCabRod.querySelector('#rmCabLinhas').addEventListener('input', e => {
-      mestra.cabecalho = mestra.cabecalho || {};
-      mestra.cabecalho.texto = e.target.value;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
-    });
-
-    popCabRod.querySelector('#rmCabAlinha').addEventListener('change', e => {
-      mestra.cabecalho = mestra.cabecalho || {};
-      mestra.cabecalho.alinhamento = e.target.value;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
-    });
-
-    popCabRod.querySelector('#rmLogoArq')?.addEventListener('change', e => {
-      const arq = e.target.files?.[0];
-      if (!arq) return;
-      const leitor = new FileReader();
-      leitor.onload = ev => {
-        mestra.cabecalho = mestra.cabecalho || {};
-        mestra.cabecalho.logo_base64 = ev.target.result;
-        this.renderizarFolhasPaginas();
-        this.notificarMudanca();
-      };
-      leitor.readAsDataURL(arq);
-    });
-
-    popCabRod.querySelector('#rmRodAtivo').addEventListener('change', e => {
-      mestra.rodape = mestra.rodape || {};
-      mestra.rodape.ativo = e.target.checked;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
-    });
-
-    popCabRod.querySelector('#rmRodTexto').addEventListener('input', e => {
-      mestra.rodape = mestra.rodape || {};
-      mestra.rodape.texto = e.target.value;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
-    });
-
-    popCabRod.querySelector('#rmRodNum').addEventListener('change', e => {
-      mestra.rodape = mestra.rodape || {};
-      mestra.rodape.numeracao = e.target.checked;
-      this.renderizarFolhasPaginas();
-      this.notificarMudanca();
     });
 
     // 3. Popover Estilos de Texto

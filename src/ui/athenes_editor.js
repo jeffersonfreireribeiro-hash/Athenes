@@ -506,14 +506,10 @@ export class EditorView {
           </div>
 
           <div class="rm-menu-topo-item" data-menu="cabrod">
-            <button type="button" class="rm-btn-menu-topo" id="athBtnMenuCabRod" aria-haspopup="dialog" aria-expanded="false" title="Configurar cabeçalho, rodapé e numeração da página">
+            <button type="button" class="rm-btn-menu-topo" id="athBtnMenuCabRod" aria-haspopup="dialog" title="Cabeçalho, rodapé, numeração de páginas e notas de rodapé">
               ${svgIcone('subtitulo', 14)}
-              <span>Cabeçalho & Rodapé</span>
-              <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
-                <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <span>Configuração de Página</span>
             </button>
-            <div class="rm-topo-popover" id="athPopoverCabRod" role="dialog" aria-label="Cabeçalho e Rodapé" hidden></div>
           </div>
 
           <div class="rm-menu-topo-item" data-menu="estilos">
