@@ -29,8 +29,9 @@ class ReaderTest {
         val artigoAtivo = viewModel.obterArtigoAtivo()
         assertTrue("Artigo ativo deve ser o Acoustic Performance-Based Design", artigoAtivo.titulo.contains("Acoustic"))
         assertEquals("Deve possuir 33 páginas de estudo", 33, artigoAtivo.totalPaginas)
-        assertEquals("Chave Zotero deve ser JKCLFWH6", "JKCLFWH6", artigoAtivo.chaveZotero)
-        assertEquals("User ID Zotero deve ser 18806479", "18806479", artigoAtivo.zoteroConfig.userId)
+        assertTrue("Exemplo não deve conter chave Zotero", artigoAtivo.chaveZotero.isEmpty())
+        assertTrue("Exemplo não deve conter User ID Zotero", artigoAtivo.zoteroConfig.userId.isEmpty())
+        assertTrue("Exemplo não deve conter API key", artigoAtivo.zoteroConfig.apiKey.isEmpty())
         assertTrue("Deve possuir citação inicial marcada", artigoAtivo.citacoes.isNotEmpty())
     }
 

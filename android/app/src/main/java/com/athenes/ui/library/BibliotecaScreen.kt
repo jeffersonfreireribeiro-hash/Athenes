@@ -99,7 +99,7 @@ fun BibliotecaScreen(
                     ) {
                         OutlinedButton(
                             onClick = {
-                                Toast.makeText(context, "Sincronizando biblioteca do Zotero...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "A sincronização do Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
                             },
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
@@ -113,7 +113,7 @@ fun BibliotecaScreen(
 
                         Button(
                             onClick = {
-                                Toast.makeText(context, "Selecione o arquivo PDF para vincular ao novo artigo.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "A importação de artigos ainda não está disponível.", Toast.LENGTH_SHORT).show()
                             },
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
@@ -248,7 +248,7 @@ fun BibliotecaScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Zotero Conectado (#18806479)",
+                                text = "Zotero não conectado",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold,

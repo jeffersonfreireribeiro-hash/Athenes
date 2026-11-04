@@ -71,10 +71,10 @@ fun EstudoArtigosScreen(
                 onAlternarEsquerdo = { viewModel.alternarPainelEsquerdo() },
                 onAlternarDireito = { viewModel.alternarPainelDireito() },
                 onAbrirPdfClick = {
-                    Toast.makeText(context, "Abrindo ${artigoAtivo.zoteroConfig.driveFileName}...", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "A abertura do PDF ainda não está disponível.", Toast.LENGTH_SHORT).show()
                 },
                 onSalvarDriveZoteroClick = {
-                    Toast.makeText(context, "Sincronizado e salvo no Google Drive & Zotero!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "A sincronização com Drive e Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
                 },
                 onVoltarBiblioteca = onVoltarBiblioteca
             )
@@ -135,7 +135,7 @@ fun EstudoArtigosScreen(
                     coresDisponiveis = viewModel.coresDisponiveis,
                     onVoltar = onVoltarBiblioteca,
                     onSalvar = {
-                        Toast.makeText(context, "Sincronizado e salvo no Google Drive & Zotero!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "A sincronização com Drive e Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
                     },
                     onDesfazer = { viewModel.desfazerTraco() },
                     onLimparPagina = { viewModel.limparPagina() },
@@ -195,13 +195,13 @@ fun EstudoArtigosScreen(
                             viewModel.alternarPainelEsquerdo()
                         },
                         onSyncZoteroClick = {
-                            Toast.makeText(context, "Sincronizando biblioteca do Zotero...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "A sincronização do Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
                         },
                         onNovoArtigoClick = {
-                            Toast.makeText(context, "Novo artigo Zotero", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "A importação de artigos ainda não está disponível.", Toast.LENGTH_SHORT).show()
                         },
                         onNovaFolhaExtraClick = {
-                            Toast.makeText(context, "Folha extra adicionada ao PDF", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Adicionar folha ao PDF ainda não está disponível.", Toast.LENGTH_SHORT).show()
                         }
                     )
                 }

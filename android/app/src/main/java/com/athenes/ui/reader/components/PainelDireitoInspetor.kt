@@ -862,7 +862,7 @@ private fun ConteudoAbaZoteroDrive(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     CampoFormulario(
-                        rotulo = "Seu Zotero User ID (ex.: 18806479)",
+                        rotulo = "Seu ID de usuário do Zotero",
                         valor = userId,
                         onValorAlterado = { userId = it }
                     )

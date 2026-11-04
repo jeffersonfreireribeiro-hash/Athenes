@@ -87,9 +87,9 @@ data class PaginaPdfInfo(
 )
 
 data class ZoteroVinculoConfig(
-    val apiKey: String = "KNEYoy8RTMlkaTuHx5WPc3bH",
-    val userId: String = "18806479",
-    val itemKey: String = "JKCLFWH6",
+    val apiKey: String = "",
+    val userId: String = "",
+    val itemKey: String = "",
     val doi: String = "10.3390/buildings10020036",
     val driveStatus: String = "Drive OK ✓",
     val driveFileName: String = "Acoustic Performance-Based Design A Brief Overview.pdf",

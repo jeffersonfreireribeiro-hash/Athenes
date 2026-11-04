@@ -1,0 +1,52 @@
+# Paridade entre web e Android
+
+Inventário de 04/11/2026. A coluna **estado** descreve o código Android atual, não uma promessa de implementação. `Parcial` significa que existe uma interface ou modelo relacionado, mas falta comportamento da web. A web é a referência funcional. Arquivos citados são relativos à raiz do repositório.
+
+| Recurso da web | Fonte na web | Estado no APK | Destino Android |
+| --- | --- | --- | --- |
+| Abas Escrita e Artigos Zotero | `src/ui/athenes_dashboard.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: biblioteca e leitor existem, sem as duas abas equivalentes | Documentos / Biblioteca |
+| Árvore de pastas, subpastas, contadores, Todos e compartilhadas | `src/ui/athenes_dashboard_pastas.js`, `src/core/athenes_arquivos.js` | Não | Documentos, painel de pastas |
+| Criar, renomear, excluir e mover pastas; vincular pasta do Drive | `src/ui/athenes_dashboard_pastas.js`, `src/core/athenes_drive_navegar.js` | Não | Documentos, painel de pastas |
+| Mover documentos entre pastas | `src/ui/athenes_dashboard_pastas.js` | Não | Documentos, menu Mover para…; arrastar no tablet |
+| Cartões com metadados, busca, ordenação e ações de documento | `src/ui/athenes_dashboard.js`, `src/ui/athenes_arquivos_ui.js`, `src/core/athenes_repositorio.js` | Parcial: cartões e ações básicas em `BibliotecaScreen.kt` | Documentos |
+| Lixeira, duplicação e compartilhamento de documentos | `src/ui/athenes_dashboard_modais.js`, `src/core/athenes_compartilhamento.js` | Parcial | Documentos, menu do cartão |
+| Sincronização de perfil, estado e Google Drive | `src/ui/athenes_dashboard_sincronia.js`, `src/core/athenes_perfil_servidor.js`, `src/core/athenes_drive_sync.js` | Não: estado local não equivale a sincronização | Documentos / Conta |
+| Login Google e perfil de colaborador | `src/ui/athenes_login_view.js`, `src/core/athenes_supabase_auth.js`, `src/core/athenes_conta.js` | Não | Conta |
+| Backup do espaço e importação de DOCX, JSON e BIB | `src/core/athenes_arquivos.js`, `src/core/athenes_docx_importador.js`, `src/core/athenes_bibliografia.js` | Não | Documentos, Importar / Exportar |
+| Formatos de papel, orientação, margens e páginas mestras | `src/ui/athenes_config_pagina_modal.js`, `src/ui/athenes_editor_mestra.js`, `src/core/athenes_mestra_canvas.js` | Não: folha básica no editor | Editor, Página |
+| Cabeçalho, rodapé, numeração, elementos recorrentes e intervalos de mestra | `src/core/athenes_mestra_render.js`, `src/core/athenes_pagina_elementos.js` | Não | Editor, Mestras |
+| Grade de 12 colunas e blocos lado a lado | `src/core/athenes_grid.js`, `src/core/athenes_bloco_layout.js`, `src/ui/athenes_editor_layout_bloco.js` | Parcial: coluna simples por bloco | Editor, Layout |
+| Títulos, parágrafos, listas, citações, tabelas, quadros e figuras | `src/ui/athenes_editor_bloco_folha.js`, `src/ui/athenes_tabela_ui.js`, `src/ui/athenes_figura_ui.js` | Parcial: tipos e edição básica em `EditorViewModel.kt` | Editor, barra de blocos |
+| Figura por código, imagem, mapa e fórmula LaTeX | `src/core/athenes_figura_codigo.js`, `src/ui/athenes_figura_codigo_ui.js`, `src/core/athenes_formula.js` | Parcial: imagem e campo de fórmula sem paridade de renderização | Editor, barra de blocos |
+| Campos, divisor, espaço, quebra, sumário, lista de ilustrações e referências | `src/core/athenes_sumario.js`, `src/core/athenes_documento.js`, `src/ui/athenes_sumario_painel.js` | Parcial: alguns tipos sem geração equivalente | Editor, barra de blocos |
+| Notas de rodapé, marcadores e referências cruzadas | `src/core/athenes_notas_rodape.js`, `src/core/athenes_marcadores.js`, `src/ui/athenes_marcadores_ui.js` | Não | Editor, Inserir |
+| Estilos editáveis, sete alinhamentos, pt, entrelinha, espaçamentos e recuos | `src/core/athenes_estilos.js`, `src/core/athenes_estilo_avancado.js`, `src/ui/athenes_editor_estilo_modal.js` | Parcial: estilos fixos e alinhamentos limitados | Editor, Estilos |
+| Fontes de catálogo/importadas/variáveis e hifenização | `src/core/athenes_fontes.js`, `src/core/athenes_fontes_catalogo.js`, `src/core/athenes_hifenizacao.js` | Não | Editor, Estilos |
+| Pacote `athenes-tema-v1`: importar, validar, aplicar, exportar e prompt de extração | `src/core/athenes_pacote_estilo.js`, `src/ui/athenes_central_estilos_modal.js` | Não | Editor, Central de Estilos |
+| Modelos ABNT, APA, Vancouver e IEEE | `src/core/athenes_templates.js`, `src/core/athenes_template_de_tema.js` | Não | Novo documento |
+| Citar Zotero e Dividir Bloco Aqui | `src/ui/athenes_editor_barra_contextual.js`, `src/ui/athenes_painel_zotero.js` | Parcial: inserção simples de citação, sem divisão | Editor, barra contextual |
+| Oito estilos bibliográficos e referências automáticas com links | `src/core/athenes_bibliografia_estilos.js`, `src/core/athenes_citacao.js`, `src/core/athenes_bibliografia.js` | Não | Editor, Citações / Referências |
+| Modos Edição, Sugestão, Comparar e Leitura | `src/ui/athenes_visoes_revisao.js` | Parcial: seletor sem fluxo completo | Editor, Revisão |
+| Comentários, sugestões e comparação de versões | `src/core/athenes_colaboracao.js`, `src/core/athenes_diff.js`, `src/ui/athenes_sugestoes_ui.js` | Não | Editor, Revisão |
+| Presença e compartilhamento com permissões | `src/core/athenes_compartilhamento.js`, `src/ui/athenes_compartilhar_modal.js` | Não | Editor, Compartilhar |
+| PDF fiel e DOCX, com opções de exportação | `src/core/athenes_export_pdf.js`, `src/core/athenes_export_docx.js`, `src/ui/athenes_painel_exportar.js` | Parcial: exportadores Android básicos | Editor, Exportar |
+| Atalhos, zoom, réguas, grade, margens e desfazer/refazer | `src/core/athenes_atalhos.js`, `src/ui/athenes_zoom_canvas.js`, `src/ui/athenes_reguas.js` | Parcial: desfazer/refazer no editor | Editor |
+| Configuração Zotero na conta e no Drive | `src/core/athenes_zotero_config.js`, `src/core/athenes_zotero_conta.js` | Parcial: formulário local sem sincronização | Conta, Zotero |
+| Biblioteca Zotero paginada, filtros, busca, período e ordenação | `src/core/athenes_zotero.js`, `src/core/athenes_biblioteca_artigos.js` | Não: artigos de demonstração locais | Biblioteca |
+| Coleções Zotero como pastas de bibliografia | `src/core/athenes_zotero_pastas.js` | Não | Biblioteca, pastas |
+| Campos Zotero por tipo e autores com função | `src/core/athenes_zotero_campos.js`, `src/ui/athenes_estudo_artigos_dados.js` | Não | Biblioteca, detalhes do item |
+| PDF real em rolagem contínua, zoom e cache | `src/ui/athenes_estudo_artigos_tela.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: `PdfContinuousCanvas.kt` usa páginas de demonstração; falta vínculo ao PDF real | Estudo |
+| Grifos, seis cores, caneta, linha, borracha, notas, citações e fichamento | `src/ui/athenes_estudo_artigos_anotacoes.js`, `src/ui/athenes_estudo_artigos_painel_direito.js` | Parcial: ferramentas e dados locais | Estudo |
+| Selecionar PDF, baixar anexo e importar notas do Zotero | `src/core/athenes_zotero_anexos_notas.js`, `src/ui/athenes_estudo_artigos_modais.js` | Não | Estudo, PDF |
+| Citação direta longa a partir de destaque | `src/core/athenes_citacao.js`, `src/ui/athenes_estudo_artigos_anotacoes.js` | Não | Estudo, Citar |
+| Grafo de obras, autores, temas e anos | `src/core/athenes_conexoes.js`, `src/ui/athenes_painel_conexoes.js` | Não | Biblioteca, Conexões |
+
+## Sequência de implementação
+
+1. Navegação adaptativa, conta e pastas; preservar o estado na rotação.
+2. Persistência e sincronização reais para documentos e Zotero, com fila offline.
+3. PDF real, sem páginas simuladas quando não houver arquivo, e ferramentas de anotação.
+4. Motor de documento compatível com blocos, estilos, mestras, citações e exportação da web.
+5. Revisão, colaboração, acessibilidade e medição de desempenho em aparelhos reais.
+
+Nenhuma linha marcada `Não` ou `Parcial` deve ser tratada como paridade concluída. A implementação completa requer contratos de dados compatíveis com a web e testes de integração para importação, sincronização, renderização e exportação.

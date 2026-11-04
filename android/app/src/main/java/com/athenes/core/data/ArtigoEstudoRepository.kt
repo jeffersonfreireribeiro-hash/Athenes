@@ -158,7 +158,7 @@ class ArtigoEstudoRepository {
                 titulo = "Acoustic Performance-Based Design: A Brief Overview of the Opportunities and Limits in Current Practice",
                 autores = "RADINO",
                 ano = 2020,
-                chaveZotero = "JKCLFWH6",
+                chaveZotero = "",
                 totalPaginas = 33,
                 resumoOficial = "Architecture, PBD benefits both design workflow and outcome, allowing one to control the performance of the design proposal since early design phases. The paper aims to explore its current application in the acoustic field, where its potential is still little exploited in architectural practice.",
                 meuResumo = "Síntese dos principais achados sobre o uso de simulação acústica paramétrica integrada ao Grasshopper e solver evolutivo (Galapagos). Aponta os limites de tempo de processamento e a necessidade de interoperabilidade entre modelos geométricos e ferramentas de análise.",
@@ -189,9 +189,9 @@ class ArtigoEstudoRepository {
                     )
                 ),
                 zoteroConfig = ZoteroVinculoConfig(
-                    apiKey = "KNEYoy8RTMlkaTuHx5WPc3bH",
-                    userId = "18806479",
-                    itemKey = "JKCLFWH6",
+                    apiKey = "",
+                    userId = "",
+                    itemKey = "",
                     doi = "10.3390/buildings10020036",
                     driveStatus = "Drive OK ✓",
                     driveFileName = "Acoustic Performance-Based Design A Brief Overview.pdf",
