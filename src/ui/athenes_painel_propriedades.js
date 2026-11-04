@@ -103,8 +103,30 @@ export class PainelPropriedades {
     this.renderizar();
   }
 
+  /**
+   * Monta o painel. Se algo no bloco selecionado fizer a montagem falhar, o painel mostra o aviso (e o erro vai ao console)
+   * em vez de ficar em branco, e a pessoa pode tirar a seleção e seguir editando.
+   */
   renderizar() {
     if (!this.container) return;
+    try {
+      this.montarConteudo();
+    } catch (erro) {
+      console.error('[Athenes] Painel de propriedades:', erro);
+      this.container.innerHTML = '';
+      const aviso = document.createElement('div');
+      aviso.className = 'rm-props';
+      aviso.innerHTML = `<div class="rm-vazio-cartao" style="padding:20px 16px;">
+        <h3 style="margin:0 0 6px 0; font:800 14px var(--glx-font);">Não foi possível montar as propriedades</h3>
+        <p style="margin:0 0 10px 0; font-size:12px; color:var(--glx-muted);">${escapeHtml(erro?.message || 'Erro desconhecido')}. O texto do bloco não foi alterado.</p>
+        <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" data-acao="limpar-selecao">Limpar seleção</button>
+      </div>`;
+      aviso.querySelector('[data-acao="limpar-selecao"]').addEventListener('click', () => this.setSelecao(null, null));
+      this.container.appendChild(aviso);
+    }
+  }
+
+  montarConteudo() {
     this.container.innerHTML = '';
 
     const wrapper = document.createElement('div');
