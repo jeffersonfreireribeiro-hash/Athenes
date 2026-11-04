@@ -126,6 +126,7 @@ class EditorViewModel : ViewModel() {
     // Bloco Selecionado Atualmente no Palco
     private val _blocoSelecionadoId = MutableStateFlow<String?>(null)
     val blocoSelecionadoId: StateFlow<String?> = _blocoSelecionadoId.asStateFlow()
+    private var cursorTexto: Pair<String, Int>? = null
 
     // Lista de Blocos na Folha
     private val _blocos = MutableStateFlow<List<BlocoEditor>>(listOf(blocoParagrafoVazio()))
@@ -176,6 +177,7 @@ class EditorViewModel : ViewModel() {
             if (doc.id == ID_DOCUMENTO_EXEMPLO && _resumo.value.isBlank()) _resumo.value = RESUMO_EXEMPLO
         }
         _blocoSelecionadoId.value = null
+        cursorTexto = null
         historico.clear()
         indiceHistorico = -1
         salvarNoHistorico()
@@ -210,7 +212,14 @@ class EditorViewModel : ViewModel() {
     fun abrirPainelCitacao() { _painelCitacaoAberto.value = true }
     fun fecharPainelCitacao() { _painelCitacaoAberto.value = false }
 
-    fun selecionarBloco(id: String) { _blocoSelecionadoId.value = id }
+    fun selecionarBloco(id: String) {
+        if (_blocoSelecionadoId.value != id) cursorTexto = null
+        _blocoSelecionadoId.value = id
+    }
+
+    fun posicionarCursorTexto(id: String, posicao: Int) {
+        if (_blocoSelecionadoId.value == id) cursorTexto = id to posicao
+    }
 
     /** Seções numeradas derivadas dos blocos de título (fonte única: o próprio documento). */
     fun montarEstrutura(blocos: List<BlocoEditor>): List<SecaoEstrutura> {
@@ -307,11 +316,17 @@ class EditorViewModel : ViewModel() {
         val alvo = _blocos.value.find { it.id == _blocoSelecionadoId.value }
         salvarNoHistorico()
         if (alvo != null && (alvo.tipo == TipoBlocoEditor.PARAGRAFO || alvo.tipo == TipoBlocoEditor.CITACAO)) {
-            val sep = if (alvo.texto.isBlank() || alvo.texto.endsWith(" ")) "" else " "
-            atualizarBloco(alvo.id) { it.copy(texto = it.texto + sep + marca) }
+            val posicao = cursorTexto?.takeIf { it.first == alvo.id }?.second?.coerceIn(0, alvo.texto.length) ?: alvo.texto.length
+            val antes = alvo.texto.substring(0, posicao)
+            val depois = alvo.texto.substring(posicao)
+            val prefixo = if (antes.isNotEmpty() && !antes.last().isWhitespace()) " " else ""
+            val sufixo = if (depois.isNotEmpty() && !depois.first().isWhitespace()) " " else ""
+            atualizarBloco(alvo.id) { it.copy(texto = antes + prefixo + marca + sufixo + depois) }
+            cursorTexto = alvo.id to (posicao + prefixo.length + marca.length + sufixo.length)
         } else {
             inserirAposSelecionado(BlocoEditor(tipo = TipoBlocoEditor.PARAGRAFO, texto = marca))
         }
+        salvarNoHistorico()
         _painelCitacaoAberto.value = false
     }
 
@@ -357,6 +372,7 @@ class EditorViewModel : ViewModel() {
         lista.add(indice + 1, novo)
         _blocos.value = lista
         _blocoSelecionadoId.value = novo.id
+        cursorTexto = null
         salvarNoHistorico()
         marcarAlterado()
         return true

@@ -535,7 +535,7 @@ private fun ItemBlocoFolha(
                 CampoFolha(
                     value = bloco.texto, onValueChange = { vm.atualizarTextoBloco(bloco.id, it) },
                     editavel = editavel, placeholder = "Escreva aqui…", onFocused = selecionar,
-                    onCursorChange = { posicaoCursor = it },
+                    onCursorChange = { posicaoCursor = it; vm.posicionarCursorTexto(bloco.id, it) },
                     modifier = Modifier.padding(start = if (compacto) 14.dp else 24.dp),
                     style = TextStyle(fontSize = if (compacto) 14.sp else 12.5.sp, lineHeight = if (compacto) 22.sp else 19.sp, color = TextoCor, textAlign = alinhamento)
                 )
@@ -593,7 +593,7 @@ private fun ItemBlocoFolha(
                     CampoFolha(
                         value = bloco.texto, onValueChange = { vm.atualizarTextoBloco(bloco.id, it) },
                         editavel = editavel, placeholder = "Citação direta longa (mais de 3 linhas)…", onFocused = selecionar,
-                        onCursorChange = { posicaoCursor = it },
+                        onCursorChange = { posicaoCursor = it; vm.posicionarCursorTexto(bloco.id, it) },
                         style = TextStyle(fontSize = if (compacto) 12.5.sp else 11.sp, lineHeight = if (compacto) 18.sp else 15.sp, color = Color(0xFF334155), textAlign = TextAlign.Justify)
                     )
                 }
