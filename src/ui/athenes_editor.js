@@ -619,6 +619,7 @@ export class EditorView {
             <button type="button" class="rm-ic-bt" id="rmAddDivisor" data-tip="Divisor" title="Inserir Divisor">${svgIcone('divisor', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddEspaco" data-tip="Espaço" title="Inserir Espaçamento">${svgIcone('espacamento', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddSumario" data-tip="Sumário" title="Inserir Sumário automático (títulos em todos os níveis)">${svgIcone('sumario', 16)}</button>
+            <button type="button" class="rm-ic-bt" id="rmAddReferencias" data-tip="Bibliografia" title="Inserir a lista de referências (gerada sozinha com as obras citadas pelo Zotero)">${svgIcone('referencias', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddQuebra" data-tip="Quebra" title="Inserir Quebra de Página">${svgIcone('quebra_pagina', 16)}</button>
 
             <!-- Modo de trabalho (como no Docs): Edição / Sugestão / Comparar / Leitura -->
@@ -860,6 +861,11 @@ export class EditorView {
     root.querySelector('#rmAddDivisor').addEventListener('click', () => adicionar('divisor', {}));
     root.querySelector('#rmAddEspaco').addEventListener('click', () => adicionar('espaco', { altura_pt: 24 }));
     root.querySelector('#rmAddSumario').addEventListener('click', () => adicionar('sumario', {}));
+    root.querySelector('#rmAddReferencias').addEventListener('click', () => {
+      const ja = (this.doc.secoes || []).flatMap(sec => sec.blocos || []).find(x => x.tipo === 'referencias');
+      if (ja) { document.querySelector(`.ath-bloco-folha[data-bloco-id="${ja.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; } // a lista é uma só: leva até ela
+      adicionar('referencias', { titulo: 'Referências' });
+    });
     root.querySelector('#rmAddQuebra').addEventListener('click', () => adicionar('quebra_pagina', {}));
 
     // Alternar Guia Grade
