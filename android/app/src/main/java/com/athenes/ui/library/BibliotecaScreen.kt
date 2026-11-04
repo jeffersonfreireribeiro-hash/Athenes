@@ -50,6 +50,9 @@ fun BibliotecaScreen(
     var pastaAtivaId by rememberSaveable { mutableStateOf<String?>(null) }
     var criarPastaAberto by remember { mutableStateOf(false) }
     var nomeNovaPasta by remember { mutableStateOf("") }
+    var renomearPastaAberto by remember { mutableStateOf(false) }
+    var excluirPastaAberto by remember { mutableStateOf(false) }
+    var nomePastaEditada by remember { mutableStateOf("") }
     var documentoParaMover by remember { mutableStateOf<Documento?>(null) }
 
     // Estados da Aba 2 (Artigos / Zotero)
@@ -170,16 +173,26 @@ fun BibliotecaScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    FilterChip(selected = pastaAtivaId == null, onClick = { pastaAtivaId = null }, label = { Text("Todos") })
+                    FilterChip(selected = pastaAtivaId == null, onClick = { pastaAtivaId = null }, label = { Text("Todos (${documentos.size})") })
                     pastas.forEach { pasta ->
                         val pai = pastas.find { it.id == pasta.pastaPaiId }
                         FilterChip(
                             selected = pastaAtivaId == pasta.id,
                             onClick = { pastaAtivaId = pasta.id },
-                            label = { Text(if (pai == null) pasta.nome else "${pai.nome} / ${pasta.nome}") }
+                            label = {
+                                val nome = if (pai == null) pasta.nome else "${pai.nome} / ${pasta.nome}"
+                                Text("$nome (${documentos.count { it.pastaId == pasta.id }})")
+                            }
                         )
                     }
                     OutlinedButton(onClick = { nomeNovaPasta = ""; criarPastaAberto = true }) { Text("Nova pasta") }
+                    if (pastaAtivaId != null) {
+                        TextButton(onClick = {
+                            nomePastaEditada = pastas.find { it.id == pastaAtivaId }?.nome.orEmpty()
+                            renomearPastaAberto = true
+                        }) { Text("Renomear") }
+                        TextButton(onClick = { excluirPastaAberto = true }) { Text("Excluir pasta") }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -365,6 +378,35 @@ fun BibliotecaScreen(
                 }, enabled = nomeNovaPasta.isNotBlank()) { Text("Criar") }
             },
             dismissButton = { TextButton(onClick = { criarPastaAberto = false }) { Text("Cancelar") } }
+        )
+    }
+    if (renomearPastaAberto) {
+        AlertDialog(
+            onDismissRequest = { renomearPastaAberto = false },
+            title = { Text("Renomear pasta") },
+            text = { OutlinedTextField(value = nomePastaEditada, onValueChange = { nomePastaEditada = it }, label = { Text("Nome") }) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pastaAtivaId?.let { viewModel.renomearPasta(it, nomePastaEditada) }
+                    renomearPastaAberto = false
+                }, enabled = nomePastaEditada.isNotBlank()) { Text("Salvar") }
+            },
+            dismissButton = { TextButton(onClick = { renomearPastaAberto = false }) { Text("Cancelar") } }
+        )
+    }
+    if (excluirPastaAberto) {
+        AlertDialog(
+            onDismissRequest = { excluirPastaAberto = false },
+            title = { Text("Excluir pasta?") },
+            text = { Text("Os documentos voltarão para Meus documentos. As subpastas também serão excluídas.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pastaAtivaId?.let { viewModel.excluirPasta(it) }
+                    pastaAtivaId = null
+                    excluirPastaAberto = false
+                }) { Text("Excluir") }
+            },
+            dismissButton = { TextButton(onClick = { excluirPastaAberto = false }) { Text("Cancelar") } }
         )
     }
     documentoParaMover?.let { doc ->
