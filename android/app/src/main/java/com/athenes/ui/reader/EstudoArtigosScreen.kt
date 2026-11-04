@@ -128,6 +128,13 @@ fun EstudoArtigosScreen(
                     uri = Uri.parse(pdfUriTexto!!),
                     paginaAtual = paginaAtiva,
                     onTotalPaginas = { totalPdf = it; viewModel.definirTotalPaginasPdf(it) },
+                    ferramenta = ferramentaAtiva,
+                    cor = corAtiva,
+                    modoSomenteStylus = modoSomenteStylus,
+                    tracos = artigoAtivo.tracos,
+                    onAdicionarTraco = { pagina, pontos -> viewModel.adicionarTracoLivre(pagina, pontos) },
+                    onApagarTraco = { pagina, x, y -> viewModel.apagarTracosProximos(pagina, x, y, 0.03f) },
+                    onStylusDetectada = { viewModel.registrarStylusDetectada() },
                     modifier = Modifier.fillMaxSize()
                 )
             } else {

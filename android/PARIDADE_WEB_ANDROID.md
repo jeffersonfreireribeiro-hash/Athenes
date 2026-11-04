@@ -36,7 +36,7 @@ Inventário de 04/11/2026. A coluna **estado** descreve o código Android atual,
 | Coleções Zotero como pastas de bibliografia | `src/core/athenes_zotero_pastas.js` | Não | Biblioteca, pastas |
 | Campos Zotero por tipo e autores com função | `src/core/athenes_zotero_campos.js`, `src/ui/athenes_estudo_artigos_dados.js` | Não | Biblioteca, detalhes do item |
 | PDF real em rolagem contínua, zoom e cache | `src/ui/athenes_estudo_artigos_tela.js`, `src/ui/athenes_estudo_artigos.js` | Parcial: seleção local, renderização sob demanda, zoom de 75% a 200% e cache em `PdfRealViewer.kt`; falta vínculo ao Drive | Estudo |
-| Grifos, seis cores, caneta, linha, borracha, notas, citações e fichamento | `src/ui/athenes_estudo_artigos_anotacoes.js`, `src/ui/athenes_estudo_artigos_painel_direito.js` | Parcial: ferramentas e dados locais | Estudo |
+| Grifos, seis cores, caneta, linha, borracha, notas, citações e fichamento | `src/ui/athenes_estudo_artigos_anotacoes.js`, `src/ui/athenes_estudo_artigos_painel_direito.js` | Parcial: caneta, marca-texto, linha e borracha sobre o PDF real; notas, citações e fichamento ainda sem vínculo visual ou persistência completa | Estudo |
 | Selecionar PDF, baixar anexo e importar notas do Zotero | `src/core/athenes_zotero_anexos_notas.js`, `src/ui/athenes_estudo_artigos_modais.js` | Parcial: seleção local; anexos e notas Zotero ausentes | Estudo, PDF |
 | Citação direta longa a partir de destaque | `src/core/athenes_citacao.js`, `src/ui/athenes_estudo_artigos_anotacoes.js` | Não | Estudo, Citar |
 | Grafo de obras, autores, temas e anos | `src/core/athenes_conexoes.js`, `src/ui/athenes_painel_conexoes.js` | Não | Biblioteca, Conexões |
@@ -57,6 +57,6 @@ A navegação principal agora oferece Documentos, Biblioteca, Estudo e Conta. Em
 
 ## Leitor de PDF
 
-Sem arquivo vinculado, o leitor mostra o estado vazio e a ação **Selecionar PDF**. A escolha usa o seletor de documentos do Android e guarda a URI por artigo. `PdfRenderer` abre o arquivo fora da thread principal; `LazyColumn` compõe as páginas visíveis e um cache LRU limita os bitmaps a aproximadamente 24 MiB. A contagem de páginas vem do PDF. As ferramentas de anotação e citação existentes ainda não desenham sobre a página real; esta parte permanece pendente.
+Sem arquivo vinculado, o leitor mostra o estado vazio e a ação **Selecionar PDF**. A escolha usa o seletor de documentos do Android e guarda a URI por artigo. `PdfRenderer` abre o arquivo fora da thread principal; `LazyColumn` compõe as páginas visíveis e um cache LRU limita os bitmaps a aproximadamente 24 MiB. A contagem de páginas vem do PDF. Caneta, marca-texto, linha e borracha desenham sobre a página real em coordenadas proporcionais; persistir essas anotações após fechar o app e vincular notas/citações ao PDF ainda são pendências.
 
 Os indicadores antigos de conexão com Drive e a mensagem de sincronização concluída foram retirados dos dados de exemplo e do formulário. O formulário ainda mantém os dados apenas na sessão atual.
