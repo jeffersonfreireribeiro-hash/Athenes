@@ -27,10 +27,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.athenes.core.data.ZoteroAnexosClient
+import com.athenes.core.data.ZoteroApiClient
+import com.athenes.core.data.ZoteroCredentialsStore
 import com.athenes.core.model.AbaInspetorDireito
 import com.athenes.core.model.PaginaPdfInfo
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.reader.components.*
+import java.io.File
+import java.util.UUID
 
 @Composable
 fun EstudoArtigosScreen(
@@ -43,6 +51,10 @@ fun EstudoArtigosScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val escopo = rememberCoroutineScope()
+    val anexosClient = remember { ZoteroAnexosClient() }
+    val zoteroClient = remember { ZoteroApiClient() }
+    var baixandoZotero by remember { mutableStateOf(false) }
 
     LaunchedEffect(artigoIdInicial) {
         if (!artigoIdInicial.isNullOrBlank()) {
@@ -74,6 +86,43 @@ fun EstudoArtigosScreen(
             pdfUriTexto = uri.toString()
             totalPdf = 0
             viewModel.definirTotalPaginasPdf(0)
+        }
+    }
+    val baixarPdfZotero: () -> Unit = {
+        if (!baixandoZotero) {
+            val artigoId = artigoAtivo.id
+            val itemKey = artigoAtivo.chaveZotero
+            val credenciais = runCatching { ZoteroCredentialsStore(context).carregar() }.getOrNull()
+            when {
+                credenciais == null -> Toast.makeText(context, "Conecte sua conta Zotero na Biblioteca.", Toast.LENGTH_LONG).show()
+                itemKey.isBlank() -> Toast.makeText(context, "Este artigo não tem chave do Zotero.", Toast.LENGTH_LONG).show()
+                else -> escopo.launch {
+                    baixandoZotero = true
+                    val resultado = runCatching {
+                        val (chave, usuarioSalvo) = credenciais
+                        val usuario = if (usuarioSalvo.isBlank()) zoteroClient.descobrirUsuario(chave) else usuarioSalvo
+                        val anexos = anexosClient.listarPdf(usuario, chave, itemKey)
+                        val anexo = anexos.firstOrNull { it.baixavel }
+                            ?: error(if (anexos.isEmpty()) "Nenhum PDF encontrado neste item do Zotero." else "O PDF está vinculado apenas ao computador.")
+                        val bytes = anexosClient.baixarPdf(usuario, chave, anexo)
+                        val uriLocal = withContext(Dispatchers.IO) {
+                            val pasta = File(context.filesDir, "pdfs").apply { mkdirs() }
+                            val nome = UUID.nameUUIDFromBytes(artigoId.toByteArray(Charsets.UTF_8)).toString()
+                            val arquivo = File(pasta, "zotero_$nome.pdf")
+                            arquivo.writeBytes(bytes)
+                            Uri.fromFile(arquivo)
+                        }
+                        context.getSharedPreferences("pdf_artigos", 0).edit().putString(artigoId, uriLocal.toString()).apply()
+                        if (artigoAtivo.id == artigoId) {
+                            pdfUriTexto = uriLocal.toString()
+                            totalPdf = 0
+                            viewModel.definirTotalPaginasPdf(0)
+                        }
+                    }
+                    baixandoZotero = false
+                    Toast.makeText(context, resultado.fold({ "PDF baixado do Zotero." }, { it.message ?: "Não foi possível baixar o PDF." }), Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
     val paginaAtiva by viewModel.paginaAtiva.collectAsState()
@@ -150,6 +199,10 @@ fun EstudoArtigosScreen(
                     Text("Selecione o arquivo deste artigo para ler as páginas reais.")
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = { seletorPdf.launch(arrayOf("application/pdf")) }) { Text("Selecionar PDF") }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = baixarPdfZotero, enabled = !baixandoZotero) {
+                        Text(if (baixandoZotero) "Baixando PDF…" else "Baixar do Zotero")
+                    }
                 }
             }
             // BARRA DE PÍLULA FLUTUANTE (.rm-barra-blocos)
