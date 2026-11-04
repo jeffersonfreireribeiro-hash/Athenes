@@ -10,6 +10,7 @@
  */
 import { obterConfigSupabase } from './athenes_colaboracao.js';
 import { cabecalhosSupabase, lerSessaoSupabase } from './athenes_supabase_auth.js';
+import { obterContaAtiva } from './athenes_conta.js';
 
 export const PAPEIS = Object.freeze({
   leitura: { rotulo: 'Leitura', descricao: 'Só abre e lê' },
@@ -24,10 +25,22 @@ export const papelValido = (p) => Object.prototype.hasOwnProperty.call(PAPEIS, p
 const url = (cfg, consulta) => `${cfg.url}/rest/v1/${cfg.tabela}?${consulta}`;
 const aspasPg = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
+/**
+ * O documento é DA MINHA CONTA? Vale o mesmo usuário do banco OU a mesma conta gravada no documento (`proprietario.conta`): o mesmo
+ * e-mail Google entrando em outro computador pode chegar com outro identificador de usuário, e o documento próprio não pode virar
+ * "compartilhado comigo". `contaDoDoc` vem do documento (ou da coluna `conta` da listagem).
+ */
+export function documentoEDaMinhaConta({ userIdDoDoc = '', contaDoDoc = '' } = {}, { userId = lerSessaoSupabase()?.user_id, email = lerSessaoSupabase()?.email, conta = obterContaAtiva() } = {}) {
+  if (userId && userIdDoDoc && userIdDoDoc === userId) return true;
+  const dona = normalizarEmail(contaDoDoc);
+  return Boolean(dona) && (dona === normalizarEmail(conta) || dona === normalizarEmail(email));
+}
+
 /** Papel de quem está logado numa linha do banco: 'dono' | 'leitura' | 'comentario' | 'edicao' | '' (sem acesso). */
 export function papelNaLinha(linha, { userId = lerSessaoSupabase()?.user_id, email = lerSessaoSupabase()?.email } = {}) {
   if (!linha) return '';
   if (userId && linha.user_id === userId) return 'dono';
+  if (documentoEDaMinhaConta({ contaDoDoc: linha.conta ?? linha.conteudo_json?.proprietario?.conta }, { userId, email, conta: obterContaAtiva() })) return 'dono'; // mesma conta, outro computador
   const meu = normalizarEmail(email);
   const papel = linha.permissoes?.[meu];
   if (papelValido(papel)) return papel;
@@ -73,11 +86,11 @@ export async function listarCompartilhadosComigo(fetchImpl = globalThis.fetch) {
   const email = normalizarEmail(sessao?.email);
   if (!email) return [];
   const cfg = obterConfigSupabase();
-  const consulta = `compartilhado_com=cs.{${encodeURIComponent(aspasPg(email))}}&select=id,titulo,norma,atualizado_em,atualizado_por,permissoes,user_id,dono:conteudo_json->proprietario->>nome&order=atualizado_em.desc&limit=100`;
+  const consulta = `compartilhado_com=cs.{${encodeURIComponent(aspasPg(email))}}&select=id,titulo,norma,atualizado_em,atualizado_por,permissoes,user_id,dono:conteudo_json->proprietario->>nome,conta:conteudo_json->proprietario->>conta&order=atualizado_em.desc&limit=100`;
   const resp = await fetchImpl(url(cfg, consulta), { headers: await cabecalhosSupabase(cfg, { fetchImpl }) });
   if (!resp.ok) throw new Error(`Não foi possível listar os compartilhados comigo (${resp.status}).`);
   return ((await resp.json()) || [])
-    .filter(l => l.user_id !== sessao.user_id)
+    .filter(l => l.user_id !== sessao.user_id && !documentoEDaMinhaConta({ contaDoDoc: l.conta }, { userId: sessao.user_id, email })) // o que é meu não é "compartilhado comigo"
     .map(l => ({ ...l, papel: papelNaLinha(l, { userId: sessao.user_id, email }) || 'leitura' }));
 }
 
