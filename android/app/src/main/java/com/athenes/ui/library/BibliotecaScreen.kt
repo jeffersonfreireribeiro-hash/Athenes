@@ -24,6 +24,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.core.model.Documento
+import com.athenes.core.data.ZoteroCredentialsStore
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.components.*
 import com.athenes.ui.theme.*
@@ -41,6 +42,7 @@ fun BibliotecaScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val credenciaisZotero = remember(context) { ZoteroCredentialsStore(context) }
     var updateBannerDismissed by remember { mutableStateOf(false) }
 
     // Estados da Aba 1 (Escrita)
@@ -120,7 +122,13 @@ fun BibliotecaScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         OutlinedButton(
-                            onClick = { mostrarConexaoZotero = true },
+                            onClick = {
+                                credenciaisZotero.carregar()?.let { (chave, usuario) ->
+                                    chaveZotero = chave
+                                    usuarioZotero = usuario
+                                }
+                                mostrarConexaoZotero = true
+                            },
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                             modifier = Modifier.height(44.dp),
@@ -480,7 +488,7 @@ fun BibliotecaScreen(
             title = { Text("Conectar Zotero") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Informe sua chave do Zotero. O ID é opcional; o aplicativo pode descobri-lo pela chave.")
+                    Text("Informe sua chave do Zotero. O ID é opcional; o aplicativo pode descobri-lo pela chave. A chave fica protegida neste aparelho.")
                     OutlinedTextField(
                         value = chaveZotero,
                         onValueChange = { chaveZotero = it },
@@ -498,9 +506,15 @@ fun BibliotecaScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.sincronizarZotero(chaveZotero, usuarioZotero)
-                    chaveZotero = ""
-                    mostrarConexaoZotero = false
+                    runCatching { credenciaisZotero.salvar(chaveZotero, usuarioZotero) }
+                        .onSuccess {
+                            viewModel.sincronizarZotero(chaveZotero, usuarioZotero)
+                            chaveZotero = ""
+                            mostrarConexaoZotero = false
+                        }
+                        .onFailure {
+                            Toast.makeText(context, "Não foi possível proteger a chave neste aparelho.", Toast.LENGTH_SHORT).show()
+                        }
                 }, enabled = chaveZotero.isNotBlank()) { Text("Sincronizar") }
             },
             dismissButton = { TextButton(onClick = { mostrarConexaoZotero = false }) { Text("Cancelar") } }

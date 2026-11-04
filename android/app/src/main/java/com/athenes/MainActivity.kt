@@ -19,10 +19,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.athenes.core.data.DocumentoRepository
 import com.athenes.core.data.ArtigoEstudoRepository
+import com.athenes.core.data.ZoteroCredentialsStore
 import com.athenes.core.model.Documento
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.core.updater.AppUpdater
@@ -214,11 +216,24 @@ private fun iconeDestino(destino: DestinoPrincipal): ImageVector = when (destino
 
 @Composable
 private fun ContaScreen(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val credenciais = remember(context) { ZoteroCredentialsStore(context) }
+    var chaveGuardada by remember { mutableStateOf(credenciais.carregar() != null) }
     Column(modifier = modifier.fillMaxSize().padding(24.dp)) {
         Text("Conta", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
         Spacer(Modifier.height(16.dp))
-        Text("Perfil e sincronização", style = MaterialTheme.typography.titleMedium)
+        Text("Zotero", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
-        Text("Nenhuma conta conectada. A conexão com Google Drive e Zotero ainda não está disponível neste aplicativo.")
+        Text(if (chaveGuardada) "Chave protegida neste aparelho." else "Nenhuma chave do Zotero guardada.")
+        Spacer(Modifier.height(8.dp))
+        Text("Abra Biblioteca → Sincronizar Zotero para configurar ou atualizar a chave.")
+        if (chaveGuardada) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = { credenciais.remover(); chaveGuardada = false }) { Text("Remover chave deste aparelho") }
+        }
+        Spacer(Modifier.height(24.dp))
+        Text("Google Drive e perfil", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        Text("A conexão com a conta e o Drive ainda não está disponível no APK.")
     }
 }
