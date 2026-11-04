@@ -35,6 +35,25 @@ import org.junit.runner.RunWith
 class NavegacaoAcessibilidadeTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun referenciaCruzadaEntraNoCursorEPodeSerDesfeita() {
+        val vm = EditorViewModel()
+        compose.runOnIdle {
+            val paragrafo = vm.blocos.value.first()
+            vm.atualizarTextoBloco(paragrafo.id, "Veja aqui.")
+            vm.selecionarBloco(paragrafo.id)
+            vm.posicionarCursorTexto(paragrafo.id, 5)
+            vm.adicionarBloco(TipoBlocoEditor.FIGURA)
+            vm.selecionarBloco(paragrafo.id)
+            vm.posicionarCursorTexto(paragrafo.id, 5)
+            val figura = vm.blocos.value.last()
+            vm.inserirReferenciaCruzada(figura.id)
+            assertTrue(vm.blocos.value.first().texto.contains("[ref:figura:${figura.id}]"))
+            assertEquals(paragrafo.id, vm.paraExportacao().blocos.first().id)
+            vm.desfazer()
+            assertEquals("Veja aqui.", vm.blocos.value.first().texto)
+        }
+    }
+
     @Test fun buscaEAcaoPrincipalFuncionamEmTelaCompacta() {
         var busca by mutableStateOf("")
         var novoDocumento = false
