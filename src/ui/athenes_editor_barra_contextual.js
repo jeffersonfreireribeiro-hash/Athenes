@@ -23,8 +23,8 @@ export const metodosBarraContextual = {
     barra.style.borderRadius = '999px';
     barra.style.boxShadow = '0 6px 22px rgba(49, 79, 121, 0.22)';
     barra.style.border = '1px solid var(--ath-primary-line, #C8D7E6)';
-    barra.style.padding = '5px 10px';
-    barra.style.gap = '4px';
+    barra.style.padding = '3px 6px'; // mesma medida da pílula do cursor
+    barra.style.gap = '3px';
     barra.style.alignItems = 'center';
     barra.style.transform = 'translate(-50%, -100%)';
     barra.style.marginTop = '-8px';
@@ -33,7 +33,7 @@ export const metodosBarraContextual = {
     barra.innerHTML = `
       <!-- Dropdown de Estilo de Texto na Barra Flutuante -->
       <div class="ath-ctx-dropdown-wrap" id="athWrapCtxEstilo">
-        <button type="button" class="ath-ctx-dropdown-btn" id="athBtnContextEstiloMenu" title="Aplicar Estilo de Texto ao Bloco" style="height:28px; padding:0 10px; font-weight:700;">
+        <button type="button" class="ath-ctx-dropdown-btn" id="athBtnContextEstiloMenu" title="Aplicar Estilo de Texto ao Bloco" style="height:26px; padding:0 10px; font-weight:700;">
           <span id="athRotuloCtxEstilo" style="font-size:11px; font-weight:700; max-width:115px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Estilo</span>
           <span style="font-size:10px; opacity:0.8;">▾</span>
         </button>
@@ -44,10 +44,10 @@ export const metodosBarraContextual = {
           <div id="athListaItensCtxEstilos" class="ath-rolagem-interna" style="display:flex; flex-direction:column; gap:2px; max-height:236px; overflow-y:auto; padding-right:4px;"></div>
         </div>
       </div>
-      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 2px;"></span>
-      <span style="width:1px; height:16px; background:var(--ath-primary-line, #C8D7E6); margin:0 2px;"></span>
-      <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" id="athBtnContextDividir" title="Dividir este bloco de texto em dois no cursor" style="height:28px; display:inline-flex; align-items:center; gap:4px; border-radius:999px;">${svgIcone('divisor', 13)} Dividir</button>
-      <button type="button" class="glx-btn glx-btn-xs glx-btn-primary" id="athBtnContextCitar" title="Inserir citação Zotero" style="height:28px; display:inline-flex; align-items:center; border-radius:999px;">Citar Zotero</button>
+      <span class="ath-pill-sep"></span>
+      <button type="button" class="ath-pill-bt" id="athBtnContextDividir" title="Dividir este bloco de texto em dois no cursor">${svgIcone('divisor', 13)} <span>Dividir Bloco Aqui</span></button>
+      <span class="ath-pill-sep"></span>
+      <button type="button" class="ath-pill-bt ath-pill-bt-zotero" id="athBtnContextCitar" title="Inserir citação bibliográfica do Zotero">${svgIcone('zotero', 14)} <span>Citar Zotero</span></button>
     `;
 
     // Pill flutuante para quando o cursor está posicionado no texto (sem seleção prévia)
