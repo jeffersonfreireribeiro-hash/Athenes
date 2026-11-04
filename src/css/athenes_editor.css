@@ -2707,3 +2707,14 @@ a.ath-citacao-link { color: inherit; text-decoration: none; cursor: pointer; }
 @media (max-width: 1180px) { .rm-editor .rm-ed-grade.ath-redim { grid-template-columns: 1fr !important; } .ath-redim-alca { display: none; } }
 .rm-editor.ath-modo-revisao .rm-ed-grade.ath-redim { grid-template-columns: minmax(0, 1fr) !important; }
 .rm-editor.ath-modo-revisao .ath-redim-alca { display: none; }
+
+/* Réguas do documento (athenes_reguas_documento.js) */
+.ath-palco-reguas { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.ath-palco-reguas > .rm-prev-palco { flex: 1 1 0; min-height: 0; margin: 20px 0 0 20px; }
+.ath-regua-h { position: absolute; top: 0; left: 20px; height: 20px; z-index: 4; }
+.ath-regua-v { position: absolute; top: 20px; left: 0; width: 20px; z-index: 4; }
+.ath-regua-canto { position: absolute; top: 0; left: 0; width: 20px; height: 20px; background: #fff; border-right: 1px solid #C8D7E6; border-bottom: 1px solid #C8D7E6; z-index: 4; }
+.ath-palco-reguas.sem-reguas > canvas, .ath-palco-reguas.sem-reguas > .ath-regua-canto { display: none; }
+.ath-palco-reguas.sem-reguas > .rm-prev-palco { margin: 0; }
+.rm-editor.ath-modo-revisao .ath-regua-h, .rm-editor.ath-modo-revisao .ath-regua-v, .rm-editor.ath-modo-revisao .ath-regua-canto { display: none; }
+.rm-editor.ath-modo-revisao .ath-palco-reguas > .rm-prev-palco { margin: 0; }

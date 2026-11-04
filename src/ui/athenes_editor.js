@@ -65,6 +65,10 @@ import { ModalEditorMestra } from './athenes_editor_mestra.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 import { abrirPopoverEstiloTabela } from './athenes_tabela_ui.js';
 import { instalarZoomCanvas } from './athenes_zoom_canvas.js';
+import { ligarReguasDoDocumento } from './athenes_reguas_documento.js';
+
+/** As réguas começam visíveis; a escolha da pessoa fica lembrada. */
+function reguasVisiveis() { try { return localStorage.getItem('athenes_reguas_visiveis') !== '0'; } catch (_) { return true; } }
 import { montarLeituraFiel, montarComparacao } from './athenes_visoes_revisao.js';
 import { instalarSugestaoInline, abrirCardSugestao, fecharCardSugestao, SEL_MARCA } from './athenes_sugestoes_ui.js';
 import { geometriaCorpoMm, resolverAreasPagina } from '../core/athenes_paginacao.js';
@@ -630,6 +634,10 @@ export class EditorView {
               </div>
             </div>
 
+            <button type="button" class="rm-ic-bt ${reguasVisiveis() ? 'on' : ''}" id="rmRegua" aria-pressed="${reguasVisiveis()}" title="Mostrar ou ocultar as réguas (milímetros, com as margens da página)">
+              ${svgIcone('reguas', 18)}
+            </button>
+
             <!-- Botão de Grade à Direita -->
             <button type="button" class="rm-ic-bt rm-ic-guia ${this.guiasVisiveis ? 'on' : ''}" id="rmGuia" aria-pressed="${this.guiasVisiveis}" title="Alternar visualização da grade de 12 colunas">
               ${svgIcone('guia_grade', 18)}
@@ -637,7 +645,10 @@ export class EditorView {
           </div>
 
           <!-- Palco de Páginas Reais -->
-          <div class="rm-prev rm-prev-palco" id="rmPrevPalco"></div>
+          <div class="ath-palco-reguas ${reguasVisiveis() ? '' : 'sem-reguas'}" id="athPalcoReguas">
+            <canvas class="ath-regua-h" aria-hidden="true"></canvas><canvas class="ath-regua-v" aria-hidden="true"></canvas><div class="ath-regua-canto" aria-hidden="true"></div>
+            <div class="rm-prev rm-prev-palco" id="rmPrevPalco"></div>
+          </div>
           <button type="button" class="ath-zoom-indicador" id="athZoomIndicador" title="Ctrl + roda do mouse para zoom · clique para 100%">100%</button>
         </section>
 
@@ -668,6 +679,15 @@ export class EditorView {
     this.pintarCursoresRemotosNaFolha();
 
     const palcoNovo = root.querySelector('#rmPrevPalco');
+    this._reguasDoc?.destruir?.();
+    this._reguasDoc = ligarReguasDoDocumento(root.querySelector('#athPalcoReguas'), palcoNovo);
+    root.querySelector('#rmRegua')?.addEventListener('click', (e) => {
+      const caixa = root.querySelector('#athPalcoReguas'); const mostrar = caixa.classList.contains('sem-reguas');
+      caixa.classList.toggle('sem-reguas', !mostrar);
+      e.currentTarget.classList.toggle('on', mostrar); e.currentTarget.setAttribute('aria-pressed', String(mostrar));
+      try { localStorage.setItem('athenes_reguas_visiveis', mostrar ? '1' : '0'); } catch (_) {}
+      this._reguasDoc?.atualizar();
+    });
     if (palcoNovo) {
       // clicar fora de qualquer bloco (fundo do palco, margem ou espaço vazio da folha) tira a seleção do bloco e do texto
       palcoNovo.addEventListener('mousedown', (ev) => {
@@ -1852,6 +1872,7 @@ export class EditorView {
       const areasPag = resolverAreasPagina(this.doc, mestraPag, pag, pag.numeroExibido ?? pag.numero, paginas.length);
 
       folha.style.padding = `${padTop}px ${padRight}px ${padBottom}px ${padLeft}px`;
+      folha.dataset.margens = [geo.topoMm, margens.r, geo.baseMm, margens.l].map(v => Math.round((Number(v) || 0) * 10) / 10).join(','); // para as réguas
 
       // Linha indicativa das margens
       const guiaMargem = document.createElement('div');
