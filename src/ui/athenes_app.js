@@ -20,6 +20,7 @@ import { PainelZotero } from './athenes_painel_zotero.js';
 import { PainelConexoes } from './athenes_painel_conexoes.js';
 import { PainelExportarModal } from './athenes_painel_exportar.js';
 import { ReguasController } from './athenes_reguas.js';
+import { carregarFontesImportadas, hidratarFontesDoDocumento, sincronizarDeclaracaoDeFontes } from './athenes_fontes_ui.js';
 
 import { mostrarAviso } from './athenes_aviso.js';
 import { driveConectado, enviarDocumentoAoDrive, marcarSessaoDriveExpirada, obterTokenDrive } from '../core/athenes_drive_sync.js';
@@ -50,6 +51,7 @@ export class AthenesApp {
     this.reguas = null;
 
     if (estaSessaoAtiva()) definirContaAtiva(obterPerfilColaborador()); // já conectado: os dados lidos a seguir são os desta conta
+    this._fontesProntas = carregarFontesImportadas().catch(() => []); // biblioteca de fontes desta máquina (IndexedDB) antes do primeiro desenho
     this.iniciar();
   }
 
@@ -194,6 +196,21 @@ export class AthenesApp {
         this.abrirModalConexoes();
       }
     });
+    this.hidratarFontes(this.documentoAtivo);
+  }
+
+  /** Abrir documento/template: baixa e ativa as fontes dos estilos que esta máquina ainda não tem e redesenha com as métricas certas. */
+  async hidratarFontes(doc) {
+    try {
+      await this._fontesProntas;
+      const { baixadas, falhas } = await hidratarFontesDoDocumento(doc);
+      if (doc !== this.documentoAtivo || !this.editorView) return;
+      if (baixadas.length) {
+        this.editorView.aposAlteracaoExterna?.(true);
+        mostrarAviso?.(`Fontes baixadas e prontas offline: ${baixadas.join(', ')}.`, { tipo: 'ok', ms: 5000 });
+      }
+      if (falhas.length) mostrarAviso?.(`Fonte indisponível neste computador: ${falhas.map(f => f.nome).join(', ')}. O texto usa uma fonte parecida até você baixá-la ou importá-la.`);
+    } catch (_) { /* sem fontes extras: segue com as do sistema */ }
   }
 
   /** O editor recria o DOM a cada redesenho; o inspetor é remontado no novo contêiner. */
@@ -337,6 +354,7 @@ export class AthenesApp {
    */
   autoSalvar({ semDrive = false, imediato = false } = {}) {
     if (!this.documentoAtivo) return;
+    sincronizarDeclaracaoDeFontes(this.documentoAtivo); // quais fontes os estilos usam (sem binários): outra máquina baixa ao abrir
     if (semDrive || imediato) { this.descarregarSalvamento(); this.gravarDocumento(this.documentoAtivo, { semDrive }); return; }
     this.documentoAtivo.dataModificacao = new Date().toISOString();
     this._docPendente = this.documentoAtivo;

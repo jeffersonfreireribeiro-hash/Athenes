@@ -9,6 +9,7 @@
 import { svgIcone } from './athenes_icones.js';
 import { ptParaMm, mmParaPt, FONTES_SISTEMA, PESOS_FONTE, estiloParaCss, TIPOS_ENTRELINHA, tipoEntrelinhaDoEstilo, aplicarTipoEntrelinha } from '../core/athenes_estilos.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
+import { criarSeletorFonte } from './athenes_seletor_fonte.js';
 import { htmlMarcadoresEstilo, ligarMarcadoresEstilo } from './athenes_marcadores_ui.js';
 import { CAMPOS_MARCADOR } from '../core/athenes_marcadores.js';
 
@@ -269,9 +270,7 @@ export class ModalEditorEstilo {
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
           <label style="font:700 12px var(--glx-font); color:#334155; display:flex; flex-direction:column; gap:4px;">
             Família Tipográfica
-            <select id="athModalEstiloFonte" class="ath-select" style="height:34px; font-size:12.5px;">
-              ${Object.values(FONTES_SISTEMA).map(f => `<option value="${f.id}" ${f.id === (r.fonte || 'nunito') ? 'selected' : ''}>${f.rotulo}</option>`).join('')}
-            </select>
+            <span id="athModalEstiloFonte"></span>
           </label>
           <label style="font:700 12px var(--glx-font); color:#334155; display:flex; flex-direction:column; gap:4px;">
             Peso da Fonte
@@ -367,10 +366,10 @@ export class ModalEditorEstilo {
       atualizarPrevia();
     });
 
-    modal.querySelector('#athModalEstiloFonte').addEventListener('change', e => {
-      this.rascunho.fonte = e.target.value;
-      atualizarPrevia();
-    });
+    modal.querySelector('#athModalEstiloFonte').replaceWith(criarSeletorFonte({
+      valor: this.rascunho.fonte || 'nunito', doc: this.doc,
+      aoEscolher: (id) => { this.rascunho.fonte = id; atualizarPrevia(); }
+    }));
 
     modal.querySelector('#athModalEstiloPeso').addEventListener('change', e => {
       this.rascunho.peso = parseInt(e.target.value, 10);

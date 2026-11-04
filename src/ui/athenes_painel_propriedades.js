@@ -19,6 +19,7 @@ import {
   calcularLinhas, linhaDoBloco, moverParaLinha, igualarLinha, LIMITE_BLOCOS_POR_LINHA
 } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
+import { criarSeletorFonte } from './athenes_seletor_fonte.js';
 import { sanearHtmlTexto, cssDoEstiloDeTrecho } from '../core/athenes_estilo_exclusivo.js';
 import { latexParaHtml } from '../core/athenes_formula.js';
 import { FORMATOS_NUMERO_FORMULA, idFormatoNumeroFormula } from '../core/athenes_documento.js';
@@ -1260,9 +1261,7 @@ export class PainelPropriedades {
       </label>
 
       <label style="font:700 12px var(--glx-font); width:100%; display:block;">Fonte
-        <select id="athEstiloFonte" class="glx-select" style="width:100%; height:34px; margin-top:4px;">
-          ${Object.values(FONTES_SISTEMA).map(f => `<option value="${f.id}" ${f.id === (rasc.fonte || 'nunito') ? 'selected' : ''}>${f.rotulo}</option>`).join('')}
-        </select>
+        <span id="athEstiloFonte"></span>
       </label>
 
       <div class="rm-linha2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
@@ -1369,10 +1368,10 @@ export class PainelPropriedades {
       atualizarPrevia();
     });
 
-    box.querySelector('#athEstiloFonte').addEventListener('change', e => {
-      rasc.fonte = e.target.value;
-      atualizarPrevia();
-    });
+    box.querySelector('#athEstiloFonte').replaceWith(criarSeletorFonte({
+      valor: rasc.fonte || 'nunito', doc: this.doc,
+      aoEscolher: (id) => { rasc.fonte = id; atualizarPrevia(); }
+    }));
 
     box.querySelector('#athEstiloTamanho').addEventListener('input', e => {
       rasc.tamanho_pt = parseFloat(e.target.value) || 12;

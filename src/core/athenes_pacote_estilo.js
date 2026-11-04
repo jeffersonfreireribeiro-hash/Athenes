@@ -15,6 +15,7 @@ import { criarModelosPaginaPadrao, MODOS_APLICACAO_MESTRA, SEPARADORES_LEGENDA, 
 import { sanitizarNumeracao } from './athenes_paginacao.js';
 import { normalizarConfigSumario, normalizarNumeracaoSecoes } from './athenes_sumario.js';
 import { normalizarMestraCanvas, normalizarRegrasMestra } from './athenes_mestra_canvas.js';
+import { declaracaoDeFontes, sanearDeclaracaoDeFontes, registrarFontePendente } from './athenes_fontes.js';
 import { obterConfigNotas } from './athenes_notas_rodape.js';
 import { extrairEstiloFigura, sanitizarEstiloFigura, aplicarEstiloFiguraAoBloco, extrairTipografiaTituloFonte } from './athenes_figura_layout.js';
 import { extrairEstiloGlobalTabela, sanitizarEstiloTabela, garantirEstiloTabela } from './athenes_tabela_estilo.js';
@@ -82,6 +83,8 @@ export function exportarPacoteEstilo(documento, opcoes = {}) {
       ...(Array.isArray(documento.atribuicoes_mestra) && documento.atribuicoes_mestra.length ? { atribuicoes_mestra: normalizarRegrasMestra(documento.atribuicoes_mestra) } : {})
     },
     estilos: estilos,
+    // fontes baixadas do catálogo/computador que os estilos usam (só metadados: quem importa o tema baixa de novo)
+    ...(declaracaoDeFontes({ estilos, mestras }).length ? { fontes: declaracaoDeFontes({ estilos, mestras }) } : {}),
     mestras: mestras,
     modelos_blocos: modelosBlocos,
     layout_padrao_figuras: layoutPadraoBlocos,
@@ -251,6 +254,7 @@ export function validarPacoteEstilo(conteudo) {
         ? { atribuicoes_mestra: normalizarRegrasMestra(obj.configuracaoGlobal.atribuicoes_mestra) } : {})
     },
     estilos: obj.estilos.map(sanitizarEstiloAvancado),
+    ...(Array.isArray(obj.fontes) ? { fontes: sanearDeclaracaoDeFontes(obj.fontes) } : {}),
     mestras: (Array.isArray(obj.mestras) && obj.mestras.length > 0 ? obj.mestras : criarModelosPaginaPadrao('abnt')).map(m => normalizarMestraCanvas(m)),
     modelos_blocos: Array.isArray(obj.modelos_blocos) ? obj.modelos_blocos : [],
     layout_padrao_figuras: obj.layout_padrao_figuras || {},
@@ -326,6 +330,12 @@ export function aplicarPacoteEstilo(documento, pacote, opcoes = {}) {
     if (aplicarNosBlocosExistentes) for (const sec of documento.secoes || []) for (const b of sec.blocos || []) if (b.tipo === 'sumario') delete b.sumario_config;
   }
   if (p.configuracaoGlobal?.numeracao_secoes) documento.numeracao_secoes = JSON.parse(JSON.stringify(p.configuracaoGlobal.numeracao_secoes));
+
+  // fontes do tema: entram como declaradas (a interface baixa as que faltam); o seletor já as mostra
+  if (Array.isArray(p.fontes) && p.fontes.length) {
+    documento.fontes_declaradas = sanearDeclaracaoDeFontes(p.fontes);
+    documento.fontes_declaradas.forEach(registrarFontePendente);
+  }
 
   // 3. Atualiza Modelos de Blocos Customizados
   if (Array.isArray(p.modelos_blocos) && p.modelos_blocos.length > 0) {
@@ -408,6 +418,7 @@ INSTRUÇÕES DE ANÁLISE:
    - REGRA DE CONSOLIDAÇÃO (obrigatória): NÃO crie um estilo para cada formatação vista. Agrupe parágrafos por assinatura tipográfica (fonte, tamanho, peso, itálico, caixa alta, alinhamento, recuos, espaçamentos) e consolide em 5 a 8 estilos canônicos: "corpo" (texto corrido), "titulo1"…"titulo3" (um por nível de seção), "citacao_direta" (recuo esquerdo ≥ 20 mm, fonte menor), "legenda" e "fonte_citada" (iguais entre si: uma única formatação para legendas e fontes), "nota_rodape" e "capa" (isolada: só a folha de rosto). Variações de poucos décimos de ponto, de recuo ou de espaçamento pertencem ao MESMO estilo. Negrito, itálico ou cor aplicados a trechos dentro do parágrafo NÃO são estilos. Use o estilo dominante (mais caracteres) como valor do estilo canônico.
    - Marcadores e numeração de parágrafos e títulos ficam no estilo: "marcador_tipo" ("circulo" | "traco" | "quadrado" | "ponto_traco" | "numero"; omita se não houver), "marcador_estilo_num" ("decimal" | "decimal_zero" | "lower_alpha" | "upper_alpha" | "lower_roman" | "upper_roman"), "marcador_separador" ("ponto" 1. | "parentese" 1) | "entre_parenteses" (1) | "travessao" 1 –), "marcador_inicio", "marcador_nivel" (1-5), "marcador_tab_mm" (distância entre o marcador e o texto, em mm) e "marcador_alinhamento" ("left" | "center" | "right"). A numeração continua entre blocos seguidos e recomeça depois de um bloco sem numeração.
    - O Athenes é guiado SÓ por estilos de texto: toda fonte, cor, alinhamento, entrelinha, espaço, recuo, fundo, borda e marcador deve estar num estilo (nunca em blocos ou trechos avulsos); negrito/itálico/sublinhado pontuais NÃO existem, crie um estilo se o formato se repete.
+   - Fontes fora da lista padrão: use a família do catálogo Google Fonts/Fontsource (ex.: "Montserrat", "EB Garamond") com "fonte": "fonte_<nome_em_minusculas_com_underscore>" no estilo (ex.: "fonte_eb_garamond") e declare cada uma em "fontes": [{ "id": "fonte_eb_garamond", "nome": "EB Garamond", "origem": "catalogo", "catalogoId": "eb-garamond", "categoria": "serif" | "sans-serif" | "monospace" }] (raiz do JSON). O Athenes baixa a família inteira (regular, itálico, semibold, bold) ao importar o tema.
    - Identifique também recuos persistentes do parágrafo: "recuo_esquerdo_mm", "recuo_direito_mm" (mm) e "recuo_deslocado_mm" (recuo francês/hanging).
    - ESTILOS DE PARÁGRAFO AVANÇADOS (opcional, só quando o documento realmente os usa): adicione ao estilo o objeto "avancado" com apenas os grupos presentes:
      "avancado": {

@@ -7,6 +7,7 @@ import { analisarCompatibilidadeDocx } from '../core/athenes_compatibilidade.js'
 import { exportarParaDocx } from '../core/athenes_export_docx.js';
 import { rasterizarFiguraParaPng } from './athenes_figura_codigo_ui.js';
 import { gerarDocumentoHtmlPdf } from '../core/athenes_export_pdf.js';
+import { prepararFontesParaPdf, sincronizarDeclaracaoDeFontes } from './athenes_fontes_ui.js';
 import { svgIcone } from './athenes_icones.js';
 
 export class PainelExportarModal {
@@ -143,14 +144,22 @@ export class PainelExportarModal {
     });
 
     // Visualizar e Imprimir PDF
-    this.modalEl.querySelector('#athBtnExportarPdf').addEventListener('click', () => {
-      const htmlPdf = gerarDocumentoHtmlPdf(this.doc);
+    this.modalEl.querySelector('#athBtnExportarPdf').addEventListener('click', async () => {
+      // a janela abre já (clique do usuário) e o PDF só é gerado quando TODAS as fontes dos estilos estão carregadas
       const win = window.open('', '_blank');
+      if (win) win.document.write('<p style="font:600 14px system-ui;padding:24px;color:#314F79">Preparando as fontes do documento…</p>');
+      const { ok, falhas } = await prepararFontesParaPdf(this.doc);
+      if (!ok && !confirm(`Estas fontes não puderam ser carregadas: ${falhas.join(', ')}.
+
+O PDF sairia com uma fonte reserva (quebras de linha diferentes da tela). Gerar mesmo assim?`)) { win?.close(); return; }
+      sincronizarDeclaracaoDeFontes(this.doc);
+      const htmlPdf = gerarDocumentoHtmlPdf(this.doc);
       if (win) {
         win.document.open();
         win.document.write(htmlPdf);
         win.document.close();
-        setTimeout(() => win.print(), 500);
+        try { await win.document.fonts.ready; } catch (_) { /* segue */ }
+        setTimeout(() => win.print(), 200);
       } else {
         alert('O navegador bloqueou a abertura da janela de impressão. Permita pop-ups para visualizar o PDF.');
       }
@@ -158,6 +167,7 @@ export class PainelExportarModal {
 
     // Baixar pacote JSON (.athenes)
     this.modalEl.querySelector('#athBtnBaixarJson').addEventListener('click', () => {
+      sincronizarDeclaracaoDeFontes(this.doc);
       const str = JSON.stringify(this.doc, null, 2);
       const blob = new Blob([str], { type: 'application/json' });
       const url = URL.createObjectURL(blob);

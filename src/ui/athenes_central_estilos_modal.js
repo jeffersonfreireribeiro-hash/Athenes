@@ -9,7 +9,7 @@
  */
 
 import { listarTemplatesUsuario } from '../core/athenes_templates.js';
-import { importarArquivoDeFonte, excluirFonteImportada } from './athenes_fontes_ui.js';
+import { importarArquivoDeFonte, excluirFonteImportada, hidratarFontesDoDocumento } from './athenes_fontes_ui.js';
 import { listarFontesImportadas, nomeSugerido } from '../core/athenes_fontes.js';
 import { FONTES_SISTEMA as FONTES } from '../core/athenes_estilos.js';
 import { comprimirImagensDoPacote } from './athenes_imagem_util.js';
@@ -383,6 +383,7 @@ export class ModalCentralEstilos {
         const resultado = aplicarPacoteEstilo(this.doc, this.pacoteValidado, { aplicarNosBlocosExistentes: propagar, storage: globalThis.localStorage });
         this.editor?.notificarMudanca?.();
         this.editor?.renderizar?.();
+        hidratarFontesDoDocumento(this.doc).then(r => { if (r.baixadas.length) this.editor?.aposAlteracaoExterna?.(true); }).catch(() => {}); // baixa as fontes do tema em segundo plano
         this.onSucesso(resultado);
 
         alert(`✓ Estilo "${resultado.temaNome}" aplicado com sucesso!\n${resultado.estilosQtd} estilos de texto e ${resultado.mestrasQtd} páginas mestras atualizados.${resultado.templatesImportados ? `

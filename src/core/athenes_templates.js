@@ -15,6 +15,7 @@ import { criarDocumento, criarModelosPaginaPadrao, criarNovoBloco, criarSecao, g
 import { criarEstilosPadrao } from './athenes_estilos.js';
 import { clonarComNovosIds } from './athenes_arquivos.js';
 import { sanitizarEstiloAvancado } from './athenes_estilo_avancado.js';
+import { sanearDeclaracaoDeFontes } from './athenes_fontes.js';
 import { sanearBlocoDeTexto, sanearDocumentoEstilos } from './athenes_estilo_exclusivo.js';
 
 export const CATEGORIAS_TEMPLATE = ['academic', 'report', 'user_custom'];
@@ -22,7 +23,7 @@ export const ROTULO_CATEGORIA = { academic: 'Acadêmico', report: 'Relatório', 
 export const CHAVE_TEMPLATES_USUARIO = 'athenes_templates_usuario';
 
 // Configurações de nível de documento que fazem parte do "layout" e acompanham o template
-const CONFIGS_DO_DOCUMENTO = ['paginacao', 'numeracao_secoes', 'notas_config', 'separador_legenda', 'formato_numero_formula', 'sumario_config_padrao', 'atribuicoes_mestra', 'guias'];
+const CONFIGS_DO_DOCUMENTO = ['paginacao', 'numeracao_secoes', 'notas_config', 'separador_legenda', 'formato_numero_formula', 'sumario_config_padrao', 'atribuicoes_mestra', 'guias', 'fontes_declaradas'];
 
 const clonar = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 const IDS_ESTILOS_ESSENCIAIS = ['titulo1', 'titulo2', 'titulo3', 'corpo'];
@@ -254,6 +255,7 @@ export function sanitizarTemplate(t) {
   limpo.id = typeof limpo.id === 'string' && /^[\w-]{1,80}$/.test(limpo.id) ? limpo.id : gerarId('tpl');
   limpo.config.estilos = limpo.config.estilos.filter(e => e && typeof e.id === 'string').map(sanitizarEstiloAvancado);
   limpo.config.mestras = limpo.config.mestras.filter(m => m && typeof m.id === 'string');
+  if (limpo.config.fontes_declaradas !== undefined) limpo.config.fontes_declaradas = sanearDeclaracaoDeFontes(limpo.config.fontes_declaradas); // só metadados curtos das fontes do template
   if (!limpo.config.mestras.length || !limpo.config.estilos.length) return null;
   limpo.secoes = (Array.isArray(limpo.secoes) ? limpo.secoes : []).filter(s => s && typeof s === 'object').map(s => ({
     nome: String(s.nome || 'Seção').slice(0, 120), mestraId: String(s.mestraId || limpo.config.mestras[0].id), blocos: Array.isArray(s.blocos) ? s.blocos : []
