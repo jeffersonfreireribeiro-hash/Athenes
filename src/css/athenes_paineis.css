@@ -182,3 +182,5 @@ body:has(.ath-modal-backdrop) .ath-barra-contextual {
   .ath-zotero-col-dir { border-left: 1px solid #E2E8F0; padding-left: 14px; align-self: stretch; }
 }
 .ath-zotero-painel textarea { resize: vertical; width: 100% !important; min-height: 48px; max-width: 100%; } /* o tamanho das caixas de texto só muda na vertical */
+.ath-zotero-painel textarea { max-height: 45vh; }
+.ath-zotero-colunas { scrollbar-width: thin; scrollbar-color: #B6C3D3 transparent; padding-right: 6px; } /* barra de rolagem visível quando o conteúdo passa da janela */
