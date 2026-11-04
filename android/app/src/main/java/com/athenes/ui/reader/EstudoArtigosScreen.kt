@@ -10,6 +10,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Draw
@@ -31,6 +33,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.athenes.core.data.ZoteroAnexosClient
+import com.athenes.core.data.ZoteroAnexoPdf
 import com.athenes.core.data.ZoteroApiClient
 import com.athenes.core.data.ZoteroCredentialsStore
 import com.athenes.core.model.AbaInspetorDireito
@@ -55,6 +58,8 @@ fun EstudoArtigosScreen(
     val anexosClient = remember { ZoteroAnexosClient() }
     val zoteroClient = remember { ZoteroApiClient() }
     var baixandoZotero by remember { mutableStateOf(false) }
+    var anexosParaEscolher by remember { mutableStateOf<List<ZoteroAnexoPdf>>(emptyList()) }
+    var artigoParaAnexo by remember { mutableStateOf<String?>(null) }
     var importandoNotasZotero by remember { mutableStateOf(false) }
 
     LaunchedEffect(artigoIdInicial) {
@@ -89,6 +94,32 @@ fun EstudoArtigosScreen(
             viewModel.definirTotalPaginasPdf(0)
         }
     }
+    val iniciarDownload: (ZoteroAnexoPdf, String) -> Unit = { anexo, artigoId ->
+        escopo.launch {
+            baixandoZotero = true
+            val resultado = runCatching {
+                val (chave, usuarioSalvo) = ZoteroCredentialsStore(context).carregar()
+                    ?: error("Conecte sua conta Zotero na Biblioteca.")
+                val usuario = if (usuarioSalvo.isBlank()) zoteroClient.descobrirUsuario(chave) else usuarioSalvo
+                val bytes = anexosClient.baixarPdf(usuario, chave, anexo)
+                val uriLocal = withContext(Dispatchers.IO) {
+                    val pasta = File(context.filesDir, "pdfs").apply { mkdirs() }
+                    val nome = UUID.nameUUIDFromBytes(artigoId.toByteArray(Charsets.UTF_8)).toString()
+                    val arquivo = File(pasta, "zotero_$nome.pdf")
+                    arquivo.writeBytes(bytes)
+                    Uri.fromFile(arquivo)
+                }
+                context.getSharedPreferences("pdf_artigos", 0).edit().putString(artigoId, uriLocal.toString()).apply()
+                if (artigoAtivo.id == artigoId) {
+                    pdfUriTexto = uriLocal.toString()
+                    totalPdf = 0
+                    viewModel.definirTotalPaginasPdf(0)
+                }
+            }
+            baixandoZotero = false
+            Toast.makeText(context, resultado.fold({ "PDF baixado do Zotero." }, { it.message ?: "Não foi possível baixar o PDF." }), Toast.LENGTH_LONG).show()
+        }
+    }
     val baixarPdfZotero: () -> Unit = {
         if (!baixandoZotero) {
             val artigoId = artigoAtivo.id
@@ -103,25 +134,15 @@ fun EstudoArtigosScreen(
                         val (chave, usuarioSalvo) = credenciais
                         val usuario = if (usuarioSalvo.isBlank()) zoteroClient.descobrirUsuario(chave) else usuarioSalvo
                         val anexos = anexosClient.listarPdf(usuario, chave, itemKey)
-                        val anexo = anexos.firstOrNull { it.baixavel }
-                            ?: error(if (anexos.isEmpty()) "Nenhum PDF encontrado neste item do Zotero." else "O PDF está vinculado apenas ao computador.")
-                        val bytes = anexosClient.baixarPdf(usuario, chave, anexo)
-                        val uriLocal = withContext(Dispatchers.IO) {
-                            val pasta = File(context.filesDir, "pdfs").apply { mkdirs() }
-                            val nome = UUID.nameUUIDFromBytes(artigoId.toByteArray(Charsets.UTF_8)).toString()
-                            val arquivo = File(pasta, "zotero_$nome.pdf")
-                            arquivo.writeBytes(bytes)
-                            Uri.fromFile(arquivo)
-                        }
-                        context.getSharedPreferences("pdf_artigos", 0).edit().putString(artigoId, uriLocal.toString()).apply()
-                        if (artigoAtivo.id == artigoId) {
-                            pdfUriTexto = uriLocal.toString()
-                            totalPdf = 0
-                            viewModel.definirTotalPaginasPdf(0)
-                        }
+                        val baixaveis = anexos.filter { it.baixavel }
+                        if (baixaveis.isEmpty()) error(if (anexos.isEmpty()) "Nenhum PDF encontrado neste item do Zotero." else "O PDF está vinculado apenas ao computador.")
+                        baixaveis
                     }
                     baixandoZotero = false
-                    Toast.makeText(context, resultado.fold({ "PDF baixado do Zotero." }, { it.message ?: "Não foi possível baixar o PDF." }), Toast.LENGTH_LONG).show()
+                    resultado.onSuccess { lista ->
+                        if (lista.size == 1) iniciarDownload(lista.first(), artigoId)
+                        else { anexosParaEscolher = lista; artigoParaAnexo = artigoId }
+                    }.onFailure { Toast.makeText(context, it.message ?: "Não foi possível listar os anexos.", Toast.LENGTH_LONG).show() }
                 }
             }
         }
@@ -166,6 +187,26 @@ fun EstudoArtigosScreen(
 
     val mostrarDialogCitacao by viewModel.mostrarDialogNovaCitacao.collectAsState()
     val mostrarDialogNota by viewModel.mostrarDialogNovaNota.collectAsState()
+
+    if (anexosParaEscolher.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { anexosParaEscolher = emptyList(); artigoParaAnexo = null },
+            title = { Text("Escolher PDF do Zotero") },
+            text = {
+                Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+                    anexosParaEscolher.forEach { anexo ->
+                        TextButton(onClick = {
+                            val artigoId = artigoParaAnexo
+                            anexosParaEscolher = emptyList()
+                            artigoParaAnexo = null
+                            if (artigoId != null) iniciarDownload(anexo, artigoId)
+                        }) { Text(anexo.nomeArquivo) }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { anexosParaEscolher = emptyList(); artigoParaAnexo = null }) { Text("Cancelar") } }
+        )
+    }
 
     Scaffold(
         topBar = {
