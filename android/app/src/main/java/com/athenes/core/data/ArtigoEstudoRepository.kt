@@ -198,6 +198,9 @@ class ArtigoEstudoRepository {
 
     fun excluirArtigoLocal(id: String): Boolean {
         if (artigosLocais.none { it.id == id }) return false
+        // Uma gravação adiada anterior não pode recriar as anotações do artigo excluído.
+        anotacoesPendentes?.cancel()
+        gravacaoPendente?.cancel()
         artigosLocais = artigosLocais.filterNot { it.id == id }
         _artigos.value = _artigos.value.filterNot { it.id == id }
         if (_artigoAtivoId.value == id) _artigoAtivoId.value = _artigos.value.firstOrNull()?.id.orEmpty()
@@ -207,6 +210,8 @@ class ArtigoEstudoRepository {
                 ctx.getSharedPreferences(nome, Context.MODE_PRIVATE).edit().remove(id).apply()
             }
         }
+        salvarAnotacoesDepois()
+        salvarTracosDepois()
         return true
     }
 
