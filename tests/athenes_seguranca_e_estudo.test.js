@@ -22,6 +22,10 @@ import { ZoteroClient } from '../src/core/athenes_zotero.js';
 const lerCodigoEstudo = () => ['', '_dados', '_tela', '_painel_direito', '_anotacoes', '_modais']
   .map(n => fs.readFileSync(path.resolve(`src/ui/athenes_estudo_artigos${n}.js`), 'utf8')).join('');
 
+// o dashboard é dividido em módulos (modais, pastas, sincronia): o código é lido em conjunto
+const lerCodigoDashboard = () => ['', '_modais', '_pastas', '_sincronia']
+  .map(n => fs.readFileSync(path.resolve(`src/ui/athenes_dashboard${n}.js`), 'utf8')).join('');
+
 test('escapeHtml e sanitizarHtmlEditorial bloqueiam vetores XSS preservando formatação editorial', () => {
   const sujo = `<p onclick="alert(1)">Texto <b>negrito</b> <script>evil()</script> <a href="javascript:alert(2)">link</a></p>`;
   const limpo = sanitizarHtmlEditorial(sujo);
@@ -173,7 +177,7 @@ test('Estúdio de Artigos preserva folhas extras no PDF real e rolarParaPagina u
 });
 
 test('DashboardView possui sincronização com Supabase e backup de espaço para multi-PC', () => {
-  const codigoDash = fs.readFileSync(path.resolve('src/ui/athenes_dashboard.js'), 'utf8');
+  const codigoDash = lerCodigoDashboard();
 
   assert.equal(codigoDash.includes('athBtnSincronizarNuvem'), true);
   assert.equal(codigoDash.includes('athBtnBackupEspaco'), true);
@@ -185,7 +189,7 @@ test('DashboardView possui sincronização com Supabase e backup de espaço para
 });
 
 test('DashboardView possui barra lateral de pastas do Google Drive, subpastas e filtro estrito', () => {
-  const codigoDash = fs.readFileSync(path.resolve('src/ui/athenes_dashboard.js'), 'utf8');
+  const codigoDash = lerCodigoDashboard();
   const cssEditor = fs.readFileSync(path.resolve('src/css/athenes_editor.css'), 'utf8');
 
   // Estrutura de layout com sidebar e banner
@@ -307,6 +311,13 @@ test('Todos os módulos frontend (UI e Core) importam sem SyntaxError ou referê
     'src/ui/athenes_estudo_artigos.js',
     'src/ui/athenes_editor.js',
     'src/ui/athenes_dashboard.js',
+    'src/ui/athenes_dashboard_modais.js',
+    'src/ui/athenes_dashboard_pastas.js',
+    'src/ui/athenes_dashboard_sincronia.js',
+    'src/core/athenes_documento_base.js',
+    'src/core/athenes_numeracao_legendas.js',
+    'src/core/athenes_bloco_layout.js',
+    'src/core/athenes_pagina_elementos.js',
     'src/ui/athenes_app.js'
   ];
 
