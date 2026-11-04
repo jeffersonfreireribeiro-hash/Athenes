@@ -26,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -137,6 +139,7 @@ fun BibliotecaScreen(
     var nomePastaEditada by remember { mutableStateOf("") }
     var documentoParaMover by remember { mutableStateOf<Documento?>(null) }
     var documentoParaExcluirDefinitivamente by remember { mutableStateOf<Documento?>(null) }
+    var documentoDetalheId by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Estados da Aba 2 (Artigos / Zotero)
     val textoBuscaArtigos by viewModel.textoBuscaArtigos.collectAsState()
@@ -310,10 +313,12 @@ fun BibliotecaScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val painelLateral = maxWidth >= 900.dp
-                    val larguraConteudo = maxWidth - if (painelLateral) 236.dp else 0.dp
-                    val colunas = if (larguraConteudo >= 900.dp) GridCells.Fixed(3) else if (larguraConteudo >= 600.dp) GridCells.Fixed(2) else GridCells.Fixed(1)
+                    val paineis = configurarPaineisDocumento(maxWidth.value.toInt(), mostrandoLixeira)
+                    val painelLateral = paineis.pastas
+                    val painelDetalhe = paineis.detalhe
+                    val colunas = GridCells.Fixed(paineis.colunas)
                     val documentosNaPasta = if (mostrandoLixeira) lixeira else if (pastaAtivaId == null) documentos else documentos.filter { it.pastaId == pastaAtivaId }
+                    val documentoDetalhe = documentosNaPasta.find { it.id == documentoDetalheId }
                     Row(Modifier.fillMaxSize()) {
                     if (painelLateral) {
                         Surface(
@@ -376,17 +381,30 @@ fun BibliotecaScreen(
                                             TextButton(onClick = { documentoParaExcluirDefinitivamente = doc }) { Text("Excluir definitivamente") }
                                         }
                                     }
-                                } else AthenesCard(
-                                    documento = doc,
-                                    onAbrirClick = { onAbrirDocumento(doc) },
-                                    onDuplicarClick = { viewModel.duplicarDocumento(doc.id) },
-                                    onRenomearClick = { viewModel.solicitarRenomear(doc) },
-                                    onExcluirClick = { viewModel.solicitarExclusao(doc) },
-                                    onMoverClick = { documentoParaMover = doc }
-                                )
+                                } else Box(Modifier.border(if (painelDetalhe && doc.id == documentoDetalheId) 2.dp else 0.dp,
+                                    if (painelDetalhe && doc.id == documentoDetalheId) AthenesPrimary else Color.Transparent,
+                                    RoundedCornerShape(12.dp))) {
+                                    AthenesCard(
+                                        documento = doc,
+                                        onAbrirClick = { if (painelDetalhe) documentoDetalheId = doc.id else onAbrirDocumento(doc) },
+                                        onDuplicarClick = { viewModel.duplicarDocumento(doc.id) },
+                                        onRenomearClick = { viewModel.solicitarRenomear(doc) },
+                                        onExcluirClick = { viewModel.solicitarExclusao(doc) },
+                                        onMoverClick = { documentoParaMover = doc }
+                                    )
+                                }
                             }
                         }
                     }
+                    }
+                    if (painelDetalhe) {
+                        Spacer(Modifier.width(16.dp))
+                        PainelDetalheDocumento(
+                            documento = documentoDetalhe,
+                            onAbrir = { documentoDetalhe?.let(onAbrirDocumento) },
+                            onMover = { documentoDetalhe?.let { documentoParaMover = it } },
+                            onRenomear = { documentoDetalhe?.let(viewModel::solicitarRenomear) }
+                        )
                     }
                     }
                 }
@@ -752,6 +770,56 @@ fun BibliotecaScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+data class ConfiguracaoPaineisDocumento(val pastas: Boolean, val detalhe: Boolean, val colunas: Int)
+
+fun configurarPaineisDocumento(larguraDp: Int, lixeira: Boolean): ConfiguracaoPaineisDocumento {
+    val pastas = larguraDp >= 1150
+    val detalhe = larguraDp >= 700 && !lixeira
+    val larguraLista = larguraDp - (if (pastas) 236 else 0) - (if (detalhe) 316 else 0)
+    val colunas = when {
+        larguraLista >= 900 -> 3
+        larguraLista >= 600 -> 2
+        else -> 1
+    }
+    return ConfiguracaoPaineisDocumento(pastas, detalhe, colunas)
+}
+
+@Composable
+fun PainelDetalheDocumento(
+    documento: Documento?,
+    onAbrir: () -> Unit,
+    onMover: () -> Unit,
+    onRenomear: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.width(300.dp).fillMaxHeight(),
+        color = Color.White,
+        shape = RoundedCornerShape(8.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+    ) {
+        if (documento == null) Box(Modifier.padding(20.dp), contentAlignment = Alignment.Center) {
+            Text("Selecione um documento para ver os detalhes.", color = AthenesTextMuted)
+        } else Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(documento.titulo, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+            if (documento.subtitulo.isNotBlank()) Text(documento.subtitulo, style = MaterialTheme.typography.bodyMedium)
+            HorizontalDivider()
+            Text("Tipo: ${documento.tipo.rotuloAmigavel}")
+            Text("Situação: ${documento.situacao.name.lowercase().replaceFirstChar { it.uppercase() }}")
+            Text("Autor: ${documento.autor}")
+            Text("Alterado em: ${documento.modificadoEm}")
+            if (documento.resumo.isNotBlank()) {
+                HorizontalDivider()
+                Text("Resumo", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+                Text(documento.resumo, style = MaterialTheme.typography.bodyMedium)
+            }
+            Button(onClick = onAbrir, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Abrir documento") }
+            OutlinedButton(onClick = onMover, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Mover para…") }
+            TextButton(onClick = onRenomear, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Renomear") }
         }
     }
 }

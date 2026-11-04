@@ -19,7 +19,9 @@ import com.athenes.core.citacao.AutorReferencia
 import com.athenes.core.citacao.ReferenciaAcademica
 import com.athenes.ui.editor.components.GrafoConexoesDialog
 import com.athenes.ui.library.DialogNovoArtigoLocal
+import com.athenes.ui.library.PainelDetalheDocumento
 import com.athenes.core.model.ArtigoEstudoDetalhado
+import com.athenes.core.model.Documento
 import com.athenes.core.data.ArtigoEstudoRepository
 import com.athenes.ui.reader.EstudoArtigosScreen
 import com.athenes.ui.reader.ReaderViewModel
@@ -34,6 +36,19 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NavegacaoAcessibilidadeTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun painelDeDetalheMostraDocumentoEAbrirFunciona() {
+        var abriu = false
+        val documento = Documento(id = "doc-1", titulo = "Relatório de campo", subtitulo = "Área urbana", resumo = "Resumo do levantamento")
+        compose.setContent { MaterialTheme {
+            PainelDetalheDocumento(documento, onAbrir = { abriu = true }, onMover = {}, onRenomear = {})
+        } }
+        compose.onNodeWithText("Relatório de campo").assertExists()
+        compose.onNodeWithText("Área urbana").assertExists()
+        compose.onNodeWithText("Resumo do levantamento").assertExists()
+        compose.onNodeWithText("Abrir documento").performClick()
+        compose.runOnIdle { assertTrue(abriu) }
+    }
 
     @Test fun notaRodapeMantemTextoEHistoricoNoDocumento() {
         val vm = EditorViewModel()
