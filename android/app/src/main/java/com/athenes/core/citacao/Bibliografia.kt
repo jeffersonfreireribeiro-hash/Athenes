@@ -61,6 +61,8 @@ data class ReferenciaAcademica(
 
 object Bibliografia {
     private val pt = Locale.forLanguageTag("pt-BR")
+    fun ancora(refId: String): String = "ref_" + refId.replace(Regex("[^A-Za-z0-9_]"), "_").take(27) +
+        "_" + refId.hashCode().toUInt().toString(16)
     private fun ponto(texto: String): String = texto.trim().let { if (it.isBlank() || it.last() in ".!?") it else "$it." }
     private fun juntar(vararg partes: String): String = partes.filter(String::isNotBlank).joinToString(" ").replace(Regex("\\s+([,.;:])"), "$1").replace("..", ".").trim()
     private fun primeiroAutor(ref: ReferenciaAcademica): String = ref.autores.firstOrNull()?.sobrenome.orEmpty().ifBlank { ref.titulo }

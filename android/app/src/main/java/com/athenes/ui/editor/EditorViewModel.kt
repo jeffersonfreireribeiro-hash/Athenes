@@ -307,6 +307,9 @@ class EditorViewModel : ViewModel() {
     fun definirNivelTitulo(id: String, nivel: Int) = atualizarBloco(id) { it.copy(nivelTitulo = nivel.coerceIn(1, 9)) }
 
     fun adicionarBloco(tipo: TipoBlocoEditor) {
+        if (tipo == TipoBlocoEditor.REFERENCIAS) {
+            _blocos.value.firstOrNull { it.tipo == tipo }?.let { selecionarBloco(it.id); return }
+        }
         salvarNoHistorico()
         val novo = when (tipo) {
             TipoBlocoEditor.TITULO -> BlocoEditor(tipo = tipo, alinhamento = AlinhamentoTexto.ESQUERDA)
@@ -358,6 +361,9 @@ class EditorViewModel : ViewModel() {
         } else {
             inserirAposSelecionado(BlocoEditor(tipo = TipoBlocoEditor.PARAGRAFO, texto = marca,
                 citacoes = listOf(CitacaoInline(referencia.id, 0, marca.length))))
+        }
+        if (_blocos.value.none { it.tipo == TipoBlocoEditor.REFERENCIAS }) {
+            _blocos.value = _blocos.value + BlocoEditor(tipo = TipoBlocoEditor.REFERENCIAS)
         }
         salvarNoHistorico()
         _painelCitacaoAberto.value = false

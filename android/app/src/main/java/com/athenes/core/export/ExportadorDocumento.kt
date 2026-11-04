@@ -90,10 +90,10 @@ object ExportadorDocumento {
                     }
                 }
                 TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) {
-                    corpo.append(par(b.texto, alinhamento = b.alinhamento, recuoPrimeira = 709))
+                    corpo.append(par(b.texto, alinhamento = b.alinhamento, recuoPrimeira = 709, citacoes = b.citacoes))
                 }
                 TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) {
-                    corpo.append(par(b.texto, justificado = true, simples = true, tamanho = 20, recuoEsq = 2268, antes = 120, depois = 120))
+                    corpo.append(par(b.texto, justificado = true, simples = true, tamanho = 20, recuoEsq = 2268, antes = 120, depois = 120, citacoes = b.citacoes))
                 }
                 TipoBlocoExport.FIGURA -> {
                     if (b.legenda.isNotBlank()) corpo.append(par(b.legenda, centro = true, negrito = true, tamanho = 20, simples = true, antes = 120, depois = 60, mantemProximo = true))
@@ -129,7 +129,8 @@ object ExportadorDocumento {
                 TipoBlocoExport.REFERENCIAS -> {
                     corpo.append(par("REFERÊNCIAS", negrito = true, antes = 120, depois = 120))
                     referenciasOrdenadas.forEachIndexed { indice, ref ->
-                        corpo.append(par(Bibliografia.formatar(ref, doc.estiloBibliografico, indice + 1), simples = true, depois = 120))
+                        corpo.append(par(Bibliografia.formatar(ref, doc.estiloBibliografico, indice + 1), simples = true,
+                            depois = 120, marcador = Bibliografia.ancora(ref.id), marcadorId = indice + 1))
                     }
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> corpo.append("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>")
@@ -218,7 +219,10 @@ object ExportadorDocumento {
         depois: Int = 0,
         mantemProximo: Boolean = false,
         numId: Int? = null,
-        estilo: String? = null
+        estilo: String? = null,
+        citacoes: List<CitacaoInline> = emptyList(),
+        marcador: String? = null,
+        marcadorId: Int = 0
     ): String {
         val jc = when {
             centro -> "center"
@@ -245,9 +249,25 @@ object ExportadorDocumento {
             if (italico) append("<w:i/>")
             append("<w:sz w:val=\"$tamanho\"/>")
         }
-        // Quebras de linha viram <w:br/>; o restante é escapado.
-        val partes = texto.split("\n").joinToString("<w:br/>") { "<w:t xml:space=\"preserve\">${xml(it)}</w:t>" }
-        return "<w:p><w:pPr>$ppr</w:pPr><w:r><w:rPr>$rpr</w:rPr>$partes</w:r></w:p>"
+        fun run(trecho: String): String {
+            val partes = trecho.split("\n").joinToString("<w:br/>") { "<w:t xml:space=\"preserve\">${xml(it)}</w:t>" }
+            return "<w:r><w:rPr>$rpr</w:rPr>$partes</w:r>"
+        }
+        val conteudo = buildString {
+            var anterior = 0
+            for (c in citacoes.sortedBy { it.inicio }) {
+                if (c.inicio < anterior || c.fim > texto.length || c.fim <= c.inicio) continue
+                if (c.inicio > anterior) append(run(texto.substring(anterior, c.inicio)))
+                append("<w:hyperlink w:anchor=\"${Bibliografia.ancora(c.refId)}\" w:history=\"1\">")
+                append(run(texto.substring(c.inicio, c.fim)))
+                append("</w:hyperlink>")
+                anterior = c.fim
+            }
+            if (anterior < texto.length || isEmpty()) append(run(texto.substring(anterior)))
+        }
+        val inicioMarcador = if (marcador != null) "<w:bookmarkStart w:id=\"$marcadorId\" w:name=\"$marcador\"/>" else ""
+        val fimMarcador = if (marcador != null) "<w:bookmarkEnd w:id=\"$marcadorId\"/>" else ""
+        return "<w:p><w:pPr>$ppr</w:pPr>$inicioMarcador$conteudo$fimMarcador</w:p>"
     }
 
     private fun tabela(linhas: List<List<String>>, pagina: ConfiguracaoPagina): String {
@@ -351,7 +371,7 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                     val nivelHtml = (b.nivelTitulo + 1).coerceAtMost(6)
                     sb.append("<h$nivelHtml id=\"secao-$secao\">${numerosTitulos[secao - 1]}&nbsp; ${html(b.titulo)}</h$nivelHtml>")
                 }
-                TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha;text-align-last:$ultimaLinha\">${html(b.texto)}</p>")
+                TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha;text-align-last:$ultimaLinha\">${htmlComCitacoes(b.texto, b.citacoes)}</p>")
                 TipoBlocoExport.LISTA -> if (b.texto.isNotBlank()) {
                     val tag = if (b.listaNumerada) "ol" else "ul"
                     sb.append("<$tag>")
@@ -372,12 +392,12 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                 TipoBlocoExport.REFERENCIAS -> {
                     sb.append("<section aria-label=\"Referências\"><h2>REFERÊNCIAS</h2>")
                     referenciasOrdenadas.forEachIndexed { indice, ref ->
-                        sb.append("<p>${html(Bibliografia.formatar(ref, doc.estiloBibliografico, indice + 1))}</p>")
+                        sb.append("<p id=\"${Bibliografia.ancora(ref.id)}\">${html(Bibliografia.formatar(ref, doc.estiloBibliografico, indice + 1))}</p>")
                     }
                     sb.append("</section>")
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> sb.append("<div style=\"break-before:page\"></div>")
-                TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${html(b.texto)}</div>")
+                TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${htmlComCitacoes(b.texto, b.citacoes)}</div>")
                 TipoBlocoExport.FIGURA -> {
                     sb.append("<figure>")
                     if (b.legenda.isNotBlank()) sb.append("<figcaption>${html(b.legenda)}</figcaption>")
@@ -417,4 +437,17 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
 
     private fun html(s: String): String = s
         .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("\n", "<br>")
+
+    private fun htmlComCitacoes(texto: String, citacoes: List<CitacaoInline>): String = buildString {
+        var anterior = 0
+        for (c in citacoes.sortedBy { it.inicio }) {
+            if (c.inicio < anterior || c.fim > texto.length || c.fim <= c.inicio) continue
+            append(html(texto.substring(anterior, c.inicio)))
+            append("<a href=\"#${Bibliografia.ancora(c.refId)}\" style=\"color:inherit;text-decoration:none\">")
+            append(html(texto.substring(c.inicio, c.fim)))
+            append("</a>")
+            anterior = c.fim
+        }
+        append(html(texto.substring(anterior)))
+    }
 }

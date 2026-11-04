@@ -14,6 +14,8 @@ import com.athenes.core.export.TipoBlocoExport
 import com.athenes.core.citacao.AutorReferencia
 import com.athenes.core.citacao.EstiloBibliografico
 import com.athenes.core.citacao.ReferenciaAcademica
+import com.athenes.core.citacao.Bibliografia
+import com.athenes.core.citacao.CitacaoInline
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -23,6 +25,25 @@ import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
 class ExportadorTest {
+
+    @Test
+    fun `citacao aponta para a referencia em HTML e DOCX`() {
+        val ref = ReferenciaAcademica("obra-1", "book", "Livro", listOf(AutorReferencia("Silva", "Ana")), "2025")
+        val marca = "(SILVA, 2025)"
+        val doc = DocumentoExport("Teste", "", "", "", listOf(
+            BlocoExport(TipoBlocoExport.PARAGRAFO, texto = "Veja $marca.", citacoes = listOf(CitacaoInline(ref.id, 5, 5 + marca.length))),
+            BlocoExport(TipoBlocoExport.REFERENCIAS)
+        ), referencias = listOf(ref))
+        val ancora = Bibliografia.ancora(ref.id)
+        val html = ExportadorDocumento.gerarHtml(doc, ResolvedorImagem { null })
+        assertTrue(html.contains("href=\"#$ancora\""))
+        assertTrue(html.contains("id=\"$ancora\""))
+        val partes = entradas(ExportadorDocumento.gerarDocx(doc, ResolvedorImagem { null }))
+        val xml = String(partes["word/document.xml"]!!)
+        DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(ByteArrayInputStream(xml.toByteArray()))
+        assertTrue(xml.contains("w:anchor=\"$ancora\""))
+        assertTrue(xml.contains("w:name=\"$ancora\""))
+    }
 
     @Test
     fun `bloco de referencias segue estilo e ordem na tela e nas exportacoes`() {
