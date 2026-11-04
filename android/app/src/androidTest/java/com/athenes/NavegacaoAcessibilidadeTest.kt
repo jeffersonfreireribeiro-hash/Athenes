@@ -81,13 +81,16 @@ class NavegacaoAcessibilidadeTest {
 
     @Test fun novoArtigoExigeTituloEAbreComDadosInformados() {
         var resultado: List<String>? = null
+        var selecionarPdf = false
         compose.setContent {
             MaterialTheme {
-                DialogNovoArtigoLocal(onFechar = {}, onCriar = { titulo, autores, ano, publicacao, resumo ->
+                DialogNovoArtigoLocal(onFechar = {}, onSelecionarPdf = { selecionarPdf = true }, onCriar = { titulo, autores, ano, publicacao, resumo ->
                     resultado = listOf(titulo, autores, ano.toString(), publicacao, resumo)
                 })
             }
         }
+        compose.onNodeWithText("Selecionar PDF").performClick()
+        compose.runOnIdle { assertTrue(selecionarPdf) }
         compose.onNodeWithText("Título").performTextInput("Pesquisa local")
         compose.onNodeWithText("Autores").performTextInput("Ana Silva")
         compose.onNodeWithText("Adicionar e abrir").performClick()

@@ -1,5 +1,8 @@
 package com.athenes.ui.library
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -88,6 +91,25 @@ fun BibliotecaScreen(
         }
     }
     val credenciaisZotero = remember(context) { ZoteroCredentialsStore(context) }
+    var pdfNovoArtigoUri by remember { mutableStateOf<Uri?>(null) }
+    var pdfNovoArtigoNome by remember { mutableStateOf<String?>(null) }
+    val escolherPdfNovoArtigo = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val permissao = runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            if (permissao.isFailure) {
+                Toast.makeText(context, "Não foi possível manter acesso ao PDF.", Toast.LENGTH_LONG).show()
+            } else {
+                pdfNovoArtigoUri = uri
+                pdfNovoArtigoNome = runCatching {
+                    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                }.getOrNull() ?: "PDF selecionado"
+            }
+        }
+    }
     var updateBannerDismissed by remember { mutableStateOf(false) }
 
     // Estados da Aba 1 (Escrita)
@@ -191,7 +213,7 @@ fun BibliotecaScreen(
                         }
 
                         Button(
-                            onClick = { novoArtigoAberto = true },
+                            onClick = { pdfNovoArtigoUri = null; pdfNovoArtigoNome = null; novoArtigoAberto = true },
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             modifier = Modifier.heightIn(min = 48.dp).weight(1f),
@@ -505,8 +527,13 @@ fun BibliotecaScreen(
     if (novoArtigoAberto) {
         DialogNovoArtigoLocal(
             onFechar = { novoArtigoAberto = false },
+            pdfNome = pdfNovoArtigoNome,
+            onSelecionarPdf = { escolherPdfNovoArtigo.launch(arrayOf("application/pdf")) },
             onCriar = { titulo, autores, ano, publicacao, resumo ->
                 val artigo = viewModel.criarArtigoLocal(titulo, autores, ano, publicacao, resumo)
+                pdfNovoArtigoUri?.let { uri ->
+                    context.getSharedPreferences("pdf_artigos", 0).edit().putString(artigo.id, uri.toString()).apply()
+                }
                 novoArtigoAberto = false
                 onAbrirLeitorPdf(artigo.id)
             }
@@ -694,6 +721,8 @@ fun BibliotecaScreen(
 @Composable
 fun DialogNovoArtigoLocal(
     onFechar: () -> Unit,
+    pdfNome: String? = null,
+    onSelecionarPdf: () -> Unit = {},
     onCriar: (String, String, Int, String, String) -> Unit
 ) {
     var titulo by rememberSaveable { mutableStateOf("") }
@@ -707,12 +736,15 @@ fun DialogNovoArtigoLocal(
         title = { Text("Novo artigo") },
         text = {
             Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Crie um registro local e vincule um PDF no estúdio.", style = MaterialTheme.typography.bodySmall)
+                Text("Crie um registro local. Você pode vincular um PDF agora ou no estúdio.", style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(titulo, { titulo = it }, label = { Text("Título") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(autores, { autores = it }, label = { Text("Autores") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(ano, { ano = it.filter(Char::isDigit).take(4) }, label = { Text("Ano") }, singleLine = true, modifier = Modifier.fillMaxWidth(), isError = anoValor == null || anoValor !in 1500..2100)
                 OutlinedTextField(publicacao, { publicacao = it }, label = { Text("Publicação") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(resumo, { resumo = it }, label = { Text("Resumo") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+                OutlinedButton(onClick = onSelecionarPdf, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Text(pdfNome ?: "Selecionar PDF")
+                }
             }
         },
         confirmButton = {
