@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -27,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.core.model.Documento
 import com.athenes.core.data.ZoteroCredentialsStore
+import com.athenes.core.data.ZoteroColecoes
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.components.*
 import com.athenes.ui.theme.*
@@ -35,6 +38,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BibliotecaScreen(
     viewModel: BibliotecaViewModel,
@@ -90,6 +94,8 @@ fun BibliotecaScreen(
     val sincronizandoZotero by viewModel.sincronizandoZotero.collectAsState()
     val conectadoZotero by viewModel.conectadoZotero.collectAsState()
     val colecoesZotero by viewModel.colecoesZotero.collectAsState()
+    val colecoesEmArvore = remember(colecoesZotero) { ZoteroColecoes.organizar(colecoesZotero) }
+    var mostrarColecoes by remember { mutableStateOf(false) }
     val tipoZoteroFiltro by viewModel.tipoZoteroFiltro.collectAsState()
     val colecaoZoteroFiltro by viewModel.colecaoZoteroFiltro.collectAsState()
     val anoMinimo by viewModel.anoMinimo.collectAsState()
@@ -377,18 +383,11 @@ fun BibliotecaScreen(
                     }
                 }
                 if (colecoesZotero.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(selected = colecaoZoteroFiltro == null, onClick = { viewModel.filtrarColecaoZotero(null) }, label = { Text("Todas as coleções") })
-                        colecoesZotero.forEach { colecao ->
-                            FilterChip(
-                                selected = colecaoZoteroFiltro == colecao.chave,
-                                onClick = { viewModel.filtrarColecaoZotero(colecao.chave) },
-                                label = { Text(colecao.nome) }
-                            )
-                        }
+                    val colecaoAtiva = colecoesEmArvore.find { it.colecao.chave == colecaoZoteroFiltro }
+                    OutlinedButton(onClick = { mostrarColecoes = true }) {
+                        Icon(Icons.Rounded.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(colecaoAtiva?.caminho ?: "Todas as coleções")
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -573,5 +572,25 @@ fun BibliotecaScreen(
             },
             dismissButton = { TextButton(onClick = { mostrarConexaoZotero = false }) { Text("Cancelar") } }
         )
+    }
+    if (mostrarColecoes) {
+        ModalBottomSheet(onDismissRequest = { mostrarColecoes = false }) {
+            Text("Coleções do Zotero", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 560.dp)) {
+                item {
+                    TextButton(onClick = { viewModel.filtrarColecaoZotero(null); mostrarColecoes = false }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Todas as coleções", modifier = Modifier.fillMaxWidth())
+                    }
+                }
+                items(colecoesEmArvore, key = { it.colecao.chave }) { entrada ->
+                    TextButton(
+                        onClick = { viewModel.filtrarColecaoZotero(entrada.colecao.chave); mostrarColecoes = false },
+                        modifier = Modifier.fillMaxWidth().padding(start = (entrada.nivel * 16).coerceAtMost(96).dp)
+                    ) {
+                        Text(entrada.colecao.nome, modifier = Modifier.fillMaxWidth(), fontWeight = if (entrada.colecao.chave == colecaoZoteroFiltro) FontWeight.Bold else FontWeight.Normal)
+                    }
+                }
+            }
+        }
     }
 }
