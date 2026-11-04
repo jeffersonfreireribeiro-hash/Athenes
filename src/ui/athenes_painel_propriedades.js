@@ -27,7 +27,8 @@ import { montarPainelSumario } from './athenes_sumario_painel.js';
 import { NIVEL_MAX, nivelDe, blocoNumerado, normalizarNumeracaoSecoes, REGEX_NUMERO_MANUAL } from '../core/athenes_sumario.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
 import { montarPainelFiguraVisual, montarPainelTipografiaBloco, papeisTipografiaFigura } from './athenes_figura_ui.js';
-import { qtdSlotsDoLayout, ajustarItensAoLayout } from '../core/athenes_figura_layout.js';
+import { qtdSlotsDoLayout, ajustarItensAoLayout, papelDoSubtipo, fonteDoItem, ehFonteCodigo, FONTES_CONTEUDO } from '../core/athenes_figura_layout.js';
+import { abrirEditorCodigoFigura } from './athenes_figura_codigo_ui.js';
 import { criarSeletorSimbolosMatematica } from './athenes_simbolos_matematica.js';
 import { escapeHtml, registrarListenerSelecaoSegura, obterOuRestaurarSelecaoDoBloco } from '../core/athenes_seguranca.js';
 
@@ -616,6 +617,7 @@ export class PainelPropriedades {
             <option value="diagrama" ${b.subtipo === 'diagrama' ? 'selected' : ''}>Diagrama</option>
             <option value="fluxograma" ${b.subtipo === 'fluxograma' ? 'selected' : ''}>Fluxograma</option>
             <option value="esquema" ${b.subtipo === 'esquema' ? 'selected' : ''}>Esquema</option>
+            <option value="quadro" ${b.subtipo === 'quadro' ? 'selected' : ''}>Quadro (visual)</option>
             <option value="croqui" ${b.subtipo === 'croqui' ? 'selected' : ''}>Croqui</option>
             <option value="mapa" ${b.subtipo === 'mapa' ? 'selected' : ''}>Mapa</option>
             <option value="desenho" ${b.subtipo === 'desenho' ? 'selected' : ''}>Desenho</option>
@@ -660,6 +662,12 @@ export class PainelPropriedades {
                   <strong style="font-size:11.5px; color:#1F2733;">Slot ${idx + 1} (${String.fromCharCode(97 + idx).toUpperCase()})</strong>
                   ${it.url ? `<button type="button" class="rm-ic rm-ic-perigo" data-limpar-slot="${idx}" title="Remover imagem deste campo" style="width:20px; height:20px;">${svgIcone('fechar', 12)}</button>` : ''}
                 </div>
+                ${ehFonteCodigo(fonteDoItem(it).sourceType) ? `
+                <div style="display:flex; gap:8px; align-items:center; padding:6px 8px; border:1px dashed #9DB6D4; border-radius:8px; background:#EAF1FA;">
+                  <b style="font:800 11px ui-monospace,Consolas,monospace; color:#314F79;">&lt;/&gt;</b>
+                  <span style="flex:1; font:700 11.5px var(--glx-font); color:#1F2733;">${escapeHtml(FONTES_CONTEUDO.find(f => f.id === it.sourceType)?.rotulo || 'Código')}</span>
+                  <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" data-editar-codigo-slot="${idx}" style="height:26px; font:800 11px var(--glx-font);">Editar código…</button>
+                </div>` : `
                 <div style="display:flex; gap:10px; align-items:center;">
                   <div style="width:52px; height:52px; border-radius:8px; background:#EFF2F6; border:1px solid #CBD5E1; overflow:hidden; display:grid; place-items:center; flex:none;">
                     ${it.url ? `<img src="${it.url}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="color:#94A3B8; display:inline-flex;">${svgIcone('imagem', 20)}</span>`}
@@ -671,8 +679,9 @@ export class PainelPropriedades {
                       <input type="file" accept="image/*" data-upload-slot="${idx}" hidden>
                     </label>
                     <input type="text" data-url-slot="${idx}" value="${it.url || ''}" placeholder="Ou cole URL da imagem" style="font-size:11px; height:28px; padding:4px 8px; border-radius:8px; box-sizing:border-box;">
+                    <button type="button" class="glx-btn glx-btn-xs glx-btn-soft" data-editar-codigo-slot="${idx}" title="SVG, HTML+CSS, Mermaid ou gráfico JSON" style="height:26px; font:800 11px var(--glx-font);">&lt;/&gt; Inserir via código / vetor…</button>
                   </div>
-                </div>
+                </div>`}
                 ${qtdSlots > 1 ? `
                   <input type="text" data-subleg-slot="${idx}" value="${it.legenda_sub || ''}" placeholder="Sublegenda deste item (ex: Detalhe B)" style="font-size:11px; height:28px; padding:4px 8px; border-radius:8px; box-sizing:border-box;">
                 ` : ''}
@@ -711,6 +720,8 @@ export class PainelPropriedades {
 
       box.querySelector('#rmFigSubtipo').addEventListener('change', e => {
         b.subtipo = e.target.value;
+        b.semanticRole = papelDoSubtipo(b.subtipo);
+        (b.itens || []).forEach(i => { if (i) i.semanticRole = b.semanticRole; });
         recalcularNumeracaoAutomatica(this.doc);
         this.notificarMudanca();
         this.renderizar();
@@ -731,7 +742,12 @@ export class PainelPropriedades {
       montarPainelFiguraVisual(box.querySelector('#athFigPainelVisual'), {
         bloco: b,
         aoAlterar: (chave) => {
-          if (chave === 'layout' || chave === 'subrotulo_tipo') {
+          if (chave === 'semantica') {
+            // classificação mudou: novo prefixo/contador; título e lista automática se atualizam
+            recalcularNumeracaoAutomatica(this.doc);
+            this.notificarMudanca();
+            this.renderizar();
+          } else if (chave === 'layout' || chave === 'subrotulo_tipo') {
             // nº de slots ou tipo de rótulo mudou: refaz campos de imagem e papéis de tipografia do inspetor
             this.notificarMudanca();
             this.renderizar();
@@ -749,7 +765,9 @@ export class PainelPropriedades {
           if (!file) return;
           const reader = new FileReader();
           reader.onload = ev => {
+            b.itens[idx].sourceType = 'image_url';
             b.itens[idx].url = ev.target.result;
+            b.itens[idx].content = ev.target.result;
             b.src = b.itens[0]?.url || '';
             this.notificarMudanca();
             this.renderizar();
@@ -761,7 +779,9 @@ export class PainelPropriedades {
       box.querySelectorAll('[data-url-slot]').forEach(inp => {
         inp.addEventListener('input', () => {
           const idx = parseInt(inp.dataset.urlSlot, 10);
+          b.itens[idx].sourceType = 'image_url';
           b.itens[idx].url = inp.value;
+          b.itens[idx].content = inp.value;
           b.src = b.itens[0]?.url || '';
           this.notificarMudanca();
         });
@@ -772,6 +792,21 @@ export class PainelPropriedades {
           const idx = parseInt(inp.dataset.sublegSlot, 10);
           b.itens[idx].legenda_sub = inp.value;
           this.notificarMudanca();
+        });
+      });
+
+      box.querySelectorAll('[data-editar-codigo-slot]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.editarCodigoSlot, 10);
+          abrirEditorCodigoFigura({
+            doc: this.doc, bloco: b, idx,
+            aoSalvar: (item) => {
+              b.itens[idx] = { ...(b.itens[idx] || {}), ...item, url: '' };
+              b.src = b.itens[0]?.url || '';
+              this.notificarMudanca();
+              this.renderizar();
+            }
+          });
         });
       });
 

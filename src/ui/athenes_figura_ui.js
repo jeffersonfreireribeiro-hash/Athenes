@@ -13,8 +13,10 @@
 
 import {
   LAYOUTS_FIGURA, GAPS_FIGURA, RAIOS_IMG, obterLayoutFigura, obterConfigFigura, descreverFigura,
-  ajustarItensAoLayout, PLACEHOLDER_IMG, AJUSTES_IMG, qtdSlotsDoLayout, SUBROTULO_TIPOS, SUBROTULO_FORMATOS
+  ajustarItensAoLayout, PLACEHOLDER_IMG, AJUSTES_IMG, qtdSlotsDoLayout, SUBROTULO_TIPOS, SUBROTULO_FORMATOS,
+  PAPEIS_SEMANTICOS, papelSemanticoDoBloco, definirPapelSemantico, FUNDOS_CODIGO, PALETAS_FIGURA
 } from '../core/athenes_figura_layout.js';
+import { montarConteudoCodigoDom } from './athenes_figura_codigo_ui.js';
 import { rotuloDaFigura } from '../core/athenes_documento.js';
 import { FONTES_SISTEMA, estiloParaCssComAlinhamento, localizarEstilo } from '../core/athenes_estilos.js';
 
@@ -214,7 +216,9 @@ const ROT = {
   largura_modo: { corpo: 'Largura do texto', estendida: 'Estendida até a margem', pagina: 'Largura total da página', pct: 'Porcentagem personalizada' },
   alinhamento_bloco: { esquerda: 'Alinhar à esquerda', centro: 'Centralizar', direita: 'Alinhar à direita' },
   fluxo: { em_linha: 'Em linha (sem contorno)', contornar_esq: 'Texto contorna à direita da figura', contornar_dir: 'Texto contorna à esquerda da figura' },
-  estilo_traco: { solida: 'Traço contínuo', tracejada: 'Traço tracejado' }
+  estilo_traco: { solida: 'Traço contínuo', tracejada: 'Traço tracejado' },
+  codigo_fundo: { transparente: 'Transparente (usa o fundo da folha)', branco: 'Branco', suave: 'Cinza suave' },
+  codigo_paleta: { tema: 'Cores do tema', vivida: 'Cores vivas', cinza: 'Escala de cinza (impressão P&B)' }
 };
 
 /** Lista (ícone + nome) das opções de um tipo, a partir do dicionário `ROT`. */
@@ -253,12 +257,18 @@ export function construirGradeFiguraDom(b, opc = {}) {
     mold.className = 'ath-fig-moldura';
     Object.assign(mold.style, it.moldura);
 
-    const img = document.createElement('img');
-    img.alt = it.legenda_sub || 'Ilustração';
-    img.src = it.url || PLACEHOLDER_IMG;
-    img.draggable = false;
-    Object.assign(img.style, it.img);
-    mold.appendChild(img);
+    if (it.sourceType && it.sourceType !== 'image_url') {
+      // figura por código: o resultado aparece como qualquer figura; o código fica oculto (abre em "Editar código")
+      montarConteudoCodigoDom(mold, b, (b.itens || [])[it.idx] || {}, it.idx, opc.doc || { estilos: opc.estilos });
+      cel.dataset.fonte = it.sourceType;
+    } else {
+      const img = document.createElement('img');
+      img.alt = it.legenda_sub || 'Ilustração';
+      img.src = it.url || PLACEHOLDER_IMG;
+      img.draggable = false;
+      Object.assign(img.style, it.img);
+      mold.appendChild(img);
+    }
 
     const estRotulo = localizarEstilo(opc.estilos, d.cfg.subrotulo_texto_estilo_id);
     const estSub = localizarEstilo(opc.estilos, d.cfg.sublegenda_estilo_id);
@@ -304,22 +314,32 @@ export function construirGradeFiguraDom(b, opc = {}) {
  * Barra flutuante da imagem selecionada: trocar, enquadramento, ponto focal e limpar.
  * @param {{b:object, idx:number, aoAlterar:()=>void, aoTrocarImagem:(idx:number)=>void, aoLimpar:(idx:number)=>void}} p
  */
-export function criarBarraItemFigura({ b, idx, aoAlterar, aoTrocarImagem, aoLimpar }) {
+export function criarBarraItemFigura({ b, idx, aoAlterar, aoTrocarImagem, aoLimpar, aoEditarCodigo }) {
   garantirCss();
   const it = (b.itens || [])[idx] || {};
   const cfg = obterConfigFigura(b);
+  const ehCodigo = !!it.sourceType && it.sourceType !== 'image_url';
   const barra = document.createElement('div');
   barra.className = 'ath-fig-barra-item';
   barra.addEventListener('click', e => e.stopPropagation());
   barra.addEventListener('dblclick', e => e.stopPropagation());
 
+  const sep = () => { const s = document.createElement('span'); s.className = 'sep'; return s; };
   const trocar = document.createElement('button');
-  trocar.type = 'button'; trocar.className = 'ath-ic-bt'; trocar.title = 'Trocar imagem';
+  trocar.type = 'button'; trocar.className = 'ath-ic-bt'; trocar.title = ehCodigo ? 'Trocar por uma imagem enviada' : 'Trocar imagem';
   trocar.innerHTML = iconeOpcao('trocar');
   trocar.addEventListener('click', () => aoTrocarImagem(idx));
   barra.appendChild(trocar);
 
-  const sep = () => { const s = document.createElement('span'); s.className = 'sep'; return s; };
+  if (aoEditarCodigo) {
+    const cod = document.createElement('button');
+    cod.type = 'button'; cod.className = 'ath-ic-bt'; cod.title = ehCodigo ? 'Editar código (SVG, HTML, Mermaid, gráfico JSON)' : 'Inserir via código / vetor';
+    cod.innerHTML = '<b style="font:800 11px ui-monospace,Consolas,monospace;letter-spacing:-.5px">&lt;/&gt;</b>';
+    if (ehCodigo) cod.setAttribute('aria-pressed', 'true');
+    cod.addEventListener('click', () => aoEditarCodigo(idx));
+    barra.appendChild(cod);
+  }
+  if (ehCodigo) return barra; // enquadramento/foco só fazem sentido para imagens raster
   barra.appendChild(sep());
   barra.appendChild(criarGrupoIcones({
     opcoes: AJUSTES_IMG.map(k => ({ valor: k, rotulo: ROT.ajuste[k], icone: iconeOpcao('ajuste', k) })),
@@ -420,6 +440,15 @@ export function montarPainelFiguraVisual(el, ctx) {
     return l;
   };
 
+  // 0. Classificação semântica: define prefixo da legenda, contador e lista automática
+  const papelAtual = papelSemanticoDoBloco(b);
+  secao('Classificação (prefixo e numeração)', criarGrupoIcones({
+    opcoes: [...PAPEIS_SEMANTICOS.map(p => ({ valor: p.id, rotulo: `${p.rotulo} — "${p.prefixo} 1"`, icone: svg(`<text x="12" y="12.5" text-anchor="middle" font-size="7" font-weight="800" fill="currentColor" stroke="none">${p.prefixo.slice(0, 3)}</text>`) })),
+      { valor: 'other', rotulo: 'Outro (rótulo personalizado)', icone: svg('<text x="12" y="12.5" text-anchor="middle" font-size="7" font-weight="800" fill="currentColor" stroke="none">…</text>') }],
+    valor: papelAtual, rotulo: 'Classificação', modo: 'lista',
+    aoMudar: (v) => { definirPapelSemantico(b, v); ctx.aoAlterar('semantica'); remontar(); }
+  }));
+
   // 1. Disposição (layouts com ícone dedicado)
   secao('Disposição das imagens', criarGrupoIcones({
     opcoes: LAYOUTS_FIGURA.map(l => ({ valor: l.id, rotulo: l.rotulo, icone: iconeLayout(l.id) })),
@@ -453,6 +482,17 @@ export function montarPainelFiguraVisual(el, ctx) {
     campo('Cor da linha', cor),
     ['Traço', grupo('estilo_traco', cfg.img_borda_estilo, v => set('img_borda_estilo', v), ['solida', 'tracejada'])],
     ['Cantos', grupo('img_raio', cfg.img_raio, v => set('img_raio', v), Object.keys(RAIOS_IMG))]);
+
+  // 4b. Figuras por código: fundo do contêiner e paleta herdada por Mermaid/gráficos
+  secao('Figuras por código',
+    ['Fundo', criarGrupoIcones({
+      opcoes: FUNDOS_CODIGO.map(k => ({ valor: k, rotulo: ROT.codigo_fundo[k], icone: svg(`<rect x="3" y="2" width="18" height="14" rx="1.5" ${k === 'transparente' ? 'stroke-dasharray="2 2"' : `fill="${k === 'branco' ? '#fff' : '#E2E8F0'}"`}/>`) })),
+      valor: cfg.codigo_fundo, modo: 'lista', aoMudar: v => set('codigo_fundo', v)
+    })],
+    ['Paleta (Mermaid e gráficos)', criarGrupoIcones({
+      opcoes: PALETAS_FIGURA.map(k => ({ valor: k, rotulo: ROT.codigo_paleta[k], icone: svg(`<rect x="3" y="4" width="5" height="10" fill="${{ tema: '#314F79', vivida: '#2563EB', cinza: '#1F2937' }[k]}" stroke="none"/><rect x="9.5" y="7" width="5" height="7" fill="${{ tema: '#D97706', vivida: '#F59E0B', cinza: '#6B7280' }[k]}" stroke="none"/><rect x="16" y="9" width="5" height="5" fill="${{ tema: '#0F766E', vivida: '#10B981', cinza: '#D1D5DB' }[k]}" stroke="none"/>`) })),
+      valor: cfg.codigo_paleta, modo: 'lista', aoMudar: v => set('codigo_paleta', v)
+    })]);
 
   // 5. Sombra
   secao('Sombra projetada', grupo('img_sombra', cfg.img_sombra, v => set('img_sombra', v), ['nenhuma', 'suave', 'media', 'elevada']));

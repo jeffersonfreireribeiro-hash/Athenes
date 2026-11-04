@@ -72,7 +72,9 @@ import { cssMarcadoresNota, obterConfigNotas, criarNotaRodape, htmlMarcadorNota,
 import { construirAreaPaginaDom, construirNotasDom, abrirEditorNota, fecharEditorNota } from './athenes_pagina_ui.js';
 import { ModalConfigPagina } from './athenes_config_pagina_modal.js';
 import { construirGradeFiguraDom, criarBarraItemFigura, criarBotaoLayoutFigura } from './athenes_figura_ui.js';
-import { descreverFigura } from '../core/athenes_figura_layout.js';
+import { descreverFigura, papelDoSubtipo, ehFonteCodigo, fonteDoItem, obterPapelSemantico } from '../core/athenes_figura_layout.js';
+import { abrirModalInserirFigura, abrirEditorCodigoFigura } from './athenes_figura_codigo_ui.js';
+import { exemploDeCodigo } from '../core/athenes_figura_codigo.js';
 import { ModalEditorEstilo } from './athenes_editor_estilo_modal.js';
 import { ModalCentralEstilos } from './athenes_central_estilos_modal.js';
 import { sanearDocumentoEstilos, sanearHtmlTexto, aplicarEstilosDeTrecho, ehBlocoDeTexto, ajusteDeFragmento } from '../core/athenes_estilo_exclusivo.js';
@@ -117,6 +119,7 @@ function resumoBloco(b) {
 
 const MENUS_BLOCO = {
   figura: [
+    { tipo: 'figura', acao: 'modal_figura', icone: 'figura', rotulo: 'Nova figura…', desc: 'Para que vai servir? Gráfico, figura, diagrama, esquema ou quadro — upload ou código (SVG, HTML, Mermaid, JSON)' },
     { tipo: 'figura', subtipo: 'figura', icone: 'imagem', rotulo: 'Figura', desc: 'Imagem, esquema ou ilustração numerada' },
     { tipo: 'figura', subtipo: 'grafico', icone: 'grafico', rotulo: 'Gráfico', desc: 'Barras, linhas, dispersão — numeração própria' },
     { tipo: 'figura', subtipo: 'fotografia', icone: 'fotografia', rotulo: 'Fotografia', desc: 'Registro fotográfico, com fonte e crédito' },
@@ -1965,6 +1968,11 @@ export class EditorView {
         ev.stopPropagation();
         const it = itens[Number(el.dataset.i)];
         fecharTodos();
+        if (it.acao === 'modal_figura') {
+          if (modoSomenteLeitura(this.modoTrabalho)) { alert('O documento está em um modo somente leitura (Leitura ou Comparar). Mude para Edição ou Sugestão no topo para inserir blocos.'); return; }
+          abrirModalInserirFigura({ aoConfirmar: (r) => this.inserirFiguraClassificada(r, adicionar) });
+          return;
+        }
         const dados = it.tipo === 'figura'
           ? { subtipo: it.subtipo, titulo: `${it.rotulo} — Descrição` }
           : (it.tipo === 'quadro' ? { titulo: 'Quadro — Dados conceituais' } : (it.tipo === 'tabela' ? { titulo: 'Tabela — Dados quantitativos' } : {}));
@@ -2373,8 +2381,10 @@ export class EditorView {
       idx: sel.idx,
       aoAlterar: () => { this.notificarMudancaRapida(); this.reconstruirFigura(bloco.id); },
       aoTrocarImagem: (i) => this.escolherImagemItemFigura(bloco, i),
+      aoEditarCodigo: (i) => this.editarCodigoItemFigura(bloco, i),
       aoLimpar: (i) => {
         bloco.itens[i].url = '';
+        bloco.itens[i].content = '';
         bloco.src = bloco.itens[0]?.url || '';
         this.notificarMudanca();
         this.reconstruirFigura(bloco.id);
@@ -2384,6 +2394,37 @@ export class EditorView {
 
   reconstruirFigura(blocoId) {
     this.container?.querySelector(`.ath-bloco-folha[data-bloco-id="${blocoId}"]`)?._reconstruirFigura?.();
+  }
+
+  /** Modal dividido (código | prévia ao vivo) do slot `idx`; um slot de imagem vira figura por código ao aplicar. */
+  editarCodigoItemFigura(b, idx) {
+    if (modoSomenteLeitura(this.modoTrabalho)) return;
+    abrirEditorCodigoFigura({
+      doc: this.doc, bloco: b, idx,
+      aoSalvar: (item) => {
+        if (!Array.isArray(b.itens)) b.itens = [];
+        b.itens[idx] = { ...(b.itens[idx] || {}), ...item, url: '' };
+        b.src = b.itens[0]?.url || '';
+        this.notificarMudanca();
+        this.renderizar();
+      }
+    });
+  }
+
+  /** "Nova figura…": cria o bloco já classificado (prefixo/numeração/proporção) e abre upload ou editor de código. */
+  inserirFiguraClassificada({ papel, sourceType }, adicionar) {
+    const p = obterPapelSemantico(papel);
+    const codigo = ehFonteCodigo(sourceType);
+    adicionar('figura', {
+      semanticRole: papel,
+      subtipo: p?.subtipo,
+      titulo: `${p?.prefixo || 'Figura'} — Descrição`,
+      itens: [{ id: 'fig_item_' + Date.now().toString(36), url: '', legenda_sub: 'Visão geral', sourceType: codigo ? sourceType : 'image_url', content: codigo ? exemploDeCodigo(sourceType) : '' }]
+    });
+    const b = this.blocoSelecionado;
+    if (!b) return;
+    if (codigo) this.editarCodigoItemFigura(b, 0);
+    else this.escolherImagemItemFigura(b, 0);
   }
 
   /** Abre o seletor de arquivo e grava a imagem (data URL, offline) no slot `idx`. */
@@ -2397,7 +2438,10 @@ export class EditorView {
       const leitor = new FileReader();
       leitor.onload = (e) => {
         if (!Array.isArray(b.itens)) b.itens = [];
-        (b.itens[idx] ||= { url: '', legenda_sub: '' }).url = e.target.result;
+        const item = (b.itens[idx] ||= { url: '', legenda_sub: '' });
+        item.sourceType = 'image_url'; // volta a ser imagem enviada (descarta o código do slot)
+        item.url = e.target.result;
+        item.content = e.target.result;
         b.src = b.itens[0]?.url || '';
         this.notificarMudanca();
         this.reconstruirFigura(b.id);
@@ -2874,6 +2918,7 @@ export class EditorView {
         { id: 'diagrama', nome: 'Diagrama' },
         { id: 'fluxograma', nome: 'Fluxo' },
         { id: 'esquema', nome: 'Esquema' },
+        { id: 'quadro', nome: 'Quadro' },
         { id: 'croqui', nome: 'Croqui' },
         { id: 'desenho', nome: 'Desenho' },
         { id: 'ilustracao', nome: 'Ilustração' }
@@ -2881,6 +2926,8 @@ export class EditorView {
       selSub.innerHTML = subtipos.map(s => `<option value="${s.id}" ${(b.subtipo || 'figura') === s.id ? 'selected' : ''}>${s.nome}</option>`).join('');
       selSub.addEventListener('change', e => {
         b.subtipo = e.target.value;
+        b.semanticRole = papelDoSubtipo(b.subtipo); // o subtipo escolhido manda (Foto/Fluxo/… seguem na mesma categoria)
+        (b.itens || []).forEach(it => { if (it) it.semanticRole = b.semanticRole; });
         b.titulo = obterTituloCompletoComNumeracao(b);
         this.notificarMudanca();
         this.renderizar();
@@ -3248,10 +3295,15 @@ export class EditorView {
         estilos: this.doc.estilos,
         interativo: true,
         selecionadoIdx: this._itemFigura?.id === b.id ? this._itemFigura.idx : null,
+        doc: this.doc, // figuras por código herdam tipografia/paleta do documento
         // clique único na imagem: seleciona a figura individual (barra flutuante + painel do bloco)
         aoClicarItem: (idx, ev) => { ev.stopPropagation(); this.selecionarItemFigura(b, pag, idx); },
-        // duplo clique: troca a imagem do slot
-        aoDuploClique: (idx, ev) => { ev.stopPropagation(); this.escolherImagemItemFigura(b, idx); }
+        // duplo clique: figura por código abre o editor de código; imagem abre o seletor de arquivo
+        aoDuploClique: (idx, ev) => {
+          ev.stopPropagation();
+          if (ehFonteCodigo(fonteDoItem((b.itens || [])[idx]).sourceType)) this.editarCodigoItemFigura(b, idx);
+          else this.escolherImagemItemFigura(b, idx);
+        }
       }).grid;
       let grid = montarGrade();
       aplicarBlocoFig();

@@ -482,6 +482,7 @@ INSTRUÇÕES DE ANÁLISE:
    - img_moldura: "nenhuma" | "fina" | "dupla" | "passe_partout"; img_borda_largura_pt (0.25-6), img_borda_estilo ("solida"|"tracejada"), img_borda_cor (#RRGGBB); img_raio: "reto" | "discreto" | "arredondado" | "pilula"; img_sombra: "nenhuma" | "suave" | "media" | "elevada".
    - ajuste_enquadramento: "contain" | "cover" | "fill"; foco_x/foco_y (0-100, ponto focal); proporcao_imagem: "livre" | "16/9" | "4/3" | "1/1" | "3/4" | "9/16".
    - largura_modo: "corpo" | "estendida" | "pagina" | "pct" (com largura_pct 20-100); alinhamento_bloco: "esquerda" | "centro" | "direita"; fluxo: "em_linha" | "contornar_esq" | "contornar_dir".
+   - Figuras por código (SVG, HTML+CSS, Mermaid, gráficos JSON — conteúdo do bloco, não do tema): codigo_fundo: "transparente" | "branco" | "suave" (fundo do contêiner da figura por código); codigo_paleta: "tema" (cor primária do tema + complementares) | "vivida" | "cinza" (impressão P&B com hachuras); Mermaid e gráficos herdam também a tipografia do estilo de corpo. A proporção padrão por categoria é dada por proporcao_imagem (ex.: gráfico "4/3", diagrama "16/9"). Classificação semântica do bloco (semanticRole: chart/figure/diagram/scheme/frame) define o prefixo da legenda (Gráfico, Figura, Diagrama, Esquema, Quadro) e não faz parte do tema.
 
 5. ESTILO DE CÉLULAS DE TABELAS E QUADROS ("estilo_tabela" dentro de layout_padrao_figuras.tabela e .quadro):
    - bordas.externas {t,r,b,l} e bordas.internas {h,v}: cada aresta é null (sem borda) ou { "largura_pt": 0.25-6, "estilo": "solida"|"tracejada"|"pontilhada"|"dupla", "cor": "#RRGGBB" }.
@@ -786,7 +787,9 @@ Responda EXCLUSIVAMENTE com o bloco JSON válido abaixo, sem texto antes ou depo
         "largura_modo": "corpo",
         "largura_pct": 100,
         "alinhamento_bloco": "centro",
-        "fluxo": "em_linha"
+        "fluxo": "em_linha",
+        "codigo_fundo": "transparente",
+        "codigo_paleta": "tema"
       }
     },
     "tabela": {

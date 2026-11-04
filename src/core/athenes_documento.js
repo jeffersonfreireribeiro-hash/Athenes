@@ -10,7 +10,9 @@ import { parametrosTextoPt, linhasEstimadas, lacunasInternasPt, alturaTabelaPt, 
 import { garantirEstilosDeTitulos } from './athenes_estilos.js';
 import { aplicarRegrasMestraNasPaginas, vincularOverridesAsPaginas } from './athenes_mestra_canvas.js';
 import { criarEstilosPadrao, PERFIS_FORMATACAO } from './athenes_estilos.js';
-import { obterLayoutFigura, CHAVES_ESTILO_FIGURA } from './athenes_figura_layout.js';
+import {
+  obterLayoutFigura, CHAVES_ESTILO_FIGURA, PAPEIS_VALIDOS, obterPapelSemantico, papelDoSubtipo, migrarBlocoFigura
+} from './athenes_figura_layout.js';
 import { geometriaCorpoMm, calcularNumerosExibidos } from './athenes_paginacao.js';
 import {
   obterConfigNotas, idsNotasDoBloco, alturaSegmentoPt, alturaSeparadorPt, ajustarNotasAoEspaco, rotularNotas, PT_POR_MM
@@ -34,6 +36,7 @@ export const ROTULOS_FIGURA = Object.freeze({
   diagrama: 'Diagrama',
   fluxograma: 'Fluxograma',
   esquema: 'Esquema',
+  quadro: 'Quadro', // quadro visual por código: divide o contador (e a lista) com os quadros de texto
   croqui: 'Croqui',
   desenho: 'Desenho',
   ilustracao: 'Ilustração',
@@ -327,7 +330,16 @@ export function criarNovoBloco(tipo, dados = {}) {
 
     case 'figura':
       b.tipo = 'figura';
+      // classificação semântica ("Para que vai servir?"): define subtipo (prefixo + contador independente) e proporção padrão
       b.subtipo = ROTULOS_FIGURA[dados.subtipo] ? dados.subtipo : 'figura';
+      if (PAPEIS_VALIDOS.includes(dados.semanticRole)) {
+        const papel = obterPapelSemantico(dados.semanticRole);
+        if (papel && !ROTULOS_FIGURA[dados.subtipo]) b.subtipo = papel.subtipo;
+        b.semanticRole = dados.semanticRole;
+        if (papel && dados.proporcao_imagem === undefined) dados = { ...dados, proporcao_imagem: papel.proporcao };
+      } else {
+        b.semanticRole = papelDoSubtipo(b.subtipo);
+      }
       b.titulo = dados.titulo || `${ROTULOS_FIGURA[b.subtipo]} 1 — Descrição detalhada da ilustração`;
       b.layout = dados.layout || '1'; // '1', '2_lado', '2_empilhado', '3_linha', '3_misto', '4_grade', '6_grade'
       b.itens = Array.isArray(dados.itens) ? dados.itens : [
@@ -349,6 +361,7 @@ export function criarNovoBloco(tipo, dados = {}) {
         if (dados[k] !== undefined && k !== 'layout' && k !== 'largura_pct') b[k] = dados[k];
       }
       if (dados.largura_pct !== undefined) b.largura_pct = dados.largura_pct;
+      migrarBlocoFigura(b); // itens antigos (só `url`) viram image_url + content
       break;
 
     case 'mapa':
@@ -1241,8 +1254,10 @@ export function recalcularNumeracaoAutomatica(doc) {
       const forcarAuto = b.numeracao_automatica === true;
       if (b.tipo === 'figura' || b.tipo === 'imagem') {
         const sub = b.tipo === 'imagem' ? 'figura' : (ROTULOS_FIGURA[b.subtipo] ? b.subtipo : 'figura');
+        migrarBlocoFigura(b); // documentos antigos: image_url + semanticRole derivados do subtipo
         porSubtipo[sub] = (porSubtipo[sub] || 0) + 1;
-        b.numero_sequencial = porSubtipo[sub];
+        // "Quadro" por código divide o contador com os quadros de texto (mesma lista e mesmo prefixo)
+        b.numero_sequencial = sub === 'quadro' ? ++cont.quadro : porSubtipo[sub];
         const rotulo = ROTULOS_FIGURA[sub];
         const sepAnt = b.legenda_sep;
         b.legenda_sep = separadorLegenda(doc, b);
@@ -1315,7 +1330,7 @@ export function aplicarNumeracaoNoTitulo(bloco, doc) {
 export function removerPrefixoNumeracaoTitulo(titulo, tipo = 'figura', subtipo = 'figura') {
   if (!titulo) return '';
   let limpo = String(titulo).trim();
-  const todosRotulos = ['Figura', 'Gráfico', 'Grafico', 'Fotografia', 'Diagrama', 'Fluxograma', 'Ilustração', 'Ilustracao', 'Foto', 'Tabela', 'Quadro', 'Mapa', 'Fórmula', 'Formula', 'Equação', 'Equacao'];
+  const todosRotulos = ['Figura', 'Gráfico', 'Grafico', 'Fotografia', 'Diagrama', 'Fluxograma', 'Esquema', 'Croqui', 'Ilustração', 'Ilustracao', 'Foto', 'Tabela', 'Quadro', 'Mapa', 'Fórmula', 'Formula', 'Equação', 'Equacao'];
   const regex = new RegExp(`^(${todosRotulos.join('|')})\\s*\\d*\\s*(?:[-—–:]+|\\.(?=\\s))?\\s*`, 'i');
   let anterior = '';
   // Remove prefixos encadeados para desarmar repetições como "Figura 1 — Figura 1asdasdasd"
@@ -1459,7 +1474,7 @@ export function gerarListaQuadros(doc) {
   const lista = [];
   for (const sec of doc.secoes || []) {
     for (const b of sec.blocos || []) {
-      if (b.tipo === 'quadro') {
+      if (b.tipo === 'quadro' || (b.tipo === 'figura' && b.subtipo === 'quadro')) {
         lista.push({
           id: b.id,
           tipo: 'quadro',
@@ -1487,7 +1502,7 @@ export function resolverReferenciasCruzadas(texto, doc) {
     for (const b of sec.blocos || []) mapaBlocos.set(b.id, b);
   }
 
-  const tipos = 'figura|grafico|fotografia|diagrama|fluxograma|mapa|tabela|quadro|formula|equacao';
+  const tipos = 'figura|grafico|fotografia|diagrama|fluxograma|esquema|croqui|desenho|ilustracao|mapa|tabela|quadro|formula|equacao';
   const regex = new RegExp('\\[ref:(' + tipos + '):([a-zA-Z0-9_-]+)\\]', 'gi');
   return texto.replace(regex, (match, tipo, id) => {
     const b = mapaBlocos.get(id);

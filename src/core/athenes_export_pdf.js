@@ -22,6 +22,7 @@ import { ajusteDeFragmento, aplicarEstilosDeTrecho } from './athenes_estilo_excl
 import { geometriaCorpoMm, resolverAreasPagina } from './athenes_paginacao.js';
 import { obterConfigNotas, aplicarRotulosNotasHtml, sanitizarHtmlNota, cssMarcadoresNota } from './athenes_notas_rodape.js';
 import { descreverFigura, cssObjParaString, PLACEHOLDER_IMG } from './athenes_figura_layout.js';
+import { marcacaoItemCodigo } from './athenes_figura_codigo.js';
 import { obterEstiloTabela, dimensoesTabela, resolverCelula, celulaParaCss, tabelaParaCss } from './athenes_tabela_estilo.js';
 import { rotuloDaFigura, gerarSumarioDinamico, modeloDaPagina, formatarNumeroPagina, gerarCssMolduraBloco, repaginarDocumento, colapsoEntreBlocosPt, margensTextoPt, obterTituloCompletoComNumeracao, obterPrefixoNumeracao, recalcularNumeracaoAutomatica } from './athenes_documento.js';
 
@@ -222,6 +223,15 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       const d = descreverFigura(bloco, { margens_mm: opcoes.margens_mm || { l: 25, r: 20 }, permitirFlutuar: true });
       const rot = rotuloDaFigura(bloco);
 
+      // conteúdo do slot: imagem (url) ou figura por código (SVG/Mermaid/gráfico JSON → SVG vetorial; HTML+CSS escopado)
+      const conteudoItem = (it) => {
+        if (it.sourceType && it.sourceType !== 'image_url') {
+          const m = marcacaoItemCodigo(bloco, (bloco.itens || [])[it.idx] || {}, it.idx, documento);
+          if (m.ok) return m.html;
+          return '<div style="padding:10px; color:#B91C1C; font-size:9pt; border:1px dashed #FCA5A5; background:#FEF2F2">Figura por código com erro: ' + escaparHtml((m.erros[0] && m.erros[0].mensagem) || 'conteúdo inválido') + '</div>';
+        }
+        return '<img src="' + escaparHtml(it.url || PLACEHOLDER_IMG) + '" alt="" style="' + cssObjParaString({ ...it.img, ...(it.img.maxHeight === undefined && !it.img.height ? { maxHeight: '65mm' } : {}) }) + '">';
+      };
       const itensHtml = d.itens.map((it) => {
         const cssRotulo = cssTextoPapel(bloco, 'subrotulo_texto', estilosMap, null, 'font-weight:800; font-size:9pt; color:#1F2733;');
         const cssSub = cssTextoPapel(bloco, 'sublegenda', estilosMap, null, 'font-size:9pt; color:#64748B; font-style:italic;');
@@ -236,7 +246,7 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
         }
         return '<div style="' + cssObjParaString(it.celula) + '">' +
           '<div style="' + cssObjParaString(it.moldura) + '">' +
-            '<img src="' + escaparHtml(it.url || PLACEHOLDER_IMG) + '" alt="" style="' + cssObjParaString({ ...it.img, ...(it.img.maxHeight === undefined && !it.img.height ? { maxHeight: '65mm' } : {}) }) + '">' +
+            conteudoItem(it) +
             chip +
           '</div>' +
           legenda +

@@ -12,7 +12,10 @@
  *   img_moldura, img_borda_largura_pt, img_borda_estilo, img_borda_cor, img_raio, img_sombra,
  *   ajuste_enquadramento, foco_x, foco_y, proporcao_imagem, altura_modo,
  *   largura_modo, largura_pct, alinhamento_bloco, fluxo
- * Por item (`itens[i]`): url, legenda_sub, ajuste, foco_x, foco_y.
+ *   codigo_fundo, codigo_paleta  (figuras por código: fundo do contêiner e paleta herdada por Mermaid/gráficos)
+ * Por item (`itens[i]`): url, legenda_sub, ajuste, foco_x, foco_y e, para figuras por código,
+ *   sourceType ('image_url'|'svg_code'|'html_code'|'mermaid_code'|'chart_json') + content (URL ou código).
+ * Por bloco: semanticRole ('chart'|'figure'|'diagram'|'scheme'|'frame'|'other') — define o prefixo da legenda e a numeração.
  */
 
 // ───────────────────────────── Layouts do subgrid ─────────────────────────────
@@ -55,6 +58,7 @@ export function ajustarItensAoLayout(bloco) {
     bloco.itens.push({ url: '', legenda_sub: `Item ${String.fromCharCode(97 + bloco.itens.length).toUpperCase()}` });
   }
   if (q === 1 && bloco.itens[0]) bloco.src = bloco.itens[0].url || bloco.src || '';
+  migrarBlocoFigura(bloco);
   return bloco.itens;
 }
 
@@ -78,6 +82,96 @@ export const LARGURAS_BLOCO = ['corpo', 'estendida', 'pagina', 'pct'];
 export const ALINHAMENTOS_BLOCO = ['esquerda', 'centro', 'direita'];
 export const FLUXOS = ['em_linha', 'contornar_esq', 'contornar_dir'];
 export const PROPORCOES = ['livre', '16/9', '4/3', '1/1', '3/4', '9/16'];
+export const FUNDOS_CODIGO = ['transparente', 'branco', 'suave'];
+export const FUNDOS_CODIGO_CSS = Object.freeze({ transparente: '', branco: '#FFFFFF', suave: '#F8FAFC' });
+export const PALETAS_FIGURA = ['tema', 'vivida', 'cinza'];
+
+// ───────────────────────────── Classificação semântica e fonte do conteúdo ─────────────────────────────
+
+/**
+ * "Para que vai servir?": a escolha define prefixo da legenda, contador de numeração, lista automática
+ * e a proporção padrão do contêiner. `subtipo` é o identificador de numeração (ver ROTULOS_FIGURA).
+ */
+export const PAPEIS_SEMANTICOS = Object.freeze([
+  { id: 'chart', rotulo: 'Gráfico', subtipo: 'grafico', prefixo: 'Gráfico', lista: 'Lista de Gráficos', proporcao: '4/3', fontePadrao: 'chart_json', desc: 'Dados em barras, linhas, dispersão, pizza ou boxplot' },
+  { id: 'figure', rotulo: 'Figura / Imagem', subtipo: 'figura', prefixo: 'Figura', lista: 'Lista de Figuras', proporcao: 'livre', fontePadrao: 'image_url', desc: 'Fotografia, ilustração ou imagem enviada' },
+  { id: 'diagram', rotulo: 'Diagrama / Fluxograma', subtipo: 'diagrama', prefixo: 'Diagrama', lista: 'Lista de Diagramas', proporcao: '16/9', fontePadrao: 'mermaid_code', desc: 'Processos, relações e estruturas entre elementos' },
+  { id: 'scheme', rotulo: 'Esquema / Representação técnica', subtipo: 'esquema', prefixo: 'Esquema', lista: 'Lista de Esquemas', proporcao: '4/3', fontePadrao: 'svg_code', desc: 'Desenho técnico vetorial, croqui ou esquema conceitual' },
+  { id: 'frame', rotulo: 'Quadro', subtipo: 'quadro', prefixo: 'Quadro', lista: 'Lista de Quadros', proporcao: '16/9', fontePadrao: 'html_code', desc: 'Quadro visual em HTML+CSS (numeração compartilhada com os quadros de texto)' }
+]);
+const PAPEL_POR_ID = new Map(PAPEIS_SEMANTICOS.map(p => [p.id, p]));
+export const PAPEIS_VALIDOS = Object.freeze([...PAPEL_POR_ID.keys(), 'other']);
+
+const SUBTIPO_PARA_PAPEL = Object.freeze({
+  grafico: 'chart', figura: 'figure', fotografia: 'figure', ilustracao: 'figure', desenho: 'figure', croqui: 'figure',
+  diagrama: 'diagram', fluxograma: 'diagram', esquema: 'scheme', quadro: 'frame', personalizado: 'other'
+});
+
+export function papelDoSubtipo(subtipo) { return SUBTIPO_PARA_PAPEL[subtipo] || 'figure'; }
+export function obterPapelSemantico(id) { return PAPEL_POR_ID.get(id) || null; }
+
+export const FONTES_CONTEUDO = Object.freeze([
+  { id: 'image_url', rotulo: 'Imagem (arquivo ou URL)', codigo: false },
+  { id: 'svg_code', rotulo: 'SVG (vetor)', codigo: true, linguagem: 'SVG' },
+  { id: 'html_code', rotulo: 'HTML + CSS', codigo: true, linguagem: 'HTML' },
+  { id: 'mermaid_code', rotulo: 'Mermaid (diagrama)', codigo: true, linguagem: 'Mermaid' },
+  { id: 'chart_json', rotulo: 'Gráfico (JSON)', codigo: true, linguagem: 'JSON' }
+]);
+const FONTES_IDS = FONTES_CONTEUDO.map(f => f.id);
+export const ehFonteCodigo = (t) => FONTES_IDS.includes(t) && t !== 'image_url';
+
+/** Papel semântico efetivo do bloco (campo explícito, senão derivado do subtipo — documentos antigos). */
+export function papelSemanticoDoBloco(b) {
+  if (b && PAPEIS_VALIDOS.includes(b.semanticRole)) return b.semanticRole;
+  return papelDoSubtipo(b?.subtipo || 'figura');
+}
+
+/** Item sem mutar: fonte e conteúdo efetivos (item legado só com `url` = image_url). */
+export function fonteDoItem(it = {}) {
+  const tipo = FONTES_IDS.includes(it.sourceType) ? it.sourceType : 'image_url';
+  const conteudo = tipo === 'image_url' ? String(it.url ?? it.content ?? '') : String(it.content ?? '');
+  return { sourceType: tipo, content: conteudo, codigo: tipo !== 'image_url' };
+}
+
+export function itemTemConteudo(it) {
+  const f = fonteDoItem(it);
+  return f.codigo ? f.content.trim().length > 0 : f.content.length > 0;
+}
+
+/**
+ * Migração idempotente: documentos antigos (só imagem) ganham sourceType 'image_url' + content e semanticRole
+ * derivado do subtipo. Mantém `url` e `content` sincronizados para imagens.
+ */
+export function migrarBlocoFigura(b) {
+  if (!b || (b.tipo !== 'figura' && b.tipo !== 'imagem')) return b;
+  if (!PAPEIS_VALIDOS.includes(b.semanticRole)) b.semanticRole = papelSemanticoDoBloco(b);
+  if (Array.isArray(b.itens)) {
+    for (const it of b.itens) {
+      if (!it || typeof it !== 'object') continue;
+      if (!FONTES_IDS.includes(it.sourceType)) it.sourceType = 'image_url';
+      if (it.sourceType === 'image_url') it.content = String(it.url ?? it.content ?? '');
+      else { it.content = String(it.content ?? ''); it.url = ''; }
+      it.semanticRole = b.semanticRole;
+    }
+  }
+  return b;
+}
+
+/**
+ * Define a classificação do bloco: ajusta subtipo (prefixo/contador) e, se pedido, a proporção padrão do contêiner.
+ * `aplicarPadroes`: só aplica a proporção se o bloco ainda está em "livre".
+ */
+export function definirPapelSemantico(b, papelId, { aplicarPadroes = true } = {}) {
+  const papel = PAPEL_POR_ID.get(papelId);
+  if (!papel) { b.semanticRole = 'other'; b.subtipo = 'personalizado'; }
+  else {
+    b.semanticRole = papel.id;
+    b.subtipo = papel.subtipo;
+    if (aplicarPadroes && (!b.proporcao_imagem || b.proporcao_imagem === 'livre')) b.proporcao_imagem = papel.proporcao;
+  }
+  if (Array.isArray(b.itens)) b.itens.forEach(it => { if (it) it.semanticRole = b.semanticRole; });
+  return b;
+}
 
 const COR = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const dentro = (v, lista, padrao) => (lista.includes(v) ? v : padrao);
@@ -96,7 +190,8 @@ export const CHAVES_ESTILO_FIGURA = Object.freeze([
   'titulo_alinhamento', 'legenda_alinhamento', 'fonte_alinhamento', 'sublegenda_alinhamento',
   'img_moldura', 'img_borda_largura_pt', 'img_borda_estilo', 'img_borda_cor', 'img_raio', 'img_sombra',
   'ajuste_enquadramento', 'foco_x', 'foco_y', 'proporcao_imagem',
-  'largura_modo', 'largura_pct', 'alinhamento_bloco', 'fluxo'
+  'largura_modo', 'largura_pct', 'alinhamento_bloco', 'fluxo',
+  'codigo_fundo', 'codigo_paleta'
 ]);
 
 /** Configuração efetiva (sem mutar o bloco): valores inválidos/ausentes caem no padrão. */
@@ -122,6 +217,8 @@ export function obterConfigFigura(b = {}) {
     largura_pct: num(b.largura_pct, 20, 100, 100),
     alinhamento_bloco: dentro(b.alinhamento_bloco, ALINHAMENTOS_BLOCO, 'centro'),
     fluxo: dentro(b.fluxo, FLUXOS, 'em_linha'),
+    codigo_fundo: dentro(b.codigo_fundo, FUNDOS_CODIGO, 'transparente'),
+    codigo_paleta: dentro(b.codigo_paleta, PALETAS_FIGURA, 'tema'),
     titulo_estilo_id: idEstilo(b.titulo_estilo_id),
     numeracao_estilo_id: idEstilo(b.numeracao_estilo_id),
     legenda_estilo_id: idEstilo(b.legenda_estilo_id),
@@ -302,9 +399,17 @@ export function descreverFigura(b, { margens_mm = { l: 25, r: 20 }, permitirFlut
       }
     }
     const texto = qtd > 1 ? rotuloSubfigura(i, cfg.subrotulo_tipo, cfg.subrotulo_formato) : '';
+    const fonte = fonteDoItem(it);
+    if (fonte.codigo) {
+      const fundo = FUNDOS_CODIGO_CSS[cfg.codigo_fundo];
+      if (fundo && !moldCelula.background) moldCelula.background = fundo;
+    }
     itens.push({
       idx: i,
-      url: it.url || (qtd === 1 ? b.src || '' : ''),
+      sourceType: fonte.sourceType,
+      content: fonte.codigo ? fonte.content : '',
+      semanticRole: papelSemanticoDoBloco(b),
+      url: fonte.codigo ? '' : (it.url || (qtd === 1 ? b.src || '' : '')),
       legenda_sub: it.legenda_sub || '',
       celula: { gridColumn: `${c0} / ${c1}`, gridRow: `${r0} / ${r1}`, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '0' },
       moldura: moldCelula,

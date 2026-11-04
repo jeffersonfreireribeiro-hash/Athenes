@@ -16,6 +16,8 @@ import { gerarSumarioDinamico, modeloDaPagina, obterTituloCompletoComNumeracao, 
 import { documentoComSugestoesResolvidas } from './athenes_diff.js';
 import { resolverAreasPagina, normalizarNumeracao, normalizarArea, estiloEfetivoNumeracao } from './athenes_paginacao.js';
 import { FONTES_SISTEMA } from './athenes_estilos.js';
+import { descreverFigura } from './athenes_figura_layout.js';
+import { resolverItemCodigo, svgComDimensoes, textoAlternativoItem } from './athenes_figura_codigo.js';
 import { obterConfigNotas, obterNota, sanitizarHtmlNota, idsNotasDoBloco } from './athenes_notas_rodape.js';
 import { nomeFonteDocx } from './athenes_tabela_estilo.js';
 import { calcularNumeracaoSecoes, extrairItensSumario, configEfetivaSumario, removerNumeroManual, aplicarTransformacao, nivelDe, NIVEL_MAX } from './athenes_sumario.js';
@@ -368,10 +370,43 @@ function construirHfDaMestra(documento, mestra, ctx) {
   return { titlePg, evenAndOdd, ids };
 }
 
+/** Largura/altura (px) de PNG/JPEG a partir do cabeçalho; null se não reconhecer. */
+export function dimensoesImagem(bytes) {
+  try {
+    if (bytes[0] === 0x89 && bytes[1] === 0x50) {
+      const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      return { w: dv.getUint32(16), h: dv.getUint32(20) };
+    }
+    if (bytes[0] === 0xFF && bytes[1] === 0xD8) {
+      let i = 2;
+      while (i < bytes.length) {
+        if (bytes[i] !== 0xFF) { i++; continue; }
+        const marc = bytes[i + 1];
+        const len = (bytes[i + 2] << 8) | bytes[i + 3];
+        if (marc >= 0xC0 && marc <= 0xCF && ![0xC4, 0xC8, 0xCC].includes(marc)) return { h: (bytes[i + 5] << 8) | bytes[i + 6], w: (bytes[i + 7] << 8) | bytes[i + 8] };
+        i += 2 + len;
+      }
+    }
+  } catch { /* cabeçalho ilegível: usa proporção padrão */ }
+  return null;
+}
+
+/** <w:drawing> inline (PNG/JPG principal; SVG opcional em extensão `asvg:svgBlip`, lido pelo Word 2016+). */
+function desenhoInlineDocx({ id, relId, svgRelId, cx, cy, alt, moldura }) {
+  const ln = moldura ? `<a:ln w="${moldura.w}"${moldura.dupla ? ' cmpd="dbl"' : ''}><a:solidFill><a:srgbClr val="${moldura.cor}"/></a:solidFill>${moldura.tracejada ? '<a:prstDash val="dash"/>' : ''}</a:ln>` : '';
+  const ext = svgRelId ? `<a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="${svgRelId}"/></a:ext></a:extLst>` : '';
+  return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Figura ${id}" descr="${escaparXml(alt || '')}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${id}" name="Imagem ${id}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="${relId}">${ext}</a:blip><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${ln}</pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+}
+
 /**
  * Gera um pacote .docx binário completo pronto para download e edição
+ * @param {object} documento
+ * @param {{rasterizar?: (d:{tipo:'svg'|'html', svg?:string, html?:string, css?:string, escopo?:string, largura:number, altura:number, fundo?:string})
+ *   => Promise<{bytes:Uint8Array, largura:number, altura:number}|null>}} [opcoes]
+ *   `rasterizar` (só no navegador) converte figuras por código em PNG; o SVG vai junto como `svgBlip` (vetorial no Word 2016+).
+ *   Sem ele, figuras por código saem como texto de reserva com a descrição (nunca quebram o arquivo).
  */
-export async function exportarParaDocx(documento) {
+export async function exportarParaDocx(documento, opcoes = {}) {
   // Sugestões pendentes saem como "proposta aceita", sem marcações <ins>/<del> cruas no Word
   documento = documentoComSugestoesResolvidas(documento, 'aceitar');
   recalcularNumeracaoAutomatica(documento); // legendas com o separador escolhido
@@ -397,6 +432,7 @@ export async function exportarParaDocx(documento) {
   <Default Extension="png" ContentType="image/png"/>
   <Default Extension="jpg" ContentType="image/jpeg"/>
   <Default Extension="jpeg" ContentType="image/jpeg"/>
+  <Default Extension="svg" ContentType="image/svg+xml"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
   <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
@@ -831,14 +867,94 @@ export async function exportarParaDocx(documento) {
         const jcFig = ({ esquerda: 'left', direita: 'right' })[b.alinhamento_bloco] || 'center';
         const titFig = obterTituloCompletoComNumeracao(b);
         if (titFig) {
-          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titFig)}</w:t></w:r></w:p>`);
+          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:keepNext/><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titFig)}</w:t></w:r></w:p>`);
         }
-        bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="64748B"/></w:rPr><w:t>[Ilustração / Grid de Imagens - Layout ${escaparXml(b.layout || '1')}]</w:t></w:r></w:p>`);
+        // imagens e figuras por código (SVG/Mermaid/gráfico → PNG + svgBlip; HTML → PNG) no layout do subgrid
+        const dFig = descreverFigura(b, { margens_mm: mestra.margens_mm || { l: 30, r: 20 } });
+        const papelFig = dimensoesPapelMm(mestra.formato, mestra.orientacao, mestra.dimensoes_personalizadas);
+        const mgFig = mestra.margens_mm || { l: 30, r: 20 };
+        const larguraUtilEmu = Math.max(40, papelFig.largura_mm - (mgFig.l ?? 30) - (mgFig.r ?? 20)) * EMU_MM * (dFig.cfg.largura_modo === 'pct' ? dFig.cfg.largura_pct / 100 : 1);
+        const gapEmu = Math.round(dFig.qtd > 1 ? 3 * EMU_MM : 0);
+        const colunas = Math.max(1, new Set(dFig.itens.map(it => it.celula.gridColumn.split(' / ')[0])).size);
+        const larguraCelEmu = Math.floor((larguraUtilEmu - gapEmu * (colunas - 1)) / colunas);
+        const molduraFig = dFig.cfg.img_moldura === 'nenhuma' ? null : {
+          w: Math.round(dFig.cfg.img_borda_largura_pt * 12700 * (dFig.cfg.img_moldura === 'dupla' ? 2.5 : 1)),
+          cor: dFig.cfg.img_borda_cor.replace('#', '').toUpperCase().padStart(6, '0').slice(0, 6),
+          dupla: dFig.cfg.img_moldura === 'dupla', tracejada: dFig.cfg.img_borda_estilo === 'tracejada'
+        };
+        const celulasFig = [];
+        for (const it of dFig.itens) {
+          const itemRaw = (b.itens || [])[it.idx] || {};
+          let midia = null; // { png:{bytes,ext}, svg?:string, w, h }
+          const alt = textoAlternativoItem(b, itemRaw);
+          let aviso = '';
+          if (it.sourceType && it.sourceType !== 'image_url') {
+            const r = resolverItemCodigo(b, itemRaw, it.idx, documento);
+            if (r.tipo === 'erro') aviso = `Figura por código com erro: ${r.erros?.[0]?.mensagem || 'conteúdo inválido'}`;
+            else if (typeof opcoes.rasterizar === 'function') {
+              try {
+                const larguraPx = r.tipo === 'svg' ? Math.round(r.largura) : 640;
+                const alturaPx = r.tipo === 'svg' ? Math.round(r.altura) : 0;
+                const fundoRas = dFig.cfg.codigo_fundo === 'suave' ? '#F8FAFC' : '#FFFFFF';
+                const ras = await opcoes.rasterizar(r.tipo === 'svg'
+                  ? { tipo: 'svg', svg: svgComDimensoes(r.svg, larguraPx, alturaPx), largura: larguraPx, altura: alturaPx, fundo: fundoRas }
+                  : { tipo: 'html', html: r.html, css: r.css, escopo: r.escopo, largura: larguraPx, altura: 0, fundo: fundoRas });
+                if (ras?.bytes?.length) midia = { png: { bytes: ras.bytes, ext: 'png' }, svg: r.tipo === 'svg' ? svgComDimensoes(r.svg, larguraPx, alturaPx) : null, w: ras.largura || larguraPx, h: ras.altura || alturaPx || larguraPx * 0.6 };
+              } catch (e) { aviso = 'Não foi possível converter a figura por código para imagem.'; }
+            }
+            if (!midia && !aviso) aviso = `[${alt} — figura por código: abra no Athenes para exportar como imagem]`;
+          } else if (it.url && it.url.startsWith('data:image/')) {
+            const dados = dataUrlParaBytes(it.url);
+            if (dados && (dados.ext === 'png' || dados.ext === 'jpg')) {
+              const dim = dimensoesImagem(dados.bytes) || { w: 4, h: 3 };
+              midia = { png: dados, svg: null, w: dim.w, h: dim.h };
+            } else aviso = '[Imagem em formato não suportado pelo Word (use PNG ou JPG)]';
+          } else if (it.url) aviso = '[Imagem externa: não embutida. Envie o arquivo para incluí-la no Word]';
+          else aviso = '[Espaço reservado para imagem]';
+
+          let corpoCel = '';
+          if (midia) {
+            const alturaMaxEmu = 160 * EMU_MM;
+            let cx = Math.min(larguraCelEmu, Math.round(midia.w * 9525 * 2)); // no máximo 2× o tamanho nativo (96 dpi)
+            let cy = Math.round(cx * (midia.h / midia.w));
+            if (dFig.cfg.proporcao_imagem !== 'livre') { const [pw, ph] = dFig.cfg.proporcao_imagem.split('/').map(Number); cx = larguraCelEmu; cy = Math.round(cx * ph / pw); }
+            if (cy > alturaMaxEmu) { cx = Math.round(cx * alturaMaxEmu / cy); cy = alturaMaxEmu; }
+            contadorImagens++;
+            const n = contadorImagens;
+            const nomePng = `image${n}.${midia.png.ext === 'jpg' ? 'jpg' : 'png'}`;
+            imagens.push({ id: `rIdImg${n}`, nome: nomePng, bytes: midia.png.bytes });
+            zip.add(`word/media/${nomePng}`, midia.png.bytes);
+            let svgRel = null;
+            if (midia.svg) {
+              const bytesSvg = new TextEncoder().encode(midia.svg);
+              imagens.push({ id: `rIdSvg${n}`, nome: `image${n}.svg`, bytes: bytesSvg });
+              zip.add(`word/media/image${n}.svg`, bytesSvg);
+              svgRel = `rIdSvg${n}`;
+            }
+            corpoCel += `<w:p><w:pPr><w:keepNext/><w:spacing w:before="60" w:after="60"/><w:jc w:val="center"/></w:pPr>${desenhoInlineDocx({ id: n, relId: `rIdImg${n}`, svgRelId: svgRel, cx, cy, alt, moldura: molduraFig })}</w:p>`;
+          } else {
+            corpoCel += `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(aviso)}</w:t></w:r></w:p>`;
+          }
+          const rotSub = it.subrotulo?.texto ? `${it.subrotulo.texto} ` : '';
+          if (rotSub || it.legenda_sub) {
+            corpoCel += `<w:p><w:pPr><w:spacing w:after="60"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">${escaparXml(rotSub)}</w:t></w:r><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="475569"/></w:rPr><w:t>${escaparXml(it.legenda_sub || '')}</w:t></w:r></w:p>`;
+          }
+          celulasFig.push({ it, xml: corpoCel });
+        }
+        const temSpan = dFig.itens.some(it => { const [c0, c1] = it.celula.gridColumn.split(' / ').map(Number); const [r0, r1] = it.celula.gridRow.split(' / ').map(Number); return c1 - c0 > 1 || r1 - r0 > 1; });
+        if (dFig.qtd === 1 || temSpan || colunas === 1) {
+          celulasFig.forEach(c => bodyXmlParts.push(c.xml));
+        } else {
+          const linhasT = [];
+          for (let i = 0; i < celulasFig.length; i += colunas) linhasT.push(celulasFig.slice(i, i + colunas));
+          const wDxa = Math.floor(larguraCelEmu / 635);
+          bodyXmlParts.push(`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:jc w:val="${jcFig}"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="40" w:type="dxa"/><w:right w:w="40" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${Array.from({ length: colunas }, () => `<w:gridCol w:w="${wDxa}"/>`).join('')}</w:tblGrid>${linhasT.map(l => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${Array.from({ length: colunas }, (_, k) => `<w:tc><w:tcPr><w:tcW w:w="${wDxa}" w:type="dxa"/></w:tcPr>${l[k]?.xml || '<w:p/>'}</w:tc>`).join('')}</w:tr>`).join('')}</w:tbl>`);
+        }
         if (b.legenda_geral) {
-          bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(b.legenda_geral)}</w:t></w:r></w:p>`);
+          bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(String(b.legenda_geral).replace(/<[^>]+>/g, ''))}</w:t></w:r></w:p>`);
         }
         if (b.fonte) {
-          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(b.fonte)}</w:t></w:r></w:p>`);
+          bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(String(b.fonte).replace(/<[^>]+>/g, ''))}</w:t></w:r></w:p>`);
         }
       } else if (b.tipo === 'mapa') {
         const titMapa = obterTituloCompletoComNumeracao(b);

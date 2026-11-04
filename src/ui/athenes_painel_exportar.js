@@ -5,6 +5,7 @@
 
 import { analisarCompatibilidadeDocx } from '../core/athenes_compatibilidade.js';
 import { exportarParaDocx } from '../core/athenes_export_docx.js';
+import { rasterizarFiguraParaPng } from './athenes_figura_codigo_ui.js';
 import { gerarDocumentoHtmlPdf } from '../core/athenes_export_pdf.js';
 import { svgIcone } from './athenes_icones.js';
 
@@ -122,7 +123,7 @@ export class PainelExportarModal {
       btn.disabled = true;
 
       try {
-        const buffer = await exportarParaDocx(this.doc);
+        const buffer = await exportarParaDocx(this.doc, { rasterizar: rasterizarFiguraParaPng }); // figuras por código → PNG + SVG vetorial
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
