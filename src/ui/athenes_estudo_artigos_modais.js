@@ -471,7 +471,7 @@ export const metodosEstudoModais = {
         return;
       }
       statusEl.textContent = 'Buscando referências na sua biblioteca Zotero...';
-      const remotos = await this.zoteroClient.buscarItens({ limite: 100 });
+      const remotos = await this.zoteroClient.buscarItens();
       const lista = Array.isArray(remotos) ? remotos : [];
       this._cacheRefsZotero = { t: Date.now(), itens: lista };
       catalogoRefs = lista.map(paraRef);

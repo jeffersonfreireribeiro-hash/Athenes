@@ -284,7 +284,7 @@ export class PainelZotero {
 
   async sincronizarZotero() {
     try {
-      const itens = await this.client.buscarItens({ limite: 50 });
+      const itens = await this.client.buscarItens();
       this.conectado = true;
       this.referenciasCache = itens;
       this.renderizar();

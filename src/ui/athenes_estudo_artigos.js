@@ -893,7 +893,7 @@ export class EstudoArtigosView {
       this.artigoAtivo = null;
     }
 
-    const itens = await this.zoteroClient.buscarItens({ limite: 60 });
+    const itens = await this.zoteroClient.buscarItens();
     if (this.zoteroClient.userId) {
       this.salvarConfigZotero({ userId: this.zoteroClient.userId });
     }
@@ -915,7 +915,7 @@ export class EstudoArtigosView {
     let novos = 0;
     (itens || []).forEach(it => {
       const ids = pastasDoItemZotero(it.colecoes, mapaPastas);
-      const existente = this.artigos.find(a => a.chaveZotero === it.chave || a.titulo === it.titulo);
+      const existente = this.artigos.find(a => a.chaveZotero === it.chave || (!a.chaveZotero && a.titulo === it.titulo));
       if (existente) {
         existente.colecoesZotero = it.colecoes || [];
         if (naRaizOuZotero(existente)) { existente.pastasIds = ids; existente.pastaId = ids[0]; }

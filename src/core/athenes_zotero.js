@@ -97,10 +97,15 @@ export class ZoteroClient {
     if (!this.userId) return [];
 
     try {
-      const url = `${this.getBaseUrl()}/collections?limit=100`;
-      const res = await fetch(url, { headers: this.getHeaders() });
-      if (!res.ok) throw new Error(`Erro ao listar coleções (${res.status})`);
-      const dados = await res.json();
+      const dados = [];
+      for (let pg = 0; pg < 20; pg++) { // 100 por vez
+        const res = await fetch(`${this.getBaseUrl()}/collections?limit=100&start=${dados.length}`, { headers: this.getHeaders() });
+        if (!res.ok) throw new Error(`Erro ao listar coleções (${res.status})`);
+        const parte = await res.json();
+        if (!Array.isArray(parte) || !parte.length) break;
+        dados.push(...parte);
+        if (parte.length < 100) break;
+      }
 
       return dados.map(item => ({
         key: item.key,
@@ -137,7 +142,7 @@ export class ZoteroClient {
   /**
    * Busca itens na biblioteca (com filtro por texto e/ou coleção)
    */
-  async buscarItens({ termo = '', colecaoKey = '', limite = 50 } = {}) {
+  async buscarItens({ termo = '', colecaoKey = '', limite = 2000 } = {}) {
     await this.garantirUserId();
     if (!this.userId) return [];
 
@@ -147,24 +152,43 @@ export class ZoteroClient {
         : `${this.getBaseUrl()}/items/top`;
 
       const params = new URLSearchParams({
-        limit: String(limite),
+        limit: String(Math.min(100, limite)), // a API do Zotero entrega no máximo 100 por vez: o resto vem em páginas (start)
         sort: 'dateModified',
         direction: 'desc'
       });
 
       if (termo) params.set('q', termo);
 
+      let endpointUsado = endpoint;
       let res = await fetch(`${endpoint}?${params.toString()}`, { headers: this.getHeaders() });
       if (!res.ok) {
         // Fallback para /items caso /items/top não esteja disponível em mock/ambiente de teste
         const fallbackEndpoint = colecaoKey
           ? `${this.getBaseUrl()}/collections/${encodeURIComponent(colecaoKey)}/items`
           : `${this.getBaseUrl()}/items`;
+        endpointUsado = fallbackEndpoint;
         res = await fetch(`${fallbackEndpoint}?${params.toString()}`, { headers: this.getHeaders() });
       }
       if (!res.ok) throw new Error(`Erro ao buscar itens (${res.status})`);
 
-      const dados = await res.json();
+      const primeira = await res.json();
+      let dados = primeira;
+      // biblioteca com mais de 100 itens: busca as páginas seguintes até o total (ou o limite pedido)
+      if (Array.isArray(primeira)) {
+        const total = Number(res.headers?.get?.('Total-Results')) || 0;
+        const alvo = Math.min(limite, total || limite);
+        const lista = [...primeira];
+        let ultima = primeira;
+        for (let pg = 0; pg < 60 && lista.length < alvo && ultima.length >= Math.min(100, limite); pg++) {
+          const p2 = new URLSearchParams(params); p2.set('start', String(lista.length)); p2.set('limit', String(Math.min(100, alvo - lista.length)));
+          const r = await fetch(`${endpointUsado}?${p2.toString()}`, { headers: this.getHeaders() });
+          if (!r.ok) break;
+          ultima = await r.json();
+          if (!Array.isArray(ultima) || !ultima.length) break;
+          lista.push(...ultima);
+        }
+        dados = lista;
+      }
       const filtrarENormalizar = (listaBruta) => (Array.isArray(listaBruta) ? listaBruta : [])
         .filter(d => {
           const t = d?.data?.itemType;
