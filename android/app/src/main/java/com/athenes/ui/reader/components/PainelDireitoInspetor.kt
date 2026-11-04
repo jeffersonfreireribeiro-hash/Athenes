@@ -974,7 +974,7 @@ private fun ConteudoAbaZoteroDrive(
                             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFA7F3D0))
                         ) {
                             Text(
-                                text = "Drive OK ✓",
+                                text = "Drive não conectado",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF047857),
@@ -1017,7 +1017,7 @@ private fun ConteudoAbaZoteroDrive(
                         driveFileId = driveLink
                     )
                     onSalvarConfig(novaCfg)
-                    Toast.makeText(context, "Sincronizado com Zotero e Google Drive com sucesso!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Dados guardados nesta sessão. A sincronização ainda não está disponível.", Toast.LENGTH_SHORT).show()
                 },
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(

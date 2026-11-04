@@ -193,9 +193,9 @@ class ArtigoEstudoRepository {
                     userId = "",
                     itemKey = "",
                     doi = "10.3390/buildings10020036",
-                    driveStatus = "Drive OK ✓",
-                    driveFileName = "Acoustic Performance-Based Design A Brief Overview.pdf",
-                    driveFileId = "drive_pdf_acoustic_2020"
+                    driveStatus = "Não conectado",
+                    driveFileName = "",
+                    driveFileId = ""
                 )
             )
 

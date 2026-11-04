@@ -91,9 +91,9 @@ data class ZoteroVinculoConfig(
     val userId: String = "",
     val itemKey: String = "",
     val doi: String = "10.3390/buildings10020036",
-    val driveStatus: String = "Drive OK ✓",
-    val driveFileName: String = "Acoustic Performance-Based Design A Brief Overview.pdf",
-    val driveFileId: String = "drive_pdf_acoustic_2020"
+    val driveStatus: String = "Não conectado",
+    val driveFileName: String = "",
+    val driveFileId: String = ""
 )
 
 data class ArtigoEstudoDetalhado(

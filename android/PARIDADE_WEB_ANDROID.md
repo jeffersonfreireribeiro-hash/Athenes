@@ -58,3 +58,5 @@ A navegação principal agora oferece Documentos, Biblioteca, Estudo e Conta. Em
 ## Leitor de PDF
 
 Sem arquivo vinculado, o leitor mostra o estado vazio e a ação **Selecionar PDF**. A escolha usa o seletor de documentos do Android e guarda a URI por artigo. `PdfRenderer` abre o arquivo fora da thread principal; `LazyColumn` compõe as páginas visíveis e um cache LRU limita os bitmaps a aproximadamente 24 MiB. A contagem de páginas vem do PDF. As ferramentas de anotação e citação existentes ainda não desenham sobre a página real; esta parte permanece pendente.
+
+Os indicadores antigos de conexão com Drive e a mensagem de sincronização concluída foram retirados dos dados de exemplo e do formulário. O formulário ainda mantém os dados apenas na sessão atual.

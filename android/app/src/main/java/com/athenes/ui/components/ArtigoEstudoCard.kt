@@ -145,7 +145,7 @@ fun ArtigoEstudoCard(
 
                 // Badge Drive Conectado
                 Surface(
-                    color = Color(0xFFECFDF5),
+                    color = Color(0xFFF1F5F9),
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Row(
@@ -153,18 +153,18 @@ fun ArtigoEstudoCard(
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.CloudDone,
+                            imageVector = Icons.Rounded.CloudOff,
                             contentDescription = null,
-                            tint = Color(0xFF059669),
+                            tint = Color(0xFF475569),
                             modifier = Modifier.size(11.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = "Drive OK",
+                            text = "Sem PDF",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF047857)
+                                color = Color(0xFF475569)
                             )
                         )
                     }
