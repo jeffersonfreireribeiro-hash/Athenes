@@ -17,6 +17,7 @@ import com.athenes.ui.components.NavegacaoPrincipal
 import com.athenes.core.citacao.AutorReferencia
 import com.athenes.core.citacao.ReferenciaAcademica
 import com.athenes.ui.editor.components.GrafoConexoesDialog
+import com.athenes.ui.library.DialogNovoArtigoLocal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -76,5 +77,23 @@ class NavegacaoAcessibilidadeTest {
         compose.onNodeWithText("140 obras", substring = true).assertExists()
         compose.onNodeWithText("Mapa: 60 de", substring = true).assertExists()
         compose.onNodeWithText("A lista abaixo contém todos.", substring = true).assertExists()
+    }
+
+    @Test fun novoArtigoExigeTituloEAbreComDadosInformados() {
+        var resultado: List<String>? = null
+        compose.setContent {
+            MaterialTheme {
+                DialogNovoArtigoLocal(onFechar = {}, onCriar = { titulo, autores, ano, publicacao, resumo ->
+                    resultado = listOf(titulo, autores, ano.toString(), publicacao, resumo)
+                })
+            }
+        }
+        compose.onNodeWithText("Título").performTextInput("Pesquisa local")
+        compose.onNodeWithText("Autores").performTextInput("Ana Silva")
+        compose.onNodeWithText("Adicionar e abrir").performClick()
+        compose.runOnIdle {
+            assertEquals("Pesquisa local", resultado?.get(0))
+            assertEquals("Ana Silva", resultado?.get(1))
+        }
     }
 }

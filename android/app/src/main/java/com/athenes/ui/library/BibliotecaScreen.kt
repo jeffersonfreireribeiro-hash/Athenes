@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -125,6 +126,7 @@ fun BibliotecaScreen(
     var mostrarConexaoZotero by remember { mutableStateOf(false) }
     var chaveZotero by remember { mutableStateOf("") }
     var usuarioZotero by remember { mutableStateOf("") }
+    var novoArtigoAberto by remember { mutableStateOf(false) }
 
     val dialogNovoAberto by viewModel.dialogNovoAberto.collectAsState()
     val docParaExcluir by viewModel.docParaExcluir.collectAsState()
@@ -152,25 +154,21 @@ fun BibliotecaScreen(
             // ========================================================
             // CABEÇALHO DA SEÇÃO (IDÊNTICO AO WEB ATHENES)
             // ========================================================
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (modoAtivo == 0) "Meus documentos" else "Biblioteca e fichamentos",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 19.sp,
-                            color = AthenesText
-                        )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = if (modoAtivo == 0) "Meus documentos" else "Biblioteca e fichamentos",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 19.sp,
+                        color = AthenesText
                     )
-                }
+                )
 
                 // Botões de Ação Específicos para a Aba de Artigos / Zotero (Idênticos ao Web)
                 if (modoAtivo == 1) {
+                    Spacer(Modifier.height(8.dp))
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -184,7 +182,7 @@ fun BibliotecaScreen(
                             },
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.height(44.dp),
+                            modifier = Modifier.heightIn(min = 48.dp).weight(1f),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = AthenesPrimary)
                         ) {
                             Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -193,12 +191,10 @@ fun BibliotecaScreen(
                         }
 
                         Button(
-                            onClick = {
-                                Toast.makeText(context, "A importação de artigos ainda não está disponível.", Toast.LENGTH_SHORT).show()
-                            },
+                            onClick = { novoArtigoAberto = true },
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.height(44.dp),
+                            modifier = Modifier.heightIn(min = 48.dp).weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = AthenesPrimary,
                                 contentColor = Color.White
@@ -206,7 +202,7 @@ fun BibliotecaScreen(
                         ) {
                             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(3.dp))
-                            Text(text = "Novo Artigo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "Novo artigo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -506,6 +502,16 @@ fun BibliotecaScreen(
     }
 
     // Diálogos Modais Contextuais
+    if (novoArtigoAberto) {
+        DialogNovoArtigoLocal(
+            onFechar = { novoArtigoAberto = false },
+            onCriar = { titulo, autores, ano, publicacao, resumo ->
+                val artigo = viewModel.criarArtigoLocal(titulo, autores, ano, publicacao, resumo)
+                novoArtigoAberto = false
+                onAbrirLeitorPdf(artigo.id)
+            }
+        )
+    }
     if (dialogNovoAberto) {
         DialogNovoDocumento(
             onDismiss = viewModel::fecharDialogNovo,
@@ -683,4 +689,36 @@ fun BibliotecaScreen(
             }
         }
     }
+}
+
+@Composable
+fun DialogNovoArtigoLocal(
+    onFechar: () -> Unit,
+    onCriar: (String, String, Int, String, String) -> Unit
+) {
+    var titulo by rememberSaveable { mutableStateOf("") }
+    var autores by rememberSaveable { mutableStateOf("") }
+    var ano by rememberSaveable { mutableStateOf(java.time.Year.now().value.toString()) }
+    var publicacao by rememberSaveable { mutableStateOf("") }
+    var resumo by rememberSaveable { mutableStateOf("") }
+    val anoValor = ano.toIntOrNull()
+    AlertDialog(
+        onDismissRequest = onFechar,
+        title = { Text("Novo artigo") },
+        text = {
+            Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Crie um registro local e vincule um PDF no estúdio.", style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(titulo, { titulo = it }, label = { Text("Título") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(autores, { autores = it }, label = { Text("Autores") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(ano, { ano = it.filter(Char::isDigit).take(4) }, label = { Text("Ano") }, singleLine = true, modifier = Modifier.fillMaxWidth(), isError = anoValor == null || anoValor !in 1500..2100)
+                OutlinedTextField(publicacao, { publicacao = it }, label = { Text("Publicação") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(resumo, { resumo = it }, label = { Text("Resumo") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onCriar(titulo.trim(), autores.trim(), anoValor!!, publicacao.trim(), resumo.trim()) },
+                enabled = titulo.isNotBlank() && anoValor != null && anoValor in 1500..2100) { Text("Adicionar e abrir") }
+        },
+        dismissButton = { TextButton(onClick = onFechar) { Text("Cancelar") } }
+    )
 }

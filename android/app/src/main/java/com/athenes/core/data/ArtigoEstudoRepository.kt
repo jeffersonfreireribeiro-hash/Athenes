@@ -23,10 +23,13 @@ class ArtigoEstudoRepository {
     private var anotacoesPendentes: Job? = null
     private var itensZotero: List<ZoteroItem> = emptyList()
     private var itensBib: List<ZoteroItem> = emptyList()
+    private var artigosLocais: List<ArtigoEstudoDetalhado> = emptyList()
 
     fun ativarPersistencia(context: Context) {
         if (contexto != null) return
         contexto = context.applicationContext
+        artigosLocais = contexto!!.getSharedPreferences("biblioteca_artigos_locais", Context.MODE_PRIVATE)
+            .getString("dados", null)?.let { runCatching { ArtigosLocaisCodec.ler(it) }.getOrNull() }.orEmpty()
         itensBib = contexto!!.getSharedPreferences("biblioteca_bib", Context.MODE_PRIVATE)
             .getString("dados", null)?.let { salvo ->
                 runCatching { ZoteroCacheCodec.ler(salvo).first }.getOrNull()
@@ -37,7 +40,8 @@ class ArtigoEstudoRepository {
                     if (itens.isNotEmpty() || itensBib.isNotEmpty()) aplicarBibliotecaZotero(itens, colecoes)
                 }
             }
-        if (itensBib.isNotEmpty() && itensZotero.isEmpty()) aplicarBibliotecaZotero(emptyList(), emptyList())
+        if ((itensBib.isNotEmpty() || artigosLocais.isNotEmpty()) && itensZotero.isEmpty())
+            aplicarBibliotecaZotero(emptyList(), emptyList())
         val preferencias = contexto!!.getSharedPreferences("tracos_pdf", Context.MODE_PRIVATE)
         val anotacoes = contexto!!.getSharedPreferences("anotacoes_pdf", Context.MODE_PRIVATE)
         val notasZoteroPrefs = contexto!!.getSharedPreferences("notas_zotero", Context.MODE_PRIVATE)
@@ -172,6 +176,26 @@ class ArtigoEstudoRepository {
     private val _colecoesZotero = MutableStateFlow<List<ZoteroColecao>>(emptyList())
     val colecoesZotero: StateFlow<List<ZoteroColecao>> = _colecoesZotero.asStateFlow()
 
+    fun adicionarArtigoLocal(titulo: String, autores: String, ano: Int, publicacao: String, resumo: String): ArtigoEstudoDetalhado {
+        require(titulo.trim().isNotEmpty()) { "Informe o título do artigo." }
+        require(ano in 1500..2100) { "Informe um ano válido." }
+        val artigo = ArtigoEstudoDetalhado(
+            id = "local_${UUID.randomUUID()}", titulo = titulo.trim(), autores = autores.trim(),
+            ano = ano, chaveZotero = "", totalPaginas = 0, resumoOficial = resumo.trim(),
+            tipoZotero = "journalArticle", camposZotero = mapOf("publicationTitle" to publicacao.trim())
+        )
+        artigosLocais = listOf(artigo) + artigosLocais
+        _artigos.value = listOf(artigo) + _artigos.value
+        _artigoAtivoId.value = artigo.id
+        salvarArtigosLocais()
+        return artigo
+    }
+
+    private fun salvarArtigosLocais() {
+        contexto?.getSharedPreferences("biblioteca_artigos_locais", Context.MODE_PRIVATE)
+            ?.edit()?.putString("dados", ArtigosLocaisCodec.escrever(artigosLocais))?.apply()
+    }
+
     fun importarBib(conteudo: String): Int {
         val importados = BibtexParser.ler(conteudo)
         require(importados.isNotEmpty()) { "O arquivo BIB não contém referências válidas." }
@@ -185,8 +209,9 @@ class ArtigoEstudoRepository {
     fun aplicarBibliotecaZotero(itens: List<ZoteroItem>, colecoes: List<ZoteroColecao>) {
         itensZotero = itens
         val anteriores = _artigos.value.associateBy { it.id }
+        artigosLocais = artigosLocais.map { anteriores[it.id] ?: it }
         _colecoesZotero.value = colecoes
-        _artigos.value = (itens + itensBib).distinctBy { it.chave }.map { item ->
+        val bibliotecaRemota = (itens + itensBib).distinctBy { it.chave }.map { item ->
             val anterior = anteriores[item.chave]
             val ano = Regex("(?:19|20)\\d{2}").find(item.data)?.value?.toIntOrNull() ?: 0
             ArtigoEstudoDetalhado(
@@ -215,6 +240,7 @@ class ArtigoEstudoRepository {
                     ?: ZoteroVinculoConfig(itemKey = item.chave, doi = item.doi)
             )
         }
+        _artigos.value = artigosLocais + bibliotecaRemota
         if (_artigos.value.isNotEmpty() && _artigos.value.none { it.id == _artigoAtivoId.value }) {
             _artigoAtivoId.value = _artigos.value.first().id
         }
@@ -367,6 +393,12 @@ class ArtigoEstudoRepository {
             if (art.id == artigoId) {
                 art.copy(meuResumo = meuResumo, analiseMetodologica = analiseMetodologica)
             } else art
+        }
+        if (artigoId.startsWith("local_")) {
+            artigosLocais = artigosLocais.map { art ->
+                if (art.id == artigoId) art.copy(meuResumo = meuResumo, analiseMetodologica = analiseMetodologica) else art
+            }
+            salvarArtigosLocais()
         }
     }
 

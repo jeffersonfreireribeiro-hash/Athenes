@@ -66,7 +66,7 @@ class BibliotecaViewModel(
     val estadoZotero: StateFlow<String> = _estadoZotero.asStateFlow()
     private val _sincronizandoZotero = MutableStateFlow(false)
     val sincronizandoZotero: StateFlow<Boolean> = _sincronizandoZotero.asStateFlow()
-    private val _conectadoZotero = MutableStateFlow(artigoRepository.artigos.value.any { it.tipoZotero.isNotBlank() })
+    private val _conectadoZotero = MutableStateFlow(artigoRepository.artigos.value.any { it.chaveZotero.isNotBlank() && !it.id.startsWith("local_") })
     val conectadoZotero: StateFlow<Boolean> = _conectadoZotero.asStateFlow()
     private val _tipoZoteroFiltro = MutableStateFlow<String?>(null)
     val tipoZoteroFiltro = _tipoZoteroFiltro.asStateFlow()
@@ -115,6 +115,8 @@ class BibliotecaViewModel(
     fun excluirDefinitivamente(id: String) = repository.excluirDefinitivamente(id)
     fun importarDocumentoJson(conteudo: String) = repository.importarDocumentoJson(conteudo)
     fun importarBib(conteudo: String) = artigoRepository.importarBib(conteudo)
+    fun criarArtigoLocal(titulo: String, autores: String, ano: Int, publicacao: String, resumo: String) =
+        artigoRepository.adicionarArtigoLocal(titulo, autores, ano, publicacao, resumo)
 
     fun criarPasta(nome: String, pastaPaiId: String? = null) = repository.criarPasta(nome, pastaPaiId)
     fun moverDocumento(id: String, pastaId: String?) = repository.moverDocumento(id, pastaId)
