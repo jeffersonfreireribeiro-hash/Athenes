@@ -519,9 +519,14 @@ private fun ItemBlocoFolha(
 
             TipoBlocoEditor.LISTA -> Column {
                 val itens = bloco.texto.lines()
+                if (editavel) Row {
+                    FilterChip(selected = !bloco.listaNumerada, onClick = { vm.definirListaNumerada(bloco.id, false) }, label = { Text("Marcadores") })
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(selected = bloco.listaNumerada, onClick = { vm.definirListaNumerada(bloco.id, true) }, label = { Text("Numerada") })
+                }
                 itens.forEachIndexed { indice, item ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                        Text("•", modifier = Modifier.padding(top = 2.dp, end = 8.dp), color = TextoCor)
+                        Text(if (bloco.listaNumerada) "${indice + 1}." else "•", modifier = Modifier.padding(top = 2.dp, end = 8.dp), color = TextoCor)
                         CampoFolha(
                             value = item,
                             onValueChange = { novo ->
@@ -574,8 +579,8 @@ private fun ItemBlocoFolha(
                 CampoFonte(bloco.fonte, editavel, selecionar) { vm.atualizarFonteBloco(bloco.id, it) }
             }
 
-            TipoBlocoEditor.TABELA -> Column(Modifier.fillMaxWidth()) {
-                CampoLegenda(bloco.legenda, "Legenda da tabela", editavel, selecionar) { vm.atualizarLegendaBloco(bloco.id, it) }
+            TipoBlocoEditor.TABELA, TipoBlocoEditor.QUADRO -> Column(Modifier.fillMaxWidth()) {
+                CampoLegenda(bloco.legenda, if (bloco.tipo == TipoBlocoEditor.QUADRO) "Título do quadro" else "Legenda da tabela", editavel, selecionar) { vm.atualizarLegendaBloco(bloco.id, it) }
                 Spacer(Modifier.height(4.dp))
                 HorizontalDivider(color = Color(0xFF1E293B), thickness = 1.2.dp)
                 bloco.tabelaLinhas.forEachIndexed { i, linha ->

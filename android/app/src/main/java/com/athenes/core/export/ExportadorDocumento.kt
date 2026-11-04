@@ -16,10 +16,11 @@ data class BlocoExport(
     val formula: String = "",
     val imagem: String = "",
     val alinhamento: AlinhamentoExport = AlinhamentoExport.JUSTIFICADO,
-    val tabela: List<List<String>> = emptyList()
+    val tabela: List<List<String>> = emptyList(),
+    val listaNumerada: Boolean = false
 )
 
-enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, FORMULA, LISTA, QUEBRA_PAGINA, DIVISOR }
+enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, QUEBRA_PAGINA, DIVISOR }
 enum class AlinhamentoExport {
     ESQUERDA, CENTRO, DIREITA, JUSTIFICADO,
     JUSTIFICADO_ESQUERDA, JUSTIFICADO_CENTRO, JUSTIFICADO_DIREITA
@@ -89,7 +90,7 @@ object ExportadorDocumento {
                     }
                     if (b.fonte.isNotBlank()) corpo.append(par(b.fonte, centro = true, italico = true, tamanho = 20, simples = true, depois = 120))
                 }
-                TipoBlocoExport.TABELA -> {
+                TipoBlocoExport.TABELA, TipoBlocoExport.QUADRO -> {
                     if (b.legenda.isNotBlank()) corpo.append(par(b.legenda, centro = true, negrito = true, tamanho = 20, simples = true, antes = 120, depois = 60, mantemProximo = true))
                     corpo.append(tabela(b.tabela, doc.pagina))
                     if (b.fonte.isNotBlank()) corpo.append(par(b.fonte, centro = true, italico = true, tamanho = 20, simples = true, antes = 60, depois = 120))
@@ -98,8 +99,8 @@ object ExportadorDocumento {
                     formula++
                     corpo.append(par("${b.formula}          ($formula)", centro = true, antes = 120, depois = 120))
                 }
-                TipoBlocoExport.LISTA -> b.texto.lines().filter { it.isNotBlank() }.forEach { item ->
-                    corpo.append(par("•  ${item.trim()}", recuoEsq = 709, depois = 60))
+                TipoBlocoExport.LISTA -> b.texto.lines().filter { it.isNotBlank() }.forEachIndexed { indice, item ->
+                    corpo.append(par("${if (b.listaNumerada) "${indice + 1}." else "•"}  ${item.trim()}", recuoEsq = 709, depois = 60))
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> corpo.append("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>")
                 TipoBlocoExport.DIVISOR -> corpo.append(
@@ -294,9 +295,10 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                 TipoBlocoExport.TITULO -> { secao++; sb.append("<h2>$secao&nbsp; ${html(b.titulo)}</h2>") }
                 TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha;text-align-last:$ultimaLinha\">${html(b.texto)}</p>")
                 TipoBlocoExport.LISTA -> if (b.texto.isNotBlank()) {
-                    sb.append("<ul>")
+                    val tag = if (b.listaNumerada) "ol" else "ul"
+                    sb.append("<$tag>")
                     b.texto.lines().filter { it.isNotBlank() }.forEach { sb.append("<li>${html(it.trim())}</li>") }
-                    sb.append("</ul>")
+                    sb.append("</$tag>")
                 }
                 TipoBlocoExport.QUEBRA_PAGINA -> sb.append("<div style=\"break-before:page\"></div>")
                 TipoBlocoExport.CITACAO -> if (b.texto.isNotBlank()) sb.append("<div class=\"cit\">${html(b.texto)}</div>")
@@ -311,7 +313,7 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                     if (b.fonte.isNotBlank()) sb.append("<div class=\"fonte\">${html(b.fonte)}</div>")
                     sb.append("</figure>")
                 }
-                TipoBlocoExport.TABELA -> {
+                TipoBlocoExport.TABELA, TipoBlocoExport.QUADRO -> {
                     if (b.legenda.isNotBlank()) sb.append("<div class=\"leg\">${html(b.legenda)}</div>")
                     sb.append("<table>")
                     b.tabela.forEachIndexed { i, linha ->

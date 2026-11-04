@@ -161,4 +161,21 @@ class ExportadorTest {
         assertTrue(xml.contains("•  Segundo item"))
         assertTrue(xml.contains("<w:br w:type=\"page\"/>"))
     }
+
+    @Test
+    fun `lista numerada e quadro preservam conteúdo nas exportações`() {
+        val doc = documento().copy(blocos = listOf(
+            BlocoExport(TipoBlocoExport.LISTA, texto = "Etapa um\nEtapa dois", listaNumerada = true),
+            BlocoExport(TipoBlocoExport.QUADRO, legenda = "Quadro 1 — Conceitos", tabela = listOf(listOf("Termo", "Definição"), listOf("A", "B")))
+        ))
+        val html = ExportadorDocumento.gerarHtml(doc, imagens)
+        assertTrue(html.contains("<ol><li>Etapa um</li><li>Etapa dois</li></ol>"))
+        assertTrue(html.contains("Quadro 1 — Conceitos"))
+        assertTrue(html.contains("<table>"))
+        val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/document.xml"]!!)
+        assertTrue(xml.contains("1.  Etapa um"))
+        assertTrue(xml.contains("2.  Etapa dois"))
+        assertTrue(xml.contains("Quadro 1 — Conceitos"))
+        assertTrue(xml.contains("<w:tbl>"))
+    }
 }

@@ -46,6 +46,7 @@ enum class TipoBlocoEditor(val rotulo: String, val desc: String) {
     CITACAO("Citação", "Citação direta longa recuada"),
     FIGURA("Figura", "Ilustração numerada com legenda e fonte"),
     TABELA("Tabela", "Tabela de dados norma IBGE"),
+    QUADRO("Quadro", "Conteúdo conceitual em células"),
     FORMULA("Fórmula", "Expressão matemática numerada"),
     LISTA("Lista", "Itens em lista"),
     QUEBRA_PAGINA("Quebra de página", "Inicia uma nova página na exportação"),
@@ -64,7 +65,8 @@ data class BlocoEditor(
     val colunas: Int = 12,
     val alinhamento: AlinhamentoTexto = AlinhamentoTexto.JUSTIFICADO,
     val estiloId: String = "texto",
-    val tabelaLinhas: List<List<String>> = emptyList()
+    val tabelaLinhas: List<List<String>> = emptyList(),
+    val listaNumerada: Boolean = false
 )
 
 data class SecaoEstrutura(
@@ -255,6 +257,8 @@ class EditorViewModel : ViewModel() {
         atualizarBloco(id) { it.copy(colunas = colunas.coerceIn(1, 12)) }
     }
 
+    fun definirListaNumerada(id: String, numerada: Boolean) = atualizarBloco(id) { it.copy(listaNumerada = numerada) }
+
     fun adicionarBloco(tipo: TipoBlocoEditor) {
         salvarNoHistorico()
         val novo = when (tipo) {
@@ -273,6 +277,11 @@ class EditorViewModel : ViewModel() {
                 fonte = "Fonte: elaborado pelos autores (${java.time.Year.now().value})",
                 alinhamento = AlinhamentoTexto.CENTRO,
                 tabelaLinhas = listOf(listOf("Coluna 1", "Coluna 2", "Coluna 3"), listOf("", "", ""))
+            )
+            TipoBlocoEditor.QUADRO -> BlocoEditor(
+                tipo = tipo, legenda = "Quadro — título", fonte = "Fonte: elaboração própria",
+                alinhamento = AlinhamentoTexto.ESQUERDA,
+                tabelaLinhas = listOf(listOf("Categoria", "Definição"), listOf("", ""))
             )
             TipoBlocoEditor.FORMULA -> BlocoEditor(tipo = tipo, formulaLatex = "x = y", alinhamento = AlinhamentoTexto.CENTRO)
             TipoBlocoEditor.LISTA -> BlocoEditor(tipo = tipo, texto = "Primeiro item\nSegundo item", alinhamento = AlinhamentoTexto.ESQUERDA)
@@ -363,7 +372,7 @@ class EditorViewModel : ViewModel() {
                 titulo = b.titulo, texto = b.texto, legenda = b.legenda, fonte = b.fonte,
                 formula = b.formulaLatex, imagem = b.imagem,
                 alinhamento = AlinhamentoExport.valueOf(b.alinhamento.name),
-                tabela = b.tabelaLinhas
+                tabela = b.tabelaLinhas, listaNumerada = b.listaNumerada
             )
         }
     )
@@ -439,6 +448,7 @@ class EditorViewModel : ViewModel() {
                 put("legenda", b.legenda); put("fonte", b.fonte); put("formulaLatex", b.formulaLatex); put("imagem", b.imagem)
                 put("colunas", b.colunas); put("alinhamento", b.alinhamento.name); put("estiloId", b.estiloId)
                 put("tabela", JSONArray(b.tabelaLinhas.map { JSONArray(it) }))
+                put("listaNumerada", b.listaNumerada)
             })
         }
         raiz.put("blocos", arr)
@@ -465,7 +475,7 @@ class EditorViewModel : ViewModel() {
                     legenda = o.optString("legenda"), fonte = o.optString("fonte"),
                     formulaLatex = o.optString("formulaLatex"), imagem = o.optString("imagem"), colunas = o.optInt("colunas", 12),
                     alinhamento = runCatching { AlinhamentoTexto.valueOf(o.optString("alinhamento")) }.getOrDefault(AlinhamentoTexto.JUSTIFICADO),
-                    estiloId = o.optString("estiloId", "texto"),
+                    estiloId = o.optString("estiloId", "texto"), listaNumerada = o.optBoolean("listaNumerada"),
                     tabelaLinhas = if (tab == null) emptyList() else (0 until tab.length()).map { r ->
                         val l = tab.getJSONArray(r)
                         (0 until l.length()).map { c -> l.getString(c) }

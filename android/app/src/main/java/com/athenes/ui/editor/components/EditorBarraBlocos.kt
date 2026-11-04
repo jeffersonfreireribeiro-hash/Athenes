@@ -64,6 +64,7 @@ fun EditorBarraBlocos(
                 }
                 BotaoBloco(Icons.Rounded.Image, "Inserir figura", TipoBlocoEditor.FIGURA, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.TableChart, "Inserir tabela", TipoBlocoEditor.TABELA, onAdicionarBloco)
+                BotaoBloco(Icons.Rounded.ViewModule, "Inserir quadro", TipoBlocoEditor.QUADRO, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.FormatQuote, "Inserir citação direta longa", TipoBlocoEditor.CITACAO, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.Functions, "Inserir fórmula", TipoBlocoEditor.FORMULA, onAdicionarBloco)
                 BotaoBloco(Icons.Rounded.FormatListBulleted, "Inserir lista", TipoBlocoEditor.LISTA, onAdicionarBloco)
