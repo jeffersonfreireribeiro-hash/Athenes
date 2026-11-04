@@ -40,3 +40,15 @@ test('copiar: baixa o PDF e envia como arquivo novo na pasta do Athenes, sem alt
   assert.ok(chamadas.some(([m, u]) => m === 'POST' && u.includes('upload/drive')), 'enviou como arquivo novo');
   assert.ok(!chamadas.some(([m]) => m === 'DELETE' || m === 'PATCH'), 'o original não é alterado');
 });
+
+import { tokenPodeLerTodoODrive } from '../src/core/athenes_drive_navegar.js';
+
+test('token só com drive.file não lê o resto do Drive (a lista viria vazia); com drive.readonly lê', async () => {
+  const resp = (scope, ok = true, status = 200) => async () => ({ ok, status, json: async () => ({ scope }) });
+  assert.equal(await tokenPodeLerTodoODrive('t1', resp('openid email https://www.googleapis.com/auth/drive.file')), false);
+  assert.equal(await tokenPodeLerTodoODrive('t2', resp('openid https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly')), true);
+  assert.equal(await tokenPodeLerTodoODrive('t3', resp('https://www.googleapis.com/auth/drive')), true);
+  assert.equal(await tokenPodeLerTodoODrive('t4', resp('', false, 400)), false, 'token inválido: pede de novo');
+  assert.equal(await tokenPodeLerTodoODrive('t5', async () => { throw new Error('offline'); }), true, 'sem rede para consultar: tenta listar');
+  assert.equal(await tokenPodeLerTodoODrive(''), false);
+});

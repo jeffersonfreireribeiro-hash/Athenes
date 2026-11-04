@@ -12,6 +12,27 @@ export const ESCOPO_LEITURA_DRIVE = 'https://www.googleapis.com/auth/drive.reado
 export const ESCOPOS_COM_LEITURA = `${GOOGLE_AUTH_ESCOPOS} ${ESCOPO_LEITURA_DRIVE}`;
 export const MIME_PASTA_DRIVE = 'application/vnd.google-apps.folder';
 
+/**
+ * O token tem acesso de LEITURA a todo o Drive? Com só `drive.file` a listagem responde 200 e VEM VAZIA (o Google esconde o que o app
+ * não criou), então não dá para saber pelo erro: pergunta ao Google quais escopos o token tem. Sem resposta, assume que tem
+ * (e a tela mostra a lista vazia normalmente). Resultado em cache por token.
+ */
+const ESCOPOS_CACHE = new Map();
+export async function tokenPodeLerTodoODrive(token, fetchImpl = globalThis.fetch) {
+  if (!token) return false;
+  if (ESCOPOS_CACHE.has(token)) return ESCOPOS_CACHE.get(token);
+  let pode = true;
+  try {
+    const r = await fetchImpl(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(token)}`);
+    if (r.ok) {
+      const escopos = String((await r.json()).scope || '').split(/\s+/);
+      pode = escopos.some(e => /\/auth\/drive(\.readonly)?$/.test(e));
+    } else if (r.status === 400) pode = false; // token vencido ou inválido: pede de novo
+  } catch (_) { /* sem rede para consultar: tenta listar mesmo assim */ }
+  ESCOPOS_CACHE.set(token, pode);
+  return pode;
+}
+
 const aspas = (t) => String(t ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 const SO_PASTAS_E_PDFS = `(mimeType = '${MIME_PASTA_DRIVE}' or mimeType = 'application/pdf' or name contains '.pdf')`;
 

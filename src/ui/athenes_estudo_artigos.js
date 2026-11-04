@@ -26,7 +26,7 @@ import { escapeHtml } from '../core/athenes_seguranca.js';
 import { svgIcone } from './athenes_icones.js';
 import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { aplicarFilhosZoteroAoArtigo } from '../core/athenes_zotero_anexos_notas.js';
-import { listarConteudoDoDrive, copiarPdfDoDriveParaAthenes, ESCOPOS_COM_LEITURA } from '../core/athenes_drive_navegar.js';
+import { tokenPodeLerTodoODrive, listarConteudoDoDrive, copiarPdfDoDriveParaAthenes, ESCOPOS_COM_LEITURA } from '../core/athenes_drive_navegar.js';
 import { PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo } from './athenes_estudo_artigos_dados.js';
 import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
@@ -1055,6 +1055,7 @@ export class EstudoArtigosView {
       aviso(mais ? 'Carregando mais…' : 'Listando seu Google Drive…');
       try {
         const token = await obterTokenOuConectar(obterConfigGoogleDrive());
+        if (estado.aba !== 'athenes' && !(await tokenPodeLerTodoODrive(token))) { if (req === estado.req) pedirPermissao(); return; } // só com `drive.file` a lista viria vazia
         let r;
         if (estado.aba === 'athenes') {
           const pdfs = await listarPdfsDoGoogleDrive(token);
