@@ -194,7 +194,7 @@ fun DialogConfirmarExclusao(
         },
         title = {
             Text(
-                text = "Excluir Documento?",
+                text = "Mover para a lixeira?",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
                     color = AthenesText
@@ -203,7 +203,7 @@ fun DialogConfirmarExclusao(
         },
         text = {
             Text(
-                text = "Tem certeza de que deseja excluir \"${documento.titulo}\"? Esta ação removerá o trabalho da biblioteca local.",
+                text = "\"${documento.titulo}\" poderá ser restaurado pela lixeira.",
                 style = MaterialTheme.typography.bodyMedium.copy(color = AthenesTextMuted)
             )
         },
@@ -216,7 +216,7 @@ fun DialogConfirmarExclusao(
                 ),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("Excluir", fontWeight = FontWeight.Bold)
+                Text("Mover para lixeira", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

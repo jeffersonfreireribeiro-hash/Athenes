@@ -14,20 +14,23 @@ import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 
-class DocumentoRepository(private val context: Context? = null) {
+class DocumentoRepository(private val context: Context? = null, private val storageDir: File? = context?.filesDir) {
 
     private val _documentos = MutableStateFlow<List<Documento>>(emptyList())
     val documentos: StateFlow<List<Documento>> = _documentos.asStateFlow()
+    private val _lixeira = MutableStateFlow<List<Documento>>(emptyList())
+    val lixeira: StateFlow<List<Documento>> = _lixeira.asStateFlow()
     private val _pastas = MutableStateFlow<List<PastaDocumento>>(emptyList())
     val pastas: StateFlow<List<PastaDocumento>> = _pastas.asStateFlow()
 
     init {
         carregarPastas()
         carregarDocumentos()
+        carregarLixeira()
     }
 
     private fun carregarPastas() {
-        val arquivo = context?.filesDir?.let { File(it, "athenes_pastas.json") } ?: return
+        val arquivo = storageDir?.let { File(it, "athenes_pastas.json") } ?: return
         if (!arquivo.exists()) return
         runCatching {
             val dados = JSONArray(arquivo.readText())
@@ -39,7 +42,7 @@ class DocumentoRepository(private val context: Context? = null) {
     }
 
     private fun salvarPastas() {
-        val arquivo = context?.filesDir?.let { File(it, "athenes_pastas.json") } ?: return
+        val arquivo = storageDir?.let { File(it, "athenes_pastas.json") } ?: return
         val dados = JSONArray()
         _pastas.value.forEach { pasta ->
             dados.put(JSONObject().put("id", pasta.id).put("nome", pasta.nome).put("pastaPaiId", pasta.pastaPaiId ?: ""))
@@ -84,7 +87,7 @@ class DocumentoRepository(private val context: Context? = null) {
     }
 
     private fun obterArquivoPersistencia(): File? {
-        return context?.filesDir?.let { File(it, "athenes_documentos.json") }
+        return storageDir?.let { File(it, "athenes_documentos.json") }
     }
 
     fun carregarDocumentos() {
@@ -179,6 +182,14 @@ class DocumentoRepository(private val context: Context? = null) {
             estadoNuvem = EstadoNuvem.LOCAL,
             modificadoEm = "Hoje"
         )
+        val origem = arquivoEditor(original.id)
+        val destino = arquivoEditor(copia.id)
+        if (origem?.exists() == true && destino != null) {
+            runCatching {
+                val conteudo = JSONObject(origem.readText()).put("titulo", copia.titulo)
+                destino.writeText(conteudo.toString())
+            }.onFailure { return }
+        }
         _documentos.value = listOf(copia) + _documentos.value
         salvarEmDisco()
     }
@@ -191,9 +202,66 @@ class DocumentoRepository(private val context: Context? = null) {
     }
 
     fun excluirDocumento(id: String) {
-        _documentos.value = _documentos.value.filter { it.id != id }
+        val documento = _documentos.value.find { it.id == id } ?: return
+        _documentos.value = _documentos.value.filterNot { it.id == id }
+        _lixeira.value = listOf(documento) + _lixeira.value.filterNot { it.id == id }
         salvarEmDisco()
+        salvarLixeira()
     }
+
+    fun restaurarDocumento(id: String): Boolean {
+        val documento = _lixeira.value.find { it.id == id } ?: return false
+        if (_documentos.value.any { it.id == id }) return false
+        val pasta = documento.pastaId?.takeIf { idPasta -> _pastas.value.any { it.id == idPasta } }
+        _documentos.value = listOf(documento.copy(pastaId = pasta)) + _documentos.value
+        _lixeira.value = _lixeira.value.filterNot { it.id == id }
+        salvarEmDisco()
+        salvarLixeira()
+        return true
+    }
+
+    fun excluirDefinitivamente(id: String): Boolean {
+        if (_lixeira.value.none { it.id == id }) return false
+        _lixeira.value = _lixeira.value.filterNot { it.id == id }
+        salvarLixeira()
+        arquivoEditor(id)?.delete()
+        return true
+    }
+
+    private fun arquivoEditor(id: String): File? = storageDir?.let { File(it, "editor_$id.json") }
+
+    private fun carregarLixeira() {
+        val arquivo = storageDir?.let { File(it, "athenes_lixeira.json") } ?: return
+        if (!arquivo.exists()) return
+        runCatching {
+            val conteudo = JSONArray(arquivo.readText())
+            _lixeira.value = (0 until conteudo.length()).map { i -> documentoDeJson(conteudo.getJSONObject(i)) }
+        }
+    }
+
+    private fun salvarLixeira() {
+        val pasta = storageDir ?: return
+        File(pasta, "athenes_lixeira.json").writeText(JSONArray(_lixeira.value.map(::documentoParaJson)).toString())
+    }
+
+    private fun documentoParaJson(doc: Documento) = JSONObject().apply {
+        put("id", doc.id); put("titulo", doc.titulo); put("subtitulo", doc.subtitulo)
+        put("tipo", doc.tipo.name); put("situacao", doc.situacao.name); put("estadoNuvem", doc.estadoNuvem.name)
+        put("autor", doc.autor); put("ano", doc.ano); put("resumo", doc.resumo)
+        put("modificadoEm", doc.modificadoEm); put("disponivelOffline", doc.disponivelOffline)
+        put("pastaId", doc.pastaId ?: "")
+    }
+
+    private fun documentoDeJson(obj: JSONObject) = Documento(
+        id = obj.getString("id"), titulo = obj.optString("titulo", "Sem título"),
+        subtitulo = obj.optString("subtitulo"), tipo = TipoDocumento.deString(obj.optString("tipo")),
+        situacao = SituacaoDocumento.deString(obj.optString("situacao")),
+        estadoNuvem = EstadoNuvem.deString(obj.optString("estadoNuvem")),
+        autor = obj.optString("autor"), ano = obj.optInt("ano", 2026),
+        resumo = obj.optString("resumo"), modificadoEm = obj.optString("modificadoEm"),
+        disponivelOffline = obj.optBoolean("disponivelOffline", true),
+        pastaId = obj.optString("pastaId").ifBlank { null }
+    )
 
     companion object {
         fun obterDocumentosPadraoIniciais(): List<Documento> {

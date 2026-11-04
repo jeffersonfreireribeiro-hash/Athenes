@@ -104,6 +104,10 @@ class BibliotecaViewModel(
         }
     }
     val pastas = repository.pastas
+    val lixeira = repository.lixeira
+
+    fun restaurarDocumento(id: String) = repository.restaurarDocumento(id)
+    fun excluirDefinitivamente(id: String) = repository.excluirDefinitivamente(id)
 
     fun criarPasta(nome: String, pastaPaiId: String? = null) = repository.criarPasta(nome, pastaPaiId)
     fun moverDocumento(id: String, pastaId: String?) = repository.moverDocumento(id, pastaId)

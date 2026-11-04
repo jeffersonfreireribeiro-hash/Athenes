@@ -9,6 +9,9 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.nio.file.Files
+import java.io.File
+import org.json.JSONObject
 
 class BibliotecaTest {
 
@@ -105,5 +108,35 @@ class BibliotecaTest {
         val doc = repository.documentos.value.first()
         assertTrue(!repository.moverDocumento(doc.id, "inexistente"))
         assertEquals(null, repository.documentos.value.first { it.id == doc.id }.pastaId)
+    }
+
+    @Test
+    fun `duplicacao copia conteudo e lixeira permite restaurar apos reabrir`() {
+        val pasta = Files.createTempDirectory("athenes-docs-test").toFile()
+        try {
+            val repositorio = DocumentoRepository(storageDir = pasta)
+            val original = repositorio.adicionarDocumento("Pesquisa completa")
+            File(pasta, "editor_${original.id}.json").writeText(
+                JSONObject().put("titulo", original.titulo).put("blocos", org.json.JSONArray().put(JSONObject().put("texto", "Conteúdo original"))).toString()
+            )
+            repositorio.duplicarDocumento(original.id)
+            val copia = repositorio.documentos.value.first()
+            assertTrue(copia.id != original.id)
+            assertEquals("Conteúdo original", JSONObject(File(pasta, "editor_${copia.id}.json").readText()).getJSONArray("blocos").getJSONObject(0).getString("texto"))
+            assertEquals(copia.titulo, JSONObject(File(pasta, "editor_${copia.id}.json").readText()).getString("titulo"))
+
+            repositorio.excluirDocumento(copia.id)
+            assertTrue(repositorio.documentos.value.none { it.id == copia.id })
+            assertTrue(File(pasta, "editor_${copia.id}.json").exists())
+            val reaberto = DocumentoRepository(storageDir = pasta)
+            assertTrue(reaberto.lixeira.value.any { it.id == copia.id })
+            assertTrue(reaberto.restaurarDocumento(copia.id))
+            assertTrue(reaberto.documentos.value.any { it.id == copia.id })
+            reaberto.excluirDocumento(copia.id)
+            assertTrue(reaberto.excluirDefinitivamente(copia.id))
+            assertTrue(!File(pasta, "editor_${copia.id}.json").exists())
+        } finally {
+            pasta.deleteRecursively()
+        }
     }
 }

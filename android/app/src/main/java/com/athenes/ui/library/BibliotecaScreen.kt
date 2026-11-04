@@ -49,7 +49,9 @@ fun BibliotecaScreen(
     val textoBusca by viewModel.textoBusca.collectAsState()
     val tipoFiltro by viewModel.tipoFiltro.collectAsState()
     val documentos by viewModel.documentosFiltrados.collectAsState()
+    val lixeira by viewModel.lixeira.collectAsState()
     val pastas by viewModel.pastas.collectAsState()
+    var mostrandoLixeira by rememberSaveable { mutableStateOf(false) }
     var pastaAtivaId by rememberSaveable { mutableStateOf<String?>(null) }
     var criarPastaAberto by remember { mutableStateOf(false) }
     var nomeNovaPasta by remember { mutableStateOf("") }
@@ -57,6 +59,7 @@ fun BibliotecaScreen(
     var excluirPastaAberto by remember { mutableStateOf(false) }
     var nomePastaEditada by remember { mutableStateOf("") }
     var documentoParaMover by remember { mutableStateOf<Documento?>(null) }
+    var documentoParaExcluirDefinitivamente by remember { mutableStateOf<Documento?>(null) }
 
     // Estados da Aba 2 (Artigos / Zotero)
     val textoBuscaArtigos by viewModel.textoBuscaArtigos.collectAsState()
@@ -191,20 +194,21 @@ fun BibliotecaScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    FilterChip(selected = pastaAtivaId == null, onClick = { pastaAtivaId = null }, label = { Text("Todos (${documentos.size})") })
+                    FilterChip(selected = !mostrandoLixeira && pastaAtivaId == null, onClick = { pastaAtivaId = null; mostrandoLixeira = false }, label = { Text("Todos (${documentos.size})") })
                     pastas.forEach { pasta ->
                         val pai = pastas.find { it.id == pasta.pastaPaiId }
                         FilterChip(
-                            selected = pastaAtivaId == pasta.id,
-                            onClick = { pastaAtivaId = pasta.id },
+                            selected = !mostrandoLixeira && pastaAtivaId == pasta.id,
+                            onClick = { pastaAtivaId = pasta.id; mostrandoLixeira = false },
                             label = {
                                 val nome = if (pai == null) pasta.nome else "${pai.nome} / ${pasta.nome}"
                                 Text("$nome (${documentos.count { it.pastaId == pasta.id }})")
                             }
                         )
                     }
-                    OutlinedButton(onClick = { nomeNovaPasta = ""; criarPastaAberto = true }) { Text("Nova pasta") }
-                    if (pastaAtivaId != null) {
+                    FilterChip(selected = mostrandoLixeira, onClick = { mostrandoLixeira = true }, label = { Text("Lixeira (${lixeira.size})") })
+                    if (!mostrandoLixeira) OutlinedButton(onClick = { nomeNovaPasta = ""; criarPastaAberto = true }) { Text("Nova pasta") }
+                    if (pastaAtivaId != null && !mostrandoLixeira) {
                         TextButton(onClick = {
                             nomePastaEditada = pastas.find { it.id == pastaAtivaId }?.nome.orEmpty()
                             renomearPastaAberto = true
@@ -217,7 +221,7 @@ fun BibliotecaScreen(
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val colunas = if (maxWidth >= 900.dp) GridCells.Fixed(3) else if (maxWidth >= 600.dp) GridCells.Fixed(2) else GridCells.Fixed(1)
-                    val documentosNaPasta = if (pastaAtivaId == null) documentos else documentos.filter { it.pastaId == pastaAtivaId }
+                    val documentosNaPasta = if (mostrandoLixeira) lixeira else if (pastaAtivaId == null) documentos else documentos.filter { it.pastaId == pastaAtivaId }
 
                     if (documentosNaPasta.isEmpty()) {
                         Box(
@@ -227,7 +231,7 @@ fun BibliotecaScreen(
                             contentAlignment = Alignment.TopCenter
                         ) {
                             Text(
-                                text = if (textoBusca.isNotBlank()) "Nenhum documento encontrado para \"$textoBusca\"" else "Nenhum documento nesta pasta.",
+                                text = if (mostrandoLixeira) "Lixeira vazia." else if (textoBusca.isNotBlank()) "Nenhum documento encontrado para \"$textoBusca\"" else "Nenhum documento nesta pasta.",
                                 style = MaterialTheme.typography.bodyMedium.copy(color = AthenesTextMuted)
                             )
                         }
@@ -240,7 +244,15 @@ fun BibliotecaScreen(
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(documentosNaPasta, key = { it.id }, contentType = { "documento" }) { doc ->
-                                AthenesCard(
+                                if (mostrandoLixeira) Card(Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(16.dp)) {
+                                        Text(doc.titulo, fontWeight = FontWeight.Bold)
+                                        Row {
+                                            TextButton(onClick = { viewModel.restaurarDocumento(doc.id) }) { Text("Restaurar") }
+                                            TextButton(onClick = { documentoParaExcluirDefinitivamente = doc }) { Text("Excluir definitivamente") }
+                                        }
+                                    }
+                                } else AthenesCard(
                                     documento = doc,
                                     onAbrirClick = { onAbrirDocumento(doc) },
                                     onDuplicarClick = { viewModel.duplicarDocumento(doc.id) },
@@ -412,6 +424,20 @@ fun BibliotecaScreen(
             documento = doc,
             onDismiss = viewModel::fecharDialogExclusao,
             onConfirmar = viewModel::confirmarExclusao
+        )
+    }
+    documentoParaExcluirDefinitivamente?.let { doc ->
+        AlertDialog(
+            onDismissRequest = { documentoParaExcluirDefinitivamente = null },
+            title = { Text("Excluir definitivamente?") },
+            text = { Text("\"${doc.titulo}\" e seu conteúdo editável serão removidos deste aparelho.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.excluirDefinitivamente(doc.id)
+                    documentoParaExcluirDefinitivamente = null
+                }) { Text("Excluir definitivamente") }
+            },
+            dismissButton = { TextButton(onClick = { documentoParaExcluirDefinitivamente = null }) { Text("Cancelar") } }
         )
     }
 
