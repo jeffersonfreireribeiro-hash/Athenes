@@ -136,6 +136,7 @@ enum class AbaInspetorDireito {
     ANOTACOES_ARTIGO,
     RESUMO_NOTAS,
     CITACOES,
+    INFORMACOES_ZOTERO,
     SUMARIO,
     ZOTERO_DRIVE
 }

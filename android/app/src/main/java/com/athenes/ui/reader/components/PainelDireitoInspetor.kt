@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.BuildConfig
+import com.athenes.core.data.ZoteroCampos
 import com.athenes.core.model.*
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.theme.*
@@ -71,7 +72,7 @@ fun PainelDireitoInspetor(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     ItemAbaInspetor(
-                        titulo = "Resumo & Notas",
+                        titulo = "Resumo",
                         icone = Icons.AutoMirrored.Rounded.Article,
                         selecionada = abaAtiva == AbaInspetorDireito.RESUMO_NOTAS,
                         onClick = { onSelecionarAba(AbaInspetorDireito.RESUMO_NOTAS) },
@@ -87,7 +88,15 @@ fun PainelDireitoInspetor(
                     )
 
                     ItemAbaInspetor(
-                        titulo = "Configurações",
+                        titulo = "Informações",
+                        icone = Icons.Rounded.Info,
+                        selecionada = abaAtiva == AbaInspetorDireito.INFORMACOES_ZOTERO,
+                        onClick = { onSelecionarAba(AbaInspetorDireito.INFORMACOES_ZOTERO) },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    ItemAbaInspetor(
+                        titulo = "Ajustes",
                         icone = Icons.Rounded.Settings,
                         selecionada = abaAtiva == AbaInspetorDireito.ZOTERO_DRIVE,
                         onClick = { onSelecionarAba(AbaInspetorDireito.ZOTERO_DRIVE) },
@@ -117,6 +126,20 @@ fun PainelDireitoInspetor(
                         onRemoverCitacao = onRemoverCitacao,
                         context = context
                     )
+                    AbaInspetorDireito.INFORMACOES_ZOTERO -> {
+                        val linhas = remember(artigo) { ZoteroCampos.linhas(artigo) }
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(linhas) { (rotulo, valor) ->
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text(rotulo, style = MaterialTheme.typography.labelSmall)
+                                    Text(valor, style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
+                            if (linhas.isEmpty()) {
+                                item { Text("Sem informações do Zotero. Sincronize a biblioteca para carregar os metadados.") }
+                            }
+                        }
+                    }
                     AbaInspetorDireito.ZOTERO_DRIVE -> ConteudoAbaZoteroDrive(
                         config = artigo.zoteroConfig,
                         modoSomenteStylus = modoSomenteStylus,

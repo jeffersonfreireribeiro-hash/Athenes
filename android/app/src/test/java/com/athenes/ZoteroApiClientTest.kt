@@ -6,6 +6,7 @@ import com.athenes.core.data.ZoteroColecao
 import com.athenes.core.data.ZoteroItem
 import com.athenes.core.data.ZoteroCriador
 import com.athenes.core.data.ArtigoEstudoRepository
+import com.athenes.core.data.ZoteroCampos
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -75,5 +76,9 @@ class ZoteroApiClientTest {
         assertEquals("12", artigo.camposZotero["volume"])
         assertEquals("author", artigo.criadoresZotero.single().funcao)
         assertEquals("COL1", artigo.colecoesZotero.single())
+        val linhas = ZoteroCampos.linhas(artigo)
+        assertEquals("Tipo do item", linhas.first().first)
+        assertTrue(linhas.indexOfFirst { it.first == "Autor" } < linhas.indexOfFirst { it.first == "Volume" })
+        assertEquals("12", linhas.first { it.first == "Volume" }.second)
     }
 }
