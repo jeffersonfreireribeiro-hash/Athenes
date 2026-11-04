@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.ui.editor.AlinhamentoTexto
 import com.athenes.ui.editor.BlocoEditor
+import com.athenes.ui.editor.TipoBlocoEditor
 import com.athenes.ui.theme.AthenesPrimary
 import com.athenes.ui.theme.AthenesTextDark
 import com.athenes.ui.theme.AthenesTextMuted
@@ -27,6 +28,7 @@ fun EditorPainelInspetor(
     bloco: BlocoEditor?,
     onAlinhamentoAlterado: (AlinhamentoTexto) -> Unit,
     onColunasAlteradas: (Int) -> Unit,
+    onNivelTituloAlterado: (Int) -> Unit,
     onDuplicarBloco: () -> Unit,
     onExcluirBloco: () -> Unit,
     onFechar: () -> Unit,
@@ -140,6 +142,18 @@ fun EditorPainelInspetor(
                                     )
                                 )
                             }
+                        }
+                    }
+
+                    if (bloco.tipo == TipoBlocoEditor.TITULO) {
+                        Column {
+                            Text("Nível do título: ${bloco.nivelTitulo}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Slider(
+                                value = bloco.nivelTitulo.toFloat(),
+                                onValueChange = { onNivelTituloAlterado(it.toInt().coerceIn(1, 9)) },
+                                valueRange = 1f..9f,
+                                steps = 7
+                            )
                         }
                     }
 

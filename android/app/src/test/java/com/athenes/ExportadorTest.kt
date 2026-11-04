@@ -3,6 +3,7 @@ package com.athenes
 import com.athenes.core.model.ConfiguracaoPagina
 import com.athenes.core.model.ConfiguracaoPaginaCodec
 import com.athenes.core.model.FormatoPagina
+import com.athenes.core.model.NumeracaoSecoes
 import com.athenes.core.export.AlinhamentoExport
 import com.athenes.core.export.BlocoExport
 import com.athenes.core.export.DocumentoExport
@@ -193,8 +194,8 @@ class ExportadorTest {
             BlocoExport(TipoBlocoExport.TITULO, titulo = "Método")
         ))
         val html = ExportadorDocumento.gerarHtml(doc, imagens)
-        assertTrue(html.contains("href=\"#secao-1\">Introdução</a>"))
-        assertTrue(html.contains("href=\"#secao-2\">Método</a>"))
+        assertTrue(html.contains("href=\"#secao-1\">1 Introdução</a>"))
+        assertTrue(html.contains("href=\"#secao-2\">2 Método</a>"))
         assertTrue(html.contains("id=\"secao-2\""))
         val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/document.xml"]!!)
         assertTrue(xml.contains("SUMÁRIO"))
@@ -217,5 +218,24 @@ class ExportadorTest {
         assertTrue(xml.contains("LISTA DE ILUSTRAÇÕES"))
         assertTrue(xml.contains("Figura 1 — Mapa"))
         assertTrue(xml.contains("Tabela 1 — Dados"))
+    }
+
+    @Test
+    fun `titulos de varios niveis recebem numeracao decimal e entram no sumario`() {
+        assertEquals(listOf("1", "1.1", "1.1.1", "1.2", "2", "2.1.1"), NumeracaoSecoes.calcular(listOf(1, 2, 3, 2, 1, 3)))
+        val doc = documento().copy(blocos = listOf(
+            BlocoExport(TipoBlocoExport.SUMARIO),
+            BlocoExport(TipoBlocoExport.TITULO, titulo = "Introdução", nivelTitulo = 1),
+            BlocoExport(TipoBlocoExport.TITULO, titulo = "Problema", nivelTitulo = 2),
+            BlocoExport(TipoBlocoExport.TITULO, titulo = "Método", nivelTitulo = 1)
+        ))
+        val html = ExportadorDocumento.gerarHtml(doc, imagens)
+        assertTrue(html.contains("1.1 Problema</a>"))
+        assertTrue(html.contains("<h3 id=\"secao-2\">1.1&nbsp; Problema</h3>"))
+        val xml = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/document.xml"]!!)
+        assertTrue(xml.contains("1.1  Problema"))
+        assertTrue(xml.contains("<w:pStyle w:val=\"Heading2\"/>"))
+        val estilos = String(entradas(ExportadorDocumento.gerarDocx(doc, imagens))["word/styles.xml"]!!)
+        assertTrue(estilos.contains("<w:outlineLvl w:val=\"1\"/>"))
     }
 }

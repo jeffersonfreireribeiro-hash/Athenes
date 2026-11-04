@@ -10,6 +10,7 @@ import com.athenes.core.model.ArtigoEstudoDetalhado
 import com.athenes.core.model.Documento
 import com.athenes.core.model.ConfiguracaoPagina
 import com.athenes.core.model.ConfiguracaoPaginaCodec
+import com.athenes.core.model.NumeracaoSecoes
 import com.athenes.core.model.TipoDocumento
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -68,7 +69,8 @@ data class BlocoEditor(
     val alinhamento: AlinhamentoTexto = AlinhamentoTexto.JUSTIFICADO,
     val estiloId: String = "texto",
     val tabelaLinhas: List<List<String>> = emptyList(),
-    val listaNumerada: Boolean = false
+    val listaNumerada: Boolean = false,
+    val nivelTitulo: Int = 1
 )
 
 data class SecaoEstrutura(
@@ -212,10 +214,10 @@ class EditorViewModel : ViewModel() {
 
     /** Seções numeradas derivadas dos blocos de título (fonte única: o próprio documento). */
     fun montarEstrutura(blocos: List<BlocoEditor>): List<SecaoEstrutura> {
-        var n = 0
-        return blocos.filter { it.tipo == TipoBlocoEditor.TITULO }.map { b ->
-            n++
-            SecaoEstrutura(id = b.id, numero = "$n.", titulo = b.titulo.ifBlank { "Seção sem título" })
+        val titulos = blocos.filter { it.tipo == TipoBlocoEditor.TITULO && it.titulo.isNotBlank() }
+        val numeros = NumeracaoSecoes.calcular(titulos.map { it.nivelTitulo })
+        return titulos.mapIndexed { indice, b ->
+            SecaoEstrutura(id = b.id, numero = numeros[indice], titulo = b.titulo, nivel = b.nivelTitulo)
         }
     }
 
@@ -260,6 +262,7 @@ class EditorViewModel : ViewModel() {
     }
 
     fun definirListaNumerada(id: String, numerada: Boolean) = atualizarBloco(id) { it.copy(listaNumerada = numerada) }
+    fun definirNivelTitulo(id: String, nivel: Int) = atualizarBloco(id) { it.copy(nivelTitulo = nivel.coerceIn(1, 9)) }
 
     fun adicionarBloco(tipo: TipoBlocoEditor) {
         salvarNoHistorico()
@@ -376,7 +379,7 @@ class EditorViewModel : ViewModel() {
                 titulo = b.titulo, texto = b.texto, legenda = b.legenda, fonte = b.fonte,
                 formula = b.formulaLatex, imagem = b.imagem,
                 alinhamento = AlinhamentoExport.valueOf(b.alinhamento.name),
-                tabela = b.tabelaLinhas, listaNumerada = b.listaNumerada
+                tabela = b.tabelaLinhas, listaNumerada = b.listaNumerada, nivelTitulo = b.nivelTitulo
             )
         }
     )
@@ -453,6 +456,7 @@ class EditorViewModel : ViewModel() {
                 put("colunas", b.colunas); put("alinhamento", b.alinhamento.name); put("estiloId", b.estiloId)
                 put("tabela", JSONArray(b.tabelaLinhas.map { JSONArray(it) }))
                 put("listaNumerada", b.listaNumerada)
+                put("nivelTitulo", b.nivelTitulo)
             })
         }
         raiz.put("blocos", arr)
@@ -480,6 +484,7 @@ class EditorViewModel : ViewModel() {
                     formulaLatex = o.optString("formulaLatex"), imagem = o.optString("imagem"), colunas = o.optInt("colunas", 12),
                     alinhamento = runCatching { AlinhamentoTexto.valueOf(o.optString("alinhamento")) }.getOrDefault(AlinhamentoTexto.JUSTIFICADO),
                     estiloId = o.optString("estiloId", "texto"), listaNumerada = o.optBoolean("listaNumerada"),
+                    nivelTitulo = o.optInt("nivelTitulo", 1).coerceIn(1, 9),
                     tabelaLinhas = if (tab == null) emptyList() else (0 until tab.length()).map { r ->
                         val l = tab.getJSONArray(r)
                         (0 until l.length()).map { c -> l.getString(c) }

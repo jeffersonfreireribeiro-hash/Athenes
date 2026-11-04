@@ -168,7 +168,6 @@ fun EditorDocumentoScreen(
     val editavel = modoRevisao != "leitura"
     val blocoSelecionado = remember(blocos, blocoSelecionadoId) { blocos.find { it.id == blocoSelecionadoId } }
     val estrutura = remember(blocos) { viewModel.montarEstrutura(blocos) }
-    val titulosSumario = remember(blocos) { blocos.filter { it.tipo == TipoBlocoEditor.TITULO && it.titulo.isNotBlank() }.map { it.titulo } }
     val titulosIlustracoes = remember(blocos) { blocos.filter { it.tipo in setOf(TipoBlocoEditor.FIGURA, TipoBlocoEditor.TABELA, TipoBlocoEditor.QUADRO) && it.legenda.isNotBlank() }.map { it.legenda } }
     val algumPainelAberto = painelEstruturaAberto || painelInspetorAberto
 
@@ -247,7 +246,7 @@ fun EditorDocumentoScreen(
                     editavel = editavel,
                     compacto = compacto,
                     numeroFormula = numeroFormula,
-                    titulosSumario = titulosSumario,
+                    estrutura = estrutura,
                     titulosIlustracoes = titulosIlustracoes,
                     onEscolherImagem = escolherImagem,
                     vm = viewModel
@@ -341,6 +340,7 @@ fun EditorDocumentoScreen(
                 bloco = blocoSelecionado,
                 onAlinhamentoAlterado = { al -> blocoSelecionado?.let { viewModel.definirAlinhamentoBloco(it.id, al) } },
                 onColunasAlteradas = { col -> blocoSelecionado?.let { viewModel.definirColunasBloco(it.id, col) } },
+                onNivelTituloAlterado = { nivel -> blocoSelecionado?.let { viewModel.definirNivelTitulo(it.id, nivel) } },
                 onDuplicarBloco = { blocoSelecionado?.let { viewModel.duplicarBloco(it.id) } },
                 onExcluirBloco = { blocoSelecionado?.let { viewModel.removerBloco(it.id) } },
                 onFechar = viewModel::fecharPainelInspetor
@@ -485,7 +485,7 @@ private fun ItemBlocoFolha(
     editavel: Boolean,
     compacto: Boolean,
     numeroFormula: Int,
-    titulosSumario: List<String>,
+    estrutura: List<SecaoEstrutura>,
     titulosIlustracoes: List<String>,
     onEscolherImagem: (String) -> Unit,
     vm: EditorViewModel
@@ -510,11 +510,16 @@ private fun ItemBlocoFolha(
             .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         when (bloco.tipo) {
-            TipoBlocoEditor.TITULO -> CampoFolha(
-                value = bloco.titulo, onValueChange = { vm.atualizarTituloBloco(bloco.id, it) },
-                editavel = editavel, placeholder = "Título da seção", onFocused = selecionar,
-                style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 16.sp, lineHeight = 22.sp, color = Color(0xFF0F172A), letterSpacing = 0.3.sp, textAlign = alinhamento)
-            )
+            TipoBlocoEditor.TITULO -> Row(verticalAlignment = Alignment.CenterVertically) {
+                val numero = estrutura.find { it.id == bloco.id }?.numero
+                if (numero != null) Text(numero, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextoCor, modifier = Modifier.padding(end = 8.dp))
+                CampoFolha(
+                    value = bloco.titulo, onValueChange = { vm.atualizarTituloBloco(bloco.id, it) },
+                    editavel = editavel, placeholder = "Título da seção", onFocused = selecionar,
+                    modifier = Modifier.weight(1f),
+                    style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 16.sp, lineHeight = 22.sp, color = Color(0xFF0F172A), letterSpacing = 0.3.sp, textAlign = alinhamento)
+                )
+            }
 
             TipoBlocoEditor.PARAGRAFO -> CampoFolha(
                 value = bloco.texto, onValueChange = { vm.atualizarTextoBloco(bloco.id, it) },
@@ -548,10 +553,10 @@ private fun ItemBlocoFolha(
 
             TipoBlocoEditor.SUMARIO -> Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Text("SUMÁRIO", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextoCor)
-                titulosSumario.forEachIndexed { indice, titulo ->
-                    Text("${indice + 1}  $titulo", fontSize = 12.sp, color = TextoCor, modifier = Modifier.padding(top = 4.dp))
+                estrutura.forEach { secao ->
+                    Text("${secao.numero}  ${secao.titulo}", fontSize = 12.sp, color = TextoCor, modifier = Modifier.padding(top = 4.dp, start = ((secao.nivel - 1) * 8).dp))
                 }
-                if (titulosSumario.isEmpty()) Text("Adicione títulos para gerar o sumário.", fontSize = 12.sp, color = AthenesTextMuted)
+                if (estrutura.isEmpty()) Text("Adicione títulos para gerar o sumário.", fontSize = 12.sp, color = AthenesTextMuted)
             }
 
             TipoBlocoEditor.LISTA_ILUSTRACOES -> Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {

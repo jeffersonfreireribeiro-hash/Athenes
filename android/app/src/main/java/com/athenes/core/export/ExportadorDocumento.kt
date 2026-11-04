@@ -1,6 +1,7 @@
 package com.athenes.core.export
 
 import com.athenes.core.model.ConfiguracaoPagina
+import com.athenes.core.model.NumeracaoSecoes
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.zip.ZipEntry
@@ -17,7 +18,8 @@ data class BlocoExport(
     val imagem: String = "",
     val alinhamento: AlinhamentoExport = AlinhamentoExport.JUSTIFICADO,
     val tabela: List<List<String>> = emptyList(),
-    val listaNumerada: Boolean = false
+    val listaNumerada: Boolean = false,
+    val nivelTitulo: Int = 1
 )
 
 enum class TipoBlocoExport { TITULO, PARAGRAFO, CITACAO, FIGURA, TABELA, QUADRO, FORMULA, LISTA, SUMARIO, LISTA_ILUSTRACOES, QUEBRA_PAGINA, DIVISOR }
@@ -58,6 +60,8 @@ object ExportadorDocumento {
         val midias = mutableListOf<Pair<String, ImagemExport>>() // nome no zip -> imagem
         val corpo = StringBuilder()
         val temLista = doc.blocos.any { it.tipo == TipoBlocoExport.LISTA }
+        val titulos = doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
+        val numerosTitulos = NumeracaoSecoes.calcular(titulos.map { it.nivelTitulo })
 
         if (doc.titulo.isNotBlank()) corpo.append(par(doc.titulo, centro = true, negrito = true, tamanho = 32, depois = 120))
         if (doc.subtitulo.isNotBlank()) corpo.append(par(doc.subtitulo, centro = true, italico = true, tamanho = 26, depois = 120))
@@ -74,7 +78,7 @@ object ExportadorDocumento {
                 TipoBlocoExport.TITULO -> {
                     if (b.titulo.isNotBlank()) {
                         secao++
-                        corpo.append(par("$secao  ${b.titulo.uppercase()}", negrito = true, tamanho = 24, antes = 240, depois = 120, estilo = "Heading1"))
+                        corpo.append(par("${numerosTitulos[secao - 1]}  ${b.titulo.uppercase()}", negrito = true, tamanho = if (b.nivelTitulo == 1) 24 else 22, antes = 240, depois = 120, estilo = "Heading${b.nivelTitulo.coerceIn(1, 9)}"))
                     }
                 }
                 TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) {
@@ -107,8 +111,7 @@ object ExportadorDocumento {
                 }
                 TipoBlocoExport.SUMARIO -> {
                     corpo.append(par("SUMÁRIO", negrito = true, antes = 120, depois = 120))
-                    doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
-                        .forEachIndexed { indice, titulo -> corpo.append(par("${indice + 1}  ${titulo.titulo}", depois = 60)) }
+                    titulos.forEachIndexed { indice, titulo -> corpo.append(par("${numerosTitulos[indice]}  ${titulo.titulo}", depois = 60, recuoEsq = (titulo.nivelTitulo - 1).coerceAtLeast(0) * 200)) }
                 }
                 TipoBlocoExport.LISTA_ILUSTRACOES -> {
                     corpo.append(par("LISTA DE ILUSTRAÇÕES", negrito = true, antes = 120, depois = 120))
@@ -150,8 +153,12 @@ object ExportadorDocumento {
         val raiz = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"""
 
-        val estilos = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:styles xmlns:w="$NS_W"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:lang w:val="pt-BR"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:outlineLvl w:val="0"/></w:pPr></w:style></w:styles>"""
+        val estilos = buildString {
+            append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="$NS_W"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:lang w:val="pt-BR"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>""")
+            for (nivel in 1..9) append("<w:style w:type=\"paragraph\" w:styleId=\"Heading$nivel\"><w:name w:val=\"heading $nivel\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:qFormat/><w:pPr><w:keepNext/><w:outlineLvl w:val=\"${nivel - 1}\"/></w:pPr></w:style>")
+            append("</w:styles>")
+        }
 
         val saida = ByteArrayOutputStream()
         ZipOutputStream(saida).use { zip ->
@@ -271,6 +278,8 @@ object ExportadorDocumento {
 
     fun gerarHtml(doc: DocumentoExport, imagens: ResolvedorImagem): String {
         require(doc.pagina.validar()) { "Configuração de página inválida." }
+        val titulos = doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
+        val numerosTitulos = NumeracaoSecoes.calcular(titulos.map { it.nivelTitulo })
         fun mm(valor: Double): String = java.lang.String.format(java.util.Locale.US, "%.2f", valor)
         val sb = StringBuilder()
         sb.append(
@@ -322,7 +331,11 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                 AlinhamentoExport.JUSTIFICADO -> "auto"
             }
             when (b.tipo) {
-                TipoBlocoExport.TITULO -> if (b.titulo.isNotBlank()) { secao++; sb.append("<h2 id=\"secao-$secao\">$secao&nbsp; ${html(b.titulo)}</h2>") }
+                TipoBlocoExport.TITULO -> if (b.titulo.isNotBlank()) {
+                    secao++
+                    val nivelHtml = (b.nivelTitulo + 1).coerceAtMost(6)
+                    sb.append("<h$nivelHtml id=\"secao-$secao\">${numerosTitulos[secao - 1]}&nbsp; ${html(b.titulo)}</h$nivelHtml>")
+                }
                 TipoBlocoExport.PARAGRAFO -> if (b.texto.isNotBlank()) sb.append("<p class=\"corpo\" style=\"text-align:$alinha;text-align-last:$ultimaLinha\">${html(b.texto)}</p>")
                 TipoBlocoExport.LISTA -> if (b.texto.isNotBlank()) {
                     val tag = if (b.listaNumerada) "ol" else "ul"
@@ -332,8 +345,7 @@ hr { border: 0; border-top: 0.8pt solid #94a3b8; margin: 10pt 0; }
                 }
                 TipoBlocoExport.SUMARIO -> {
                     sb.append("<nav aria-label=\"Sumário\"><h2>SUMÁRIO</h2><ol>")
-                    doc.blocos.filter { it.tipo == TipoBlocoExport.TITULO && it.titulo.isNotBlank() }
-                        .forEachIndexed { indice, titulo -> sb.append("<li><a href=\"#secao-${indice + 1}\">${html(titulo.titulo)}</a></li>") }
+                    titulos.forEachIndexed { indice, titulo -> sb.append("<li style=\"margin-left:${(titulo.nivelTitulo - 1) * 5}mm\"><a href=\"#secao-${indice + 1}\">${numerosTitulos[indice]} ${html(titulo.titulo)}</a></li>") }
                     sb.append("</ol></nav>")
                 }
                 TipoBlocoExport.LISTA_ILUSTRACOES -> {
