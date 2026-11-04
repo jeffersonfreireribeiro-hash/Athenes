@@ -146,8 +146,14 @@ class EditorViewModel : ViewModel() {
     private val _blocos = MutableStateFlow<List<BlocoEditor>>(listOf(blocoParagrafoVazio()))
     val blocos: StateFlow<List<BlocoEditor>> = _blocos.asStateFlow()
 
-    // Pilhas de Desfazer / Refazer
-    private val historico = mutableListOf<List<BlocoEditor>>()
+    // O texto das citações depende do estilo e da ordem das obras: restaurar apenas blocos
+    // produziria marcas antigas com uma bibliografia nova após Desfazer.
+    private data class EstadoHistorico(
+        val blocos: List<BlocoEditor>,
+        val estiloBibliografico: EstiloBibliografico,
+        val referencias: List<ReferenciaAcademica>
+    )
+    private val historico = mutableListOf<EstadoHistorico>()
     private var indiceHistorico = -1
 
     private var pastaArmazenamento: File? = null
@@ -350,11 +356,11 @@ class EditorViewModel : ViewModel() {
         val referencia = ReferenciaAcademica.doArtigo(artigo)
         val paginaValidada = Bibliografia.validarPagina(pagina, referencia.paginas, artigo.totalPaginas)
         require(paginaValidada.valida) { paginaValidada.mensagem }
+        salvarNoHistorico()
         if (_referencias.value.none { it.id == referencia.id }) _referencias.value = _referencias.value + referencia
         val indice = _referencias.value.indexOfFirst { it.id == referencia.id } + 1
         val marca = Bibliografia.citacao(referencia, _estiloBibliografico.value, indice, paginaValidada.valor, narrativa)
         val alvo = _blocos.value.find { it.id == _blocoSelecionadoId.value }
-        salvarNoHistorico()
         if (alvo != null && (alvo.tipo == TipoBlocoEditor.PARAGRAFO || alvo.tipo == TipoBlocoEditor.CITACAO)) {
             val posicao = cursorTexto?.takeIf { it.first == alvo.id }?.second?.coerceIn(0, alvo.texto.length) ?: alvo.texto.length
             val novo = CitacoesInline.inserir(TextoComCitacoes(alvo.texto, alvo.citacoes), posicao, referencia.id, marca, paginaValidada.valor, narrativa)
@@ -441,7 +447,7 @@ class EditorViewModel : ViewModel() {
     fun desfazer() {
         if (indiceHistorico > 0) {
             indiceHistorico--
-            _blocos.value = historico[indiceHistorico]
+            restaurarHistorico(historico[indiceHistorico])
             marcarAlterado()
         }
     }
@@ -449,16 +455,26 @@ class EditorViewModel : ViewModel() {
     fun refazer() {
         if (indiceHistorico < historico.size - 1) {
             indiceHistorico++
-            _blocos.value = historico[indiceHistorico]
+            restaurarHistorico(historico[indiceHistorico])
             marcarAlterado()
         }
     }
 
     private fun salvarNoHistorico() {
         while (historico.size > indiceHistorico + 1) historico.removeAt(historico.size - 1)
-        historico.add(_blocos.value)
+        val estado = EstadoHistorico(_blocos.value, _estiloBibliografico.value, _referencias.value)
+        if (historico.lastOrNull() == estado) return
+        historico.add(estado)
         if (historico.size > LIMITE_HISTORICO) historico.removeAt(0)
         indiceHistorico = historico.size - 1
+    }
+
+    private fun restaurarHistorico(estado: EstadoHistorico) {
+        _blocos.value = estado.blocos
+        _estiloBibliografico.value = estado.estiloBibliografico
+        _referencias.value = estado.referencias
+        if (_blocos.value.none { it.id == _blocoSelecionadoId.value }) _blocoSelecionadoId.value = null
+        cursorTexto = null
     }
 
     /** Instantâneo neutro (sem Android) do documento atual para os exportadores. */
