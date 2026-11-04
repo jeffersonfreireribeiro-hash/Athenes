@@ -111,10 +111,16 @@ data class ArtigoEstudoDetalhado(
     val citacoes: List<CitacaoMarcada> = emptyList(),
     val notas: List<NotaAdesiva> = emptyList(),
     val tracos: List<TracoDesenho> = emptyList(),
+    val tipoZotero: String = "",
+    val camposZotero: Map<String, String> = emptyMap(),
+    val criadoresZotero: List<ZoteroCriadorInfo> = emptyList(),
+    val colecoesZotero: List<String> = emptyList(),
     val sumario: List<SecaoSumario> = emptyList(),
     val marcadores: Set<Int> = emptySet(),
     val zoteroConfig: ZoteroVinculoConfig = ZoteroVinculoConfig()
 )
+
+data class ZoteroCriadorInfo(val funcao: String, val nome: String, val sobrenome: String)
 
 enum class FerramentaLeitura(val rotulo: String) {
     SELECAO("Selecionar Texto"),

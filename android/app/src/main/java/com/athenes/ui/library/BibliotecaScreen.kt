@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.core.model.Documento
@@ -58,6 +59,17 @@ fun BibliotecaScreen(
     // Estados da Aba 2 (Artigos / Zotero)
     val textoBuscaArtigos by viewModel.textoBuscaArtigos.collectAsState()
     val artigos by viewModel.artigosFiltrados.collectAsState()
+    val estadoZotero by viewModel.estadoZotero.collectAsState()
+    val sincronizandoZotero by viewModel.sincronizandoZotero.collectAsState()
+    val conectadoZotero by viewModel.conectadoZotero.collectAsState()
+    val colecoesZotero by viewModel.colecoesZotero.collectAsState()
+    val tipoZoteroFiltro by viewModel.tipoZoteroFiltro.collectAsState()
+    val colecaoZoteroFiltro by viewModel.colecaoZoteroFiltro.collectAsState()
+    val anoMinimo by viewModel.anoMinimo.collectAsState()
+    val ordemZotero by viewModel.ordemZotero.collectAsState()
+    var mostrarConexaoZotero by remember { mutableStateOf(false) }
+    var chaveZotero by remember { mutableStateOf("") }
+    var usuarioZotero by remember { mutableStateOf("") }
 
     val dialogNovoAberto by viewModel.dialogNovoAberto.collectAsState()
     val docParaExcluir by viewModel.docParaExcluir.collectAsState()
@@ -108,9 +120,7 @@ fun BibliotecaScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         OutlinedButton(
-                            onClick = {
-                                Toast.makeText(context, "A sincronização do Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
-                            },
+                            onClick = { mostrarConexaoZotero = true },
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                             modifier = Modifier.height(44.dp),
@@ -118,7 +128,7 @@ fun BibliotecaScreen(
                         ) {
                             Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "Sincronizar Zotero", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(text = if (sincronizandoZotero) "Sincronizando…" else "Sincronizar Zotero", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
 
                         Button(
@@ -289,7 +299,7 @@ fun BibliotecaScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Zotero não conectado",
+                                text = if (conectadoZotero) "Zotero conectado" else "Zotero não conectado",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold,
@@ -301,6 +311,44 @@ fun BibliotecaScreen(
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
+
+                if (estadoZotero.isNotBlank()) {
+                    Text(estadoZotero, style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        null to "Todos", "journalArticle" to "Artigos", "book" to "Livros",
+                        "thesis" to "Teses", "conferencePaper" to "Conferências", "fichados" to "Fichados"
+                    ).forEach { (tipo, nome) ->
+                        FilterChip(selected = tipoZoteroFiltro == tipo, onClick = { viewModel.filtrarTipoZotero(tipo) }, label = { Text(nome) })
+                    }
+                }
+                if (colecoesZotero.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(selected = colecaoZoteroFiltro == null, onClick = { viewModel.filtrarColecaoZotero(null) }, label = { Text("Todas as coleções") })
+                        colecoesZotero.forEach { colecao ->
+                            FilterChip(
+                                selected = colecaoZoteroFiltro == colecao.chave,
+                                onClick = { viewModel.filtrarColecaoZotero(colecao.chave) },
+                                label = { Text(colecao.nome) }
+                            )
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = anoMinimo == null, onClick = { viewModel.filtrarAnoMinimo(null) }, label = { Text("Todos os anos") })
+                    FilterChip(selected = anoMinimo == 2020, onClick = { viewModel.filtrarAnoMinimo(2020) }, label = { Text("Desde 2020") })
+                    FilterChip(selected = ordemZotero == "recentes", onClick = { viewModel.ordenarZotero("recentes") }, label = { Text("Recentes") })
+                    FilterChip(selected = ordemZotero == "titulo", onClick = { viewModel.ordenarZotero("titulo") }, label = { Text("Título") })
+                }
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val colunas = if (maxWidth >= 900.dp) GridCells.Fixed(3) else if (maxWidth >= 600.dp) GridCells.Fixed(2) else GridCells.Fixed(1)
@@ -424,6 +472,38 @@ fun BibliotecaScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { documentoParaMover = null }) { Text("Cancelar") } }
+        )
+    }
+    if (mostrarConexaoZotero) {
+        AlertDialog(
+            onDismissRequest = { mostrarConexaoZotero = false },
+            title = { Text("Conectar Zotero") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Informe sua chave do Zotero. O ID é opcional; o aplicativo pode descobri-lo pela chave.")
+                    OutlinedTextField(
+                        value = chaveZotero,
+                        onValueChange = { chaveZotero = it },
+                        label = { Text("Chave de API") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = usuarioZotero,
+                        onValueChange = { usuarioZotero = it },
+                        label = { Text("ID do usuário (opcional)") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.sincronizarZotero(chaveZotero, usuarioZotero)
+                    chaveZotero = ""
+                    mostrarConexaoZotero = false
+                }, enabled = chaveZotero.isNotBlank()) { Text("Sincronizar") }
+            },
+            dismissButton = { TextButton(onClick = { mostrarConexaoZotero = false }) { Text("Cancelar") } }
         )
     }
 }

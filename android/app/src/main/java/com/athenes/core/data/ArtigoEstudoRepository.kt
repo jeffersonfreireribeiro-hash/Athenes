@@ -25,6 +25,12 @@ class ArtigoEstudoRepository {
     fun ativarPersistencia(context: Context) {
         if (contexto != null) return
         contexto = context.applicationContext
+        contexto!!.getSharedPreferences("biblioteca_zotero", Context.MODE_PRIVATE)
+            .getString("dados", null)?.let { salvo ->
+                runCatching { ZoteroCacheCodec.ler(salvo) }.getOrNull()?.let { (itens, colecoes) ->
+                    if (itens.isNotEmpty()) aplicarBibliotecaZotero(itens, colecoes)
+                }
+            }
         val preferencias = contexto!!.getSharedPreferences("tracos_pdf", Context.MODE_PRIVATE)
         val anotacoes = contexto!!.getSharedPreferences("anotacoes_pdf", Context.MODE_PRIVATE)
         _artigos.value = _artigos.value.map { artigo ->
@@ -146,6 +152,46 @@ class ArtigoEstudoRepository {
 
     private val _artigos = MutableStateFlow<List<ArtigoEstudoDetalhado>>(obterArtigosIniciais())
     val artigos: StateFlow<List<ArtigoEstudoDetalhado>> = _artigos.asStateFlow()
+    private val _colecoesZotero = MutableStateFlow<List<ZoteroColecao>>(emptyList())
+    val colecoesZotero: StateFlow<List<ZoteroColecao>> = _colecoesZotero.asStateFlow()
+
+    fun aplicarBibliotecaZotero(itens: List<ZoteroItem>, colecoes: List<ZoteroColecao>) {
+        val anteriores = _artigos.value.associateBy { it.id }
+        _colecoesZotero.value = colecoes
+        _artigos.value = itens.map { item ->
+            val anterior = anteriores[item.chave]
+            val ano = Regex("(?:19|20)\\d{2}").find(item.data)?.value?.toIntOrNull() ?: 0
+            ArtigoEstudoDetalhado(
+                id = item.chave,
+                titulo = item.titulo,
+                autores = item.autores.joinToString(", ") { criador ->
+                    listOf(criador.nome, criador.sobrenome).filter(String::isNotBlank).joinToString(" ")
+                }.ifBlank { "Autor não informado" },
+                ano = ano,
+                chaveZotero = item.chave,
+                totalPaginas = anterior?.totalPaginas ?: 0,
+                resumoOficial = item.resumo,
+                meuResumo = anterior?.meuResumo.orEmpty(),
+                analiseMetodologica = anterior?.analiseMetodologica.orEmpty(),
+                tags = item.tags,
+                paginas = anterior?.paginas.orEmpty(),
+                citacoes = anterior?.citacoes.orEmpty(),
+                notas = anterior?.notas.orEmpty(),
+                tracos = anterior?.tracos.orEmpty(),
+                tipoZotero = item.tipo,
+                camposZotero = item.campos,
+                criadoresZotero = item.autores.map { ZoteroCriadorInfo(it.funcao, it.nome, it.sobrenome) },
+                colecoesZotero = item.colecoes,
+                zoteroConfig = anterior?.zoteroConfig?.copy(itemKey = item.chave)
+                    ?: ZoteroVinculoConfig(itemKey = item.chave, doi = item.doi)
+            )
+        }
+        if (_artigos.value.isNotEmpty() && _artigos.value.none { it.id == _artigoAtivoId.value }) {
+            _artigoAtivoId.value = _artigos.value.first().id
+        }
+        contexto?.getSharedPreferences("biblioteca_zotero", Context.MODE_PRIVATE)
+            ?.edit()?.putString("dados", ZoteroCacheCodec.escrever(itens, colecoes))?.apply()
+    }
 
     private val _artigoAtivoId = MutableStateFlow<String>(_artigos.value.first().id)
     val artigoAtivoId: StateFlow<String> = _artigoAtivoId.asStateFlow()

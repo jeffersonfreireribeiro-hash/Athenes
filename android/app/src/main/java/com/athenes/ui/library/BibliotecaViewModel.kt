@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.athenes.core.data.ArtigoEstudoRepository
 import com.athenes.core.data.DocumentoRepository
+import com.athenes.core.data.ZoteroApiClient
 import com.athenes.core.model.ArtigoEstudoDetalhado
 import com.athenes.core.model.Documento
 import com.athenes.core.model.TipoDocumento
@@ -13,10 +14,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 
 class BibliotecaViewModel(
     private val repository: DocumentoRepository,
-    private val artigoRepository: ArtigoEstudoRepository = ArtigoEstudoRepository.compartilhado
+    private val artigoRepository: ArtigoEstudoRepository = ArtigoEstudoRepository.compartilhado,
+    private val zoteroClient: ZoteroApiClient = ZoteroApiClient()
 ) : ViewModel() {
 
     // Tab 1: Escrita & Documentos
@@ -52,6 +56,53 @@ class BibliotecaViewModel(
     val textoBuscaArtigos: StateFlow<String> = _textoBuscaArtigos.asStateFlow()
 
     val artigos: StateFlow<List<ArtigoEstudoDetalhado>> = artigoRepository.artigos
+    val colecoesZotero = artigoRepository.colecoesZotero
+    private val _estadoZotero = MutableStateFlow("")
+    val estadoZotero: StateFlow<String> = _estadoZotero.asStateFlow()
+    private val _sincronizandoZotero = MutableStateFlow(false)
+    val sincronizandoZotero: StateFlow<Boolean> = _sincronizandoZotero.asStateFlow()
+    private val _conectadoZotero = MutableStateFlow(artigoRepository.artigos.value.any { it.tipoZotero.isNotBlank() })
+    val conectadoZotero: StateFlow<Boolean> = _conectadoZotero.asStateFlow()
+    private val _tipoZoteroFiltro = MutableStateFlow<String?>(null)
+    val tipoZoteroFiltro = _tipoZoteroFiltro.asStateFlow()
+    private val _colecaoZoteroFiltro = MutableStateFlow<String?>(null)
+    val colecaoZoteroFiltro = _colecaoZoteroFiltro.asStateFlow()
+    private val _anoMinimo = MutableStateFlow<Int?>(null)
+    val anoMinimo = _anoMinimo.asStateFlow()
+    private val _ordemZotero = MutableStateFlow("recentes")
+    val ordemZotero = _ordemZotero.asStateFlow()
+
+    fun filtrarTipoZotero(tipo: String?) { _tipoZoteroFiltro.value = tipo }
+    fun filtrarColecaoZotero(colecao: String?) { _colecaoZoteroFiltro.value = colecao }
+    fun filtrarAnoMinimo(ano: Int?) { _anoMinimo.value = ano }
+    fun ordenarZotero(ordem: String) { _ordemZotero.value = ordem }
+
+    fun sincronizarZotero(chave: String, usuarioId: String) {
+        if (chave.isBlank() || _sincronizandoZotero.value) return
+        viewModelScope.launch {
+            _sincronizandoZotero.value = true
+            _estadoZotero.value = "Buscando biblioteca do Zotero…"
+            try {
+                val id = usuarioId.trim().ifBlank { zoteroClient.descobrirUsuario(chave.trim()) }
+                val itens = async { zoteroClient.listarItens(id, chave.trim()) }
+                val colecoes = async { zoteroClient.listarColecoes(id, chave.trim()) }
+                val lista = itens.await()
+                if (lista.isEmpty()) {
+                    colecoes.cancel()
+                    _estadoZotero.value = "Nenhum item encontrado no Zotero."
+                } else {
+                    artigoRepository.aplicarBibliotecaZotero(lista, colecoes.await())
+                    _conectadoZotero.value = true
+                    _estadoZotero.value = "${lista.size} itens carregados do Zotero."
+                }
+            } catch (erro: Exception) {
+                val detalhe = erro.message?.takeIf { it.startsWith("Zotero respondeu ") }
+                _estadoZotero.value = detalhe ?: "Falha ao sincronizar. Verifique a chave e a conexão."
+            } finally {
+                _sincronizandoZotero.value = false
+            }
+        }
+    }
     val pastas = repository.pastas
 
     fun criarPasta(nome: String, pastaPaiId: String? = null) = repository.criarPasta(nome, pastaPaiId)
@@ -59,16 +110,29 @@ class BibliotecaViewModel(
     fun renomearPasta(id: String, nome: String) = repository.renomearPasta(id, nome)
     fun excluirPasta(id: String) = repository.excluirPasta(id)
 
-    val artigosFiltrados: StateFlow<List<ArtigoEstudoDetalhado>> = combine(
+    private val artigosFiltradosBase = combine(
         artigoRepository.artigos,
         _textoBuscaArtigos
     ) { lista, busca ->
-        if (busca.isBlank()) lista
-        else lista.filter {
+        lista.filter {
+            busca.isBlank() ||
             it.titulo.contains(busca, ignoreCase = true) ||
                     it.autores.contains(busca, ignoreCase = true) ||
                     it.chaveZotero.contains(busca, ignoreCase = true)
         }
+    }
+
+    val artigosFiltrados: StateFlow<List<ArtigoEstudoDetalhado>> = combine(
+        artigosFiltradosBase, _tipoZoteroFiltro, _colecaoZoteroFiltro, _anoMinimo, _ordemZotero
+    ) { lista, tipo, colecao, ano, ordem ->
+        val filtrados = lista.filter { artigo ->
+            (tipo == null || when (tipo) {
+                "fichados" -> artigo.notas.isNotEmpty() || artigo.citacoes.isNotEmpty() || artigo.meuResumo.isNotBlank()
+                else -> artigo.tipoZotero == tipo
+            }) && (colecao == null || colecao in artigo.colecoesZotero) && (ano == null || artigo.ano >= ano)
+        }
+        if (ordem == "titulo") filtrados.sortedBy { it.titulo.lowercase() }
+        else filtrados.sortedWith(compareByDescending<ArtigoEstudoDetalhado> { it.ano }.thenBy { it.titulo })
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
