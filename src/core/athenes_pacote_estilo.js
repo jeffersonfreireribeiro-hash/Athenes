@@ -16,6 +16,7 @@ import { sanitizarNumeracao } from './athenes_paginacao.js';
 import { normalizarConfigSumario, normalizarNumeracaoSecoes } from './athenes_sumario.js';
 import { normalizarMestraCanvas, normalizarRegrasMestra } from './athenes_mestra_canvas.js';
 import { declaracaoDeFontes, sanearDeclaracaoDeFontes, registrarFontePendente } from './athenes_fontes.js';
+import { ESTILOS_BIBLIOGRAFIA } from './athenes_bibliografia_estilos.js';
 import { obterConfigNotas } from './athenes_notas_rodape.js';
 import { extrairEstiloFigura, sanitizarEstiloFigura, aplicarEstiloFiguraAoBloco, extrairTipografiaTituloFonte } from './athenes_figura_layout.js';
 import { extrairEstiloGlobalTabela, sanitizarEstiloTabela, garantirEstiloTabela } from './athenes_tabela_estilo.js';
@@ -75,6 +76,8 @@ export function exportarPacoteEstilo(documento, opcoes = {}) {
       notas_rodape: obterConfigNotas(documento),
       // separador da legenda numerada ("Tabela 1 — Título")
       ...(documento.separador_legenda ? { separador_legenda: documento.separador_legenda } : {}),
+      // estilo da citação no texto e da lista de referências (ABNT, ABNT numérico, APA, Harvard, Chicago, MLA, Vancouver, IEEE)
+      ...(documento.estiloCitacao?.estilo && documento.estiloCitacao.estilo !== 'zotero' ? { estilo_citacao: documento.estiloCitacao.estilo } : {}),
       ...(documento.formato_numero_formula ? { formato_numero_formula: documento.formato_numero_formula } : {}),
       // sumário (tipografia por nível, preenchimento) e numeração decimal das seções
       ...(configSumarioDoDocumento(documento) ? { sumario: normalizarConfigSumario(configSumarioDoDocumento(documento)) } : {}),
@@ -245,6 +248,7 @@ export function validarPacoteEstilo(conteudo) {
       ...(obj.configuracaoGlobal?.notas_rodape && typeof obj.configuracaoGlobal.notas_rodape === 'object'
         ? { notas_rodape: obterConfigNotas({ notas_config: obj.configuracaoGlobal.notas_rodape }) } : {}),
       ...(FORMATOS_NUMERO_FORMULA.some(x => x.id === obj.configuracaoGlobal?.formato_numero_formula) ? { formato_numero_formula: obj.configuracaoGlobal.formato_numero_formula } : {}),
+      ...(ESTILOS_BIBLIOGRAFIA.some(x => x.id === obj.configuracaoGlobal?.estilo_citacao) ? { estilo_citacao: obj.configuracaoGlobal.estilo_citacao } : {}),
       ...(SEPARADORES_LEGENDA.some(x => x.id === obj.configuracaoGlobal?.separador_legenda) ? { separador_legenda: obj.configuracaoGlobal.separador_legenda } : {}),
       ...(obj.configuracaoGlobal?.sumario && typeof obj.configuracaoGlobal.sumario === 'object'
         ? { sumario: normalizarConfigSumario(obj.configuracaoGlobal.sumario) } : {}),
@@ -316,6 +320,7 @@ export function aplicarPacoteEstilo(documento, pacote, opcoes = {}) {
   }
 
   documento.atribuicoes_mestra = JSON.parse(JSON.stringify(p.configuracaoGlobal?.atribuicoes_mestra || []));
+  if (p.configuracaoGlobal?.estilo_citacao) documento.estiloCitacao = { ...(documento.estiloCitacao || {}), estilo: p.configuracaoGlobal.estilo_citacao };
   if (p.configuracaoGlobal?.separador_legenda) {
     documento.separador_legenda = p.configuracaoGlobal.separador_legenda;
     if (aplicarNosBlocosExistentes) for (const sec of documento.secoes || []) for (const b of sec.blocos || []) delete b.separador_legenda;
@@ -468,6 +473,7 @@ INSTRUÇÕES DE ANÁLISE:
      "grade_guia": { "visivel", "snap", "passo_mm" (malha regular), "colunas", "linhas", "calha_mm" } é a grade de diagramação da folha.
    - Atribuição de mestras por página ("configuracaoGlobal.atribuicoes_mestra"): [{ "mestraId", "de", "ate" }] (páginas 1-based; "ate" omitido = até o fim; vence o intervalo mais específico).
 
+   - Estilo da citação e da lista de referências ("configuracaoGlobal.estilo_citacao"): "abnt" | "abnt_numerico" | "apa" | "harvard" | "chicago" | "mla" | "vancouver" | "ieee" (omita se o documento não indicar)
    - Separador da legenda numerada ("configuracaoGlobal.separador_legenda"): "travessao" (Tabela 1 — Título) | "meio_traco" (–) | "hifen" (-) | "dois_pontos" (Tabela 1: Título) | "ponto" (Tabela 1. Título) | "espaco" (Tabela 1 Título). Vale para figuras, tabelas, quadros e mapas.
    - Notas de rodapé ("configuracaoGlobal.notas_rodape"): "marcador" ("numerico" | "alfabetico" | "simbolos"), "formato" ("simples" 1 | "colchetes" [1] | "parenteses" (1) | "parentese_direito" 1) | "ponto" 1.), "reiniciar", "fonte", "tamanho_pt", "entrelinha", "cor" (texto da nota) e o estilo do número em "marcador_texto" (no corpo do texto) e "marcador_nota" (no rodapé): { "fonte" (id, "" = a do texto), "cor" (#RRGGBB, "" = a do texto), "negrito", "sobrescrito" }.
    - Número automático das fórmulas ("configuracaoGlobal.formato_numero_formula"): "parenteses" (1) | "capitulo" (2.1, reinicia a cada título de nível 1) | "colchetes" [1] | "simples" 1 | "eq" Eq. (1). O número nunca é digitado: o Athenes o calcula.

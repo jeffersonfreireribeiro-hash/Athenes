@@ -4,6 +4,8 @@
  * Suporta ABNT (NBR 6023), APA 7th, IEEE e Vancouver com parser BibTeX embutido.
  */
 
+import { formatarReferenciaNoEstilo } from './athenes_bibliografia_estilos.js';
+
 export const TIPOS_OBRA = Object.freeze([
   { id: 'artigo_periodico', rotulo: 'Artigo de Periódico / Revista' },
   { id: 'livro', rotulo: 'Livro Completo' },
@@ -111,57 +113,7 @@ export function gerarCitacaoInline(referencia, norma = 'abnt', indiceNumerico = 
  * Renderiza a referência bibliográfica completa conforme a norma
  */
 export function formatarReferenciaCompleta(ref, norma = 'abnt', indice = 1) {
-  if (!ref) return '';
-
-  const autoresStr = formatarAutores(ref.autores, norma, false);
-  const ano = ref.ano || 's.d.';
-  const titulo = ref.titulo || 'Sem título';
-  const local = ref.local || ref.cidade || '';
-  const editora = ref.editora || '';
-  const publicacao = ref.publicacao || ref.revista || ref.periodico || '';
-  const volume = ref.volume ? `v. ${ref.volume}` : '';
-  const numero = ref.numero ? `n. ${ref.numero}` : '';
-  const paginas = ref.paginas ? `p. ${ref.paginas}` : '';
-  const doi = ref.doi ? `DOI: https://doi.org/${ref.doi}` : '';
-  const url = ref.url ? `Disponível em: <${ref.url}>` : '';
-
-  if (norma === 'abnt') {
-    // ABNT NBR 6023
-    if (ref.tipo === 'livro') {
-      const imprenta = `${local ? local + ': ' : ''}${editora ? editora + ', ' : ''}${ano}.`;
-      return `${autoresStr}. <strong>${titulo}</strong>. ${imprenta}${doi ? ' ' + doi : ''}`.trim();
-    }
-    if (ref.tipo === 'artigo_periodico') {
-      const detalhes = [volume, numero, paginas, ano].filter(Boolean).join(', ');
-      return `${autoresStr}. ${titulo}. <strong>${publicacao}</strong>, ${local ? local + ', ' : ''}${detalhes}. ${doi}`.trim();
-    }
-    if (ref.tipo === 'capitulo_livro') {
-      const livroTitulo = ref.livro_titulo || 'Livro';
-      return `${autoresStr}. ${titulo}. In: <strong>${livroTitulo}</strong>. ${local}: ${editora}, ${ano}. ${paginas}.`.trim();
-    }
-    // Padrão genérico ABNT
-    return `${autoresStr}. <strong>${titulo}</strong>. ${publicacao ? publicacao + ', ' : ''}${ano}. ${url} ${doi}`.trim();
-  }
-
-  if (norma === 'apa') {
-    // APA 7th Edition
-    if (ref.tipo === 'artigo_periodico') {
-      const volNum = volume ? `<em>${ref.volume}</em>${numero ? `(${ref.numero})` : ''}` : '';
-      return `${autoresStr} (${ano}). ${titulo}. <em>${publicacao}</em>, ${volNum}${paginas ? ', ' + paginas : ''}. ${doi || url}`.trim();
-    }
-    if (ref.tipo === 'livro') {
-      return `${autoresStr} (${ano}). <em>${titulo}</em>. ${editora}. ${doi || url}`.trim();
-    }
-    return `${autoresStr} (${ano}). <em>${titulo}</em>. ${publicacao ? publicacao + '.' : ''} ${doi || url}`.trim();
-  }
-
-  if (norma === 'ieee') {
-    // IEEE
-    return `[${indice}] ${autoresStr}, "${titulo}," <em>${publicacao || editora}</em>, ${volume ? volume + ', ' : ''}${paginas ? paginas + ', ' : ''}${ano}. ${doi}`.trim();
-  }
-
-  // Vancouver
-  return `${indice}. ${autoresStr}. ${titulo}. ${publicacao}. ${ano};${ref.volume || ''}${ref.numero ? '(' + ref.numero + ')' : ''}:${ref.paginas || ''}.`.trim();
+  return formatarReferenciaNoEstilo(ref, norma, indice); // todos os estilos e tipos: athenes_bibliografia_estilos.js
 }
 
 /**

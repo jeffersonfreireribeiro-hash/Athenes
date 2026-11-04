@@ -9,6 +9,7 @@ import { ajusteDeFragmento, aplicarEstilosDeTrecho } from './athenes_estilo_excl
 import { ZipBuilder } from './zip_builder.js';
 import { MM_PARA_DXA, dimensoesPapelMm } from './athenes_grid.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
+import { estiloDaBibliografia, ordenarReferencias } from './athenes_bibliografia_estilos.js';
 import { ancoraDaReferencia, nomeMarcadorWord, referenciaDoBlocoCitacao } from './athenes_citacao.js';
 import { mapaMarcadores, chaveMarcador, configListaDoBloco, segmentosDeLista } from './athenes_marcadores.js';
 import { latexParaTexto } from './athenes_formula.js';
@@ -1068,8 +1069,8 @@ export async function exportarParaDocx(documento, opcoes = {}) {
         if (b.titulo) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>${escaparXml(b.titulo)}</w:t></w:r></w:p>`);
         }
-        const refs = documento.referencias || [];
-        const norma = documento.perfil || 'abnt';
+        const norma = estiloDaBibliografia(documento, b);
+        const refs = ordenarReferencias(documento.referencias || [], norma); // autor-data: ordem alfabética; numérico: ordem de citação
         for (let i = 0; i < refs.length; i++) {
           const htmlRef = formatarReferenciaCompleta(refs[i], norma, i + 1);
           const runs = htmlParaRunsDocx(htmlRef);

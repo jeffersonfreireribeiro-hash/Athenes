@@ -12,6 +12,7 @@ import { margensEfetivasMm } from './athenes_mestra_canvas.js';
 import { dimensoesPapelMm } from './athenes_grid.js';
 import { estiloParaCss, estiloParaCssComAlinhamento, estiloParaCssTipografia, estiloParaCssNumeracao, FONTES_SISTEMA } from './athenes_estilos.js';
 import { formatarReferenciaCompleta } from './athenes_bibliografia.js';
+import { estiloDaBibliografia, ordenarReferencias } from './athenes_bibliografia_estilos.js';
 import { ancoraDaReferencia, referenciaDoBlocoCitacao } from './athenes_citacao.js';
 import { mapaMarcadores, chaveMarcador, configListaDoBloco, segmentosDeLista } from './athenes_marcadores.js';
 import { latexParaHtml } from './athenes_formula.js';
@@ -350,8 +351,8 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
     }
 
     case 'referencias': {
-      const refs = documento.referencias || [];
-      const norma = documento.perfil || 'abnt';
+      const norma = estiloDaBibliografia(documento, bloco);
+      const refs = ordenarReferencias(documento.referencias || [], norma); // autor-data: ordem alfabética; numérico: ordem de citação
       const refsFormatadas = refs.map((r, i) => {
         const html = formatarReferenciaCompleta(r, norma, i + 1);
         return `<div class="ath-ref-item" id="${ancoraDaReferencia(r)}" style="${estiloParaCss(estilosMap.referencias)}">${html}</div>`;

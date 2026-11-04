@@ -7,6 +7,8 @@ import { estiloParaCss } from '../core/athenes_estilos.js';
 import { modeloDaPagina, rotuloDaFigura, resolverReferenciasCruzadas, gerarCssMolduraBloco, removerPrefixoNumeracaoTitulo, obterTextoPuroTitulo, obterPrefixoNumeracao } from '../core/athenes_documento.js';
 import { svgIcone } from './athenes_icones.js';
 import { referenciaDoBlocoCitacao } from '../core/athenes_citacao.js';
+import { estiloDaBibliografia, ordenarReferencias } from '../core/athenes_bibliografia_estilos.js';
+import { formatarReferenciaCompleta } from '../core/athenes_bibliografia.js';
 import { chaveMarcador } from '../core/athenes_marcadores.js';
 import { latexParaHtml } from '../core/athenes_formula.js';
 import { hifenizarHtml, removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
@@ -559,6 +561,20 @@ export const metodosBlocoNaFolha = {
     // 10b. SUMÁRIO AUTOMÁTICO (vivo, com links para os títulos)
     else if (b.tipo === 'sumario') {
       el.appendChild(this.montarSumarioVivo(b, cssEstilo));
+    }
+
+    // 10c. REFERÊNCIAS: lista automática das obras citadas, no estilo escolhido (igual ao PDF e ao Word)
+    else if (b.tipo === 'referencias') {
+      const estiloRef = estiloDaBibliografia(this.doc, b);
+      const refs = ordenarReferencias(this.doc.referencias || [], estiloRef);
+      const caixa = document.createElement('div');
+      caixa.className = 'ath-ref-lista';
+      if (b.titulo) { const h = document.createElement('h2'); h.style.cssText = 'margin:0 0 8px;'; h.textContent = b.titulo; caixa.appendChild(h); }
+      if (!refs.length) {
+        const v = document.createElement('p'); v.style.cssText = 'color:#64748B; font-style:italic; margin:0;'; v.textContent = 'Nenhuma referência inserida no documento. Cite uma obra pelo Zotero e ela entra aqui.'; caixa.appendChild(v);
+      }
+      refs.forEach((r, i) => { const it = document.createElement('div'); it.className = 'ath-ref-item'; it.style.cssText = 'margin:0 0 8px; text-align:left;'; it.innerHTML = formatarReferenciaCompleta(r, estiloRef, i + 1); caixa.appendChild(it); });
+      el.appendChild(caixa);
     }
 
     // 11. OUTROS BLOCOS (CITAÇÃO, NOTAS, ETC.)

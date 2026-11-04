@@ -24,6 +24,7 @@ import { sanearHtmlTexto, cssDoEstiloDeTrecho } from '../core/athenes_estilo_exc
 import { latexParaHtml } from '../core/athenes_formula.js';
 import { FORMATOS_NUMERO_FORMULA, idFormatoNumeroFormula } from '../core/athenes_documento.js';
 import { estiloIdDoTitulo } from '../core/athenes_sumario.js';
+import { estiloDaBibliografia, ESTILOS_BIBLIOGRAFIA } from '../core/athenes_bibliografia_estilos.js';
 import { montarPainelSumario } from './athenes_sumario_painel.js';
 import { NIVEL_MAX, nivelDe, blocoNumerado, normalizarNumeracaoSecoes, REGEX_NUMERO_MANUAL } from '../core/athenes_sumario.js';
 import { ModalLayoutBloco } from './athenes_editor_layout_bloco.js';
@@ -1198,6 +1199,19 @@ export class PainelPropriedades {
     }
     else if (b.tipo === 'sumario') {
       box.appendChild(montarPainelSumario(this.doc, b, () => this.notificarMudanca(true)));
+    }
+    else if (b.tipo === 'referencias') {
+      const efetivo = estiloDaBibliografia(this.doc, b);
+      box.innerHTML = `
+        <label style="font:700 12px var(--glx-font); display:block;">Estilo da lista de referências
+          <select id="rmEstiloBibliografia" class="glx-select" style="width:100%; margin-top:4px;">
+            <option value="" ${!b.estilo_bibliografia ? 'selected' : ''}>Seguir a citação do documento (${(ESTILOS_BIBLIOGRAFIA.find(e => e.id === efetivo) || {}).rotulo || efetivo})</option>
+            ${ESTILOS_BIBLIOGRAFIA.map(e => `<option value="${e.id}" ${b.estilo_bibliografia === e.id ? 'selected' : ''}>${e.rotulo}</option>`).join('')}
+          </select>
+        </label>
+        <div style="font-size:11px; color:#64748B; margin-top:6px; line-height:1.4;">A lista é montada sozinha com as obras citadas pelo Zotero. Autor-data: ordem alfabética; numérico: ordem de citação. O formato muda conforme o tipo da obra (artigo, livro, capítulo, congresso, tese, relatório, página web).</div>
+      `;
+      box.querySelector('#rmEstiloBibliografia')?.addEventListener('change', e => { if (e.target.value) b.estilo_bibliografia = e.target.value; else delete b.estilo_bibliografia; this.notificarMudanca(true); });
     }
     else if (b.tipo === 'quebra_pagina') {
       box.innerHTML = `
