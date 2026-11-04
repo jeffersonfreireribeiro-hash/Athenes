@@ -76,6 +76,7 @@ fun BibliotecaScreen(
     val textoBusca by viewModel.textoBusca.collectAsState()
     val tipoFiltro by viewModel.tipoFiltro.collectAsState()
     val documentos by viewModel.documentosFiltrados.collectAsState()
+    val contagensPastas = remember(documentos) { documentos.groupingBy { it.pastaId }.eachCount() }
     val lixeira by viewModel.lixeira.collectAsState()
     val pastas by viewModel.pastas.collectAsState()
     val arvorePastas = remember(pastas) { PastasDocumento.organizar(pastas) }
@@ -251,9 +252,43 @@ fun BibliotecaScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val colunas = if (maxWidth >= 900.dp) GridCells.Fixed(3) else if (maxWidth >= 600.dp) GridCells.Fixed(2) else GridCells.Fixed(1)
+                    val painelLateral = maxWidth >= 900.dp
+                    val larguraConteudo = maxWidth - if (painelLateral) 236.dp else 0.dp
+                    val colunas = if (larguraConteudo >= 900.dp) GridCells.Fixed(3) else if (larguraConteudo >= 600.dp) GridCells.Fixed(2) else GridCells.Fixed(1)
                     val documentosNaPasta = if (mostrandoLixeira) lixeira else if (pastaAtivaId == null) documentos else documentos.filter { it.pastaId == pastaAtivaId }
-
+                    Row(Modifier.fillMaxSize()) {
+                    if (painelLateral) {
+                        Surface(
+                            modifier = Modifier.width(220.dp).fillMaxHeight(),
+                            color = Color.White,
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+                        ) {
+                            LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
+                                item {
+                                    TextButton(onClick = { pastaAtivaId = null; mostrandoLixeira = false }, modifier = Modifier.fillMaxWidth()) {
+                                        Text("Todos (${documentos.size})", modifier = Modifier.fillMaxWidth())
+                                    }
+                                }
+                                items(arvorePastas, key = { it.pasta.id }) { entrada ->
+                                    TextButton(
+                                        onClick = { pastaAtivaId = entrada.pasta.id; mostrandoLixeira = false },
+                                        modifier = Modifier.fillMaxWidth().padding(start = (entrada.nivel * 12).coerceAtMost(72).dp)
+                                    ) {
+                                        Text("${entrada.pasta.nome} (${contagensPastas[entrada.pasta.id] ?: 0})", modifier = Modifier.fillMaxWidth(), fontWeight = if (entrada.pasta.id == pastaAtivaId && !mostrandoLixeira) FontWeight.Bold else FontWeight.Normal)
+                                    }
+                                }
+                                item {
+                                    HorizontalDivider()
+                                    TextButton(onClick = { mostrandoLixeira = true }, modifier = Modifier.fillMaxWidth()) {
+                                        Text("Lixeira (${lixeira.size})", modifier = Modifier.fillMaxWidth())
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.width(16.dp))
+                    }
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
                     if (documentosNaPasta.isEmpty()) {
                         Box(
                             modifier = Modifier
@@ -293,6 +328,8 @@ fun BibliotecaScreen(
                                 )
                             }
                         }
+                    }
+                    }
                     }
                 }
             } else {
@@ -604,7 +641,7 @@ fun BibliotecaScreen(
                         onClick = { pastaAtivaId = entrada.pasta.id; mostrandoLixeira = false; mostrarPastas = false },
                         modifier = Modifier.fillMaxWidth().padding(start = (entrada.nivel * 16).coerceAtMost(96).dp)
                     ) {
-                        Text("${entrada.pasta.nome} (${documentos.count { it.pastaId == entrada.pasta.id }})", modifier = Modifier.fillMaxWidth(), fontWeight = if (entrada.pasta.id == pastaAtivaId) FontWeight.Bold else FontWeight.Normal)
+                        Text("${entrada.pasta.nome} (${contagensPastas[entrada.pasta.id] ?: 0})", modifier = Modifier.fillMaxWidth(), fontWeight = if (entrada.pasta.id == pastaAtivaId) FontWeight.Bold else FontWeight.Normal)
                     }
                 }
             }
