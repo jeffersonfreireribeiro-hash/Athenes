@@ -261,7 +261,9 @@ test('Google Drive & PDF no Estúdio de Artigos: popover organizado, extração 
   assert.equal(codigoEstudo.includes('athBtnSalvarPdfNoDriveDireto'), true);
 
   // Editor: dropdown dinâmico de estilos e citação Zotero no cursor
-  const codigoEditor = fs.readFileSync(path.resolve('src/ui/athenes_editor.js'), 'utf8');
+  // o editor é dividido em módulos (barra contextual, menus do topo, bloco na folha): o código é lido em conjunto
+  const codigoEditor = ['athenes_editor', 'athenes_editor_barra_contextual', 'athenes_editor_menus_topo', 'athenes_editor_bloco_folha']
+    .map(n => fs.readFileSync(path.resolve(`src/ui/${n}.js`), 'utf8')).join('\n');
   assert.equal(codigoEditor.includes('renderizarListaEstilosContextuais'), true);
   assert.equal(codigoEditor.includes('abrirPainelZotero()'), true);
   assert.equal(codigoEditor.includes('this.doc.referencias.push(ref)'), true);
@@ -284,6 +286,9 @@ test('Estúdio de Artigos suporta isolamento por pasta, método filtrarPorPasta 
 test('Todos os módulos frontend (UI e Core) importam sem SyntaxError ou referências inválidas', async () => {
   const modulos = [
     'src/core/athenes_documento.js',
+    'src/ui/athenes_editor_barra_contextual.js',
+    'src/ui/athenes_editor_menus_topo.js',
+    'src/ui/athenes_editor_bloco_folha.js',
     'src/core/athenes_estilos.js',
     'src/core/athenes_colaboracao.js',
     'src/core/athenes_seguranca.js',
