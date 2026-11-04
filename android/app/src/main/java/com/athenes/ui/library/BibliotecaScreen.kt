@@ -31,6 +31,7 @@ import com.athenes.core.model.Documento
 import com.athenes.core.data.ZoteroCredentialsStore
 import com.athenes.core.data.ZoteroColecoes
 import com.athenes.core.data.PastasDocumento
+import com.athenes.core.data.OrdemDocumentos
 import com.athenes.core.updater.AppUpdateInfo
 import com.athenes.ui.components.*
 import com.athenes.ui.theme.*
@@ -75,6 +76,7 @@ fun BibliotecaScreen(
     // Estados da Aba 1 (Escrita)
     val textoBusca by viewModel.textoBusca.collectAsState()
     val tipoFiltro by viewModel.tipoFiltro.collectAsState()
+    val ordemDocumentos by viewModel.ordemDocumentos.collectAsState()
     val documentos by viewModel.documentosFiltrados.collectAsState()
     val contagensPastas = remember(documentos) { documentos.groupingBy { it.pastaId }.eachCount() }
     val lixeira by viewModel.lixeira.collectAsState()
@@ -246,6 +248,18 @@ fun BibliotecaScreen(
                             renomearPastaAberto = true
                         }) { Text("Renomear") }
                         TextButton(onClick = { excluirPastaAberto = true }) { Text("Excluir pasta") }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OrdemDocumentos.entries.forEach { ordem ->
+                        FilterChip(
+                            selected = ordemDocumentos == ordem,
+                            onClick = { viewModel.setOrdemDocumentos(ordem) },
+                            label = { Text(ordem.rotulo) }
+                        )
                     }
                 }
 

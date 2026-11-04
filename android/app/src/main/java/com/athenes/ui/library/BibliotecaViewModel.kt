@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.athenes.core.data.ArtigoEstudoRepository
 import com.athenes.core.data.DocumentoRepository
+import com.athenes.core.data.OrdemDocumentos
+import com.athenes.core.data.OrdenacaoDocumentos
 import com.athenes.core.data.ZoteroApiClient
 import com.athenes.core.model.ArtigoEstudoDetalhado
 import com.athenes.core.model.Documento
@@ -29,13 +31,16 @@ class BibliotecaViewModel(
 
     private val _tipoFiltro = MutableStateFlow<TipoDocumento?>(null)
     val tipoFiltro: StateFlow<TipoDocumento?> = _tipoFiltro.asStateFlow()
+    private val _ordemDocumentos = MutableStateFlow(OrdemDocumentos.RECENTES)
+    val ordemDocumentos: StateFlow<OrdemDocumentos> = _ordemDocumentos.asStateFlow()
 
     val documentosFiltrados: StateFlow<List<Documento>> = combine(
         repository.documentos,
         _textoBusca,
-        _tipoFiltro
-    ) { lista, busca, filtroTipo ->
-        lista.filter { doc ->
+        _tipoFiltro,
+        _ordemDocumentos
+    ) { lista, busca, filtroTipo, ordem ->
+        OrdenacaoDocumentos.ordenar(lista.filter { doc ->
             val bateBusca = busca.isBlank() ||
                     doc.titulo.contains(busca, ignoreCase = true) ||
                     doc.subtitulo.contains(busca, ignoreCase = true) ||
@@ -44,7 +49,7 @@ class BibliotecaViewModel(
             val bateTipo = filtroTipo == null || doc.tipo == filtroTipo
 
             bateBusca && bateTipo
-        }
+        }, ordem)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -161,6 +166,8 @@ class BibliotecaViewModel(
     fun setTipoFiltro(tipo: TipoDocumento?) {
         _tipoFiltro.value = tipo
     }
+
+    fun setOrdemDocumentos(ordem: OrdemDocumentos) { _ordemDocumentos.value = ordem }
 
     fun setTextoBuscaArtigos(query: String) {
         _textoBuscaArtigos.value = query
