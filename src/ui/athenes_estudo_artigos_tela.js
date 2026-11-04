@@ -11,6 +11,21 @@ import { svgIcone, svgLogo } from './athenes_icones.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import { registrarPdfLocalNoArtigo, salvarArtigosEstudo, formatarCitacaoAbntDoArtigo, artigoTemPdf, ehArtigoExemploFicticio } from './athenes_estudo_artigos_dados.js';
 
+/**
+ * PDF guardado pelo próprio Zotero (arquivo importado): fica na pasta de dados do Zotero, em storage/CHAVE-DO-ANEXO/arquivo.pdf.
+ * A web não sabe onde é a pasta de dados deste computador (padrão: a pasta "Zotero" do seu usuário), então mostra o que sabe.
+ */
+function htmlArmazenamentoZotero(anexo) {
+  if (!anexo?.chave) return '';
+  const rel = `storage/${anexo.chave}`;
+  const copiar = (rot, texto) => texto ? `<button type="button" class="glx-btn glx-btn-soft glx-btn-xs" data-copiar="${escapeHtml(texto)}">${rot}</button>` : '';
+  return `<div class="ath-pdf-local">
+    <div><span>Pasta</span><code>${escapeHtml(rel)}</code>${copiar('Copiar pasta', rel)}</div>
+    <div><span>Arquivo</span><code>${escapeHtml(anexo.nomeArquivo || '')}</code>${copiar('Copiar nome', anexo.nomeArquivo || '')}</div>
+    <small>Dentro da pasta de dados do Zotero (padrão: a pasta "Zotero" do seu usuário). No Zotero Desktop, clique com o botão direito no item e escolha "Mostrar arquivo" para abrir essa pasta.</small>
+  </div>`;
+}
+
 /** Onde o Zotero guardou o PDF vinculado, com botões para copiar a pasta ou o caminho (para achar o arquivo ao selecioná-lo). */
 function htmlLocalDoPdf(anexo) {
   const l = localDoPdfVinculado(anexo);
@@ -518,7 +533,7 @@ export const metodosEstudoTela = {
         ? '<strong>Carregando o PDF do Google Drive…</strong>'
         : `<strong>Este artigo ainda não tem PDF vinculado</strong>
            <p>O registro veio do Zotero só com os dados da obra. Vincule o arquivo para ler, grifar e citar com página. O resumo e o fichamento ao lado já funcionam.</p>
-           ${art.anexoPdfZotero?.baixavel ? '<p><b>PDF disponível no Zotero:</b> baixe-o do armazenamento do Zotero e ele será guardado no seu Google Drive.</p>'
+           ${art.anexoPdfZotero?.baixavel ? `<p><b>PDF disponível no Zotero:</b> baixe-o do armazenamento do Zotero e ele será guardado no seu Google Drive.</p>${htmlArmazenamentoZotero(art.anexoPdfZotero)}`
              : art.anexoPdfZotero ? `<p><b>PDF só no seu computador:</b> no Zotero ele é um arquivo vinculado (não baixável pela web). Selecione o arquivo abaixo.</p>${htmlLocalDoPdf(art.anexoPdfZotero)}` : ''}
            <div class="ath-pdf-sem-arquivo-acoes">
              ${art.anexoPdfZotero?.baixavel ? `<button type="button" class="glx-btn glx-btn-primary glx-btn-sm" data-baixar-pdf-zotero>${svgIcone('drive', 14)} Baixar do Zotero</button>` : ''}
