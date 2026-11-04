@@ -35,7 +35,8 @@ data class ReferenciaAcademica(
     val numero: String = "",
     val paginas: String = "",
     val doi: String = "",
-    val url: String = ""
+    val url: String = "",
+    val palavrasChave: List<String> = emptyList()
 ) {
     companion object {
         fun doArtigo(artigo: ArtigoEstudoDetalhado): ReferenciaAcademica {
@@ -55,7 +56,7 @@ data class ReferenciaAcademica(
                 editora = campos["publisher"].orEmpty(), local = campos["place"] ?: campos["address"].orEmpty(),
                 volume = campos["volume"].orEmpty(), numero = campos["issue"] ?: campos["number"].orEmpty(),
                 paginas = campos["pages"].orEmpty(), doi = campos["DOI"] ?: campos["doi"] ?: artigo.zoteroConfig.doi,
-                url = campos["url"].orEmpty()
+                url = campos["url"].orEmpty(), palavrasChave = artigo.tags
             )
         }
     }

@@ -10,6 +10,7 @@ object BibliografiaCodec {
             put("publicacao", ref.publicacao); put("editora", ref.editora); put("local", ref.local)
             put("volume", ref.volume); put("numero", ref.numero); put("paginas", ref.paginas)
             put("doi", ref.doi); put("url", ref.url)
+            put("palavrasChave", JSONArray(ref.palavrasChave))
             put("autores", JSONArray().apply { ref.autores.forEach { autor -> put(JSONObject().apply {
                 put("sobrenome", autor.sobrenome); put("prenome", autor.prenome)
             }) } })
@@ -22,9 +23,10 @@ object BibliografiaCodec {
         val autores = o.optJSONArray("autores")?.let { a -> (0 until a.length()).mapNotNull { j ->
             a.optJSONObject(j)?.let { AutorReferencia(it.optString("sobrenome"), it.optString("prenome")) }
         } }.orEmpty()
+        val tags = o.optJSONArray("palavrasChave")?.let { a -> (0 until a.length()).mapNotNull { a.optString(it).takeIf(String::isNotBlank) } }.orEmpty()
         ReferenciaAcademica(id, o.optString("tipo"), o.optString("titulo"), autores, o.optString("ano"),
             o.optString("publicacao"), o.optString("editora"), o.optString("local"), o.optString("volume"),
-            o.optString("numero"), o.optString("paginas"), o.optString("doi"), o.optString("url"))
+            o.optString("numero"), o.optString("paginas"), o.optString("doi"), o.optString("url"), tags)
     }
 
     fun escreverCitacoes(citacoes: List<CitacaoInline>): JSONArray = JSONArray().apply {
