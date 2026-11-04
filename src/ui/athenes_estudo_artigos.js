@@ -81,9 +81,7 @@ export class EstudoArtigosView {
     if (cfg.apiKey !== undefined) this.zoteroClient.apiKey = String(cfg.apiKey).trim();
     if (cfg.username !== undefined) this.zoteroClient.username = cfg.username;
     gravarConfigZotero({ userId: this.zoteroClient.userId, apiKey: this.zoteroClient.apiKey, username: this.zoteroClient.username || '', isGroup: Boolean(this.zoteroClient.isGroup) });
-    // depois de uma pausa curta, leva a conexão para o Drive (vale nos outros computadores da conta)
-    clearTimeout(this._tZoteroDrive);
-    this._tZoteroDrive = setTimeout(() => { obterTokenDrive().then(t => t && sincronizarZoteroComDrive(t)).catch(() => {}); }, 1500);
+    // o envio à conta (servidor e Drive) é feito por athenes_zotero_conta.js, ao ouvir a mudança da chave
   }
 
   temZoteroConectado() {

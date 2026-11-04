@@ -7,6 +7,7 @@ import { definirContaAtiva } from '../core/athenes_conta.js';
 import * as repositorio from '../core/athenes_repositorio.js';
 import { sincronizarPerfil } from '../core/athenes_perfil_servidor.js';
 import { montarEstadoLocal } from '../core/athenes_perfil_local.js';
+import { ativarEnvioDaConexaoZotero } from '../core/athenes_zotero_conta.js';
 import { DashboardView } from './athenes_dashboard.js';
 import { TelaLoginView } from './athenes_login_view.js';
 import { estaSessaoAtiva, encerrarSessao, obterPerfilColaborador, salvarDocumentoNoSupabase, nuvemAutenticada } from '../core/athenes_colaboracao.js';
@@ -28,6 +29,7 @@ import { obterConfigGoogleDrive } from '../core/athenes_colaboracao.js';
 
 export class AthenesApp {
   constructor(appContainer) {
+    ativarEnvioDaConexaoZotero(); // trocou a chave do Zotero: vai para a conta (servidor) e para o Drive
     this.container = appContainer;
     // o salvamento é adiado alguns instantes (ver autoSalvar); ao sair da aba/página o que está pendente é gravado na hora
     this._tSalvar = null;

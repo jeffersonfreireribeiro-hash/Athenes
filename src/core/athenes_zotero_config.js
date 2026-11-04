@@ -18,8 +18,10 @@ export function gravarConfigZotero(parcial = {}, agora = () => new Date().toISOS
   const atual = lerConfigZotero();
   const novo = { ...atual };
   for (const [k, v] of Object.entries(parcial)) if (v !== undefined) novo[k] = typeof v === 'string' ? v.trim() : v;
-  if ((novo.apiKey || '') !== (atual.apiKey || '') || (novo.userId || '') !== (atual.userId || '')) novo.alteradoEm = agora();
+  if (parcial.alteradoEm === undefined && ((novo.apiKey || '') !== (atual.apiKey || '') || (novo.userId || '') !== (atual.userId || ''))) novo.alteradoEm = agora(); // cópia vinda da conta já traz a hora dela
   try { gravarConta(CHAVE_CONFIG_ZOTERO, JSON.stringify(novo)); } catch (_) {}
+  // chave ou ID mudaram: a conta (servidor e Drive) precisa saber já, para os outros computadores e o tablet receberem
+  if (novo.alteradoEm !== atual.alteradoEm) { try { globalThis.window?.dispatchEvent?.(new Event('athenes:zotero-alterado')); } catch (_) {} }
   return novo;
 }
 

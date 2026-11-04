@@ -4,6 +4,13 @@
  * Métodos do EstudoArtigosView (usam `this`); são acrescentados ao prototype em athenes_estudo_artigos.js.
  */
 import { obterTokenDrive } from '../core/athenes_drive_sync.js';
+import { resumoContaZotero } from '../core/athenes_zotero_conta.js';
+
+/** Depois de salvar a chave: mostra, quando o envio termina, se ela ficou guardada na conta e no Drive. */
+function mostrarOndeGuardou(el, prefixo) {
+  const ouvir = (ev) => { if (el.isConnected) el.textContent = `${prefixo}${resumoContaZotero(ev.detail)}`; };
+  window.addEventListener('athenes:zotero-conta', ouvir, { once: true });
+}
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import { obterConfigGoogleDrive, salvarConfigGoogleDrive, autenticarGoogleDrive, salvarArquivoNoGoogleDrive, obterPastasDriveLocais } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
@@ -51,6 +58,7 @@ export const metodosEstudoModais = {
           popZot.querySelector('#athPopZoteroUserInput').value = teste.usuarioId || '';
           msgEl.style.color = '#15803D';
           msgEl.textContent = `Conectado como ${teste.nomeUsuario} (ID #${teste.usuarioId})! Sincronizando...`;
+          mostrarOndeGuardou(msgEl, `Conectado como ${teste.nomeUsuario} (ID #${teste.usuarioId}) · `);
           await this.sincronizarComZoteroApi({ silencioso: true });
           this.renderizar();
         } else {
@@ -782,6 +790,7 @@ export const metodosEstudoModais = {
       modal.querySelector('#athInputModalZotUser').value = res.usuarioId || userId;
       statusEl.style.color = '#15803D';
       statusEl.textContent = `Conectado com sucesso (${res.nomeUsuario} · ID #${res.usuarioId})! Buscando biblioteca...`;
+      mostrarOndeGuardou(statusEl, `Conectado (${res.nomeUsuario} · ID #${res.usuarioId}) · `);
 
       await this.sincronizarComZoteroApi({ silencioso: true });
       setTimeout(() => {
