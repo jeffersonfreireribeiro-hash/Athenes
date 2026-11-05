@@ -241,6 +241,27 @@ export class EstudoArtigosView {
               </ul>
             </div>
           </div>
+
+          <!-- Botão de Filtrar Referências -->
+          <div class="ath-menu-popover-wrap" id="athMenuFiltrarBibWrap">
+            <button type="button" class="ath-btn ath-btn-icone ${this.filtroStatus !== 'todos' ? 'ath-btn-filtro-ativo' : ''}" id="athBtnFiltrarBib" title="Filtrar referências e artigos" aria-label="Filtrar referências e artigos" aria-haspopup="menu" aria-expanded="false">
+              ${svgIcone('filtro', 16)}
+            </button>
+            <div class="ath-menu-popover" id="athMenuFiltrarBibPopover" role="menu" hidden>
+              <div class="ath-menu-popover-header">
+                <strong>Filtrar Referências</strong>
+              </div>
+              <ul class="ath-menu-popover-lista" id="athListaOpcoesFiltroBib">
+                <li><button type="button" role="menuitem" data-filtro-bib="todos" class="${this.filtroStatus === 'todos' ? 'sel' : ''}"><span>Todos os artigos (Padrão)</span>${this.filtroStatus === 'todos' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-filtro-bib="com_pdf" class="${this.filtroStatus === 'com_pdf' ? 'sel' : ''}"><span>Com arquivo PDF</span>${this.filtroStatus === 'com_pdf' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-filtro-bib="sem_pdf" class="${this.filtroStatus === 'sem_pdf' ? 'sel' : ''}"><span>Sem arquivo PDF</span>${this.filtroStatus === 'sem_pdf' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-filtro-bib="com_notas" class="${this.filtroStatus === 'com_notas' ? 'sel' : ''}"><span>Com notas ou fichamento</span>${this.filtroStatus === 'com_notas' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-filtro-bib="com_riscos" class="${this.filtroStatus === 'com_riscos' ? 'sel' : ''}"><span>Com riscos à mão livre</span>${this.filtroStatus === 'com_riscos' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-filtro-bib="com_citacoes" class="${this.filtroStatus === 'com_citacoes' ? 'sel' : ''}"><span>Com citações marcadas</span>${this.filtroStatus === 'com_citacoes' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-filtro-bib="compartilhados" class="${this.filtroStatus === 'compartilhados' ? 'sel' : ''}"><span>Compartilhados comigo</span>${this.filtroStatus === 'compartilhados' ? svgIcone('check', 13) : ''}</button></li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         ${!containerHeaderAcoes ? `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${htmlBotoesAcao}</div>` : ''}
@@ -280,9 +301,41 @@ export class EstudoArtigosView {
         this.atualizarGridCatalogo();
       });
     });
+    // Popover Filtrar Referências
+    const btnFiltroBib = wrap.querySelector('#athBtnFiltrarBib');
+    const popFiltroBib = wrap.querySelector('#athMenuFiltrarBibPopover');
+    const fecharFiltroBib = () => {
+      if (!popFiltroBib) return;
+      popFiltroBib.hidden = true;
+      btnFiltroBib?.setAttribute('aria-expanded', 'false');
+    };
+    btnFiltroBib?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      fecharOrd();
+      const abrir = popFiltroBib.hidden;
+      popFiltroBib.hidden = !abrir;
+      btnFiltroBib.setAttribute('aria-expanded', String(abrir));
+    });
+    popFiltroBib?.querySelectorAll('[data-filtro-bib]').forEach(item => {
+      item.addEventListener('click', () => {
+        this.filtroStatus = item.dataset.filtroBib;
+        btnFiltroBib?.classList.toggle('ath-btn-filtro-ativo', this.filtroStatus !== 'todos');
+        popFiltroBib.querySelectorAll('[data-filtro-bib]').forEach(b => {
+          const ativo = b.dataset.filtroBib === this.filtroStatus;
+          b.classList.toggle('sel', ativo);
+          const icon = b.querySelector('svg');
+          if (ativo && !icon) b.insertAdjacentHTML('beforeend', svgIcone('check', 13));
+          else if (!ativo && icon) icon.remove();
+        });
+        fecharFiltroBib();
+        this.atualizarGridCatalogo();
+      });
+    });
+
     if (this._fecharMenuOrdemBib) document.removeEventListener('click', this._fecharMenuOrdemBib);
     this._fecharMenuOrdemBib = (ev) => {
       if (!ev.target.closest?.('#athMenuOrdenarBib')) fecharOrd();
+      if (!ev.target.closest?.('#athMenuFiltrarBibWrap')) fecharFiltroBib();
     };
     document.addEventListener('click', this._fecharMenuOrdemBib);
 
@@ -458,6 +511,26 @@ export class EstudoArtigosView {
     const filtrados = this.ordenarArtigos(this.artigos).filter(art => {
       if (this.pastaFiltroId && this.pastaFiltroId !== 'todas') {
         if (!artigoEstaNaPasta(art, this.pastaFiltroId)) return false;
+      }
+      if (this.filtroStatus && this.filtroStatus !== 'todos') {
+        if (this.filtroStatus === 'com_pdf' && !artigoTemPdf(art)) return false;
+        if (this.filtroStatus === 'sem_pdf' && artigoTemPdf(art)) return false;
+        if (this.filtroStatus === 'com_notas') {
+          const temNota = Boolean(art.fichamento?.resumoPessoal || art.fichamento?.metodologiaNotas || (art.fichamento?.notasPagina && Object.keys(art.fichamento.notasPagina).length > 0));
+          if (!temNota) return false;
+        }
+        if (this.filtroStatus === 'com_riscos') {
+          const temRisco = Boolean(art.fichamento?.tracosPorPagina && Object.values(art.fichamento.tracosPorPagina).some(l => Array.isArray(l) && l.length > 0));
+          if (!temRisco) return false;
+        }
+        if (this.filtroStatus === 'com_citacoes') {
+          const temCit = Boolean(art.fichamento?.citacoesMarcadas && art.fichamento.citacoesMarcadas.length > 0);
+          if (!temCit) return false;
+        }
+        if (this.filtroStatus === 'compartilhados') {
+          const ehComp = Boolean(art.compartilhadoComigo || art.proprietarioExterno || art.docCompartilhadoId);
+          if (!ehComp) return false;
+        }
       }
       if (!this.filtroBusca) return true;
       const autoresStr = (art.autores || []).map(a => `${a.prenome} ${a.sobrenome}`).join(' ');

@@ -118,11 +118,6 @@ export const metodosEstudoTela = {
           ${svgIcone('usuarios', 14)}
           <span>Compartilhar</span>
         </button>
-
-        <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="athBtnSalvarDriveEZotero" title="Salvar alterações, traços de caneta, citações e sincronizar com Nuvem, Google Drive e Zotero">
-          ${svgIcone('salvar', 14)}
-          <span>Salvar</span>
-        </button>
       </div>
     `;
     root.appendChild(topoShell);

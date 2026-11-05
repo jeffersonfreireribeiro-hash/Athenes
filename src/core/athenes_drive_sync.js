@@ -323,11 +323,17 @@ async function listarSubpastasDoDrive(token, paiId, fetchImpl) {
 export async function importarPastasDoDrive(token, { fetchImpl = globalThis.fetch, pastas = obterPastasDriveLocais() } = {}) {
   const r = { importadas: 0, vinculadas: 0, mapa: {} };
   const raizId = await obterPastaRaizDrive(token, fetchImpl, pastas);
+  const excluidas = new Set();
+  for (const x of lerPastasExcluidas()) {
+    if (x.id) excluidas.add(x.id);
+    if (x.driveId) { excluidas.add(x.driveId); excluidas.add('drive_' + x.driveId); }
+  }
   let total = 0;
   const visitar = async (lista, paiDriveId, paiLocal, nivel) => {
     if (nivel > 6 || total > 300) return;
     for (const f of await listarSubpastasDoDrive(token, paiDriveId, fetchImpl)) {
       if (nivel === 0 && PASTAS_DE_SISTEMA.has(f.name)) continue;
+      if (excluidas.has(f.id) || excluidas.has('drive_' + f.id)) continue;
       total++;
       let local = lista.find(p => p.driveId === f.id) || lista.find(p => !p.driveId && p.nome === f.name && p.origem !== 'compartilhada');
       if (local) {
@@ -486,12 +492,17 @@ const CHAVE_PASTAS_EXCLUIDAS = 'athenes_pastas_excluidas';
 const lerPastasExcluidas = () => { try { const v = JSON.parse(lerConta(CHAVE_PASTAS_EXCLUIDAS) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
 
 /** { idDaPasta: quando } das pastas excluídas neste computador (vai para o servidor, para valer em todos). */
-export const pastasExcluidasRegistradas = () => Object.fromEntries(lerPastasExcluidas().map(x => [x.id, x.em]));
+export const pastasExcluidasRegistradas = () => Object.fromEntries(lerPastasExcluidas().filter(x => x && x.id).map(x => [x.id, x.em || new Date().toISOString()]));
 
 /** Registra a exclusão de pastas (a do Drive vai para a lixeira quando estiver vazia). */
 export function registrarPastasExcluidas(pastas) {
   const lista = lerPastasExcluidas();
-  for (const p of pastas || []) if (p?.id && !lista.some(x => x.id === p.id)) lista.push({ id: p.id, driveId: p.driveId || '', lixeira: !p.driveId, em: new Date().toISOString() });
+  for (const p of pastas || []) {
+    if (!p) continue;
+    if (!lista.some(x => (p.id && x.id === p.id) || (p.driveId && x.driveId && x.driveId === p.driveId))) {
+      lista.push({ id: p.id || '', driveId: p.driveId || '', nome: p.nome || '', lixeira: !p.driveId, em: new Date().toISOString() });
+    }
+  }
   gravarConta(CHAVE_PASTAS_EXCLUIDAS, JSON.stringify(lista.slice(-300)));
 }
 

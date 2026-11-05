@@ -20,12 +20,12 @@ const CSS = `
 .ath-sum * { box-sizing: border-box; }
 
 /* Topo do painel */
-.ath-sum-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; }
-.ath-sum-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; }
+.ath-sum-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; flex-wrap: nowrap; overflow-x: auto; }
+.ath-sum-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 0 10px; border-radius: 999px; height: 32px; white-space: nowrap; flex-shrink: 0; }
 .ath-sum-chip.padrao { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
 .ath-sum-chip.custom { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
 .ath-sum-topo-acoes { display: flex; gap: 6px; }
-.ath-sum-btn-topo { height: 28px; padding: 0 10px; font-size: 11px; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; background: #FFFFFF; border: 1px solid #CBD5E1; color: #334155; }
+.ath-sum-btn-topo { height: 32px; padding: 0 10px; font-size: 11px; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; background: #FFFFFF; border: 1px solid #CBD5E1; color: #334155; white-space: nowrap; flex-shrink: 0; }
 .ath-sum-btn-topo:hover { background: #F1F5F9; border-color: #94A3B8; color: #1E293B; }
 
 /* Cards colapsáveis */
@@ -228,13 +228,13 @@ export function montarPainelSumario(doc, bloco, aoMudar) {
 
         <p class="ath-sum-subtit">${svgIcone('paleta', 12)} Cores Tipográficas</p>
         <div class="grade3">
-          ${campo('Texto do título', cor('n_cor', f.cor))}
-          ${campo('Número (1.1)', cor('n_cor_numero', f.cor_numero || f.cor))}
-          ${campo('Número da página', cor('n_cor_pagina', f.cor_pagina || f.cor))}
+          ${campo('Texto', cor('n_cor', f.cor))}
+          ${campo('Número', cor('n_cor_numero', f.cor_numero || f.cor))}
+          ${campo('Pág.', cor('n_cor_pagina', f.cor_pagina || f.cor))}
         </div>
 
         <p class="ath-sum-subtit">${svgIcone('espacamento', 12)} Espaçamento e Recuo</p>
-        <div class="grade4">
+        <div class="grade2">
           ${campo('Recuo (mm)', num('n_recuo', nv.recuo_mm, 0, 80, 0.5))}
           ${campo('Entrelinha', num('n_entrelinha', nv.espacamento.entrelinha, 0.8, 3, 0.05))}
           ${campo('Antes (mm)', num('n_antes', nv.espacamento.margem_superior_mm, 0, 30, 0.5))}

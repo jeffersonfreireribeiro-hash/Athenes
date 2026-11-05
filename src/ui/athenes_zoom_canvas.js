@@ -64,10 +64,15 @@ export function instalarZoomCanvas(palco, { obter, definir }) {
   palco.style.touchAction = 'pan-x pan-y';
   let distIni = 0;
   let zoomBaseTouch = 1;
+  let centroIniX = 0;
+  let centroIniY = 0;
   const aoTouchStart = (e) => {
     if (e.touches && e.touches.length >= 2) {
       distIni = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       zoomBaseTouch = obter();
+      const caixa = palco.getBoundingClientRect();
+      centroIniX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - caixa.left;
+      centroIniY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - caixa.top;
     }
   };
   const aoTouchMove = (e) => {
@@ -75,8 +80,13 @@ export function instalarZoomCanvas(palco, { obter, definir }) {
       if (e.cancelable) e.preventDefault();
       const distAtual = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       const ratio = distAtual / distIni;
+      const antigo = obter();
       const novo = limitarZoom(zoomBaseTouch * ratio);
-      aplicar(novo);
+      if (novo !== antigo) {
+        aplicar(novo);
+        palco.scrollLeft = scrollAncorado(palco.scrollLeft, centroIniX, antigo, novo);
+        palco.scrollTop = scrollAncorado(palco.scrollTop, centroIniY, antigo, novo);
+      }
     }
   };
   const aoTouchEnd = (e) => {

@@ -5,6 +5,9 @@
  */
 import { obterTokenOuConectar, obterTokenDrive } from '../core/athenes_drive_sync.js';
 import { obterConfigGoogleDrive, autenticarGoogleDrive, salvarArquivoNoGoogleDrive } from '../core/athenes_colaboracao.js';
+import { lerSessaoSupabase } from '../core/athenes_supabase_auth.js';
+import { obterContaAtiva } from '../core/athenes_conta.js';
+import { normalizarEmail } from '../core/athenes_compartilhamento.js';
 import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { linhasInformacoesZotero, informacoesDoArtigo } from '../core/athenes_zotero_campos.js';
 import { svgIcone, svgGoogleDrive } from './athenes_icones.js';
@@ -35,9 +38,27 @@ export const metodosEstudoPainelDireito = {
   },
 
   htmlQuemTemAcesso(art) {
-    const ehCompartilhadoComigo = Boolean(art.compartilhadoComigo || art.proprietarioExterno);
-    const donoNome = art.proprietario?.nome || art.proprietario?.conta || art.proprietario_email || (ehCompartilhadoComigo ? 'Outro autor' : 'Você');
-    const donoEmail = art.proprietario?.email || art.proprietario_email || '';
+    let sessao = null;
+    try { sessao = lerSessaoSupabase(); } catch (_) {}
+    let contaAtiva = '';
+    try { contaAtiva = obterContaAtiva(); } catch (_) {}
+    const meuEmail = normalizarEmail(sessao?.email || contaAtiva || '');
+    const meuUserId = String(sessao?.user_id || '').trim();
+
+    const donoEmail = normalizarEmail(art.proprietario?.email || art.proprietario?.conta || art.proprietario_email || '');
+    const donoUserId = String(art.proprietario?.id || art.user_id || '').replace(/^ext_/, '').trim();
+
+    const ehDonoPeloEmail = Boolean(donoEmail && meuEmail && donoEmail === meuEmail);
+    const ehDonoPeloId = Boolean(donoUserId && meuUserId && donoUserId === meuUserId);
+    const ehCompartilhadoComigo = Boolean(
+      art.compartilhadoComigo ||
+      art.proprietarioExterno ||
+      (donoEmail && !ehDonoPeloEmail) ||
+      (donoUserId && meuUserId && !ehDonoPeloId) ||
+      (art.permissao && art.permissao !== 'dono')
+    );
+
+    const donoNome = art.proprietario?.nome || (donoEmail ? donoEmail.split('@')[0] : (ehCompartilhadoComigo ? 'Outro autor' : 'Você'));
     const meuPapel = art.permissao || (ehCompartilhadoComigo ? 'leitura' : 'dono');
     
     const pessoasMap = art.compartilhamento?.pessoas || art.permissoes || {};
@@ -96,10 +117,17 @@ export const metodosEstudoPainelDireito = {
           <!-- Convidados -->
           ${listaPessoas.map(([email, papel]) => `
             <li style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; font-size:11px;">
-              <span style="color:#334155; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px;">${escapeHtml(email)}</span>
+              <span style="color:#334155; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px;">${escapeHtml(email)}${meuEmail && normalizarEmail(email) === meuEmail ? ' (Você)' : ''}</span>
               <span class="ath-badge ath-badge-info" style="font-size:9.5px; text-transform:uppercase;">${rotuloPapel(papel)}</span>
             </li>
           `).join('')}
+
+          ${ehCompartilhadoComigo && !listaPessoas.some(([em]) => normalizarEmail(em) === meuEmail) ? `
+            <li style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; font-size:11px;">
+              <span style="color:#334155; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px;">${escapeHtml(meuEmail || 'Você')} (Sua conta)</span>
+              <span class="ath-badge ath-badge-info" style="font-size:9.5px; text-transform:uppercase;">${rotuloPapel(meuPapel)}</span>
+            </li>
+          ` : ''}
         </ul>
 
         <div style="padding:7px 10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; font-size:11px; color:#475569; display:flex; align-items:center; gap:6px;">

@@ -73,15 +73,15 @@ export function salvarPerfilColaborador(perfil) {
 export function estaSessaoAtiva() {
   try {
     if (typeof localStorage !== 'undefined') {
-      const sessaoPersistente = localStorage.getItem('athenes_sessao_ativa');
-      if (sessaoPersistente === 'conectado') return true;
+      if (localStorage.getItem('athenes_sessao_ativa') === 'conectado') return true;
+      const s = localStorage.getItem('athenes_sb_sessao');
+      if (s && s !== 'null') return true;
     }
     if (typeof sessionStorage !== 'undefined') {
-      const sessaoTemporaria = sessionStorage.getItem('athenes_sessao_ativa');
-      if (sessaoTemporaria === 'conectado') return true;
+      if (sessionStorage.getItem('athenes_sessao_ativa') === 'conectado') return true;
     }
     const p = obterPerfilColaborador();
-    if (p && p.conectado && p.continuarConectado) return true;
+    if (p && p.conectado) return true;
   } catch (_) {}
   return false;
 }
@@ -338,6 +338,21 @@ export function obterConfigSupabase() {
 /**
  * Salva (Upsert) o documento completo na tabela `documentos_athenes` do projeto Supabase.
  */
+function sanitizarDocParaNuvem(doc) {
+  if (!doc) return doc;
+  const copia = { ...doc };
+  delete copia.pdfDataUrl;
+  delete copia.pdfBlob;
+  delete copia.pdfBlobUrl;
+  if (copia.artigoEstudo) {
+    copia.artigoEstudo = { ...copia.artigoEstudo };
+    delete copia.artigoEstudo.pdfDataUrl;
+    delete copia.artigoEstudo.pdfBlob;
+    delete copia.artigoEstudo.pdfBlobUrl;
+  }
+  return copia;
+}
+
 export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = globalThis.fetch, { preservarData = false } = {}) {
   if (!doc || !doc.id) throw new Error('Documento inválido para salvamento na nuvem.');
   if (typeof fetchImpl !== 'function') throw new Error('API fetch indisponível neste ambiente.');
@@ -359,7 +374,7 @@ export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = 
     titulo: String(doc.titulo || 'Documento sem título'),
     autor: String(doc.autor || colab.nome || ''),
     norma: String(doc.norma || 'abnt'),
-    conteudo_json: doc,
+    conteudo_json: sanitizarDocParaNuvem(doc),
     sugestoes_json: garantirEstruturaSugestoes(doc),
     atualizado_em: agora,
     atualizado_por: colab.nome || 'Autor'

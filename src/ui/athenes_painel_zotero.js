@@ -430,7 +430,7 @@ export class PainelZotero {
             <input type="text" class="ath-cit-pag" value="${escaparAttr(this.paginas[ref.id] || '')}" placeholder="${escaparAttr(intervaloDePaginas(ref)?.texto || '—')}" style="width:64px; height:22px; font-size:11px; padding:0 6px; border:1px solid #CBD5E1; border-radius:6px;">
             <small class="ath-cit-pag-dica" style="font-weight:600; color:#64748B;">${escaparAttr(this.dicaCurta(ref))}</small>
           </label>
-          <div class="ath-cit-botoes" style="display:flex; gap:4px; align-items:center; flex-shrink:0;">${botoesCitar}</div>
+          <div class="ath-cit-botoes" style="display:flex; gap:4px; align-items:center; flex-wrap:wrap; width:100%; margin-top:6px;">${botoesCitar}</div>
         </div>
       `;
 

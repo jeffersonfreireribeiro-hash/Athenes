@@ -45,7 +45,7 @@ const nomeNorm = (n) => String(n || '').trim().toLowerCase();
 function mesclarArvore(base = [], extra = [], mapa = {}, excluidas = {}) {
   const saida = [];
   const juntar = (p) => {
-    if (excluidas[p.id]) return;
+    if (excluidas[p.id] || (p.driveId && excluidas[p.driveId]) || excluidas[`n:${nomeNorm(p.nome)}`]) return;
     const igual = saida.find(q => q.id === p.id || (p.driveId && q.driveId && p.driveId === q.driveId) || nomeNorm(q.nome) === nomeNorm(p.nome));
     if (!igual) {
       const novo = { ...clone(p), subpastas: [] };

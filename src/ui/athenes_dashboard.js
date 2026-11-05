@@ -61,6 +61,7 @@ export class DashboardView {
     this.onLogout = opcoes.onLogout || (() => {});
     this.filtroBusca = '';
     this.filtroTipo = 'todos';
+    this.ordemDocumentos = 'recente_desc';
     this.abaAtiva = opcoes.abaInicial || 'escrita'; // 'escrita' | 'artigos_zotero'
     this.pastaAtivaId = opcoes.pastaInicialId || 'todas';
     this.pastasDrive = obterPastasDriveLocais();
@@ -280,7 +281,7 @@ export class DashboardView {
                 <h1>Meus Documentos e Artigos</h1>
                 <p>Ambiente de escrita e diagramação acadêmica em blocos com revisão estilo Google Docs e sincronia em tempo real.</p>
               </div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <div class="ath-dash-head-acoes">
                 <button type="button" class="ath-btn ath-btn-icone ${driveConectado() ? 'ath-btn-zotero-ok' : ''}" id="athBtnBackupEspaco" title="${driveConectado() ? 'Google Drive conectado: backup, nuvem e sincronização ativos' : 'Google Drive: conectar para backup e sincronização'}" aria-label="Google Drive">
                   ${svgGoogleDrive(20)}
                 </button>
@@ -305,16 +306,45 @@ export class DashboardView {
               </div>
             </header>
 
-            <div class="ath-dash-filtros">
+            <div class="ath-dash-filtros-linha">
               <div class="ath-busca-box">
                 ${svgIcone('busca', 16)}
                 <input type="text" class="ath-input" id="athDashBusca" placeholder="Pesquisar por título, autor ou palavra-chave...">
               </div>
 
-              <select class="ath-select" style="max-width:200px;" id="athDashFiltroTipo">
-                <option value="todos">Todos os tipos</option>
-                ${TIPOS_DOCUMENTO.map(t => `<option value="${t.id}">${t.rotulo}</option>`).join('')}
-              </select>
+              <!-- Menu Ordenar Documentos -->
+              <div class="ath-menu-popover-wrap" id="athMenuOrdenarDocWrap">
+                <button type="button" class="ath-btn ath-btn-icone" id="athBtnOrdenarDoc" title="Definir ordem dos documentos" aria-label="Definir ordem dos documentos" aria-haspopup="menu" aria-expanded="false">
+                  ${svgIcone('ordenar', 17)}
+                </button>
+                <div class="ath-menu-popover" id="athMenuOrdenarDocPopover" role="menu" hidden>
+                  <div class="ath-menu-popover-header">
+                    <strong>Ordem dos Documentos</strong>
+                  </div>
+                  <ul class="ath-menu-popover-lista" id="athListaOpcoesOrdemDoc">
+                    <li><button type="button" role="menuitem" data-ordem-doc="recente_desc" class="${this.ordemDocumentos === 'recente_desc' ? 'sel' : ''}"><span>Alterado recentemente (Padrão)</span>${this.ordemDocumentos === 'recente_desc' ? svgIcone('check', 13) : ''}</button></li>
+                    <li><button type="button" role="menuitem" data-ordem-doc="recente_asc" class="${this.ordemDocumentos === 'recente_asc' ? 'sel' : ''}"><span>Alterado mais antigo</span>${this.ordemDocumentos === 'recente_asc' ? svgIcone('check', 13) : ''}</button></li>
+                    <li><button type="button" role="menuitem" data-ordem-doc="titulo_asc" class="${this.ordemDocumentos === 'titulo_asc' ? 'sel' : ''}"><span>Título (A → Z)</span>${this.ordemDocumentos === 'titulo_asc' ? svgIcone('check', 13) : ''}</button></li>
+                    <li><button type="button" role="menuitem" data-ordem-doc="titulo_desc" class="${this.ordemDocumentos === 'titulo_desc' ? 'sel' : ''}"><span>Título (Z → A)</span>${this.ordemDocumentos === 'titulo_desc' ? svgIcone('check', 13) : ''}</button></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Menu Filtrar Documentos -->
+              <div class="ath-menu-popover-wrap" id="athMenuFiltrarDocWrap">
+                <button type="button" class="ath-btn ath-btn-icone ${this.filtroTipo !== 'todos' ? 'ath-btn-filtro-ativo' : ''}" id="athBtnFiltrarDoc" title="Filtrar por tipo de documento" aria-label="Filtrar por tipo de documento" aria-haspopup="menu" aria-expanded="false">
+                  ${svgIcone('filtro', 16)}
+                </button>
+                <div class="ath-menu-popover" id="athMenuFiltrarDocPopover" role="menu" hidden>
+                  <div class="ath-menu-popover-header">
+                    <strong>Filtrar por Tipo</strong>
+                  </div>
+                  <ul class="ath-menu-popover-lista" id="athListaOpcoesFiltroDoc">
+                    <li><button type="button" role="menuitem" data-filtro-tipo="todos" class="${this.filtroTipo === 'todos' ? 'sel' : ''}"><span>Todos os tipos (Padrão)</span>${this.filtroTipo === 'todos' ? svgIcone('check', 13) : ''}</button></li>
+                    ${TIPOS_DOCUMENTO.map(t => `<li><button type="button" role="menuitem" data-filtro-tipo="${t.id}" class="${this.filtroTipo === t.id ? 'sel' : ''}"><span>${escapeHtml(t.rotulo)}</span>${this.filtroTipo === t.id ? svgIcone('check', 13) : ''}</button></li>`).join('')}
+                  </ul>
+                </div>
+              </div>
             </div>
 
             <div class="ath-docs-grid" id="athDocsGrid">
@@ -324,12 +354,12 @@ export class DashboardView {
 
           <!-- Conteúdo da Aba 2: Leitura de Artigos, Anotador de PDF (estilo Samsung Notes) & Zotero + Drive -->
           <section id="athSecaoDashArtigosZotero" ${this.abaAtiva === 'artigos_zotero' ? '' : 'hidden'}>
-            <header class="ath-dash-head ath-dash-head-zotero" style="margin-bottom:18px;">
+            <header class="ath-dash-head">
               <div class="ath-dash-titulo">
                 <h1>Estúdio de Artigos, Leitura de PDF & Fichamento Zotero</h1>
                 <p>Leia seus PDFs em tela cheia, risque à mão livre, marque citações e sincronize suas notas com o Zotero.</p>
               </div>
-              <div id="athHeaderAcoesZotero" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"></div>
+              <div id="athHeaderAcoesZotero" class="ath-dash-head-acoes"></div>
             </header>
             <div id="athContainerEstudoArtigos"></div>
           </section>
@@ -398,10 +428,62 @@ export class DashboardView {
       this.atualizarGrid();
     });
 
-    const selectTipo = root.querySelector('#athDashFiltroTipo');
-    selectTipo.addEventListener('change', () => {
-      this.filtroTipo = selectTipo.value;
-      this.atualizarGrid();
+    // Popover Ordenar Documentos
+    const btnOrdDoc = root.querySelector('#athBtnOrdenarDoc');
+    const popOrdDoc = root.querySelector('#athMenuOrdenarDocPopover');
+    const fecharPopOrdDoc = () => { if (popOrdDoc) popOrdDoc.hidden = true; btnOrdDoc?.setAttribute('aria-expanded', 'false'); };
+    btnOrdDoc?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      fecharPopFiltroDoc();
+      const abrir = popOrdDoc.hidden;
+      popOrdDoc.hidden = !abrir;
+      btnOrdDoc.setAttribute('aria-expanded', String(abrir));
+    });
+    popOrdDoc?.querySelectorAll('[data-ordem-doc]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.ordemDocumentos = btn.dataset.ordemDoc;
+        popOrdDoc.querySelectorAll('[data-ordem-doc]').forEach(b => {
+          const ativo = b.dataset.ordemDoc === this.ordemDocumentos;
+          b.classList.toggle('sel', ativo);
+          const icon = b.querySelector('svg');
+          if (ativo && !icon) b.insertAdjacentHTML('beforeend', svgIcone('check', 13));
+          else if (!ativo && icon) icon.remove();
+        });
+        fecharPopOrdDoc();
+        this.atualizarGrid();
+      });
+    });
+
+    // Popover Filtrar Documentos
+    const btnFiltroDoc = root.querySelector('#athBtnFiltrarDoc');
+    const popFiltroDoc = root.querySelector('#athMenuFiltrarDocPopover');
+    const fecharPopFiltroDoc = () => { if (popFiltroDoc) popFiltroDoc.hidden = true; btnFiltroDoc?.setAttribute('aria-expanded', 'false'); };
+    btnFiltroDoc?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      fecharPopOrdDoc();
+      const abrir = popFiltroDoc.hidden;
+      popFiltroDoc.hidden = !abrir;
+      btnFiltroDoc.setAttribute('aria-expanded', String(abrir));
+    });
+    popFiltroDoc?.querySelectorAll('[data-filtro-tipo]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.filtroTipo = btn.dataset.filtroTipo;
+        btnFiltroDoc.classList.toggle('ath-btn-filtro-ativo', this.filtroTipo !== 'todos');
+        popFiltroDoc.querySelectorAll('[data-filtro-tipo]').forEach(b => {
+          const ativo = b.dataset.filtroTipo === this.filtroTipo;
+          b.classList.toggle('sel', ativo);
+          const icon = b.querySelector('svg');
+          if (ativo && !icon) b.insertAdjacentHTML('beforeend', svgIcone('check', 13));
+          else if (!ativo && icon) icon.remove();
+        });
+        fecharPopFiltroDoc();
+        this.atualizarGrid();
+      });
+    });
+
+    document.addEventListener('click', (ev) => {
+      if (!ev.target.closest?.('#athMenuOrdenarDocWrap')) fecharPopOrdDoc();
+      if (!ev.target.closest?.('#athMenuFiltrarDocWrap')) fecharPopFiltroDoc();
     });
 
     const inputDocx = root.querySelector('#athInputImportarDocx');
@@ -662,8 +744,17 @@ export class DashboardView {
     });
 
     filtrados.sort((a, b) => {
+      if (this.ordemDocumentos === 'titulo_asc') {
+        return (a.titulo || '').localeCompare(b.titulo || '', 'pt-BR');
+      }
+      if (this.ordemDocumentos === 'titulo_desc') {
+        return (b.titulo || '').localeCompare(a.titulo || '', 'pt-BR');
+      }
       const ta = new Date(a.dataModificacao || a.atualizado_em || a.dataCriacao || 0).getTime();
       const tb = new Date(b.dataModificacao || b.atualizado_em || b.dataCriacao || 0).getTime();
+      if (this.ordemDocumentos === 'recente_asc') {
+        return (isNaN(ta) ? 0 : ta) - (isNaN(tb) ? 0 : tb);
+      }
       return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
     });
 
