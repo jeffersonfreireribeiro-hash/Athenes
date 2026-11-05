@@ -70,9 +70,7 @@
   flex-wrap: nowrap !important;
   box-sizing: border-box;
   flex-shrink: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
 }
 .ath-dash-topbar::-webkit-scrollbar {
   display: none;
@@ -112,6 +110,14 @@
 }
 
 /* Identificação / Login do Usuário no Topo */
+.ath-dash-user-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
+}
+
 .ath-dash-user-pill {
   display: inline-flex;
   align-items: center;
