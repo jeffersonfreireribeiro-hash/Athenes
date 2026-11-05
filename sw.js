@@ -1,10 +1,10 @@
-﻿// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Athenes â€” Service Worker PWA (Progressive Web App).
  * Permite instalar a interface no navegador, tablet e celular, funcionando com suporte offline.
  */
 
-const CACHE_NAME = 'athenes-pwa-v10';
+const CACHE_NAME = 'athenes-pwa-v11';
 
 const ASSETS_CANONICOS = [
   './',

@@ -84,7 +84,11 @@ export class AthenesApp {
   abrirDocumentoCompartilhado(docIdLink) {
     this.container.innerHTML = '<p style="padding:32px; font:600 14px Nunito, sans-serif; color:#314F79;">Abrindo documento compartilhado...</p>';
     carregarDocumentoCompartilhado(docIdLink).then(res => {
-      if (!res) throw new Error('Você não tem acesso a este documento (ou ele não existe). Peça ao dono para compartilhá-lo com o e-mail da sua conta Google.');
+      if (!res) {
+        const sessao = lerSessaoSupabase();
+        const emailInfo = sessao?.email ? `com a conta ${sessao.email}` : 'sem estar conectado';
+        throw new Error(`Você está conectado ${emailInfo}, mas este documento não foi compartilhado com este e-mail (ou o link público ainda não foi ativado pelo dono). Peça ao dono para compartilhar com ${sessao?.email || 'seu e-mail'}.`);
+      }
       if (res.doc?.norma === 'zotero_pdf' || res.doc?.artigoEstudo || String(res.doc?.id || docIdLink).startsWith('artigo_')) {
         const art = res.doc.artigoEstudo || res.doc;
         this.navegarParaDashboard();

@@ -589,6 +589,23 @@ export const metodosEstudoTela = {
       });
     });
 
+    // Botão de buscar PDF na nuvem dentro do placeholder do palco
+    root.querySelectorAll('[data-tentar-baixar-pdf-nuvem]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        const textoOriginal = btn.innerHTML;
+        btn.innerHTML = 'Buscando PDF na Nuvem...';
+        const ok = await garantirPdfDoArtigo(art);
+        if (ok) {
+          this.abrirArtigoNoEstudio(art);
+        } else {
+          btn.disabled = false;
+          btn.innerHTML = textoOriginal;
+          mostrarAviso('O PDF original ainda não foi anexado à nuvem pelo proprietário. Peça a ele para abrir o artigo e clicar em Salvar/Sincronizar no Athenes dele.', { tipo: 'aviso' });
+        }
+      });
+    });
+
     // Abrir pasta no Google Drive a partir do botão da folha
     root.querySelectorAll('[data-abrir-pasta-drive-palco]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -787,22 +804,29 @@ export const metodosEstudoTela = {
             <div class="ath-pdf-folha-vincular-aviso">
               <div class="ath-pdf-vincular-card">
                 <div class="ath-pdf-vincular-icone">
-                  ${svgIcone('drive', 36)}
+                  ${svgIcone((art.compartilhadoComigo || art.proprietarioExterno) ? 'usuarios' : 'drive', 36)}
                 </div>
-                <h3 class="ath-pdf-vincular-titulo">Vincular Arquivo PDF a Este Artigo</h3>
+                <h3 class="ath-pdf-vincular-titulo">${(art.compartilhadoComigo || art.proprietarioExterno) ? 'Artigo Compartilhado com Você' : 'Vincular Arquivo PDF a Este Artigo'}</h3>
                 <p class="ath-pdf-vincular-sub">
-                  O arquivo PDF de <strong>${escapeHtml(art.titulo || 'este artigo')}</strong> ainda não foi carregado neste computador.
+                  ${(art.compartilhadoComigo || art.proprietarioExterno) 
+                    ? `Este documento foi compartilhado por <strong>${escapeHtml(art.proprietario?.nome || art.proprietario_email || 'outro autor')}</strong>. As notas e riscos foram sincronizados!`
+                    : `O arquivo PDF de <strong>${escapeHtml(art.titulo || 'este artigo')}</strong> ainda não foi carregado neste computador.`}
                 </p>
                 <p class="ath-pdf-vincular-instrucao">
-                  Seus PDFs ficam salvos na sua pasta do Google Drive. Você pode abrir sua pasta para baixar o arquivo ou selecioná-lo diretamente no seu computador:
+                  ${(art.compartilhadoComigo || art.proprietarioExterno)
+                    ? 'Para ler o PDF original na tela cheia, tente baixar da nuvem ou selecione o arquivo .pdf no seu computador:'
+                    : 'Seus PDFs ficam salvos na sua pasta do Google Drive. Você pode abrir sua pasta para baixar o arquivo ou selecioná-lo diretamente no seu computador:'}
                 </p>
                 <div class="ath-pdf-vincular-botoes">
-                  <label class="glx-btn glx-btn-primary" style="cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
-                    ${svgIcone('upload', 14)} Selecionar Arquivo PDF no Computador...
+                  <button type="button" class="glx-btn glx-btn-primary" data-tentar-baixar-pdf-nuvem style="display:inline-flex; align-items:center; gap:8px;">
+                    ${svgIcone('sincronizar', 14)} Buscar PDF na Nuvem
+                  </button>
+                  <label class="glx-btn glx-btn-soft" style="cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+                    ${svgIcone('upload', 14)} Selecionar Arquivo PDF...
                     <input type="file" accept=".pdf" class="ath-input-vincular-pdf-palco" hidden>
                   </label>
                   <button type="button" class="glx-btn glx-btn-soft" data-abrir-pasta-drive-palco style="display:inline-flex; align-items:center; gap:8px;">
-                    ${svgIcone('drive', 14)} Abrir Minha Pasta no Google Drive ↗
+                    ${svgIcone('drive', 14)} Abrir Google Drive ↗
                   </button>
                 </div>
                 <div class="ath-pdf-vincular-dropzone">

@@ -576,6 +576,24 @@ export async function garantirPdfDoArtigo(art) {
       return true;
     }
   } catch (_) {}
+
+  // Se o documento foi compartilhado via nuvem, tenta buscar a versão remota com o PDF embutido
+  if (art.docCompartilhadoId || art.compartilhadoComigo) {
+    const idDocRemoto = art.docCompartilhadoId || art.id;
+    try {
+      const remoto = await carregarDocumentoCompartilhado(idDocRemoto);
+      const artRemoto = remoto?.doc?.artigoEstudo || remoto?.doc;
+      if (artRemoto?.pdfDataUrl) {
+        art.pdfDataUrl = artRemoto.pdfDataUrl;
+        const r = await fetch(art.pdfDataUrl);
+        const blob = await r.blob();
+        art.pdfBlobUrl = URL.createObjectURL(blob);
+        art.temPdfLocal = true;
+        salvarPdfLocal(art.id, blob).catch(() => {});
+        return true;
+      }
+    } catch (_) {}
+  }
   const idDrive = String(art.driveFileId || '').trim();
   if (idDrive && !/^drive_pdf_/.test(idDrive)) {
     const tokenDrive = await obterTokenDrive();

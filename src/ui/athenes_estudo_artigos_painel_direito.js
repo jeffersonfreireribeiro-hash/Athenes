@@ -34,6 +34,83 @@ export const metodosEstudoPainelDireito = {
         </div>`).join('')}</div>`;
   },
 
+  htmlQuemTemAcesso(art) {
+    const ehCompartilhadoComigo = Boolean(art.compartilhadoComigo || art.proprietarioExterno);
+    const donoNome = art.proprietario?.nome || art.proprietario?.conta || art.proprietario_email || (ehCompartilhadoComigo ? 'Outro autor' : 'Você');
+    const donoEmail = art.proprietario?.email || art.proprietario_email || '';
+    const meuPapel = art.permissao || (ehCompartilhadoComigo ? 'leitura' : 'dono');
+    
+    const pessoasMap = art.compartilhamento?.pessoas || art.permissoes || {};
+    const listaPessoas = Object.entries(pessoasMap).filter(([em]) => em && em.includes('@'));
+    const linkPublico = Boolean(art.compartilhamento?.publico || art.publico_leitura);
+
+    const rotuloPapel = (p) => {
+      if (p === 'edicao') return 'Editor';
+      if (p === 'comentario') return 'Comentador';
+      return 'Leitor';
+    };
+
+    return `
+      <section class="ath-zd-sec ath-zd-colab-sec" style="border-top:1px solid #E2E8F0; padding-top:14px; margin-top:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h4 style="margin:0; font-size:12.5px; font-weight:800; color:#314F79; display:flex; align-items:center; gap:6px;">
+            ${svgIcone('usuarios', 13)} Quem tem acesso ao documento
+          </h4>
+          <button type="button" class="ath-btn ath-btn-sm" id="athBtnCompartilharPainelZd" title="Gerenciar permissões ou convidar pessoas" style="height:26px; padding:0 8px; font-size:11px; display:inline-flex; align-items:center; gap:4px;">
+            ${svgIcone('usuarios', 11)} Compartilhar...
+          </button>
+        </div>
+
+        ${ehCompartilhadoComigo ? `
+          <div style="background:#EEF4FA; border:1px solid #CBD5E1; border-radius:10px; padding:10px 12px; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:6px; font-weight:800; font-size:11.5px; color:#314F79; margin-bottom:3px;">
+              ${svgIcone('usuarios', 12)} Documento compartilhado com você
+            </div>
+            <div style="font-size:11px; color:#334155; line-height:1.4;">
+              Proprietário: <strong>${escapeHtml(donoNome)}</strong>${donoEmail ? ` (${escapeHtml(donoEmail)})` : ''}
+            </div>
+            <div style="margin-top:5px; font-size:11px; font-weight:700; color:#0369A1;">
+              Sua permissão: <span class="ath-badge ath-badge-info" style="font-size:10px; text-transform:uppercase;">${rotuloPapel(meuPapel)}</span>
+            </div>
+          </div>
+        ` : `
+          <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:10px; padding:8px 12px; margin-bottom:10px; font-size:11.5px; color:#166534; display:flex; align-items:center; gap:6px;">
+            ${svgIcone('verificado', 13)} <span>Você é o <strong>proprietário</strong> deste artigo</span>
+          </div>
+        `}
+
+        <div style="font-size:11px; font-weight:700; color:#64748B; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.04em;">
+          Pessoas com acesso direto (${listaPessoas.length + 1})
+        </div>
+
+        <ul style="list-style:none; padding:0; margin:0 0 10px 0; display:flex; flex-direction:column; gap:5px;">
+          <!-- Proprietário -->
+          <li style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; font-size:11px;">
+            <div style="display:flex; flex-direction:column; min-width:0;">
+              <strong style="color:#1E293B; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(donoNome)}</strong>
+              ${donoEmail ? `<small style="color:#64748B; font-size:10px;">${escapeHtml(donoEmail)}</small>` : ''}
+            </div>
+            <span class="ath-badge ath-badge-primary" style="font-size:9.5px; text-transform:uppercase;">Proprietário</span>
+          </li>
+
+          <!-- Convidados -->
+          ${listaPessoas.map(([email, papel]) => `
+            <li style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; font-size:11px;">
+              <span style="color:#334155; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px;">${escapeHtml(email)}</span>
+              <span class="ath-badge ath-badge-info" style="font-size:9.5px; text-transform:uppercase;">${rotuloPapel(papel)}</span>
+            </li>
+          `).join('')}
+        </ul>
+
+        <div style="padding:6px 10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; font-size:11px; color:#475569; display:flex; align-items:center; gap:6px;">
+          ${linkPublico 
+            ? `<span style="color:#059669; font-weight:700; display:inline-flex; align-items:center; gap:4px;">🌐 Link Público: Qualquer pessoa com o link pode ler</span>` 
+            : `<span style="color:#64748B; display:inline-flex; align-items:center; gap:4px;">🔒 Acesso restrito apenas a pessoas convidadas</span>`}
+        </div>
+      </section>
+    `;
+  },
+
   renderizarPainelDireitoEstudio(box, art) {
     if (!box) return;
     box.innerHTML = '';
@@ -305,6 +382,9 @@ export const metodosEstudoPainelDireito = {
           </details>
         </section>
 
+        <!-- Compartilhamento & Quem tem Acesso a este Documento -->
+        ${this.htmlQuemTemAcesso(art)}
+
         <!-- 3. A obra no Zotero -->
         <section class="ath-zd-sec">
           <h4>${svgIcone('zotero', 13)} Obra no Zotero</h4>
@@ -343,6 +423,10 @@ export const metodosEstudoPainelDireito = {
         </div>
       </div>
     `;
+
+    box.querySelector('#athBtnCompartilharPainelZd')?.addEventListener('click', () => {
+      this.abrirModalCompartilharArtigo(art);
+    });
 
     box.querySelector('#athBtnDesvincularPdf')?.addEventListener('click', () => this.desvincularPdfDoArtigo(art));
 
