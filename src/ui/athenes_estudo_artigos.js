@@ -54,6 +54,7 @@ export class EstudoArtigosView {
     this.corTinta = '#314F79';
     this.corGrifoAtiva = '#FDE047'; // Amarelo clássico por padrão; suporta verde, azul, coral, roxo, laranja
     this.espessuraTinta = 3;
+    this.espessuraMarca = 18; // espessura própria do marca-texto
     this.abaDireita = 'resumo'; // 'resumo' | 'citacoes' | 'zotero_drive'
     this.pinEditandoId = null; // ID da nota adesiva atualmente aberta para edição na folha
     this.filtroBusca = '';
@@ -441,6 +442,24 @@ export class EstudoArtigosView {
       canvas.style.pointerEvents = this.ferramentaAtiva === 'cursor' ? 'none' : 'auto';
       canvas.style.cursor = this.ferramentaAtiva === 'cursor' ? 'text' : 'crosshair';
     });
+    // Seletor de espessura: só aparece com Caneta ou Marca-Texto, com valores próprios de cada ferramenta
+    const grupoEsp = root.querySelector('#athEspessuras');
+    if (grupoEsp) {
+      const ehMarca = this.ferramentaAtiva === 'marcatexto';
+      const ehCaneta = this.ferramentaAtiva === 'caneta';
+      grupoEsp.hidden = !(ehMarca || ehCaneta);
+      const valores = ehMarca ? [10, 18, 28, 40] : [2, 3, 6, 10];
+      const atual = ehMarca ? this.espessuraMarca : this.espessuraTinta;
+      grupoEsp.querySelectorAll('[data-esp]').forEach((b, i) => {
+        const v = valores[i];
+        b.dataset.esp = String(v);
+        b.title = `Espessura ${v} px`;
+        b.setAttribute('aria-label', `Espessura ${v} px`);
+        b.classList.toggle('on', v === atual);
+        const barra = b.querySelector('span');
+        if (barra) barra.style.height = `${Math.max(2, Math.min(14, Math.round(v / (ehMarca ? 3 : 1))))}px`;
+      });
+    }
     const lbl = root.querySelector('#athLabelModoRisco');
     if (lbl) {
       lbl.textContent = `${this.rotuloFerramenta(this.ferramentaAtiva)}${this.modoLinhaReta && (this.ferramentaAtiva === 'caneta' || this.ferramentaAtiva === 'marcatexto') ? ' (Linha Reta)' : ''}`;

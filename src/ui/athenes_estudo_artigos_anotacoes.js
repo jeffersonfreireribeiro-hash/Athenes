@@ -596,8 +596,8 @@ export const metodosEstudoAnotacoes = {
       tracoAtual = {
         tipo: this.ferramentaAtiva === 'marcatexto' ? 'marcatexto' : 'caneta',
         reta: Boolean(this.modoLinhaReta || ev.shiftKey),
-        cor: this.ferramentaAtiva === 'marcatexto' && this.corTinta === '#314F79' ? '#FACC15' : this.corTinta,
-        espessura: this.ferramentaAtiva === 'marcatexto' ? 18 : this.espessuraTinta,
+        cor: this.corTinta,
+        espessura: this.ferramentaAtiva === 'marcatexto' ? (this.espessuraMarca || 18) : this.espessuraTinta,
         pontos: [{ x: pos.x, y: pos.y }]
       };
       art.fichamento.tracosPorPagina[numPag].push(tracoAtual);

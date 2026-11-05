@@ -235,6 +235,7 @@ export const metodosEstudoModais = {
       `;
       popCaneta.querySelector('#athSelectEspessuraTinta').addEventListener('change', e => {
         this.espessuraTinta = parseInt(e.target.value, 10) || 3;
+        this.atualizarEstadoFerramentasNoDom(root);
       });
       popCaneta.querySelector('#athZoomMenos').addEventListener('click', () => {
         this.aplicarZoom(this.zoomPct - 10, root);

@@ -231,6 +231,11 @@ export const metodosEstudoTela = {
               `).join('')}
             </div>
 
+            <!-- Espessura do traço (Caneta / Marca-Texto) -->
+            <div class="ath-espessuras" id="athEspessuras" ${(this.ferramentaAtiva === 'caneta' || this.ferramentaAtiva === 'marcatexto') ? '' : 'hidden'} title="Espessura do traço">
+              ${[0, 1, 2, 3].map(() => `<button type="button" class="ath-esp-btn" data-esp="0"><span></span></button>`).join('')}
+            </div>
+
             <!-- Botão de Adicionar Folha Extra e Indicador de Página à Direita -->
             <div style="margin-left:auto; display:flex; align-items:center; gap:6px;">
               <span id="athIndicadorPagBarra" style="font:800 11.5px var(--glx-font); color:#314F79; background:#EEF4FA; padding:4px 10px; border-radius:999px;">
@@ -429,6 +434,17 @@ export const metodosEstudoTela = {
         root.querySelectorAll('[data-sel-cor]').forEach(c => c.classList.toggle('on', c.dataset.selCor === this.corGrifoAtiva));
       });
     });
+
+    // Espessura do traço (Caneta usa espessuraTinta; Marca-Texto usa espessuraMarca)
+    root.querySelectorAll('#athEspessuras [data-esp]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const v = parseInt(btn.dataset.esp, 10) || 3;
+        if (this.ferramentaAtiva === 'marcatexto') this.espessuraMarca = v;
+        else this.espessuraTinta = v;
+        this.atualizarEstadoFerramentasNoDom(root);
+      });
+    });
+    this.atualizarEstadoFerramentasNoDom(root);
 
     root.querySelector('#athBtnCapturarCitacaoPdf').addEventListener('click', () => {
       this.abrirModalCitacaoPdf(art, { pagina: this.paginaAtual });

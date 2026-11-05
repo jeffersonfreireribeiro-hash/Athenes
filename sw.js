@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-License-Identifier: GPL-3.0-or-later
 /**
- * Athenes — Service Worker PWA (Progressive Web App).
+ * Athenes â€” Service Worker PWA (Progressive Web App).
  * Permite instalar a interface no navegador, tablet e celular, funcionando com suporte offline.
  */
 
-const CACHE_NAME = 'athenes-pwa-v1';
+const CACHE_NAME = 'athenes-pwa-v2';
 
 const ASSETS_CANONICOS = [
   './',
@@ -33,7 +33,7 @@ const ASSETS_CANONICOS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Pré-carrega recursos essenciais tolerando falha pontual
+      // PrÃ©-carrega recursos essenciais tolerando falha pontual
       for (const asset of ASSETS_CANONICOS) {
         try {
           await cache.add(asset);
@@ -59,7 +59,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url);
 
-  // Não intercepta chamadas de nuvem (Google Drive, Supabase, Zotero API) nem rotas da API local
+  // NÃ£o intercepta chamadas de nuvem (Google Drive, Supabase, Zotero API) nem rotas da API local
   if (
     url.hostname.includes('googleapis.com') ||
     url.hostname.includes('supabase.co') ||
@@ -69,7 +69,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Estratégia Network-First com Fallback no Cache para arquivos locais
+  // EstratÃ©gia Network-First com Fallback no Cache para arquivos locais
   event.respondWith(
     fetch(req)
       .then((networkRes) => {
@@ -85,13 +85,13 @@ self.addEventListener('fetch', (event) => {
         const cachedRes = await caches.match(req);
         if (cachedRes) return cachedRes;
 
-        // Se for navegação de página e estiver offline, entrega o index.html
+        // Se for navegaÃ§Ã£o de pÃ¡gina e estiver offline, entrega o index.html
         if (req.mode === 'navigate') {
           const indexFallback = await caches.match('./index.html') || await caches.match('/');
           if (indexFallback) return indexFallback;
         }
 
-        return new Response('Offline — Athenes está offline e o recurso solicitado não está em cache.', {
+        return new Response('Offline â€” Athenes estÃ¡ offline e o recurso solicitado nÃ£o estÃ¡ em cache.', {
           status: 503,
           headers: { 'Content-Type': 'text/plain; charset=utf-8' }
         });

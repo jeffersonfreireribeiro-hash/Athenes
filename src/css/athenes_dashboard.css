@@ -2097,3 +2097,11 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   0%, 100% { box-shadow: 0 0 0 0 rgba(49, 79, 121, 0.25); }
   50% { box-shadow: 0 0 0 4px rgba(49, 79, 121, 0.1); }
 }
+
+/* Seletor de espessura do traço (Caneta / Marca-Texto) */
+.ath-espessuras { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; border: 1px solid #E2E8F0; border-radius: 999px; background: #FFFFFF; }
+.ath-espessuras[hidden] { display: none; }
+.ath-esp-btn { width: 28px; height: 28px; border: 1px solid transparent; border-radius: 50%; background: transparent; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.ath-esp-btn span { display: block; width: 16px; border-radius: 999px; background: #314F79; }
+.ath-esp-btn:hover { background: #EEF4FA; }
+.ath-esp-btn.on { border-color: #314F79; background: #EEF4FA; }
