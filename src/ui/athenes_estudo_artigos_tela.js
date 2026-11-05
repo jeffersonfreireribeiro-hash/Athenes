@@ -793,7 +793,7 @@ export const metodosEstudoTela = {
       const folhaWrap = document.createElement('div');
       folhaWrap.className = 'ath-pdf-pagina-bloco-wrap';
       folhaWrap.dataset.wrapPagina = String(numPag);
-      folhaWrap.style.minHeight = `${alturaWrapEscalada + 36}px`;
+      folhaWrap.style.minHeight = '';
 
       folhaWrap.innerHTML = `
         <div class="ath-pdf-etiqueta-pagina ${isPagAtiva ? 'ativa' : ''}" data-etiqueta-pag="${numPag}">

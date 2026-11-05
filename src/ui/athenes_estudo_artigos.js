@@ -1003,6 +1003,7 @@ export class EstudoArtigosView {
 
   /** A folha ocupa no layout o tamanho que aparece (sem sobrar espaço entre as páginas): caixa com o tamanho escalado e a folha escalada dentro. */
   aplicarEscalaNaFolha(wrap, escala) {
+    if (wrap) wrap.style.minHeight = '';
     const folha = wrap?.querySelector('.ath-pdf-folha-container');
     const caixa = folha?.parentElement;
     if (!folha || !caixa?.classList.contains('ath-pdf-escala')) return;

@@ -568,22 +568,39 @@ export const metodosEstudoAnotacoes = {
       };
     };
 
+    let touchPanDedo = null;
+
     canvas.addEventListener('pointerdown', (ev) => {
       // Detector de Caneta estilo Samsung Notes:
       // Se for toque de dedo ('touch') e o modo de caneta exclusiva estiver ativo,
-      // não desenha e permite que o dedo role a página ou faça gesto de pinça para zoom!
+      // permite rolar a página diretamente com 1 dedo pelo palco sem desenhar
       if (ev.pointerType === 'touch' && this.bloquearDedoParaRolar) {
+        const palco = root?.querySelector('#athEstudioPalco');
+        if (palco) {
+          touchPanDedo = {
+            pointerId: ev.pointerId,
+            startX: ev.clientX,
+            startY: ev.clientY,
+            scrollLeft: palco.scrollLeft,
+            scrollTop: palco.scrollTop
+          };
+          canvas.setPointerCapture?.(ev.pointerId);
+        }
         return;
       }
+
       if (ev.pointerType === 'pen') {
         this.canetaDetectada = true;
       }
       if (this.ferramentaAtiva === 'cursor') return;
+
+      // Impede o navegador de sequestrar o toque para pan nativo da janela
+      ev.preventDefault();
       this.definirPaginaAtivaSilencioso(numPag, root);
       rectCache = canvas.getBoundingClientRect();
       const pos = obterPosicaoNoCanvas(ev);
 
-      // Se a ferramenta for "Nota Adesiva", cria o card editável diretamente no ponto clicado (sem window.prompt)
+      // Se a ferramenta for "Nota Adesiva", cria o card editável diretamente no ponto clicado
       if (this.ferramentaAtiva === 'nota') {
         this.criarNotaAdesivaNaPagina(art, numPag, pos.xPct, pos.yPct, '', root);
         return;
@@ -618,8 +635,22 @@ export const metodosEstudoAnotacoes = {
     });
 
     canvas.addEventListener('pointermove', (ev) => {
+      // Pan com o dedo quando bloqueio de dedo para desenhar estiver ativo
+      if (touchPanDedo && touchPanDedo.pointerId === ev.pointerId) {
+        const palco = root?.querySelector('#athEstudioPalco');
+        if (palco) {
+          palco.scrollLeft = touchPanDedo.scrollLeft - (ev.clientX - touchPanDedo.startX);
+          palco.scrollTop = touchPanDedo.scrollTop - (ev.clientY - touchPanDedo.startY);
+        }
+        return;
+      }
+
       if (!desenhando) return;
       if (ev.pointerType === 'touch' && this.bloquearDedoParaRolar) return;
+
+      // Evita cancelamento do traço pelo navegador móvel
+      ev.preventDefault();
+
       const pos = obterPosicaoNoCanvas(ev);
       if (this.ferramentaAtiva === 'borracha') {
         const folha = canvas.closest('.ath-pdf-folha-container');
@@ -629,7 +660,7 @@ export const metodosEstudoAnotacoes = {
       }
       if (!tracoAtual) return;
 
-      // Se Modo Linha Reta estiver ativo ou tecla Shift pressionada, desenha segmento reto com trava ortogonal (0°/90°)
+      // Se Modo Linha Reta estiver ativo ou tecla Shift pressionada, desenha segmento reto com trava ortogonal
       if (this.modoLinhaReta || ev.shiftKey || tracoAtual.reta) {
         const pFim = calcularPontoFinalLinhaReta(pontoInicialReta, pos, 6);
         tracoAtual.pontos = [
@@ -642,7 +673,11 @@ export const metodosEstudoAnotacoes = {
       agendarRedesenho();
     });
 
-    const finalizarTraco = () => {
+    const finalizarTraco = (ev) => {
+      if (touchPanDedo && ev && touchPanDedo.pointerId === ev.pointerId) {
+        touchPanDedo = null;
+        return;
+      }
       if (!desenhando) return;
       desenhando = false;
       tracoAtual = null;
