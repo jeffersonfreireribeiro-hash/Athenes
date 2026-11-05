@@ -12,21 +12,28 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Draw
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.athenes.ui.theme.AthenesPrimary
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +72,11 @@ fun EstudoArtigosScreen(
     var artigoParaAnexo by remember { mutableStateOf<String?>(null) }
     var importandoNotasZotero by remember { mutableStateOf(false) }
 
+    val configuracao = LocalConfiguration.current
+    val ehTelaLarga = configuracao.screenWidthDp >= 1050
+    var painelEsquerdoLarga by rememberSaveable { mutableStateOf(true) }
+    var painelDireitoLarga by rememberSaveable { mutableStateOf(true) }
+
     LaunchedEffect(artigoIdInicial) {
         if (!artigoIdInicial.isNullOrBlank()) {
             viewModel.selecionarArtigo(artigoIdInicial)
@@ -79,7 +91,18 @@ fun EstudoArtigosScreen(
             Spacer(Modifier.height(8.dp))
             Text("Adicione um artigo na Biblioteca para começar a leitura.")
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onVoltarBiblioteca, modifier = Modifier.heightIn(min = 48.dp)) { Text("Abrir Biblioteca") }
+            Button(
+                onClick = onVoltarBiblioteca,
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AthenesPrimary,
+                    contentColor = Color.White
+                ),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                modifier = Modifier.height(38.dp)
+            ) {
+                Text("Abrir Biblioteca", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            }
         }
         return
     }
@@ -91,11 +114,14 @@ fun EstudoArtigosScreen(
     }
     var totalPdf by remember(artigoAtivo.id) { mutableIntStateOf(0) }
     val artigoExibido = remember(artigoAtivo, pdfUriTexto, totalPdf) {
-        if (pdfUriTexto == null) artigoAtivo.copy(totalPaginas = 0, paginas = emptyList())
-        else if (totalPdf > 0) artigoAtivo.copy(
+        if (pdfUriTexto == null) {
+            artigoAtivo
+        } else if (totalPdf > 0) artigoAtivo.copy(
             totalPaginas = totalPdf,
-            paginas = (1..totalPdf).map { PaginaPdfInfo(numero = it) }
-        ) else artigoAtivo.copy(totalPaginas = 0, paginas = emptyList())
+            paginas = (1..totalPdf).map { num ->
+                artigoAtivo.paginas.find { it.numero == num } ?: PaginaPdfInfo(numero = num)
+            }
+        ) else artigoAtivo
     }
     val seletorPdf = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -226,10 +252,16 @@ fun EstudoArtigosScreen(
         topBar = {
             ReaderTopBar(
                 artigo = artigoExibido,
-                painelEsquerdoAberto = painelEsquerdoAberto,
-                painelDireitoAberto = painelDireitoAberto,
-                onAlternarEsquerdo = { viewModel.alternarPainelEsquerdo() },
-                onAlternarDireito = { viewModel.alternarPainelDireito() },
+                painelEsquerdoAberto = if (ehTelaLarga) painelEsquerdoLarga else painelEsquerdoAberto,
+                painelDireitoAberto = if (ehTelaLarga) painelDireitoLarga else painelDireitoAberto,
+                onAlternarEsquerdo = {
+                    if (ehTelaLarga) painelEsquerdoLarga = !painelEsquerdoLarga
+                    else viewModel.alternarPainelEsquerdo()
+                },
+                onAlternarDireito = {
+                    if (ehTelaLarga) painelDireitoLarga = !painelDireitoLarga
+                    else viewModel.alternarPainelDireito()
+                },
                 onAbrirPdfClick = {
                     seletorPdf.launch(arrayOf("application/pdf"))
                 },
@@ -241,180 +273,326 @@ fun EstudoArtigosScreen(
         },
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
-        // O Canvas Central de Leitura & Edição ocupa SEMPRE a largura útil total.
-        // As abas laterais (Zotero e Inspetor) operam como SOBREPOSIÇÃO (Overlay)
-        // para nunca espremer o texto nem quebrar o layout da folha.
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(Color(0xFFF1F5F9))
         ) {
-            // ========================================================
-            // PALCO CENTRAL DE LEITURA & ANOTAÇÃO (100% DA LARGURA)
-            // ========================================================
-            if (pdfUriTexto != null) {
-                PdfRealViewer(
-                    uri = Uri.parse(pdfUriTexto!!),
-                    paginaAtual = paginaAtiva,
-                    onTotalPaginas = { totalPdf = it; viewModel.definirTotalPaginasPdf(it) },
-                    ferramenta = ferramentaAtiva,
-                    cor = corAtiva,
-                    modoSomenteStylus = modoSomenteStylus,
-                    tracos = artigoAtivo.tracos,
-                    notas = artigoAtivo.notas,
-                    citacoes = artigoAtivo.citacoes,
-                    onAdicionarTraco = { pagina, pontos -> viewModel.adicionarTracoLivre(pagina, pontos) },
-                    onApagarTraco = { pagina, x, y -> viewModel.apagarTracosProximos(pagina, x, y, 0.03f) },
-                    onStylusDetectada = { viewModel.registrarStylusDetectada() },
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxSize().semantics { liveRegion = LiveRegionMode.Polite },
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Sem PDF vinculado", style = MaterialTheme.typography.titleLarge)
-                    Spacer(Modifier.height(8.dp))
-                    Text("Selecione o arquivo deste artigo para ler as páginas reais.")
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = { seletorPdf.launch(arrayOf("application/pdf")) }) { Text("Selecionar PDF") }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = baixarPdfZotero, enabled = !baixandoZotero) {
-                        Text(if (baixandoZotero) "Baixando PDF…" else "Baixar do Zotero")
+            val emModoGradeLarga = maxWidth >= 1050.dp || ehTelaLarga
+
+            if (emModoGradeLarga) {
+                // ========================================================
+                // LAYOUT ADAPTATIVO DOCKED EM 3 COLUNAS NO TABLET (1440x2304)
+                // ========================================================
+                Row(modifier = Modifier.fillMaxSize()) {
+                    // Coluna 1: Painel Esquerdo (Lista de artigos Zotero & índice de páginas)
+                    AnimatedVisibility(
+                        visible = painelEsquerdoLarga,
+                        enter = expandHorizontally() + fadeIn(),
+                        exit = shrinkHorizontally() + fadeOut()
+                    ) {
+                        Surface(
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(300.dp)
+                        ) {
+                            PainelEsquerdoLeitura(
+                                artigos = artigos,
+                                artigoAtivo = artigoExibido,
+                                filtroArtigos = filtroArtigos,
+                                paginaAtiva = paginaAtiva,
+                                onFiltroArtigosAlterado = { viewModel.definirFiltroArtigos(it) },
+                                onSelecionarArtigo = { artId ->
+                                    viewModel.selecionarArtigo(artId)
+                                },
+                                onSelecionarPagina = { pag ->
+                                    viewModel.navegarParaPagina(pag)
+                                },
+                                onSyncZoteroClick = {
+                                    Toast.makeText(context, "A sincronização do Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
+                                },
+                                onNovoArtigoClick = {
+                                    Toast.makeText(context, "A importação de artigos ainda não está disponível.", Toast.LENGTH_SHORT).show()
+                                },
+                                onNovaFolhaExtraClick = {
+                                    Toast.makeText(context, "Adicionar folha ao PDF ainda não está disponível.", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
+                    }
+
+                    // Coluna 2: Palco Central de Leitura Contínua & ReaderSubBar Flutuante
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        if (pdfUriTexto != null) {
+                            PdfRealViewer(
+                                uri = Uri.parse(pdfUriTexto!!),
+                                paginaAtual = paginaAtiva,
+                                onTotalPaginas = { totalPdf = it; viewModel.definirTotalPaginasPdf(it) },
+                                ferramenta = ferramentaAtiva,
+                                cor = corAtiva,
+                                modoSomenteStylus = modoSomenteStylus,
+                                tracos = artigoAtivo.tracos,
+                                notas = artigoAtivo.notas,
+                                citacoes = artigoAtivo.citacoes,
+                                onAdicionarTraco = { pagina, pontos -> viewModel.adicionarTracoLivre(pagina, pontos) },
+                                onApagarTraco = { pagina, x, y -> viewModel.apagarTracosProximos(pagina, x, y, 0.03f) },
+                                onStylusDetectada = { viewModel.registrarStylusDetectada() },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            PdfContinuousCanvas(
+                                artigo = artigoExibido,
+                                paginaAtual = paginaAtiva,
+                                ferramentaAtiva = ferramentaAtiva,
+                                corAtiva = corAtiva,
+                                modoSomenteStylus = modoSomenteStylus,
+                                textoSelecionado = textoSelecionado,
+                                onTextoSelecionado = { txt, pag, x, y, w, h ->
+                                    viewModel.selecionarTexto(txt, pag, x, y, w, h)
+                                },
+                                onFecharPopupSelecao = { viewModel.fecharPopupSelecao() },
+                                onGrifarTexto = { viewModel.grifarTextoSelecionado() },
+                                onCriarCitacao = { viewModel.abrirCriacaoCitacao() },
+                                onCriarNota = { viewModel.abrirCriacaoNota() },
+                                onAdicionarTraco = { pagina, pontos -> viewModel.adicionarTracoLivre(pagina, pontos) },
+                                onApagarTracoProximo = { pagina, x, y -> viewModel.apagarTracosProximos(pagina, x, y, 28f) },
+                                onStylusDetectada = { viewModel.registrarStylusDetectada() },
+                                onPaginaAnterior = { viewModel.paginaAnterior() },
+                                onProximaPagina = { viewModel.proximaPagina() },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        // ReaderSubBar flutuante (pílula 36dp) sempre visível e acessível no centro
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.TopCenter)
+                                .padding(top = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            ReaderSubBar(
+                                ferramentaAtiva = ferramentaAtiva,
+                                modoLinhaReta = modoLinhaReta,
+                                corAtiva = corAtiva,
+                                coresDisponiveis = viewModel.coresDisponiveis,
+                                paginaAtual = paginaAtiva,
+                                totalPaginas = artigoExibido.totalPaginas,
+                                onPaginaAnterior = { viewModel.paginaAnterior() },
+                                onProximaPagina = { viewModel.proximaPagina() },
+                                onVoltar = onVoltarBiblioteca,
+                                onSalvar = {
+                                    Toast.makeText(context, "A sincronização com Drive e Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
+                                },
+                                onDesfazer = { viewModel.desfazerTraco() },
+                                onLimparPagina = { viewModel.limparPagina() },
+                                onSelecionarFerramenta = { viewModel.definirFerramenta(it) },
+                                onAlternarModoLinhaReta = { viewModel.alternarModoLinhaReta() },
+                                onSelecionarCor = { viewModel.definirCor(it) }
+                            )
+                        }
+                    }
+
+                    // Coluna 3: Painel Direito (Inspetor & Fichamento com 3 abas)
+                    AnimatedVisibility(
+                        visible = painelDireitoLarga,
+                        enter = expandHorizontally() + fadeIn(),
+                        exit = shrinkHorizontally() + fadeOut()
+                    ) {
+                        Surface(
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(350.dp)
+                        ) {
+                            PainelDireitoInspetor(
+                                artigo = artigoExibido,
+                                abaAtiva = abaDireitaAtiva,
+                                modoSomenteStylus = modoSomenteStylus,
+                                stylusDetectada = stylusDetectada,
+                                updateInfo = updateInfo,
+                                onAlternarModoStylus = { viewModel.alternarModoSomenteStylus() },
+                                onOpenUpdateDialog = onOpenUpdateDialog,
+                                onCheckUpdateManual = onCheckUpdateManual,
+                                onSelecionarAba = { viewModel.selecionarAbaDireita(it) },
+                                onNovaCitacaoClick = { viewModel.abrirCriacaoCitacao() },
+                                onRemoverCitacao = { viewModel.removerCitacao(it) },
+                                onInserirCitacaoNoDocumento = { cit -> onCitarNoDocumento(artigoExibido, cit) },
+                                onNovaNotaClick = { viewModel.abrirCriacaoNota() },
+                                onRemoverNota = { viewModel.removerNota(it) },
+                                onImportarNotasZotero = importarNotasZotero,
+                                importandoNotasZotero = importandoNotasZotero,
+                                onSalvarConfigZoteroDrive = { cfg -> viewModel.salvarConfigZoteroDrive(cfg) }
+                            )
+                        }
                     }
                 }
-            }
-            // BARRA DE PÍLULA FLUTUANTE (.rm-barra-blocos)
-            // Fiel ao web Athenes: [ ← ] [ 💾 ] | [ ↶ ] [ 🗑 ] | [ ☰ ] [ ✏ ] [ 🖊 ] [ ⚬—⚬ ] [ ▱ ] [ 📝 ] [ ❝ ] | ● ● ● ● ● ●
-            // Some enquanto uma gaveta está aberta, para não ficar cortada atrás dela.
-            AnimatedVisibility(
-                visible = pdfUriTexto != null && !painelEsquerdoAberto && !painelDireitoAberto,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .padding(top = 10.dp)
-            ) {
-              Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                ReaderSubBar(
-                    ferramentaAtiva = ferramentaAtiva,
-                    modoLinhaReta = modoLinhaReta,
-                    corAtiva = corAtiva,
-                    coresDisponiveis = viewModel.coresDisponiveis,
-                    onVoltar = onVoltarBiblioteca,
-                    onSalvar = {
-                        Toast.makeText(context, "A sincronização com Drive e Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
-                    },
-                    onDesfazer = { viewModel.desfazerTraco() },
-                    onLimparPagina = { viewModel.limparPagina() },
-                    onSelecionarFerramenta = { viewModel.definirFerramenta(it) },
-                    onAlternarModoLinhaReta = { viewModel.alternarModoLinhaReta() },
-                    onSelecionarCor = { viewModel.definirCor(it) }
-                )
-              }
-            }
+            } else {
+                // ========================================================
+                // LAYOUT EM LARGURAS MENORES (< 1050dp): SEM SCRIM OPACO
+                // ========================================================
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (pdfUriTexto != null) {
+                        PdfRealViewer(
+                            uri = Uri.parse(pdfUriTexto!!),
+                            paginaAtual = paginaAtiva,
+                            onTotalPaginas = { totalPdf = it; viewModel.definirTotalPaginasPdf(it) },
+                            ferramenta = ferramentaAtiva,
+                            cor = corAtiva,
+                            modoSomenteStylus = modoSomenteStylus,
+                            tracos = artigoAtivo.tracos,
+                            notas = artigoAtivo.notas,
+                            citacoes = artigoAtivo.citacoes,
+                            onAdicionarTraco = { pagina, pontos -> viewModel.adicionarTracoLivre(pagina, pontos) },
+                            onApagarTraco = { pagina, x, y -> viewModel.apagarTracosProximos(pagina, x, y, 0.03f) },
+                            onStylusDetectada = { viewModel.registrarStylusDetectada() },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        PdfContinuousCanvas(
+                            artigo = artigoExibido,
+                            paginaAtual = paginaAtiva,
+                            ferramentaAtiva = ferramentaAtiva,
+                            corAtiva = corAtiva,
+                            modoSomenteStylus = modoSomenteStylus,
+                            textoSelecionado = textoSelecionado,
+                            onTextoSelecionado = { txt, pag, x, y, w, h ->
+                                viewModel.selecionarTexto(txt, pag, x, y, w, h)
+                            },
+                            onFecharPopupSelecao = { viewModel.fecharPopupSelecao() },
+                            onGrifarTexto = { viewModel.grifarTextoSelecionado() },
+                            onCriarCitacao = { viewModel.abrirCriacaoCitacao() },
+                            onCriarNota = { viewModel.abrirCriacaoNota() },
+                            onAdicionarTraco = { pagina, pontos -> viewModel.adicionarTracoLivre(pagina, pontos) },
+                            onApagarTracoProximo = { pagina, x, y -> viewModel.apagarTracosProximos(pagina, x, y, 28f) },
+                            onStylusDetectada = { viewModel.registrarStylusDetectada() },
+                            onPaginaAnterior = { viewModel.paginaAnterior() },
+                            onProximaPagina = { viewModel.proximaPagina() },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
-            // Scrim Translúcido de Fundo quando qualquer aba lateral estiver aberta sobre o canvas
-            if (painelEsquerdoAberto || painelDireitoAberto) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0x33000000))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
+                    // ReaderSubBar flutuante visível quando os painéis não estiverem sobrepostos
+                    AnimatedVisibility(
+                        visible = !painelEsquerdoAberto && !painelDireitoAberto,
+                        enter = fadeIn(),
+                        exit = fadeOut(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
+                            .padding(top = 10.dp)
+                    ) {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            ReaderSubBar(
+                                ferramentaAtiva = ferramentaAtiva,
+                                modoLinhaReta = modoLinhaReta,
+                                corAtiva = corAtiva,
+                                coresDisponiveis = viewModel.coresDisponiveis,
+                                paginaAtual = paginaAtiva,
+                                totalPaginas = artigoExibido.totalPaginas,
+                                onPaginaAnterior = { viewModel.paginaAnterior() },
+                                onProximaPagina = { viewModel.proximaPagina() },
+                                onVoltar = onVoltarBiblioteca,
+                                onSalvar = {
+                                    Toast.makeText(context, "A sincronização com Drive e Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
+                                },
+                                onDesfazer = { viewModel.desfazerTraco() },
+                                onLimparPagina = { viewModel.limparPagina() },
+                                onSelecionarFerramenta = { viewModel.definirFerramenta(it) },
+                                onAlternarModoLinhaReta = { viewModel.alternarModoLinhaReta() },
+                                onSelecionarCor = { viewModel.definirCor(it) }
+                            )
+                        }
+                    }
+
+                    // Painel Esquerdo Deslizante (sem scrim opaco bloqueando a folha)
+                    AnimatedVisibility(
+                        visible = painelEsquerdoAberto,
+                        enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(),
+                        exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut(),
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    ) {
+                        Surface(
+                            color = Color.White,
+                            shadowElevation = 8.dp,
+                            shape = RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp),
+                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .widthIn(max = 320.dp)
                         ) {
-                            if (painelEsquerdoAberto) viewModel.alternarPainelEsquerdo()
-                            if (painelDireitoAberto) viewModel.alternarPainelDireito()
+                            PainelEsquerdoLeitura(
+                                artigos = artigos,
+                                artigoAtivo = artigoExibido,
+                                filtroArtigos = filtroArtigos,
+                                paginaAtiva = paginaAtiva,
+                                onFiltroArtigosAlterado = { viewModel.definirFiltroArtigos(it) },
+                                onSelecionarArtigo = {
+                                    viewModel.selecionarArtigo(it)
+                                    viewModel.alternarPainelEsquerdo()
+                                },
+                                onSelecionarPagina = {
+                                    viewModel.navegarParaPagina(it)
+                                    viewModel.alternarPainelEsquerdo()
+                                },
+                                onSyncZoteroClick = {
+                                    Toast.makeText(context, "A sincronização do Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
+                                },
+                                onNovoArtigoClick = {
+                                    Toast.makeText(context, "A importação de artigos ainda não está disponível.", Toast.LENGTH_SHORT).show()
+                                },
+                                onNovaFolhaExtraClick = {
+                                    Toast.makeText(context, "Adicionar folha ao PDF ainda não está disponível.", Toast.LENGTH_SHORT).show()
+                                }
+                            )
                         }
-                )
-            }
+                    }
 
-            // ========================================================
-            // SOBREPOSIÇÃO ESQUERDA: ARTIGOS DO ZOTERO + PÁGINAS DO PDF
-            // ========================================================
-            AnimatedVisibility(
-                visible = painelEsquerdoAberto,
-                enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(),
-                exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut(),
-                modifier = Modifier.align(Alignment.CenterStart)
-            ) {
-                Surface(
-                    color = Color.White,
-                    shadowElevation = 16.dp,
-                    shape = RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD5E1)),
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .widthIn(max = 320.dp)
-                ) {
-                    PainelEsquerdoLeitura(
-                        artigos = artigos,
-                        artigoAtivo = artigoExibido,
-                        filtroArtigos = filtroArtigos,
-                        paginaAtiva = paginaAtiva,
-                        onFiltroArtigosAlterado = { viewModel.definirFiltroArtigos(it) },
-                        onSelecionarArtigo = {
-                            viewModel.selecionarArtigo(it)
-                            viewModel.alternarPainelEsquerdo()
-                        },
-                        onSelecionarPagina = {
-                            viewModel.navegarParaPagina(it)
-                            viewModel.alternarPainelEsquerdo()
-                        },
-                        onSyncZoteroClick = {
-                            Toast.makeText(context, "A sincronização do Zotero ainda não está disponível.", Toast.LENGTH_SHORT).show()
-                        },
-                        onNovoArtigoClick = {
-                            Toast.makeText(context, "A importação de artigos ainda não está disponível.", Toast.LENGTH_SHORT).show()
-                        },
-                        onNovaFolhaExtraClick = {
-                            Toast.makeText(context, "Adicionar folha ao PDF ainda não está disponível.", Toast.LENGTH_SHORT).show()
+                    // Painel Direito Deslizante (sem scrim opaco bloqueando a folha)
+                    AnimatedVisibility(
+                        visible = painelDireitoAberto,
+                        enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+                        exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                    ) {
+                        Surface(
+                            color = Color.White,
+                            shadowElevation = 8.dp,
+                            shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
+                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .widthIn(max = 370.dp)
+                        ) {
+                            PainelDireitoInspetor(
+                                artigo = artigoExibido,
+                                abaAtiva = abaDireitaAtiva,
+                                modoSomenteStylus = modoSomenteStylus,
+                                stylusDetectada = stylusDetectada,
+                                updateInfo = updateInfo,
+                                onAlternarModoStylus = { viewModel.alternarModoSomenteStylus() },
+                                onOpenUpdateDialog = onOpenUpdateDialog,
+                                onCheckUpdateManual = onCheckUpdateManual,
+                                onSelecionarAba = { viewModel.selecionarAbaDireita(it) },
+                                onNovaCitacaoClick = { viewModel.abrirCriacaoCitacao() },
+                                onRemoverCitacao = { viewModel.removerCitacao(it) },
+                                onInserirCitacaoNoDocumento = { cit -> onCitarNoDocumento(artigoExibido, cit) },
+                                onNovaNotaClick = { viewModel.abrirCriacaoNota() },
+                                onRemoverNota = { viewModel.removerNota(it) },
+                                onImportarNotasZotero = importarNotasZotero,
+                                importandoNotasZotero = importandoNotasZotero,
+                                onSalvarConfigZoteroDrive = { cfg -> viewModel.salvarConfigZoteroDrive(cfg) }
+                            )
                         }
-                    )
-                }
-            }
-
-            // ========================================================
-            // SOBREPOSIÇÃO DIREITA: RESUMO, CITAÇÕES E ZOTERO & DRIVE
-            // ========================================================
-            AnimatedVisibility(
-                visible = painelDireitoAberto,
-                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
-                modifier = Modifier.align(Alignment.CenterEnd)
-            ) {
-                Surface(
-                    color = Color.White,
-                    shadowElevation = 16.dp,
-                    shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD5E1)),
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .widthIn(max = 370.dp)
-                ) {
-                    PainelDireitoInspetor(
-                        artigo = artigoExibido,
-                        abaAtiva = abaDireitaAtiva,
-                        modoSomenteStylus = modoSomenteStylus,
-                        stylusDetectada = stylusDetectada,
-                        updateInfo = updateInfo,
-                        onAlternarModoStylus = { viewModel.alternarModoSomenteStylus() },
-                        onOpenUpdateDialog = onOpenUpdateDialog,
-                        onCheckUpdateManual = onCheckUpdateManual,
-                        onSelecionarAba = { viewModel.selecionarAbaDireita(it) },
-                        onNovaCitacaoClick = { viewModel.abrirCriacaoCitacao() },
-                        onRemoverCitacao = { viewModel.removerCitacao(it) },
-                        onInserirCitacaoNoDocumento = { cit -> onCitarNoDocumento(artigoExibido, cit) },
-                        onNovaNotaClick = { viewModel.abrirCriacaoNota() },
-                        onRemoverNota = { viewModel.removerNota(it) },
-                        onImportarNotasZotero = importarNotasZotero,
-                        importandoNotasZotero = importandoNotasZotero,
-                        onSalvarConfigZoteroDrive = { cfg -> viewModel.salvarConfigZoteroDrive(cfg) }
-                    )
+                    }
                 }
             }
         }

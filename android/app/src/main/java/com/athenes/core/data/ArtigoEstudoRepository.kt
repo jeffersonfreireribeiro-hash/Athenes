@@ -355,8 +355,14 @@ class ArtigoEstudoRepository {
     }
 
     fun selecionarArtigo(id: String) {
-        if (_artigos.value.any { it.id == id }) {
-            _artigoAtivoId.value = id
+        val encontrado = _artigos.value.find { art ->
+            art.id == id || art.chaveZotero == id ||
+            (id == "zot_art_01" && art.id == "art_reurb_2025") ||
+            (id == "zot_art_02" && art.id == "art_sustentabilidade_2026") ||
+            (id == "zot_art_03" && art.id == "art_sustentabilidade_2026")
+        }
+        if (encontrado != null) {
+            _artigoAtivoId.value = encontrado.id
         }
     }
 
@@ -427,18 +433,78 @@ class ArtigoEstudoRepository {
         salvarTracosDepois()
     }
 
+    private fun distanciaPontoSegmento(px: Float, py: Float, x1: Float, y1: Float, x2: Float, y2: Float): Float {
+        val dx = x2 - x1
+        val dy = y2 - y1
+        val l2 = dx * dx + dy * dy
+        if (l2 == 0f) {
+            val dpx = px - x1
+            val dpy = py - y1
+            return kotlin.math.sqrt(dpx * dpx + dpy * dpy)
+        }
+        val t = ((px - x1) * dx + (py - y1) * dy) / l2
+        val tClamped = t.coerceIn(0f, 1f)
+        val projX = x1 + tClamped * dx
+        val projY = y1 + tClamped * dy
+        val dpx = px - projX
+        val dpy = py - projY
+        return kotlin.math.sqrt(dpx * dpx + dpy * dpy)
+    }
+
+    private fun tracoColideComPonto(traco: TracoDesenho, x: Float, y: Float, raio: Float): Boolean {
+        val pts = traco.pontos
+        if (pts.isEmpty()) return false
+
+        val tracoEhNormalizado = pts.all { it.x <= 1.05f && it.y <= 1.05f }
+        val pontoEhNormalizado = x <= 1.05f && y <= 1.05f && raio <= 0.2f
+
+        val (qx, qy, rEfetivo) = if (pontoEhNormalizado && !tracoEhNormalizado) {
+            Triple(x * 840f, y * 1188f, (raio * 840f).coerceAtLeast(18f))
+        } else if (!pontoEhNormalizado && tracoEhNormalizado) {
+            Triple(x / 840f, y / 1188f, (raio / 840f).coerceAtLeast(0.025f))
+        } else {
+            Triple(x, y, raio)
+        }
+
+        val espessuraAdicional = if (tracoEhNormalizado && pontoEhNormalizado) {
+            (traco.espessura / 840f) / 2f
+        } else if (!tracoEhNormalizado && !pontoEhNormalizado) {
+            traco.espessura / 2f
+        } else {
+            traco.espessura / 2f
+        }
+        val limiteColisao = rEfetivo + espessuraAdicional
+
+        if (pts.size == 1) {
+            val p = pts[0]
+            val dx = p.x - qx
+            val dy = p.y - qy
+            return (dx * dx + dy * dy) <= (limiteColisao * limiteColisao)
+        }
+
+        if (traco.ehLinhaReta && pts.size >= 2) {
+            val pIni = pts.first()
+            val pFim = pts.last()
+            val dist = distanciaPontoSegmento(qx, qy, pIni.x, pIni.y, pFim.x, pFim.y)
+            if (dist <= limiteColisao) return true
+        }
+
+        for (i in 0 until pts.size - 1) {
+            val p1 = pts[i]
+            val p2 = pts[i + 1]
+            val dist = distanciaPontoSegmento(qx, qy, p1.x, p1.y, p2.x, p2.y)
+            if (dist <= limiteColisao) return true
+        }
+
+        return false
+    }
+
     fun apagarTracosProximos(artigoId: String, pagina: Int, x: Float, y: Float, raio: Float = 28f) {
         _artigos.value = _artigos.value.map { art ->
             if (art.id == artigoId) {
                 val tracosFiltrados = art.tracos.filterNot { traco ->
                     if (traco.pagina != pagina) false
-                    else {
-                        traco.pontos.any { p ->
-                            val dx = p.x - x
-                            val dy = p.y - y
-                            (dx * dx + dy * dy) <= (raio * raio)
-                        }
-                    }
+                    else tracoColideComPonto(traco, x, y, raio)
                 }
                 art.copy(tracos = tracosFiltrados)
             } else art
@@ -477,10 +543,10 @@ class ArtigoEstudoRepository {
             val paginasArtigo1 = (1..33).map { num ->
                 PaginaPdfInfo(
                     numero = num,
-                    titulo = "Folha do PDF",
-                    qtdRiscos = if (num == 1) 0 else if (num == 17) 2 else 0,
-                    qtdNotas = if (num == 1) 0 else if (num == 17) 1 else 0,
-                    qtdCitacoes = if (num == 17) 1 else 0,
+                    titulo = if (num == 1) "Folha 1 — Introduction & PBD Framework" else "Folha $num — Performance-Based Acoustic Simulation",
+                    qtdRiscos = if (num == 17) 2 else 0,
+                    qtdNotas = 0,
+                    qtdCitacoes = 0,
                     paragrafos = when (num) {
                         1 -> listOf(
                             "Architecture, PBD benefits both design workflow and outcome, allowing one to control the performance of the design proposal since early design phases. The paper aims to explore its current application in the acoustic field, where its potential is still little exploited in architectural practice.",
@@ -496,9 +562,40 @@ class ArtigoEstudoRepository {
                             "Adequate technical skills are required in manual processes, since the success of the optimization greatly relies on the correct understanding of the relations between design features and performance [2]. However, the time and manpower required in the processes may limit the number of iterations pursued and the effectiveness of the design optimization [1,23].",
                             "On the other hand, generative models allow one to explore a wide number of design options with a limited involvement of the operator, exploiting the functionalities of optimization tools (e.g., Galapagos [24] and Octopus [25]) [1,2,18,26]."
                         )
+                        3 -> listOf(
+                            "2. Room Acoustic Simulation Methods and Ray-Tracing Models",
+                            "Geometrical acoustics (GA) algorithms, such as ray-tracing, image-source and particle tracing methods, offer a computationally viable approach for early stage design iterations compared to wave-based numerical solvers (BEM/FEM).",
+                            "By coupling parametric NURBS surfaces in Rhinoceros/Grasshopper with high-efficiency ray-tracing engines, thousands of sound ray trajectories can be simulated in seconds to predict specular and diffuse reflections."
+                        )
+                        4 -> listOf(
+                            "2.1 Acoustic Performance Metrics and Multi-Objective Criteria",
+                            "ISO 3382-1 establishes clear quantitative metrics for indoor room acoustics: Reverberation Time (T30 and EDT), Early-to-Late Energy Ratios (Clarity C80 and Definition D50), Sound Strength (G), and Lateral Energy Fraction (LF).",
+                            "In concert hall geometry design, optimizing the lateral fraction LF is critical to enhancing the listener's perceived spatial impression (auditory source width - ASW), while maintaining sufficient clarity C80 for orchestral articulation."
+                        )
+                        5 -> listOf(
+                            "3. Parametric Design Workflow and Evolutionary Solvers",
+                            "The parametric script developed in Grasshopper translates structural enclosure boundaries into adaptive reflector panels with variable curvature and orientation.",
+                            "Genetic algorithms (Galapagos and Octopus) operate over continuous chromosome vectors representing panel inclination angles, spatial coordinates of sound sources, and receiver grid configurations."
+                        )
+                        6 -> listOf(
+                            "3.1 Multi-Objective Pareto Frontiers: Acoustic Quality vs Daylight and Structural Mass",
+                            "The trade-off between acoustic reflection efficiency and natural daylight penetration through glazed clerestories forms a distinct Pareto frontier.",
+                            "Octopus multi-objective solver allows designers to interactively inspect non-dominated solutions across competing performance domains without collapsing objective weights prematurely."
+                        )
+                        7 -> listOf(
+                            "4. Case Studies: Concert Hall Reflector Canopy Morphology",
+                            "A representative 1,200-seat shoebox auditorium was evaluated to assess the performance difference between formation models (manual iterations) and generative algorithmic models.",
+                            "The generative model achieved a 38% more uniform sound pressure level distribution across the stalls while reducing the physical weight of suspended reflector arrays by 22%."
+                        )
+                        8 -> listOf(
+                            "4.1 Stage Shell Design and Performers' Acoustic Support (ST1)",
+                            "Acoustic feedback on stage, quantified by the ST1 early stage support metric (-14 dB to -10 dB target range), was optimized by introducing micro-articulated timber baffles with quadratic residue diffusion profiles.",
+                            "Musicians reported heightened ensemble communication and balanced timbre across string and brass sections in double-blind listening assessments."
+                        )
                         else -> listOf(
-                            "Seção analítica da página $num com discussões paramétricas, equações de propagação sonora e simulação computacional integrada.",
-                            "Resultados obtidos através de amostragem acústica no solver evolutivo integrado à modelagem tridimensional."
+                            "Seção analítica da folha $num: Validação experimental e convergência numérica.",
+                            "Análise comparativa de malhas geométricas e tolerâncias de simulação acústica paramétrica no Grasshopper conforme normas ISO 3382-1 e critérios PBD.",
+                            "Os resultados corroboram a viabilidade de pipelines computacionais integrados para projeto arquitetônico de alto desempenho."
                         )
                     }
                 )
@@ -529,6 +626,58 @@ class ArtigoEstudoRepository {
                 )
             )
 
+            val paginasArtigo2 = (1..24).map { num ->
+                PaginaPdfInfo(
+                    numero = num,
+                    titulo = when (num) {
+                        1 -> "Folha 1 — Introdução e Referencial Teórico"
+                        2 -> "Folha 2 — Análise Espacial e Conformidade Registral"
+                        3 -> "Folha 3 — Conclusões e Diretrizes Propositivas"
+                        else -> "Folha $num — Regularização Fundiária e Metodologia"
+                    },
+                    qtdRiscos = 0,
+                    qtdNotas = if (num == 1) 1 else 0,
+                    qtdCitacoes = if (num == 1) 1 else if (num == 2) 1 else 0,
+                    paragrafos = when (num) {
+                        1 -> listOf(
+                            "RESUMO: Este artigo analisa os instrumentos técnicos e jurídicos de regularização fundiária urbana aplicados a núcleos urbanos informais consolidados, propondo diretrizes para integração entre levantamento de campo, cadastro multifinalitário e titulação registral.",
+                            "1. INTRODUÇÃO: O crescimento acelerado das cidades latino-americanas produziu tecidos urbanos heterogêneos nos quais a consolidação física precedeu a formalização cartorial. Nesse contexto, a segurança jurídica da posse depende diretamente da precisão geométrica e da rastreabilidade social do cadastro territorial.",
+                            "Historicamente, os projetos de urbanização enfrentaram gargalos severos na transição entre o diagnóstico socioespacial e a abertura de matrículas individualizadas. Quando os fluxos de desenho urbano e documentação jurídica operam em ferramentas desconectadas, multiplicam-se as inconsistências entre quadras, lotes e logradouros.",
+                            "2. REFERENCIAL METODOLÓGICO: Propomos uma arquitetura integrada em que cada unidade imobiliária mantém vínculo unívoco entre sua geometria projetada em projeção UTM (SIRGAS 2000) e os respectivos instrumentos de legitimação fundiária."
+                        )
+                        2 -> listOf(
+                            "3. ANÁLISE ESPACIAL E CONFORMIDADE REGISTRAL: Os dados empíricos coletados ao longo de 24 meses revelam que a dissociação entre a planta de parcelamento e os memoriais descritivos é a principal causa de notas devolutivas no registro de imóveis, respondendo por 58,4% dos atrasos processuais.",
+                            "Na Tabela 1 do estudo original, observa-se que municípios que adotaram validação topológica contínua e geração paramétrica de peças técnicas reduziram o retrabalho editorial em mais de dois terços.",
+                            "Além disso, o emprego de simbologia cartográfica padronizada e quadros síntese vinculados diretamente à base alfanumérica permitiu que equipes multidisciplinares (arquitetos, engenheiros, assistentes sociais e juristas) revisassem os relatórios em tempo real."
+                        )
+                        3 -> listOf(
+                            "4. CONCLUSÕES E DIRETRIZES PARA POLÍTICAS PÚBLICAS: Conclui-se que a modernização dos procedimentos de regularização fundiária exige ambientes colaborativos capazes de unir rigor tipográfico (ABNT), gestão bibliográfica estruturada e interoperabilidade com acervos em nuvem.",
+                            "Trabalhos futuros devem explorar a leitura compartilhada de laudos e artigos técnicos com camadas de anotação vetorial não destrutiva, preservando os arquivos originais no armazenamento em nuvem do pesquisador."
+                        )
+                        4 -> listOf(
+                            "5. DIAGNÓSTICO SOCIOESPACIAL E LEVANTAMENTO TOPOGRÁFICO CADASTRAL",
+                            "A demarcação urbanística inicia-se pela identificação precisa do perímetro de ocupação consolidada através de imagens de sensoriamento remoto de alta resolução e rastreamento GNSS geodésico.",
+                            "Cada lote cadastrado recebe um identificador único de cadastro (CUI) vinculado a uma matriz de atributos alfanuméricos com perfil do titular, composição familiar e histórico de ocupação."
+                        )
+                        5 -> listOf(
+                            "5.1 Validação Topológica em Banco de Dados Espacial (PostGIS)",
+                            "Garantir a ausência de sobreposições (st_overlaps) e lacunas indevidas entre lotes e faixas de domínio público é pré-requisito mandatório para a qualificação registral da planta de parcelamento.",
+                            "A automatização das rotinas de checagem topológica reduz a incidência de impugnações de confrontantes e acelera a tramitação perante a comissão municipal de REURB."
+                        )
+                        6 -> listOf(
+                            "6. PROJETO DE REGULARIZAÇÃO FUNDIÁRIA (PRF) E MEMORIAIS DESCRITIVOS",
+                            "O memorial descritivo paramétrico calcula azimutes, rumos, distâncias métricas e confrontações com base nas coordenadas de vértices do parcelamento aprovado.",
+                            "A integração direta entre a cartografia vetorial e o motor editorial elimina divergências de digitação e garante conformidade estrita com o Provimento nº 144/2023 do CNJ."
+                        )
+                        else -> listOf(
+                            "Seção $num: Diretrizes técnicas e jurídicas de regularização fundiária urbana (Lei Federal 13.465/2017).",
+                            "Análise de conformidade urbanística, parâmetros de parcelamento do solo e diretrizes ambientais para consolidação de núcleos habitacionais em áreas de preservação.",
+                            "Procedimentos integrados de expedição de Certidão de Regularização Fundiária (CRF) e titulação imobiliária coletiva e individual."
+                        )
+                    }
+                )
+            }
+
             val artigo2 = ArtigoEstudoDetalhado(
                 id = "art_reurb_2025",
                 titulo = "Regularização Fundiária Urbana e Morfologia de Assentamentos Consolidados na América Latina",
@@ -536,29 +685,123 @@ class ArtigoEstudoRepository {
                 ano = 2025,
                 chaveZotero = "ZOT8K2M9",
                 totalPaginas = 24,
-                resumoOficial = "Este artigo analisa os instrumentos técnicos e jurídicos de regularização fundiária urbana aplicados a núcleos urbanos informais consolidados.",
-                meuResumo = "Artigo fundamental para a seção de Metodologia. Demonstra que a integração entre banco territorial e peças técnicas automatizadas reduz em 64% o tempo de emissão da CRF.",
-                analiseMetodologica = "Estudo comparativo em 14 núcleos urbanos com poligonais georreferenciadas SIRGAS 2000 / UTM.",
-                tags = listOf("REURB", "Morfologia Urbana", "PostGIS", "SIG"),
-                paginas = (1..24).map { PaginaPdfInfo(numero = it) },
-                citacoes = emptyList(),
-                notas = emptyList()
+                resumoOficial = "Este artigo analisa os instrumentos técnicos e jurídicos de regularização fundiária urbana (REURB-S e REURB-E) aplicados a núcleos urbanos informais consolidados, propondo diretrizes para integração entre levantamento aerofotogramétrico, cadastro multifinalitário e titulação.",
+                meuResumo = "Artigo fundamental para a seção de Metodologia. Demonstra que a integração entre banco territorial (PostGIS) e peças técnicas automatizadas reduz em 64% o tempo de emissão da CRF.",
+                analiseMetodologica = "Estudo comparativo em 14 núcleos urbanos com uso de poligonais georreferenciadas SIRGAS 2000 / UTM e validação topológica prévia.",
+                tags = listOf("REURB", "Morfologia Urbana", "Cadastro Territorial", "PostGIS", "SIG"),
+                paginas = paginasArtigo2,
+                citacoes = listOf(
+                    CitacaoMarcada(
+                        id = "cit_1",
+                        pagina = 1,
+                        texto = "A segurança jurídica da posse depende diretamente da precisão geométrica e da rastreabilidade social do cadastro territorial.",
+                        comentario = "Usar na Introdução (parágrafo 3) para fundamentar a escolha metodológica.",
+                        referenciaAbnt = "(SANTOS; RIBEIRO, 2025, p. 1)",
+                        corHex = "#FACC15"
+                    ),
+                    CitacaoMarcada(
+                        id = "cit_2",
+                        pagina = 2,
+                        texto = "A dissociação entre a planta de parcelamento e os memoriais descritivos é a principal causa de notas devolutivas no registro de imóveis.",
+                        comentario = "Excelente argumento para justificar o motor paramétrico do Athenes.",
+                        referenciaAbnt = "(SANTOS; RIBEIRO, 2025, p. 2)",
+                        corHex = "#059669"
+                    )
+                ),
+                notas = listOf(
+                    NotaAdesiva(
+                        id = "pin_1",
+                        pagina = 1,
+                        xPct = 62f,
+                        yPct = 30f,
+                        titulo = "Destaque do Orientador",
+                        texto = "Conferir como os autores definem o índice de consolidação viária na p. 115.",
+                        corHex = "#D97706"
+                    )
+                ),
+                zoteroConfig = ZoteroVinculoConfig(
+                    apiKey = "",
+                    userId = "",
+                    itemKey = "ZOT8K2M9",
+                    doi = "10.22296/2317-1529.rbeur.2025v27n2p114",
+                    driveStatus = "Sincronizado no Google Drive",
+                    driveFileName = "Santos_Ribeiro_2025_REURB_Morfologia.pdf",
+                    driveFileId = "drive_pdf_reurb_2025"
+                )
             )
+
+            val paginasArtigo3 = (1..18).map { num ->
+                PaginaPdfInfo(
+                    numero = num,
+                    titulo = when (num) {
+                        1 -> "Folha 1 — Colaboração e Conflitos na Edição Científica"
+                        2 -> "Folha 2 — Leitura Ativa e Fichamento Zotero"
+                        else -> "Folha $num — Sistemas Distribuídos e Editoração"
+                    },
+                    qtdRiscos = 0,
+                    qtdNotas = 0,
+                    qtdCitacoes = if (num == 1) 1 else 0,
+                    paragrafos = when (num) {
+                        1 -> listOf(
+                            "ABSTRACT: A escrita científica contemporânea é intrinsecamente colaborativa. Todavia, ferramentas tradicionais forçam pesquisadores a escolher entre controle tipográfico preciso (LaTeX/DTP) e colaboração fácil em nuvem.",
+                            "1. PROBLEMA DE PESQUISA: A combinação de presença síncrona com sugestões granulares de inserção e exclusão reduz a fricção cognitiva durante a revisão entre orientador e orientando, mantendo o histórico decisório transparente.",
+                            "2. ARQUITETURA EM BLOCOS: Quando o documento é modelado como uma sequência de seções mestras e blocos semânticos (títulos, parágrafos, figuras compostas, tabelas ABNT e equações), a resolução de conflitos torna-se determinística."
+                        )
+                        2 -> listOf(
+                            "3. INTEGRAÇÃO COM BIBLIOTECAS DE REFERÊNCIAS E ANOTAÇÃO DE PDF: Observamos que 78% dos pesquisadores realizam a leitura e o grifo de artigos em PDF separadamente do ambiente de redação, perdendo o vínculo entre os trechos riscados no PDF e as citações inseridas no manuscrito.",
+                            "A unificação do estúdio de leitura de PDF (com tinta digital estilo tablet e armazenamento direto no Drive pessoal do autor) ao gerenciador Zotero elimina a duplicação de arquivos pesados e preserva todas as marcações na nuvem."
+                        )
+                        3 -> listOf(
+                            "4. ESTRUTURAS CRDT PARA TIPOGRAFIA E PAGINAÇÃO EDITORIAL",
+                            "Tipos de dados replicados sem conflito (Conflict-free Replicated Data Types - CRDTs) garantem eventual consistência entre clientes distribuídos sem a necessidade de coordenadores centrais com bloqueio pessimista.",
+                            "A decomposição do manuscrito em árvores causais associadas a identificadores fracionários viabiliza a ordenação imutável de parágrafos e citações sob conexões intermitentes."
+                        )
+                        4 -> listOf(
+                            "4.1 Modos de Trabalho: Rascunho, Sugestão e Revisão Final",
+                            "Inspirado nos ciclos de revisão editorial clássicos, o sistema permite que o orientador registre sugestões pontuais de edição sem destruir o texto original do autor discente.",
+                            "A aprovação ou rejeição de alterações opera sobre operações de tombstone rastreáveis no grafo de versões, fornecendo prestação de contas integral para publicações submetidas a periódicos indexados."
+                        )
+                        else -> listOf(
+                            "Seção analítica da folha $num: Protocolos de sincronização em tempo real via WebSockets e canais peer-to-peer.",
+                            "Análise de latência, tolerância a falhas e desempenho de renderização vetorial de PDFs acadêmicos com aceleração gráfica em tablets de alta densidade.",
+                            "Convergência entre rigor normativo ABNT, gerenciamento bibliográfico estruturado e portabilidade em formatos abertos."
+                        )
+                    }
+                )
+            }
 
             val artigo3 = ArtigoEstudoDetalhado(
                 id = "art_sustentabilidade_2026",
-                titulo = "Análise Espacial e Diretrizes de Reurbanização Sustentável",
-                autores = "SILVA & LIMA, 2026",
-                ano = 2026,
+                titulo = "Sistemas Colaborativos CRDT e Editoração Científica em Tempo Real na Web Moderna",
+                autores = "KLEPPMANN & ALMEIDA, 2024",
+                ano = 2024,
                 chaveZotero = "ZOT4P9L2",
                 totalPaginas = 18,
-                resumoOficial = "Estudo de escopo e proposições metodológicas para comunidades consolidadas com foco em eficiência energética e microclima.",
-                meuResumo = "Fundamenta a relevância de diagnósticos de conforto térmico e drenagem sustentável.",
-                analiseMetodologica = "Modelagem estatística espacial e sensoriamento remoto de alta resolução.",
-                tags = listOf("Sustentabilidade", "Conforto Térmico", "Microclima"),
-                paginas = (1..18).map { PaginaPdfInfo(numero = it) },
-                citacoes = emptyList(),
-                notas = emptyList()
+                resumoOficial = "Investigação sobre estruturas de dados livres de conflito (CRDTs) e canais de presença em tempo real aplicados à escrita acadêmica distribuída entre orientadores e pesquisadores.",
+                meuResumo = "Explica como combinar edição em tempo real com modos de revisão assíncrona (Sugestão com Aceitar/Rejeitar) sem perda de formatação tipográfica.",
+                analiseMetodologica = "Avaliação com 42 grupos de pesquisa universitários utilizando documentos estruturados em blocos.",
+                tags = listOf("CRDT", "Colaboração Síncrona", "Editoração Acadêmica", "WebSockets"),
+                paginas = paginasArtigo3,
+                citacoes = listOf(
+                    CitacaoMarcada(
+                        id = "cit_201",
+                        pagina = 1,
+                        texto = "A combinação de presença síncrona com sugestões granulares de inserção e exclusão reduz a fricção cognitiva durante a revisão entre orientador e orientando.",
+                        comentario = "Citar na seção sobre o fluxo de revisão colaborativa.",
+                        referenciaAbnt = "(KLEPPMANN; ALMEIDA, 2024, p. 1)",
+                        corHex = "#314F79"
+                    )
+                ),
+                notas = emptyList(),
+                zoteroConfig = ZoteroVinculoConfig(
+                    apiKey = "",
+                    userId = "",
+                    itemKey = "ZOT4P9L2",
+                    doi = "10.1145/3612345.3612399",
+                    driveStatus = "Sincronizado no Google Drive",
+                    driveFileName = "Kleppmann_Almeida_2024_CRDT_Academic_Publishing.pdf",
+                    driveFileId = "drive_pdf_crdt_2024"
+                )
             )
 
             return listOf(artigo1, artigo2, artigo3)

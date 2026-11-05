@@ -37,6 +37,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.core.model.*
@@ -51,7 +53,7 @@ fun PdfContinuousCanvas(
     corAtiva: String,
     modoSomenteStylus: Boolean = false,
     textoSelecionado: TextoSelecionadoPopup?,
-    onTextoSelecionado: (String, Int, Float, Float) -> Unit,
+    onTextoSelecionado: (String, Int, Float, Float, Float, Float) -> Unit,
     onFecharPopupSelecao: () -> Unit,
     onGrifarTexto: () -> Unit,
     onCriarCitacao: () -> Unit,
@@ -95,8 +97,8 @@ fun PdfContinuousCanvas(
                     modoSomenteStylus = modoSomenteStylus,
                     tracosPagina = artigo.tracos.filter { it.pagina == pagina.numero },
                     notasPagina = artigo.notas.filter { it.pagina == pagina.numero },
-                    onTextoSelecionado = { texto ->
-                        onTextoSelecionado(texto, pagina.numero, 0f, 0f)
+                    onTextoSelecionado = { texto, x, y, w, h ->
+                        onTextoSelecionado(texto, pagina.numero, x, y, w, h)
                     },
                     onAdicionarTraco = onAdicionarTraco,
                     onApagarTracoProximo = onApagarTracoProximo,
@@ -298,7 +300,7 @@ private fun FolhaPdfRenderizada(
     modoSomenteStylus: Boolean,
     tracosPagina: List<TracoDesenho>,
     notasPagina: List<NotaAdesiva>,
-    onTextoSelecionado: (String) -> Unit,
+    onTextoSelecionado: (String, Float, Float, Float, Float) -> Unit,
     onAdicionarTraco: (Int, List<PontoTraco>) -> Unit,
     onApagarTracoProximo: (Int, Float, Float) -> Unit,
     onStylusDetectada: () -> Unit
@@ -337,6 +339,7 @@ private fun FolhaPdfRenderizada(
             )
         }
 
+        var folhaCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
         // Folha de Papel A4 com Sombra e Borda
         Box(
             modifier = Modifier
@@ -344,6 +347,7 @@ private fun FolhaPdfRenderizada(
                 .shadow(elevation = 3.dp, shape = RoundedCornerShape(2.dp))
                 .background(Color.White)
                 .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(2.dp))
+                .onGloballyPositioned { folhaCoords = it }
         ) {
             // Camada de Texto Acadêmico
             Column(
@@ -362,8 +366,9 @@ private fun FolhaPdfRenderizada(
                         )
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+                    val doiParte = if (artigo.zoteroConfig.doi.isNotBlank()) " · DOI: ${artigo.zoteroConfig.doi}" else ""
                     Text(
-                        text = "Autor: ${artigo.autores} — Publicado em ${artigo.ano} · DOI: ${artigo.zoteroConfig.doi}",
+                        text = "Autor: ${artigo.autores} — Publicado em ${artigo.ano}$doiParte",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontWeight = FontWeight.SemiBold,
                             color = AthenesPrimary,
@@ -380,8 +385,23 @@ private fun FolhaPdfRenderizada(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
+                if (pagina.paragrafos.isEmpty()) {
+                    Text(
+                        text = "Página ${pagina.numero} — Conteúdo analítico em processamento editorial.",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = FontFamily.Serif,
+                            fontSize = 14.5.sp,
+                            color = Color(0xFF64748B)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp)
+                    )
+                }
+
                 // Parágrafos do Artigo
                 pagina.paragrafos.forEach { par ->
+                    var parCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
                     Text(
                         text = par,
                         style = MaterialTheme.typography.bodyMedium.copy(
@@ -393,8 +413,17 @@ private fun FolhaPdfRenderizada(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 6.dp)
+                            .onGloballyPositioned { parCoords = it }
                             .clickable {
-                                onTextoSelecionado(par)
+                                val folha = folhaCoords
+                                val p = parCoords
+                                val (relX, relY, relW, relH) = if (folha != null && p != null && folha.isAttached && p.isAttached) {
+                                    val pos = folha.localPositionOf(p, Offset.Zero)
+                                    listOf(pos.x, pos.y, p.size.width.toFloat(), p.size.height.toFloat())
+                                } else {
+                                    listOf(32f, 200f, 600f, 50f)
+                                }
+                                onTextoSelecionado(par, relX, relY, relW, relH)
                             }
                     )
                 }
@@ -405,8 +434,15 @@ private fun FolhaPdfRenderizada(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    val rodapeTexto = if (artigo.zoteroConfig.doi.isNotBlank()) {
+                        "DOI: ${artigo.zoteroConfig.doi} · ${artigo.ano}"
+                    } else if (artigo.chaveZotero.isNotBlank()) {
+                        "Zotero: ${artigo.chaveZotero} · ${artigo.ano}"
+                    } else {
+                        "${artigo.autores} (${artigo.ano})"
+                    }
                     Text(
-                        text = "Buildings 2020, 10, 36; doi:10.3390/buildings10020036",
+                        text = rodapeTexto,
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = 9.sp,
                             color = AthenesTextMuted
@@ -486,16 +522,24 @@ private fun FolhaPdfRenderizada(
                     )
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
+                    val w = size.width
+                    val h = size.height
+                    fun toPixel(p: PontoTraco, ehNorm: Boolean): Offset =
+                        if (ehNorm) Offset(p.x * w, p.y * h) else Offset(p.x, p.y)
+
                     // Desenhar traços já persistidos
                     tracosPagina.forEach { traco ->
                         val cor = parseHexColor(traco.corHex).copy(
                             alpha = if (traco.ehMarcaTexto) 0.38f else 1.0f
                         )
+                        val ehNorm = traco.pontos.all { it.x <= 1.05f && it.y <= 1.05f }
                         if (traco.pontos.size > 1) {
                             val path = Path().apply {
-                                moveTo(traco.pontos.first().x, traco.pontos.first().y)
+                                val p0 = toPixel(traco.pontos.first(), ehNorm)
+                                moveTo(p0.x, p0.y)
                                 for (p in traco.pontos.drop(1)) {
-                                    lineTo(p.x, p.y)
+                                    val pt = toPixel(p, ehNorm)
+                                    lineTo(pt.x, pt.y)
                                 }
                             }
                             drawPath(
@@ -508,10 +552,11 @@ private fun FolhaPdfRenderizada(
                                 )
                             )
                         } else if (traco.pontos.size == 1) {
+                            val pt = toPixel(traco.pontos.first(), ehNorm)
                             drawCircle(
                                 color = cor,
                                 radius = traco.espessura / 2,
-                                center = Offset(traco.pontos.first().x, traco.pontos.first().y)
+                                center = pt
                             )
                         }
                     }

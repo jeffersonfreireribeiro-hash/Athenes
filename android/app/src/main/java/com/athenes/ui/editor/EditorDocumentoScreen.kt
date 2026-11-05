@@ -15,11 +15,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ContentCut
+import androidx.compose.material.icons.rounded.FormatQuote
+import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import com.athenes.ui.components.AthenesPillFiltro
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,6 +64,9 @@ import com.athenes.ui.editor.components.EditorPainelCitacao
 import com.athenes.ui.editor.components.EditorTopBar
 import com.athenes.ui.editor.components.DialogConfiguracaoPagina
 import com.athenes.ui.editor.components.GrafoConexoesDialog
+import com.athenes.ui.editor.estilos.CatalogoFontes
+import com.athenes.ui.editor.estilos.DialogEditarEstilo
+import com.athenes.ui.editor.estilos.EstiloEditorial
 import com.athenes.ui.theme.AthenesPrimary
 import com.athenes.ui.theme.AthenesTextMuted
 import androidx.compose.foundation.Image
@@ -124,6 +139,24 @@ fun EditorDocumentoScreen(
     val painelInspetorAberto by viewModel.painelInspetorAberto.collectAsState()
     val painelCitacaoAberto by viewModel.painelCitacaoAberto.collectAsState()
 
+    val estilos by viewModel.estilos.collectAsState()
+    val estiloAtivoId by viewModel.estiloAtivoId.collectAsState()
+    var estiloParaEditar by remember { mutableStateOf<EstiloEditorial?>(null) }
+
+    val seletorFonteLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                CatalogoFontes.importarFonte(context, uri)
+            }.onSuccess {
+                Toast.makeText(context, "Fonte '${it.rotulo}' importada com sucesso!", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, "Falha ao importar fonte: ${it.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     // Seletor de fotos do sistema (sem permissão de armazenamento); a imagem é copiada e reduzida.
     var alvoImagem by remember { mutableStateOf<String?>(null) }
     val seletorImagem = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -195,6 +228,7 @@ fun EditorDocumentoScreen(
 
     val editavel = modoRevisao != "leitura"
     val blocoSelecionado = remember(blocos, blocoSelecionadoId) { blocos.find { it.id == blocoSelecionadoId } }
+    val estiloCorrenteId = blocoSelecionado?.estiloId ?: estiloAtivoId
     var mostrarReferenciasCruzadas by remember { mutableStateOf(false) }
     var mostrarNotasRodape by remember { mutableStateOf(false) }
     var notaEditandoId by remember { mutableStateOf<String?>(null) }
@@ -240,6 +274,11 @@ fun EditorDocumentoScreen(
         val larguraFolha = if (compacto) maxWidth - 8.dp else minOf(820.dp, maxWidth - 32.dp)
         val margemEsquerda = maxOf(12.dp, larguraFolha * (configPagina.margemEsquerdaMm / configPagina.larguraMm).toFloat())
         val margemDireita = maxOf(12.dp, larguraFolha * (configPagina.margemDireitaMm / configPagina.larguraMm).toFloat())
+
+        // Gutter fixo na margem esquerda para a alça de reordenação
+        val larguraGutter = if (compacto) 28.dp else 34.dp
+        val paddingInicioFolha = (margemEsquerda - larguraGutter).coerceAtLeast(6.dp)
+
         // Gavetas e scrim começam abaixo da barra de título: voltar/estrutura/inspetor seguem acessíveis.
         val topoHud = 52.dp + WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
@@ -255,28 +294,38 @@ fun EditorDocumentoScreen(
                 .shadow(2.dp)
                 .background(Color.White),
             contentPadding = PaddingValues(
-                start = margemEsquerda, end = margemDireita,
+                start = paddingInicioFolha, end = margemDireita,
                 top = 52.dp + 52.dp + 8.dp, bottom = 32.dp
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item(key = "cabecalho") {
-                CabecalhoFolha(
-                    titulo = titulo, subtitulo = subtitulo, autores = autores, resumo = resumo,
-                    editavel = editavel, compacto = compacto,
-                    onTitulo = viewModel::definirTitulo,
-                    onSubtitulo = viewModel::definirSubtitulo,
-                    onResumo = viewModel::definirResumo
-                )
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.width(larguraGutter))
+                    Box(modifier = Modifier.weight(1f)) {
+                        CabecalhoFolha(
+                            titulo = titulo, subtitulo = subtitulo, autores = autores, resumo = resumo,
+                            editavel = editavel, compacto = compacto,
+                            onTitulo = viewModel::definirTitulo,
+                            onSubtitulo = viewModel::definirSubtitulo,
+                            onResumo = viewModel::definirResumo
+                        )
+                    }
+                }
             }
             itemsIndexed(blocos, key = { _, b -> b.id }) { indice, bloco ->
                 val numeroFormula = blocos.take(indice + 1).count { it.tipo == TipoBlocoEditor.FORMULA }
+                val numeroIlustracao = blocos.take(indice + 1).count { it.tipo == TipoBlocoEditor.FIGURA }
                 ItemBlocoFolha(
                     bloco = bloco,
                     selecionado = bloco.id == blocoSelecionadoId,
                     editavel = editavel,
                     compacto = compacto,
+                    larguraGutter = larguraGutter,
+                    podeSubir = indice > 0,
+                    podeDescer = indice < blocos.size - 1,
                     numeroFormula = numeroFormula,
+                    numeroIlustracao = if (numeroIlustracao > 0) numeroIlustracao else 1,
                     estrutura = estrutura,
                     titulosIlustracoes = titulosIlustracoes,
                     referencias = referencias,
@@ -312,7 +361,12 @@ fun EditorDocumentoScreen(
                     onExportarPdf = exportarPdf,
                     onExportarJson = exportarJson,
                     onConfigurarPagina = { mostrarConfigPagina = true },
-                    onVoltar = ::sair
+                    onVoltar = ::sair,
+                    estilosDisponiveis = estilos,
+                    estiloAtivoId = estiloCorrenteId,
+                    onSelecionarEstilo = viewModel::aplicarEstiloAoBloco,
+                    onCriarNovoEstilo = { estiloParaEditar = EstiloEditorial.novoPersonalizado() },
+                    onEditarEstilo = { id -> estiloParaEditar = viewModel.obterEstilo(id) }
                 )
                 // Barra de inserção de blocos logo abaixo do título (preferência do usuário: no topo)
                 if (editavel) {
@@ -489,7 +543,24 @@ fun EditorDocumentoScreen(
     }
     if (mostrarConexoes) GrafoConexoesDialog(referencias = referencias, onFechar = { mostrarConexoes = false })
 
-
+    if (estiloParaEditar != null) {
+        DialogEditarEstilo(
+            estiloOriginal = estiloParaEditar!!,
+            fontesDisponiveis = CatalogoFontes.listarTodas(context),
+            onSalvar = { novoEstilo ->
+                viewModel.salvarEstilo(novoEstilo)
+                estiloParaEditar = null
+            },
+            onDismiss = { estiloParaEditar = null },
+            onExcluir = { id ->
+                viewModel.excluirEstilo(id)
+                estiloParaEditar = null
+            },
+            onImportarFonteClick = {
+                seletorFonteLauncher.launch(arrayOf("font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-opentype", "*/*"))
+            }
+        )
+    }
 }
 
 private suspend fun rolarParaSelecionado(listState: LazyListState, vm: EditorViewModel) {
@@ -563,6 +634,7 @@ private fun CampoFolha(
     editavel: Boolean,
     modifier: Modifier = Modifier,
     onFocused: () -> Unit = {},
+    onFocusChanged: ((Boolean) -> Unit)? = null,
     onCursorChange: ((Int) -> Unit)? = null
 ) {
     var campo by remember { mutableStateOf(TextFieldValue(value)) }
@@ -579,7 +651,13 @@ private fun CampoFolha(
         cursorBrush = SolidColor(AthenesPrimary),
         modifier = modifier
             .fillMaxWidth()
-            .onFocusChanged { if (it.isFocused) { onFocused(); onCursorChange?.invoke(campo.selection.start) } },
+            .onFocusChanged {
+                if (it.isFocused) {
+                    onFocused()
+                    onCursorChange?.invoke(campo.selection.start)
+                }
+                onFocusChanged?.invoke(it.isFocused)
+            },
         decorationBox = { interno ->
             // propagateMinConstraints: o campo interno ocupa a largura toda, então textAlign (centro/justificado) funciona
             Box(Modifier.fillMaxWidth().padding(vertical = 4.dp), propagateMinConstraints = true) {
@@ -596,6 +674,192 @@ private fun CampoFolha(
 }
 
 // ===================================================================
+// Alça Lateral e Gutter de Reordenação de Blocos (Padrão Athenes Web)
+// ===================================================================
+
+/**
+ * Desenha a alça canônica de 6 pontos (2 colunas x 3 linhas) em Canvas puro,
+ * idêntica ao SVG de src/ui/athenes_icones.js:41.
+ */
+@Composable
+fun IconeAlca6Pontos(
+    modifier: Modifier = Modifier,
+    tint: Color = AthenesPrimary
+) {
+    Canvas(modifier = modifier) {
+        val raio = 1.5.dp.toPx()
+        val espacoX = size.width - (2 * raio)
+        val espacoY = (size.height - (2 * raio)) / 2f
+        for (col in 0..1) {
+            val cx = raio + (col * espacoX)
+            for (lin in 0..2) {
+                val cy = raio + (lin * espacoY)
+                drawCircle(
+                    color = tint,
+                    radius = raio,
+                    center = Offset(cx, cy)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Barra lateral acoplada à margem esquerda do bloco selecionado.
+ * Permite subir (delta = -1) e descer (delta = +1) com feedback tátil.
+ */
+@Composable
+fun BarraLateralMoverBloco(
+    podeSubir: Boolean,
+    podeDescer: Boolean,
+    onSubir: () -> Unit,
+    onDescer: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .width(28.dp)
+            .fillMaxHeight()
+            .heightIn(min = 64.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFFEEF4FA),
+        border = BorderStroke(1.dp, AthenesPrimary.copy(alpha = 0.4f)),
+        shadowElevation = 2.dp
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(vertical = 4.dp)
+        ) {
+            // Botão Mover para Cima
+            IconButton(
+                onClick = onSubir,
+                enabled = podeSubir,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowUp,
+                    contentDescription = "Mover bloco para cima",
+                    tint = if (podeSubir) AthenesPrimary else Color(0xFF94A3B8),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            // Alça central de 6 pontos
+            IconeAlca6Pontos(
+                tint = AthenesPrimary.copy(alpha = 0.75f),
+                modifier = Modifier
+                    .padding(vertical = 3.dp)
+                    .size(width = 12.dp, height = 16.dp)
+            )
+
+            // Botão Mover para Baixo
+            IconButton(
+                onClick = onDescer,
+                enabled = podeDescer,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = "Mover bloco para baixo",
+                    tint = if (podeDescer) AthenesPrimary else Color(0xFF94A3B8),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Botões flutuantes contextuais móveis ("Citar Zotero" e "Dividir bloco")
+ * com mini alça de arraste discreta, equivalentes à barra de cursor do Web Athenes.
+ */
+@Composable
+fun BotoesFlutuantesContextuais(
+    podeDividir: Boolean,
+    onDividir: () -> Unit,
+    onCitar: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
+    Surface(
+        modifier = modifier
+            .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+            .pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    offsetX += dragAmount.x
+                    offsetY += dragAmount.y
+                }
+            },
+        shape = RoundedCornerShape(999.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, AthenesPrimary.copy(alpha = 0.3f)),
+        shadowElevation = 6.dp
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+        ) {
+            // Mini alça de arraste discreta de 6 pontos
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .padding(start = 2.dp, end = 2.dp)
+                    .size(width = 14.dp, height = 24.dp)
+            ) {
+                IconeAlca6Pontos(
+                    tint = AthenesPrimary.copy(alpha = 0.6f),
+                    modifier = Modifier.size(width = 10.dp, height = 14.dp)
+                )
+            }
+
+            // 1. "Citar Zotero": ícone Icons.Rounded.FormatQuote, cor AthenesPrimary
+            Surface(
+                onClick = onCitar,
+                shape = CircleShape,
+                color = Color(0xFFEEF4FA),
+                border = BorderStroke(1.dp, AthenesPrimary.copy(alpha = 0.35f)),
+                modifier = Modifier.size(30.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.FormatQuote,
+                        contentDescription = "Citar Zotero",
+                        tint = AthenesPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            // 2. "Dividir bloco": ícone Icons.Rounded.ContentCut, cor AthenesPrimary
+            Surface(
+                onClick = onDividir,
+                enabled = podeDividir,
+                shape = CircleShape,
+                color = if (podeDividir) Color(0xFFEEF4FA) else Color(0xFFF1F5F9),
+                border = BorderStroke(1.dp, if (podeDividir) AthenesPrimary.copy(alpha = 0.35f) else Color(0xFFCBD5E1)),
+                modifier = Modifier.size(30.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.ContentCut,
+                        contentDescription = "Dividir bloco",
+                        tint = if (podeDividir) AthenesPrimary else Color(0xFF94A3B8),
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ===================================================================
 // Blocos da folha
 // ===================================================================
 @Composable
@@ -604,7 +868,11 @@ private fun ItemBlocoFolha(
     selecionado: Boolean,
     editavel: Boolean,
     compacto: Boolean,
+    larguraGutter: Dp,
+    podeSubir: Boolean,
+    podeDescer: Boolean,
     numeroFormula: Int,
+    numeroIlustracao: Int = 1,
     estrutura: List<SecaoEstrutura>,
     titulosIlustracoes: List<String>,
     referencias: List<ReferenciaAcademica>,
@@ -616,6 +884,12 @@ private fun ItemBlocoFolha(
     val borda = RoundedCornerShape(6.dp)
     val selecionar = { vm.selecionarBloco(bloco.id) }
     var posicaoCursor by remember(bloco.id) { mutableIntStateOf(0) }
+    var textoFocado by remember(bloco.id) { mutableStateOf(false) }
+    LaunchedEffect(selecionado) {
+        if (!selecionado) {
+            textoFocado = false
+        }
+    }
     val alinhamento = when (bloco.alinhamento) {
         AlinhamentoTexto.ESQUERDA -> TextAlign.Left
         AlinhamentoTexto.CENTRO -> TextAlign.Center
@@ -624,15 +898,42 @@ private fun ItemBlocoFolha(
         AlinhamentoTexto.JUSTIFICADO_CENTRO, AlinhamentoTexto.JUSTIFICADO_DIREITA -> TextAlign.Justify
     }
 
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(borda)
-            .background(if (selecionado) AthenesPrimary.copy(alpha = 0.04f) else Color.Transparent)
-            .border(1.dp, if (selecionado) AthenesPrimary.copy(alpha = 0.6f) else Color.Transparent, borda)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { selecionar() }
-            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.Top
     ) {
+        // Gutter na margem esquerda: alça e setas apenas quando o bloco está selecionado
+        Box(
+            modifier = Modifier
+                .width(larguraGutter)
+                .fillMaxHeight()
+                .padding(end = 6.dp),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            if (selecionado && editavel) {
+                BarraLateralMoverBloco(
+                    podeSubir = podeSubir,
+                    podeDescer = podeDescer,
+                    onSubir = { vm.moverBloco(bloco.id, -1) },
+                    onDescer = { vm.moverBloco(bloco.id, 1) },
+                    modifier = Modifier.fillMaxHeight()
+                )
+            }
+        }
+
+        // Conteúdo do bloco editorial com overlay flutuante
+        Box(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(borda)
+                    .background(if (selecionado) AthenesPrimary.copy(alpha = 0.04f) else Color.Transparent)
+                    .border(1.dp, if (selecionado) AthenesPrimary.copy(alpha = 0.6f) else Color.Transparent, borda)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { selecionar() }
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+            ) {
         when (bloco.tipo) {
             TipoBlocoEditor.TITULO -> Row(verticalAlignment = Alignment.CenterVertically) {
                 val numero = estrutura.find { it.id == bloco.id }?.numero
@@ -649,21 +950,30 @@ private fun ItemBlocoFolha(
                 CampoFolha(
                     value = bloco.texto, onValueChange = { vm.atualizarTextoBloco(bloco.id, it) },
                     editavel = editavel, placeholder = "Escreva aqui…", onFocused = selecionar,
+                    onFocusChanged = { if (it) textoFocado = true },
                     onCursorChange = { posicaoCursor = it; vm.posicionarCursorTexto(bloco.id, it) },
                     modifier = Modifier.padding(start = if (compacto) 14.dp else 24.dp),
                     style = TextStyle(fontSize = if (compacto) 14.sp else 12.5.sp, lineHeight = if (compacto) 22.sp else 19.sp, color = TextoCor, textAlign = alinhamento)
                 )
-                if (selecionado && editavel && posicaoCursor in 1 until bloco.texto.length) {
-                    TextButton(onClick = { vm.dividirBloco(bloco.id, posicaoCursor) }) { Text("Dividir bloco aqui") }
-                }
             }
 
             TipoBlocoEditor.LISTA -> Column {
                 val itens = bloco.texto.lines()
-                if (editavel) Row {
-                    FilterChip(selected = !bloco.listaNumerada, onClick = { vm.definirListaNumerada(bloco.id, false) }, label = { Text("Marcadores") })
-                    Spacer(Modifier.width(8.dp))
-                    FilterChip(selected = bloco.listaNumerada, onClick = { vm.definirListaNumerada(bloco.id, true) }, label = { Text("Numerada") })
+                if (editavel) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AthenesPillFiltro(
+                        rotulo = "Marcadores",
+                        ativo = !bloco.listaNumerada,
+                        onClick = { vm.definirListaNumerada(bloco.id, false) },
+                        altura = 28.dp,
+                        tamanhoFonte = 11.sp
+                    )
+                    AthenesPillFiltro(
+                        rotulo = "Numerada",
+                        ativo = bloco.listaNumerada,
+                        onClick = { vm.definirListaNumerada(bloco.id, true) },
+                        altura = 28.dp,
+                        tamanhoFonte = 11.sp
+                    )
                 }
                 itens.forEachIndexed { indice, item ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -697,7 +1007,15 @@ private fun ItemBlocoFolha(
 
             TipoBlocoEditor.REFERENCIAS -> Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Text("REFERÊNCIAS", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextoCor)
-                TextButton(onClick = onVerConexoes, modifier = Modifier.heightIn(min = 48.dp)) { Text("Ver conexões") }
+                TextButton(
+                    onClick = onVerConexoes,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    modifier = Modifier.height(30.dp)
+                ) {
+                    Icon(Icons.Rounded.Hub, contentDescription = null, tint = AthenesPrimary, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Ver conexões", fontSize = 12.sp, color = AthenesPrimary, fontWeight = FontWeight.Medium)
+                }
                 Bibliografia.ordenar(referencias, estiloBibliografico).forEachIndexed { indice, ref ->
                     Text(Bibliografia.formatar(ref, estiloBibliografico, indice + 1), fontSize = 12.sp,
                         color = TextoCor, modifier = Modifier.padding(top = 8.dp))
@@ -712,8 +1030,13 @@ private fun ItemBlocoFolha(
                 if (selecionado && editavel) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         (1..4).forEach { n ->
-                            FilterChip(selected = bloco.camposColunas == n, onClick = { vm.definirColunasCampos(bloco.id, n) },
-                                label = { Text("$n col.") })
+                            AthenesPillFiltro(
+                                rotulo = "$n col.",
+                                ativo = bloco.camposColunas == n,
+                                onClick = { vm.definirColunasCampos(bloco.id, n) },
+                                altura = 28.dp,
+                                tamanhoFonte = 11.sp
+                            )
                         }
                     }
                 }
@@ -776,17 +1099,15 @@ private fun ItemBlocoFolha(
                     CampoFolha(
                         value = bloco.texto, onValueChange = { vm.atualizarTextoBloco(bloco.id, it) },
                         editavel = editavel, placeholder = "Citação direta longa (mais de 3 linhas)…", onFocused = selecionar,
+                        onFocusChanged = { if (it) textoFocado = true },
                         onCursorChange = { posicaoCursor = it; vm.posicionarCursorTexto(bloco.id, it) },
                         style = TextStyle(fontSize = if (compacto) 12.5.sp else 11.sp, lineHeight = if (compacto) 18.sp else 15.sp, color = Color(0xFF334155), textAlign = TextAlign.Justify)
                     )
                 }
-                if (selecionado && editavel && posicaoCursor in 1 until bloco.texto.length) {
-                    TextButton(onClick = { vm.dividirBloco(bloco.id, posicaoCursor) }) { Text("Dividir bloco aqui") }
-                }
             }
 
             TipoBlocoEditor.FIGURA -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                CampoLegenda(bloco.legenda, "Legenda da figura", editavel, selecionar) { vm.atualizarLegendaBloco(bloco.id, it) }
+                CampoLegenda(bloco.legenda, "Figura $numeroIlustracao — legenda", editavel, selecionar) { vm.atualizarLegendaBloco(bloco.id, it) }
                 Spacer(Modifier.height(6.dp))
                 ImagemFigura(
                     nomeArquivo = bloco.imagem,
@@ -865,6 +1186,23 @@ private fun ItemBlocoFolha(
             TipoBlocoEditor.DIVISOR -> HorizontalDivider(color = Color(0xFFCBD5E1), thickness = 1.dp, modifier = Modifier.padding(vertical = 14.dp))
         }
     }
+
+    // Overlay flutuante contextual móvel ("Dividir bloco" e "Citar Zotero")
+    if (selecionado && editavel && textoFocado && (bloco.tipo == TipoBlocoEditor.PARAGRAFO || bloco.tipo == TipoBlocoEditor.CITACAO)) {
+        BotoesFlutuantesContextuais(
+            podeDividir = posicaoCursor in 1 until bloco.texto.length,
+            onDividir = { vm.dividirBloco(bloco.id, posicaoCursor) },
+            onCitar = {
+                vm.posicionarCursorTexto(bloco.id, posicaoCursor)
+                vm.abrirPainelCitacao()
+            },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 4.dp, end = 8.dp)
+        )
+    }
+}
+}
 }
 
 @Composable

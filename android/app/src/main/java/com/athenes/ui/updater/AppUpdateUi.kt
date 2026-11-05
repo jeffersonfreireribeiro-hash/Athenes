@@ -124,20 +124,23 @@ fun UpdateBanner(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                // Botão tonal suave pill 'Atualizar →' (sem conflito com o botão primário de novo documento)
                 Button(
                     onClick = onOpenDialog,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(999.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AthenesPrimary,
-                        contentColor = Color.White
+                        containerColor = Color(0xFFDBEAFE),
+                        contentColor = AthenesPrimary
                     ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.height(34.dp)
+                    border = BorderStroke(1.dp, Color(0xFF93C5FD)),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                    modifier = Modifier.height(32.dp)
                 ) {
                     Text(
-                        text = "Atualizar",
+                        text = "Atualizar →",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        color = AthenesPrimary
                     )
                 }
 

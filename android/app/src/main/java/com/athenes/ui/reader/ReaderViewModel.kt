@@ -13,7 +13,9 @@ data class TextoSelecionadoPopup(
     val texto: String,
     val pagina: Int,
     val xOffset: Float = 0f,
-    val yOffset: Float = 0f
+    val yOffset: Float = 0f,
+    val largura: Float = 0f,
+    val altura: Float = 0f
 )
 
 class ReaderViewModel(
@@ -157,8 +159,8 @@ class ReaderViewModel(
         _abaDireitaAtiva.value = aba
     }
 
-    fun selecionarTexto(texto: String, pagina: Int, x: Float = 0f, y: Float = 0f) {
-        _textoSelecionado.value = TextoSelecionadoPopup(texto, pagina, x, y)
+    fun selecionarTexto(texto: String, pagina: Int, x: Float = 0f, y: Float = 0f, largura: Float = 0f, altura: Float = 0f) {
+        _textoSelecionado.value = TextoSelecionadoPopup(texto, pagina, x, y, largura, altura)
     }
 
     fun fecharPopupSelecao() {
@@ -172,15 +174,25 @@ class ReaderViewModel(
     fun grifarTextoSelecionado() {
         val sel = _textoSelecionado.value ?: return
         val art = obterArtigoAtivo()
-        val novoTraco = TracoDesenho(
-            pagina = sel.pagina,
-            corHex = _corAtiva.value,
-            espessura = 14f,
-            pontos = listOf(PontoTraco(100f, 200f), PontoTraco(600f, 200f)),
-            ehLinhaReta = true,
-            ehMarcaTexto = true
-        )
-        repository.adicionarTraco(art.id, novoTraco)
+
+        val xIni = if (sel.largura > 40f) sel.xOffset + 4f else 48f
+        val xFim = if (sel.largura > 40f) (sel.xOffset + sel.largura - 4f) else 780f
+        val alturaEfetiva = if (sel.altura > 20f) sel.altura else 48f
+        val lineSpacing = 30f
+        val numLinhas = (alturaEfetiva / lineSpacing).toInt().coerceIn(1, 12)
+
+        for (i in 0 until numLinhas) {
+            val yLinha = (if (sel.yOffset > 0f) sel.yOffset else 200f) + 14f + (i * lineSpacing)
+            val tracoGrifo = TracoDesenho(
+                pagina = sel.pagina,
+                corHex = _corAtiva.value,
+                espessura = 18f,
+                pontos = listOf(PontoTraco(xIni, yLinha), PontoTraco(xFim, yLinha)),
+                ehLinhaReta = true,
+                ehMarcaTexto = true
+            )
+            repository.adicionarTraco(art.id, tracoGrifo)
+        }
         _textoSelecionado.value = null
     }
 

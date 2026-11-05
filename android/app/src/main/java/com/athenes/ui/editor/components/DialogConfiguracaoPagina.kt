@@ -45,19 +45,29 @@ fun DialogConfiguracaoPagina(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("Formato do papel")
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FormatoPagina.entries.forEach { opcao ->
-                        FilterChip(
-                            selected = formato == opcao,
+                        com.athenes.ui.components.AthenesPillFiltro(
+                            rotulo = opcao.rotulo,
+                            ativo = formato == opcao,
                             onClick = { formato = opcao },
-                            label = { Text(opcao.rotulo) },
-                            modifier = Modifier.heightIn(min = 48.dp)
+                            altura = 32.dp
                         )
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = !paisagem, onClick = { paisagem = false }, label = { Text("Retrato") }, modifier = Modifier.heightIn(min = 48.dp))
-                    FilterChip(selected = paisagem, onClick = { paisagem = true }, label = { Text("Paisagem") }, modifier = Modifier.heightIn(min = 48.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.athenes.ui.components.AthenesPillFiltro(
+                        rotulo = "Retrato",
+                        ativo = !paisagem,
+                        onClick = { paisagem = false },
+                        altura = 32.dp
+                    )
+                    com.athenes.ui.components.AthenesPillFiltro(
+                        rotulo = "Paisagem",
+                        ativo = paisagem,
+                        onClick = { paisagem = true },
+                        altura = 32.dp
+                    )
                 }
                 if (formato == FormatoPagina.PERSONALIZADO) {
                     NumeroPagina("Largura (mm)", largura) { largura = it }

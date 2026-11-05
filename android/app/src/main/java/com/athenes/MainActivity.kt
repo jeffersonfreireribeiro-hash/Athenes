@@ -47,7 +47,7 @@ enum class AppTela {
 }
 
 enum class DestinoPrincipal(val rotulo: String) {
-    DOCUMENTOS("Documentos"), BIBLIOTECA("Biblioteca"), ESTUDO("Estudo"), CONTA("Conta")
+    DOCUMENTOS("Documentos"), BIBLIOTECA("Biblioteca")
 }
 
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
@@ -149,16 +149,6 @@ class MainActivity : ComponentActivity() {
                                         },
                                         modifier = Modifier.padding(padding)
                                     )
-                                    DestinoPrincipal.ESTUDO -> EstudoArtigosScreen(
-                                        artigoIdInicial = artigoSelecionadoId,
-                                        updateInfo = appUpdateInfo,
-                                        onOpenUpdateDialog = { showUpdateDialog = true },
-                                        onCheckUpdateManual = { scope.launch { checkAppUpdate(forced = true) } },
-                                        onVoltarBiblioteca = { destino = DestinoPrincipal.BIBLIOTECA },
-                                        onCitarNoDocumento = ::solicitarDocumentoParaCitacao,
-                                        modifier = Modifier.padding(padding)
-                                    )
-                                    DestinoPrincipal.CONTA -> ContaScreen(Modifier.padding(padding))
                                 }
                             }
                         }
@@ -236,29 +226,5 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun ContaScreen(modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val credenciais = remember(context) { ZoteroCredentialsStore(context) }
-    var chaveGuardada by remember { mutableStateOf(credenciais.carregar() != null) }
-    Column(modifier = modifier.fillMaxSize().padding(24.dp)) {
-        Text("Conta", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
-        Spacer(Modifier.height(16.dp))
-        Text("Zotero", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-        Text(if (chaveGuardada) "Chave protegida neste aparelho." else "Nenhuma chave do Zotero guardada.")
-        Spacer(Modifier.height(8.dp))
-        Text("Abra Biblioteca → Sincronizar Zotero para configurar ou atualizar a chave.")
-        if (chaveGuardada) {
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = { credenciais.remover(); chaveGuardada = false }) { Text("Remover chave deste aparelho") }
-        }
-        Spacer(Modifier.height(24.dp))
-        Text("Google Drive e perfil", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-        Text("A conexão com a conta e o Drive ainda não está disponível no APK.")
     }
 }

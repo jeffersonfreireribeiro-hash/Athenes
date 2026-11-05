@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -213,38 +214,49 @@ fun ArtigoEstudoCard(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // 4. Botão de Ação: Abrir em Tela Cheia (PDF & Fichamento)
+            // 4. Botão de Ação: Abrir em Tela Cheia (PDF & Fichamento) — Estilo Tonal Secundário Soft UI (36dp)
             Button(
                 onClick = onAbrirTelaCheiaClick,
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AthenesPrimary,
-                    contentColor = Color.White
+                    containerColor = Color(0xFFEEF4FA),
+                    contentColor = AthenesPrimary
                 ),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                modifier = Modifier.fillMaxWidth()
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                modifier = Modifier.fillMaxWidth().height(36.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
             ) {
                 Icon(
                     imageVector = Icons.Rounded.PictureAsPdf,
                     contentDescription = null,
+                    tint = AthenesPrimary,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Abrir estúdio",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
+                    style = TextStyle(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = AthenesPrimary
                     )
                 )
             }
             if (onEditarLocal != null || onExcluirLocal != null) {
-                Row(Modifier.fillMaxWidth()) {
-                    if (onEditarLocal != null) TextButton(onClick = onEditarLocal, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                        Text("Editar artigo")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (onEditarLocal != null) TextButton(
+                        onClick = onEditarLocal,
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.weight(1f).height(32.dp)
+                    ) {
+                        Text("Editar", fontSize = 12.sp, color = AthenesTextDark)
                     }
-                    if (onExcluirLocal != null) TextButton(onClick = onExcluirLocal, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                        Text("Excluir artigo")
+                    if (onExcluirLocal != null) TextButton(
+                        onClick = onExcluirLocal,
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.weight(1f).height(32.dp)
+                    ) {
+                        Text("Excluir", fontSize = 12.sp, color = Color(0xFFDC2626))
                     }
                 }
             }

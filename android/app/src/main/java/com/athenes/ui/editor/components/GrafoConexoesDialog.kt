@@ -82,9 +82,21 @@ fun GrafoConexoesDialog(referencias: List<ReferenciaAcademica>, onFechar: () -> 
                 Text("Conexões bibliográficas", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text("${grafo.totalReferencias} obras · completude ${grafo.indiceCompletude}%", style = MaterialTheme.typography.bodySmall)
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterChip(selected = filtro == null, onClick = { filtro = null }, label = { Text("Todos") })
+                    com.athenes.ui.components.AthenesPillFiltro(
+                        rotulo = "Todos",
+                        ativo = filtro == null,
+                        onClick = { filtro = null },
+                        altura = 30.dp,
+                        tamanhoFonte = 12.sp
+                    )
                     TipoNoConexao.entries.forEach { tipo ->
-                        FilterChip(selected = filtro == tipo, onClick = { filtro = tipo }, label = { Text(tipo.name.lowercase().replaceFirstChar(Char::uppercase)) })
+                        com.athenes.ui.components.AthenesPillFiltro(
+                            rotulo = tipo.name.lowercase().replaceFirstChar(Char::uppercase),
+                            ativo = filtro == tipo,
+                            onClick = { filtro = tipo },
+                            altura = 30.dp,
+                            tamanhoFonte = 12.sp
+                        )
                     }
                 }
                 if (grafo.nos.isEmpty()) {

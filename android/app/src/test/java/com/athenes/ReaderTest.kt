@@ -223,4 +223,54 @@ class ReaderTest {
         assertEquals("Deve restar apenas 1 traço (o que está distante)", 1, tracosP4.size)
         assertEquals(500f, tracosP4.first().pontos.first().x, 0.1f)
     }
+
+    @Test
+    fun testApagarLinhaRetaNoMeioComBorracha() {
+        viewModel.navegarParaPagina(2)
+        val artId = viewModel.obterArtigoAtivo().id
+
+        // Linha reta horizontal de (50, 200) até (450, 200)
+        viewModel.adicionarTracoLivre(
+            listOf(PontoTraco(50f, 200f), PontoTraco(450f, 200f))
+        )
+
+        var tracosP2 = viewModel.obterArtigoAtivo().tracos.filter { it.pagina == 2 }
+        assertEquals(1, tracosP2.size)
+
+        // Passar a borracha no meio da linha reta em (250, 202) -> deve apagar
+        viewModel.apagarTracosProximos(250f, 202f, pagina = 2, raio = 24f)
+
+        tracosP2 = viewModel.obterArtigoAtivo().tracos.filter { it.pagina == 2 }
+        assertEquals("Linha reta deve ser apagada ao passar borracha no meio do segmento", 0, tracosP2.size)
+    }
+
+    @Test
+    fun testGrifarTextoEApagarComBorracha() {
+        viewModel.navegarParaPagina(1)
+        val artId = viewModel.obterArtigoAtivo().id
+
+        // 1. Seleciona texto de um parágrafo (x: 40, y: 300, w: 700, h: 60)
+        viewModel.selecionarTexto(
+            texto = "Parágrafo selecionado para grifo",
+            pagina = 1,
+            x = 40f,
+            y = 300f,
+            largura = 700f,
+            altura = 60f
+        )
+        assertNotNull(viewModel.textoSelecionado.value)
+
+        // 2. Aplica o grifo (pincel / marca-texto)
+        viewModel.grifarTextoSelecionado()
+        assertNull("Popup deve fechar após grifar", viewModel.textoSelecionado.value)
+
+        val tracosP1 = viewModel.obterArtigoAtivo().tracos.filter { it.pagina == 1 && it.ehMarcaTexto }
+        assertTrue("Devem ter sido criadas linhas de grifo sobre o texto", tracosP1.isNotEmpty())
+
+        // 3. Passar a borracha sobre o texto grifado em (200, 314) -> apaga a linha
+        val totalAntes = viewModel.obterArtigoAtivo().tracos.filter { it.pagina == 1 }.size
+        viewModel.apagarTracosProximos(200f, 314f, pagina = 1, raio = 25f)
+        val totalDepois = viewModel.obterArtigoAtivo().tracos.filter { it.pagina == 1 }.size
+        assertTrue("Borracha deve remover o traço de grifo de texto", totalDepois < totalAntes)
+    }
 }

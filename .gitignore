@@ -8,6 +8,14 @@ tests/amostra_artigo_athenes.html
 
 # Android build artifacts
 android/.gradle/
+android/.gradle_user/
+android/caches/
+android/daemon/
+android/kotlin-profile/
+android/native/
+android/notifications/
+android/.tmp/
+android/android/
 android/build/
 android/*/build/
 android/local.properties
@@ -16,4 +24,3 @@ android/.kotlin/
 android/*.iml
 android/*/*.iml
 *.salive
-

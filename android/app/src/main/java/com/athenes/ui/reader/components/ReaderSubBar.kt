@@ -22,10 +22,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.athenes.core.model.FerramentaLeitura
 import com.athenes.ui.theme.AthenesPrimary
+import com.athenes.ui.theme.AthenesTextDark
 
 /**
  * Barra de Opções e Ferramentas Flutuante em Pílula (.rm-barra-blocos).
@@ -45,7 +50,11 @@ fun ReaderSubBar(
     onSelecionarFerramenta: (FerramentaLeitura) -> Unit,
     onAlternarModoLinhaReta: () -> Unit,
     onSelecionarCor: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    paginaAtual: Int = 1,
+    totalPaginas: Int = 1,
+    onPaginaAnterior: () -> Unit = {},
+    onProximaPagina: () -> Unit = {}
 ) {
     Surface(
         color = Color.White,
@@ -58,11 +67,17 @@ fun ReaderSubBar(
     ) {
         Row(
             modifier = Modifier
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            // Grupo 1: Ações + Ferramentas + Cores com rolagem horizontal suave
+            Row(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
             // 1. Botão Voltar (chevron v deitado <)
             BotaoCircularBarra(
                 onClick = onVoltar,
@@ -150,18 +165,16 @@ fun ReaderSubBar(
                 )
             }
 
-            // 7. Marca-Texto Translúcido (🖊)
+            // 7. Marca-Texto Translúcido (pincel / marca-texto exato ao Web)
             val ehMarcador = ferramentaAtiva == FerramentaLeitura.MARCADOR
             BotaoCircularBarra(
                 onClick = { onSelecionarFerramenta(FerramentaLeitura.MARCADOR) },
                 contentDescription = "Marca-Texto Translúcido",
                 ativo = ehMarcador
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Highlight,
-                    contentDescription = null,
+                IconeMarcaTexto(
                     tint = if (ehMarcador) Color.White else Color(0xFF64748B),
-                    modifier = Modifier.size(17.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
@@ -178,18 +191,16 @@ fun ReaderSubBar(
                 )
             }
 
-            // 9. Borracha (▱)
+            // 9. Borracha (borracha chanfrada com linha exata ao Web)
             val ehBorracha = ferramentaAtiva == FerramentaLeitura.BORRACHA
             BotaoCircularBarra(
                 onClick = { onSelecionarFerramenta(FerramentaLeitura.BORRACHA) },
                 contentDescription = "Borracha",
                 ativo = ehBorracha
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.AutoFixNormal,
-                    contentDescription = null,
+                IconeBorracha(
                     tint = if (ehBorracha) Color.White else Color(0xFF64748B),
-                    modifier = Modifier.size(17.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
@@ -239,6 +250,46 @@ fun ReaderSubBar(
                         ativa = ehAtiva,
                         onClick = { onSelecionarCor(hex) }
                     )
+                }
+            }
+        }
+
+            if (totalPaginas > 1) {
+                Spacer(Modifier.width(8.dp))
+                // Grupo 2: Paginação fixa à direita (sempre visível e sem corte)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    IconButton(
+                        onClick = onPaginaAnterior,
+                        enabled = paginaAtual > 1,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.ChevronLeft,
+                            contentDescription = "Página anterior",
+                            tint = if (paginaAtual > 1) AthenesPrimary else Color(0xFF94A3B8)
+                        )
+                    }
+                    Text(
+                        text = "$paginaAtual / $totalPaginas",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = AthenesTextDark
+                        )
+                    )
+                    IconButton(
+                        onClick = onProximaPagina,
+                        enabled = paginaAtual < totalPaginas,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.ChevronRight,
+                            contentDescription = "Próxima página",
+                            tint = if (paginaAtual < totalPaginas) AthenesPrimary else Color(0xFF94A3B8)
+                        )
+                    }
                 }
             }
         }
@@ -406,6 +457,67 @@ private fun IconeLinhaRetaConectada(tint: Color, modifier: Modifier = Modifier) 
         )
         drawCircle(color = tint, radius = r, center = p1)
         drawCircle(color = tint, radius = r, center = p2)
+    }
+}
+
+/**
+ * Ícone SVG de Marca-Texto / Pincel Translúcido (exato ao web Athenes).
+ */
+@Composable
+private fun IconeMarcaTexto(tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val sx = size.width / 24f
+        val sy = size.height / 24f
+        val strokeW = 1.9.dp.toPx()
+
+        val ponta = Path().apply {
+            moveTo(9f * sx, 11f * sy)
+            lineTo(3f * sx, 17f * sy)
+            lineTo(3f * sx, 20f * sy)
+            lineTo(12f * sx, 20f * sy)
+            lineTo(15f * sx, 17f * sy)
+        }
+        drawPath(ponta, tint, style = Stroke(width = strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        val corpo = Path().apply {
+            moveTo(22f * sx, 12f * sy)
+            lineTo(17.4f * sx, 16.6f * sy)
+            quadraticTo(16f * sx, 18f * sy, 14.6f * sx, 16.6f * sy)
+            lineTo(9.4f * sx, 11.4f * sy)
+            quadraticTo(8f * sx, 10f * sy, 9.4f * sx, 8.6f * sy)
+            lineTo(14f * sx, 4f * sy)
+        }
+        drawPath(corpo, tint, style = Stroke(width = strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+/**
+ * Ícone SVG de Borracha chanfrada (exato ao web Athenes / Lucide eraser).
+ */
+@Composable
+private fun IconeBorracha(tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val sx = size.width / 24f
+        val sy = size.height / 24f
+        val strokeW = 1.9.dp.toPx()
+
+        val contorno = Path().apply {
+            moveTo(7f * sx, 21f * sy)
+            lineTo(2.7f * sx, 16.7f * sy)
+            quadraticTo(1.7f * sx, 15f * sy, 2.7f * sx, 13.3f * sy)
+            lineTo(12.3f * sx, 3.7f * sy)
+            quadraticTo(14f * sx, 2.3f * sy, 15.7f * sx, 3.7f * sy)
+            lineTo(21.3f * sx, 9.3f * sy)
+            quadraticTo(22.3f * sx, 11f * sy, 21.3f * sx, 12.7f * sy)
+            lineTo(13f * sx, 21f * sy)
+        }
+        drawPath(contorno, tint, style = Stroke(width = strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        // Linha base de apoio da borracha
+        drawLine(tint, Offset(7f * sx, 21f * sy), Offset(22f * sx, 21f * sy), strokeWidth = strokeW, cap = StrokeCap.Round)
+
+        // Linha diagonal divisória da borracha
+        drawLine(tint, Offset(5f * sx, 11f * sy), Offset(14f * sx, 20f * sy), strokeWidth = strokeW, cap = StrokeCap.Round)
     }
 }
 

@@ -5,6 +5,7 @@ import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -18,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,9 +27,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -199,14 +203,34 @@ fun BibliotecaScreen(
                     )
                 )
 
-                // Botões de Ação Específicos para a Aba de Artigos / Zotero (Idênticos ao Web)
+                // Botões de Ação Específicos para a Aba de Artigos / Zotero (Compactos e Alinhados à Direita)
                 if (modoAtivo == 1) {
                     Spacer(Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.End
                     ) {
+                        // Botão Importar referências BIB (38dp, só ícone, Soft UI)
+                        Surface(
+                            onClick = { escolherBib.launch("*/*") },
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.PostAdd,
+                                    contentDescription = "Importar referências BIB",
+                                    tint = AthenesPrimary,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
                         OutlinedButton(
                             onClick = {
                                 credenciaisZotero.carregar()?.let { (chave, usuario) ->
@@ -215,29 +239,60 @@ fun BibliotecaScreen(
                                 }
                                 mostrarConexaoZotero = true
                             },
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.heightIn(min = 48.dp).weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                            modifier = Modifier.height(38.dp),
+                            border = BorderStroke(1.dp, AthenesPrimary),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = AthenesPrimary)
                         ) {
-                            Icon(Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = if (sincronizandoZotero) "Sincronizando…" else "Sincronizar Zotero", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Icon(
+                                imageVector = Icons.Rounded.Sync,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (sincronizandoZotero) "Sincronizando…" else "Sincronizar Zotero",
+                                style = TextStyle(
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AthenesPrimary
+                                )
+                            )
                         }
 
+                        Spacer(modifier = Modifier.width(8.dp))
+
                         Button(
-                            onClick = { pdfNovoArtigoUri = null; pdfNovoArtigoNome = null; artigoLocalParaEditarId = null; novoArtigoAberto = true },
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.heightIn(min = 48.dp).weight(1f),
+                            onClick = {
+                                pdfNovoArtigoUri = null
+                                pdfNovoArtigoNome = null
+                                artigoLocalParaEditarId = null
+                                novoArtigoAberto = true
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                            modifier = Modifier.height(38.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = AthenesPrimary,
                                 contentColor = Color.White
-                            )
+                            ),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
                         ) {
-                            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(text = "Novo artigo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Icon(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Novo artigo",
+                                style = TextStyle(
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            )
                         }
                     }
                 }
@@ -268,44 +323,148 @@ fun BibliotecaScreen(
                     onNovoDocumentoClick = viewModel::abrirDialogNovo
                 )
 
-                TextButton(onClick = { escolherDocumentoJson.launch("application/json") }) {
-                    Icon(Icons.Rounded.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Importar documento JSON")
-                }
+                Spacer(modifier = Modifier.height(10.dp))
 
-                Spacer(modifier = Modifier.height(12.dp))
-
+                // LINHA DE PASTAS E AÇÕES RÁPIDAS UNIFICADA
                 Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val pastaAtiva = arvorePastas.find { it.pasta.id == pastaAtivaId }
-                    OutlinedButton(onClick = { mostrarPastas = true }) {
-                        Icon(Icons.Rounded.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(pastaAtiva?.caminho ?: "Todos (${documentos.size})")
+                    val rotuloPasta = if (mostrandoLixeira) "Lixeira" else pastaAtiva?.caminho ?: "Todos"
+                    val totalDocsPasta = if (mostrandoLixeira) lixeira.size else if (pastaAtivaId == null) documentos.size else (contagensPastas[pastaAtivaId] ?: 0)
+
+                    // À esquerda: Seletor de pasta ativa ("Todos (3)") e ações contextuais
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        AthenesPillFiltro(
+                            rotulo = rotuloPasta,
+                            ativo = !mostrandoLixeira,
+                            onClick = {
+                                if (mostrandoLixeira) mostrandoLixeira = false
+                                mostrarPastas = true
+                            },
+                            icone = Icons.Rounded.Folder,
+                            contador = totalDocsPasta
+                        )
+
+                        if (pastaAtivaId != null && !mostrandoLixeira) {
+                            AthenesPillFiltro(
+                                rotulo = "Renomear",
+                                ativo = false,
+                                onClick = {
+                                    nomePastaEditada = pastas.find { it.id == pastaAtivaId }?.nome.orEmpty()
+                                    renomearPastaAberto = true
+                                },
+                                icone = Icons.Rounded.Edit
+                            )
+                            AthenesPillFiltro(
+                                rotulo = "Excluir pasta",
+                                ativo = false,
+                                onClick = { excluirPastaAberto = true },
+                                icone = Icons.Rounded.DeleteOutline
+                            )
+                        }
                     }
-                    FilterChip(selected = mostrandoLixeira, onClick = { mostrandoLixeira = true }, label = { Text("Lixeira (${lixeira.size})") })
-                    if (!mostrandoLixeira) OutlinedButton(onClick = { nomeNovaPasta = ""; criarPastaAberto = true }) { Text("Nova pasta") }
-                    if (pastaAtivaId != null && !mostrandoLixeira) {
-                        TextButton(onClick = {
-                            nomePastaEditada = pastas.find { it.id == pastaAtivaId }?.nome.orEmpty()
-                            renomearPastaAberto = true
-                        }) { Text("Renomear") }
-                        TextButton(onClick = { excluirPastaAberto = true }) { Text("Excluir pasta") }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // À direita: Cluster de 3 botões de ícone (32dp cada, Soft UI, espaçados por 6dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // 1. [Importar JSON]: botão compacto só de ícone
+                        Surface(
+                            onClick = { escolherDocumentoJson.launch("application/json") },
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.FileUpload,
+                                    contentDescription = "Importar documento JSON",
+                                    tint = AthenesPrimary,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                        }
+
+                        // 2. [Nova pasta]: botão compacto só de ícone "+"
+                        Surface(
+                            onClick = { nomeNovaPasta = ""; criarPastaAberto = true },
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.White,
+                            border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Add,
+                                    contentDescription = "Nova pasta",
+                                    tint = AthenesPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        // 3. [Lixeira]: botão compacto só de ícone com badge se > 0
+                        Surface(
+                            onClick = { mostrandoLixeira = !mostrandoLixeira },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (mostrandoLixeira) Color(0xFFEEF4FA) else Color.White,
+                            border = BorderStroke(1.dp, if (mostrandoLixeira) AthenesPrimary else Color(0xFFCBD5E1)),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (mostrandoLixeira) Icons.Rounded.Delete else Icons.Rounded.DeleteOutline,
+                                    contentDescription = "Lixeira",
+                                    tint = if (mostrandoLixeira) AthenesPrimary else Color(0xFF64748B),
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                if (lixeira.isNotEmpty()) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(999.dp),
+                                        color = if (mostrandoLixeira) AthenesPrimary.copy(alpha = 0.15f) else Color(0xFFF1F5F9)
+                                    ) {
+                                        Text(
+                                            text = lixeira.size.toString(),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (mostrandoLixeira) AthenesPrimary else Color(0xFF64748B),
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // CHIPS DE ORDENAÇÃO DE DOCUMENTOS (Pills Soft UI Athenes)
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     OrdemDocumentos.entries.forEach { ordem ->
-                        FilterChip(
-                            selected = ordemDocumentos == ordem,
-                            onClick = { viewModel.setOrdemDocumentos(ordem) },
-                            label = { Text(ordem.rotulo) }
+                        AthenesPillFiltro(
+                            rotulo = ordem.rotulo,
+                            ativo = ordemDocumentos == ordem,
+                            onClick = { viewModel.setOrdemDocumentos(ordem) }
                         )
                     }
                 }
@@ -415,42 +574,56 @@ fun BibliotecaScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    OutlinedTextField(
-                        value = textoBuscaArtigos,
-                        onValueChange = viewModel::setTextoBuscaArtigos,
-                        placeholder = {
-                            Text(
-                                text = "Pesquisar por título, autor, chave Zotero ou DOI...",
-                                fontSize = 12.sp,
-                                color = AthenesTextMuted
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .background(Color.White, RoundedCornerShape(10.dp))
+                            .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(10.dp))
+                            .padding(start = 12.dp, end = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Search,
+                            contentDescription = null,
+                            tint = AthenesTextMuted,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Box(Modifier.weight(1f)) {
+                            if (textoBuscaArtigos.isEmpty()) {
+                                Text(
+                                    text = "Pesquisar por título, autor, chave Zotero ou DOI...",
+                                    fontSize = 12.5.sp,
+                                    color = AthenesTextMuted
+                                )
+                            }
+                            androidx.compose.foundation.text.BasicTextField(
+                                value = textoBuscaArtigos,
+                                onValueChange = viewModel::setTextoBuscaArtigos,
+                                singleLine = true,
+                                textStyle = TextStyle(
+                                    fontSize = 12.5.sp,
+                                    color = AthenesTextDark,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(AthenesPrimary),
+                                modifier = Modifier.fillMaxWidth()
                             )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Rounded.Search,
-                                contentDescription = null,
-                                tint = AthenesTextMuted,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(8.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            focusedBorderColor = AthenesPrimary,
-                            unfocusedBorderColor = Color(0xFFE2E8F0)
-                        ),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
-                        modifier = Modifier.weight(1f)
-                    )
+                        }
+                        if (textoBuscaArtigos.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.setTextoBuscaArtigos("") }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Rounded.Clear, contentDescription = "Limpar busca", tint = AthenesTextMuted, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
 
-                    // Badge de Status Conexão Zotero
+                    // Badge de Status Conexão Zotero (Compactado em 38dp, alinhado à busca)
                     Surface(
                         color = Color(0xFFECFDF5),
-                        shape = RoundedCornerShape(8.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFA7F3D0)),
-                        modifier = Modifier.height(48.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color(0xFFA7F3D0)),
+                        modifier = Modifier.height(38.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -474,44 +647,81 @@ fun BibliotecaScreen(
                     }
                 }
 
-                TextButton(onClick = { escolherBib.launch("*/*") }) {
-                    Icon(Icons.Rounded.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Importar referências BIB")
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 if (estadoZotero.isNotBlank()) {
                     Text(estadoZotero, style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
+                // LINHA 1: Tipos de Obra Acadêmica (Pills Soft UI Athenes)
                 Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    listOf(
-                        null to "Todos", "journalArticle" to "Artigos", "book" to "Livros",
-                        "thesis" to "Teses", "conferencePaper" to "Conferências", "fichados" to "Fichados"
-                    ).forEach { (tipo, nome) ->
-                        FilterChip(selected = tipoZoteroFiltro == tipo, onClick = { viewModel.filtrarTipoZotero(tipo) }, label = { Text(nome) })
+                    val filtrosTipo = listOf(
+                        null to "Todos",
+                        "journalArticle" to "Artigos",
+                        "book" to "Livros",
+                        "thesis" to "Teses",
+                        "conferencePaper" to "Conferências",
+                        "fichados" to "Fichados"
+                    )
+                    filtrosTipo.forEach { (tipo, nome) ->
+                        AthenesPillFiltro(
+                            rotulo = nome,
+                            ativo = tipoZoteroFiltro == tipo,
+                            onClick = { viewModel.filtrarTipoZotero(tipo) }
+                        )
                     }
                 }
-                if (colecoesZotero.isNotEmpty()) {
-                    val colecaoAtiva = colecoesEmArvore.find { it.colecao.chave == colecaoZoteroFiltro }
-                    OutlinedButton(onClick = { mostrarColecoes = true }) {
-                        Icon(Icons.Rounded.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(colecaoAtiva?.caminho ?: "Todas as coleções")
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // LINHA 2: Filtros de Ano, Ordenação e Coleções
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AthenesPillFiltro(
+                        rotulo = "Todos os anos",
+                        ativo = anoMinimo == null,
+                        onClick = { viewModel.filtrarAnoMinimo(null) }
+                    )
+                    AthenesPillFiltro(
+                        rotulo = "Desde 2020",
+                        ativo = anoMinimo == 2020,
+                        onClick = { viewModel.filtrarAnoMinimo(2020) }
+                    )
+                    AthenesPillFiltro(
+                        rotulo = "Recentes",
+                        ativo = ordemZotero == "recentes",
+                        onClick = { viewModel.ordenarZotero("recentes") }
+                    )
+                    AthenesPillFiltro(
+                        rotulo = "Título",
+                        ativo = ordemZotero == "titulo",
+                        onClick = { viewModel.ordenarZotero("titulo") }
+                    )
+
+                    if (colecoesZotero.isNotEmpty()) {
+                        val colecaoAtiva = colecoesEmArvore.find { it.colecao.chave == colecaoZoteroFiltro }
+                        AthenesPillFiltro(
+                            rotulo = colecaoAtiva?.caminho ?: "Todas as coleções",
+                            ativo = colecaoZoteroFiltro != null,
+                            icone = Icons.Rounded.Folder,
+                            onClick = { mostrarColecoes = true }
+                        )
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = anoMinimo == null, onClick = { viewModel.filtrarAnoMinimo(null) }, label = { Text("Todos os anos") })
-                    FilterChip(selected = anoMinimo == 2020, onClick = { viewModel.filtrarAnoMinimo(2020) }, label = { Text("Desde 2020") })
-                    FilterChip(selected = ordemZotero == "recentes", onClick = { viewModel.ordenarZotero("recentes") }, label = { Text("Recentes") })
-                    FilterChip(selected = ordemZotero == "titulo", onClick = { viewModel.ordenarZotero("titulo") }, label = { Text("Título") })
-                }
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val colunas = if (maxWidth >= 900.dp) GridCells.Fixed(3) else if (maxWidth >= 600.dp) GridCells.Fixed(2) else GridCells.Fixed(1)
@@ -799,27 +1009,154 @@ fun PainelDetalheDocumento(
     Surface(
         modifier = modifier.width(300.dp).fillMaxHeight(),
         color = Color.White,
-        shape = RoundedCornerShape(8.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
     ) {
-        if (documento == null) Box(Modifier.padding(20.dp), contentAlignment = Alignment.Center) {
-            Text("Selecione um documento para ver os detalhes.", color = AthenesTextMuted)
-        } else Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(documento.titulo, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-            if (documento.subtitulo.isNotBlank()) Text(documento.subtitulo, style = MaterialTheme.typography.bodyMedium)
-            HorizontalDivider()
-            Text("Tipo: ${documento.tipo.rotuloAmigavel}")
-            Text("Situação: ${documento.situacao.name.lowercase().replaceFirstChar { it.uppercase() }}")
-            Text("Autor: ${documento.autor}")
-            Text("Alterado em: ${documento.modificadoEm}")
-            if (documento.resumo.isNotBlank()) {
-                HorizontalDivider()
-                Text("Resumo", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
-                Text(documento.resumo, style = MaterialTheme.typography.bodyMedium)
+        if (documento == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFF8FAFC),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.size(54.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.Description,
+                                contentDescription = null,
+                                tint = AthenesTextMuted,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "Nenhum documento selecionado",
+                        style = TextStyle(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF475569)
+                        ),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Selecione um documento da lista para ver os detalhes, resumo e ações.",
+                        style = TextStyle(
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = AthenesTextMuted,
+                            lineHeight = 16.sp
+                        ),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
             }
-            Button(onClick = onAbrir, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Abrir documento") }
-            OutlinedButton(onClick = onMover, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Mover para…") }
-            TextButton(onClick = onRenomear, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Renomear") }
+        } else {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = documento.titulo,
+                    style = TextStyle(
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AthenesTextDark
+                    ),
+                    modifier = Modifier.semantics { heading() }
+                )
+                if (documento.subtitulo.isNotBlank()) {
+                    Text(
+                        text = documento.subtitulo,
+                        style = TextStyle(
+                            fontSize = 13.sp,
+                            color = AthenesTextMuted
+                        )
+                    )
+                }
+                HorizontalDivider(color = Color(0xFFE2E8F0))
+                Text(
+                    text = "Tipo: ${documento.tipo.rotuloAmigavel}",
+                    fontSize = 12.sp,
+                    color = Color(0xFF334155)
+                )
+                Text(
+                    text = "Situação: ${documento.situacao.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                    fontSize = 12.sp,
+                    color = Color(0xFF334155)
+                )
+                Text(
+                    text = "Autor: ${documento.autor}",
+                    fontSize = 12.sp,
+                    color = Color(0xFF334155)
+                )
+                Text(
+                    text = "Alterado em: ${documento.modificadoEm}",
+                    fontSize = 12.sp,
+                    color = Color(0xFF334155)
+                )
+                if (documento.resumo.isNotBlank()) {
+                    HorizontalDivider(color = Color(0xFFE2E8F0))
+                    Text(
+                        text = "Resumo",
+                        style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = AthenesTextDark),
+                        modifier = Modifier.semantics { heading() }
+                    )
+                    Text(
+                        text = documento.resumo,
+                        style = TextStyle(fontSize = 12.sp, color = AthenesTextMuted, lineHeight = 16.sp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Button(
+                    onClick = onAbrir,
+                    modifier = Modifier.fillMaxWidth().height(38.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AthenesPrimary, contentColor = Color.White),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.Article, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Abrir documento", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+                OutlinedButton(
+                    onClick = onMover,
+                    modifier = Modifier.fillMaxWidth().height(38.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AthenesPrimary),
+                    border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.DriveFileMove, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Mover para…", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
+                OutlinedButton(
+                    onClick = onRenomear,
+                    modifier = Modifier.fillMaxWidth().height(38.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AthenesTextDark),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Renomear", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
+            }
         }
     }
 }
@@ -880,8 +1217,16 @@ fun DialogNovoArtigoLocal(
                 OutlinedTextField(ano, { ano = it.filter(Char::isDigit).take(4) }, label = { Text("Ano") }, singleLine = true, modifier = Modifier.fillMaxWidth(), isError = anoValor == null || anoValor !in 1500..2100)
                 OutlinedTextField(publicacao, { publicacao = it }, label = { Text("Publicação") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(resumo, { resumo = it }, label = { Text("Resumo") }, minLines = 2, modifier = Modifier.fillMaxWidth())
-                OutlinedButton(onClick = onSelecionarPdf, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Text(pdfNome ?: "Selecionar PDF")
+                OutlinedButton(
+                    onClick = onSelecionarPdf,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(38.dp),
+                    border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Icon(Icons.Rounded.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp), tint = AthenesPrimary)
+                    Spacer(Modifier.width(6.dp))
+                    Text(pdfNome ?: "Selecionar PDF", fontSize = 13.sp, color = AthenesTextDark)
                 }
             }
             }
@@ -897,3 +1242,5 @@ fun DialogNovoArtigoLocal(
         } }
     )
 }
+
+

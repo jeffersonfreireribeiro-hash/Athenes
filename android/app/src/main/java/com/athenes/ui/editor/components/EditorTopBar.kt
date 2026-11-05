@@ -1,5 +1,6 @@
 package com.athenes.ui.editor.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,11 +18,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athenes.core.model.TipoDocumento
+import com.athenes.ui.editor.estilos.EstiloEditorial
 import com.athenes.ui.theme.*
 
 /**
  * Barra superior do editor: uma única linha de 52 dp (alvos de toque de 44 dp).
- * Voltar | título + estado de gravação | estrutura | inspetor | menu (modo, tipo, salvar).
+ * Voltar | título + estado de gravação | seletor de estilo | estrutura | inspetor | menu (modo, tipo, salvar).
  * Some ao rolar para baixo (modo foco) — ver EditorDocumentoScreen.
  */
 @Composable
@@ -42,6 +44,11 @@ fun EditorTopBar(
     onExportarJson: () -> Unit,
     onConfigurarPagina: () -> Unit,
     onVoltar: () -> Unit,
+    estilosDisponiveis: List<EstiloEditorial> = emptyList(),
+    estiloAtivoId: String = "corpo",
+    onSelecionarEstilo: (String) -> Unit = {},
+    onCriarNovoEstilo: () -> Unit = {},
+    onEditarEstilo: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var menuAberto by remember { mutableStateOf(false) }
@@ -89,6 +96,17 @@ fun EditorTopBar(
                 }
             }
 
+            if (estilosDisponiveis.isNotEmpty()) {
+                SeletorEstiloTopo(
+                    estilos = estilosDisponiveis,
+                    estiloAtivoId = estiloAtivoId,
+                    onSelecionarEstilo = onSelecionarEstilo,
+                    onCriarNovoEstilo = onCriarNovoEstilo,
+                    onEditarEstilo = onEditarEstilo,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+
             BotaoTopo(Icons.Rounded.Menu, "Estrutura e Mestras", painelEstruturaAberto, onAlternarEstrutura)
             BotaoTopo(Icons.AutoMirrored.Rounded.ViewSidebar, "Inspetor do Bloco", painelInspetorAberto, onAlternarInspetor)
 
@@ -129,14 +147,29 @@ fun EditorTopBar(
 }
 
 @Composable
-private fun BotaoTopo(icone: ImageVector, descricao: String, ativo: Boolean, onClick: () -> Unit) {
-    IconButton(
+private fun BotaoTopo(
+    icone: ImageVector,
+    descricao: String,
+    ativo: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
         onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = if (ativo) AthenesPrimarySoft else Color.Transparent,
+        border = if (ativo) BorderStroke(1.dp, AthenesPrimary.copy(alpha = 0.25f)) else null,
         modifier = Modifier
-            .size(44.dp)
-            .background(if (ativo) AthenesPrimary.copy(alpha = 0.12f) else Color.Transparent, RoundedCornerShape(10.dp))
+            .padding(horizontal = 2.dp)
+            .size(38.dp)
     ) {
-        Icon(icone, contentDescription = descricao, tint = if (ativo) AthenesPrimary else AthenesTextDark, modifier = Modifier.size(22.dp))
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icone,
+                contentDescription = descricao,
+                tint = if (ativo) AthenesPrimary else Color(0xFF475569),
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

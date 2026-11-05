@@ -137,9 +137,9 @@ class NavegacaoAcessibilidadeTest {
         compose.runOnIdle { assertEquals(DestinoPrincipal.BIBLIOTECA, destino) }
         compose.onNodeWithText("Biblioteca").assertIsSelected()
         compose.runOnIdle { compacta = false }
-        compose.onNodeWithText("Conta").performClick()
-        compose.runOnIdle { assertEquals(DestinoPrincipal.CONTA, destino) }
-        compose.onNodeWithText("Conta").assertIsSelected()
+        compose.onNodeWithText("Documentos").performClick()
+        compose.runOnIdle { assertEquals(DestinoPrincipal.DOCUMENTOS, destino) }
+        compose.onNodeWithText("Documentos").assertIsSelected()
     }
 
     @Test fun grafoComMaisDeCemObrasMantemListaCompleta() {

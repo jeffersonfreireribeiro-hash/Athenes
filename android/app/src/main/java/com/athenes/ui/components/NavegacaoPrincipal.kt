@@ -3,8 +3,6 @@ package com.athenes.ui.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Draw
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -15,7 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.athenes.DestinoPrincipal
 
-/** Os mesmos quatro destinos no celular e nas janelas médias/largas. */
+/** Os dois destinos canônicos no celular e nas janelas médias/largas (Documentos e Biblioteca). */
 @Composable
 fun NavegacaoPrincipal(destino: DestinoPrincipal, compacta: Boolean, onDestino: (DestinoPrincipal) -> Unit) {
     if (compacta) {
@@ -46,6 +44,4 @@ fun NavegacaoPrincipal(destino: DestinoPrincipal, compacta: Boolean, onDestino: 
 private fun iconeDestino(destino: DestinoPrincipal): ImageVector = when (destino) {
     DestinoPrincipal.DOCUMENTOS -> Icons.Rounded.Description
     DestinoPrincipal.BIBLIOTECA -> Icons.AutoMirrored.Rounded.MenuBook
-    DestinoPrincipal.ESTUDO -> Icons.Rounded.Draw
-    DestinoPrincipal.CONTA -> Icons.Rounded.Person
 }

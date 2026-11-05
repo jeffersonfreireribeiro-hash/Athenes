@@ -1,5 +1,6 @@
 package com.athenes.ui.reader.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -87,27 +89,25 @@ fun ReaderTopBar(
 
                 Spacer(modifier = Modifier.width(2.dp))
 
-                // Toggle Painel Esquerdo (Zotero & Páginas) com ícone SVG expressivo
-                IconButton(
+                // Toggle Painel Esquerdo (Zotero & Páginas) padronizado em 36x36dp Soft UI
+                Surface(
                     onClick = onAlternarEsquerdo,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(
-                            if (painelEsquerdoAberto) AthenesPrimary.copy(alpha = 0.12f) else Color(0xFFF1F5F9),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .border(
-                            1.dp,
-                            if (painelEsquerdoAberto) AthenesPrimary else Color(0xFFCBD5E1),
-                            shape = RoundedCornerShape(8.dp)
-                        )
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (painelEsquerdoAberto) Color(0xFFEEF4FA) else Color.White,
+                    border = BorderStroke(
+                        1.dp,
+                        if (painelEsquerdoAberto) AthenesPrimary else Color(0xFFCBD5E1)
+                    ),
+                    modifier = Modifier.size(36.dp)
                 ) {
-                    Icon(
-                        imageVector = if (painelEsquerdoAberto) Icons.AutoMirrored.Rounded.MenuOpen else Icons.Rounded.Menu,
-                        contentDescription = "Alternar Painel Esquerdo",
-                        tint = if (painelEsquerdoAberto) AthenesPrimary else AthenesTextDark,
-                        modifier = Modifier.size(19.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (painelEsquerdoAberto) Icons.AutoMirrored.Rounded.MenuOpen else Icons.Rounded.Menu,
+                            contentDescription = "Alternar Painel Esquerdo",
+                            tint = if (painelEsquerdoAberto) AthenesPrimary else AthenesTextDark,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
                 }
             }
 
@@ -173,17 +173,53 @@ fun ReaderTopBar(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // LADO DIREITO: Ícones SVG Expressivos e Compactos em vez de palavras longas
+            // LADO DIREITO: Ordem Lógica e Escala Harmônica (36dp)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // 1. Status Conexão Zotero (Ícone Acadêmico + Ponto Verde + Tag Compacta)
+                // 1. MODO LEITURA / PDF (36x36dp)
+                Surface(
+                    onClick = onAbrirPdfClick,
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.PictureAsPdf,
+                            contentDescription = "Abrir Arquivo PDF",
+                            tint = AthenesPrimary,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+                }
+
+                // 2. SINCRONIZAÇÃO NUVEM / DRIVE (36x36dp com acabamento suave e consistente)
+                Surface(
+                    onClick = onSalvarDriveZoteroClick,
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.CloudUpload,
+                            contentDescription = "Salvar no Drive & Sincronizar",
+                            tint = AthenesPrimary,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+                }
+
+                // 3. BADGE DE STATUS ZOTERO (Pill compacta e elegante de 30dp)
                 Surface(
                     color = Color(0xFFECFDF5),
-                    shape = RoundedCornerShape(20.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFA7F3D0)),
-                    modifier = Modifier.height(34.dp)
+                    shape = RoundedCornerShape(999.dp),
+                    border = BorderStroke(1.dp, Color(0xFFA7F3D0)),
+                    modifier = Modifier.height(30.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -191,20 +227,20 @@ fun ReaderTopBar(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(7.dp)
+                                .size(6.dp)
                                 .background(Color(0xFF10B981), CircleShape)
                         )
-                        Spacer(modifier = Modifier.width(5.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             imageVector = Icons.Rounded.School,
-                            contentDescription = "Zotero Conectado",
+                            contentDescription = null,
                             tint = Color(0xFF047857),
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Zotero",
-                            style = MaterialTheme.typography.bodySmall.copy(
+                            style = TextStyle(
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF047857)
@@ -213,58 +249,25 @@ fun ReaderTopBar(
                     }
                 }
 
-                // 2. Ícone Expressivo SVG: Abrir PDF (36x36dp)
-                IconButton(
-                    onClick = onAbrirPdfClick,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(Color.White, shape = RoundedCornerShape(8.dp))
-                        .border(1.dp, Color(0xFFCBD5E1), shape = RoundedCornerShape(8.dp))
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.PictureAsPdf,
-                        contentDescription = "Abrir Arquivo PDF",
-                        tint = AthenesPrimary,
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-
-                // 3. Ícone Expressivo SVG: Salvar no Google Drive e Sincronizar (36x36dp)
-                IconButton(
-                    onClick = onSalvarDriveZoteroClick,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(AthenesPrimary, shape = RoundedCornerShape(8.dp))
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.CloudUpload,
-                        contentDescription = "Salvar no Drive & Sincronizar",
-                        tint = Color.White,
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-
-                // 4. Ícone Expressivo SVG: Alternar Inspetor Direito (36x36dp)
-                IconButton(
+                // 4. INSPETOR LATERAL DIREITO (36x36dp com ícone ViewSidebar estável e estado ativo claro)
+                Surface(
                     onClick = onAlternarDireito,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(
-                            if (painelDireitoAberto) AthenesPrimary.copy(alpha = 0.12f) else Color(0xFFF1F5F9),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .border(
-                            1.dp,
-                            if (painelDireitoAberto) AthenesPrimary else Color(0xFFCBD5E1),
-                            shape = RoundedCornerShape(8.dp)
-                        )
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (painelDireitoAberto) Color(0xFFEEF4FA) else Color.White,
+                    border = BorderStroke(
+                        1.dp,
+                        if (painelDireitoAberto) AthenesPrimary else Color(0xFFCBD5E1)
+                    ),
+                    modifier = Modifier.size(36.dp)
                 ) {
-                    Icon(
-                        imageVector = if (painelDireitoAberto) Icons.AutoMirrored.Rounded.ViewSidebar else Icons.Rounded.Dock,
-                        contentDescription = "Alternar Painel Inspetor",
-                        tint = if (painelDireitoAberto) AthenesPrimary else AthenesTextDark,
-                        modifier = Modifier.size(19.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ViewSidebar,
+                            contentDescription = "Alternar Painel Inspetor Lateral",
+                            tint = if (painelDireitoAberto) AthenesPrimary else Color(0xFF475569),
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
                 }
             }
         }

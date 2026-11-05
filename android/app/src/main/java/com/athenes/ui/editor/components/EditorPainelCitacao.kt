@@ -90,7 +90,13 @@ fun EditorPainelCitacao(
             Text("Estilo de citação", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 10.dp))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 EstiloBibliografico.entries.forEach { opcao ->
-                    FilterChip(selected = estilo == opcao, onClick = { onEstiloAlterado(opcao) }, label = { Text(opcao.rotulo) })
+                    com.athenes.ui.components.AthenesPillFiltro(
+                        rotulo = opcao.rotulo,
+                        ativo = estilo == opcao,
+                        onClick = { onEstiloAlterado(opcao) },
+                        altura = 30.dp,
+                        tamanhoFonte = 11.5.sp
+                    )
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -147,8 +153,20 @@ fun EditorPainelCitacao(
                         singleLine = true
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = !narrativa, onClick = { narrativa = false }, label = { Text("Entre parênteses") })
-                        FilterChip(selected = narrativa, onClick = { narrativa = true }, label = { Text("Narrativa") })
+                        com.athenes.ui.components.AthenesPillFiltro(
+                            rotulo = "Entre parênteses",
+                            ativo = !narrativa,
+                            onClick = { narrativa = false },
+                            altura = 30.dp,
+                            tamanhoFonte = 11.5.sp
+                        )
+                        com.athenes.ui.components.AthenesPillFiltro(
+                            rotulo = "Narrativa",
+                            ativo = narrativa,
+                            onClick = { narrativa = true },
+                            altura = 30.dp,
+                            tamanhoFonte = 11.5.sp
+                        )
                     }
                 }
             },

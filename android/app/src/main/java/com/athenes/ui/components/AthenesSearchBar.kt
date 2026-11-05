@@ -36,6 +36,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,29 +81,13 @@ fun AthenesSearchBar(
             items(opcoes) { opt ->
                 val ativo = opt == tipoFiltro
                 val rotulo = opt?.rotuloAmigavel ?: "Todos os Documentos"
-                Box(
-                    modifier = Modifier
-                        .background(
-                            color = if (ativo) AthenesPrimarySoft else AthenesSurface,
-                            shape = RoundedCornerShape(999.dp)
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = if (ativo) AthenesPrimary else AthenesBorderSubtle,
-                            shape = RoundedCornerShape(999.dp)
-                        )
-                        .clickable { onTipoFiltroAlterado(opt) }
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = rotulo,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = if (ativo) FontWeight.Bold else FontWeight.Medium,
-                            color = if (ativo) AthenesPrimary else AthenesTextMuted,
-                            fontSize = 11.sp
-                        )
-                    )
-                }
+                AthenesPillFiltro(
+                    rotulo = rotulo,
+                    ativo = ativo,
+                    onClick = { onTipoFiltroAlterado(opt) },
+                    altura = 30.dp,
+                    tamanhoFonte = 12.sp
+                )
             }
         }
     }
@@ -110,35 +96,85 @@ fun AthenesSearchBar(
 @Composable
 private fun CampoBuscaDocumentos(texto: String, onAlterar: (String) -> Unit, modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.heightIn(min = 48.dp).background(AthenesSurface, RoundedCornerShape(8.dp))
-            .border(1.dp, AthenesBorder, RoundedCornerShape(8.dp)).padding(start = 10.dp),
+        modifier = modifier
+            .height(38.dp)
+            .background(AthenesSurface, RoundedCornerShape(10.dp))
+            .border(1.dp, AthenesBorder, RoundedCornerShape(10.dp))
+            .padding(start = 12.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Rounded.Search, contentDescription = null, tint = AthenesTextMuted, modifier = Modifier.size(18.dp))
+        Icon(
+            imageVector = Icons.Rounded.Search,
+            contentDescription = null,
+            tint = AthenesTextMuted,
+            modifier = Modifier.size(18.dp)
+        )
         Spacer(Modifier.width(8.dp))
         Box(Modifier.weight(1f)) {
-            if (texto.isEmpty()) Text("Buscar por título ou autor", color = AthenesTextMuted, fontSize = 12.5.sp)
+            if (texto.isEmpty()) {
+                Text(
+                    text = "Buscar por título ou autor",
+                    color = AthenesTextMuted,
+                    fontSize = 13.sp
+                )
+            }
             BasicTextField(
-                value = texto, onValueChange = onAlterar, singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = AthenesText, fontSize = 12.5.sp),
+                value = texto,
+                onValueChange = onAlterar,
+                singleLine = true,
+                textStyle = TextStyle(
+                    fontSize = 13.sp,
+                    color = AthenesText,
+                    fontWeight = FontWeight.Medium
+                ),
                 cursorBrush = SolidColor(AthenesPrimary),
-                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Buscar documentos" }
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentDescription = "Buscar documentos" }
             )
         }
-        if (texto.isNotEmpty()) IconButton(onClick = { onAlterar("") }, modifier = Modifier.size(48.dp)) {
-            Icon(Icons.Rounded.Clear, contentDescription = "Limpar busca", tint = AthenesTextMuted)
-        } else Spacer(Modifier.width(10.dp))
+        if (texto.isNotEmpty()) {
+            IconButton(
+                onClick = { onAlterar("") },
+                modifier = Modifier.size(34.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Clear,
+                    contentDescription = "Limpar busca",
+                    tint = AthenesTextMuted,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun BotaoNovoDocumento(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Button(
-        onClick = onClick, modifier = modifier.heightIn(min = 48.dp), shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = AthenesPrimary, contentColor = Color.White)
+        onClick = onClick,
+        modifier = modifier.height(38.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = AthenesPrimary,
+            contentColor = Color.White
+        ),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
     ) {
-        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Icon(
+            imageVector = Icons.Rounded.Add,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
         Spacer(Modifier.width(6.dp))
-        Text("Novo documento", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
+        Text(
+            text = "Novo documento",
+            style = TextStyle(
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        )
     }
 }
