@@ -536,9 +536,34 @@ export async function compartilharPdfNoDrive(fileId, { pessoas = [], publico = f
 /**
  * Garante que o artigo tenha um PDF real para exibir: primeiro em memória, depois no cache IndexedDB local e no Google Drive.
  */
+export async function obterPdfComoDataUrl(artId) {
+  try {
+    const local = await obterPdfLocal(artId);
+    if (!local) return null;
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(local);
+    });
+  } catch (_) {
+    return null;
+  }
+}
+
 export async function garantirPdfDoArtigo(art) {
   if (!art) return false;
   if (art.pdfBlobUrl) return true;
+  if (art.pdfDataUrl) {
+    try {
+      const r = await fetch(art.pdfDataUrl);
+      const blob = await r.blob();
+      art.pdfBlobUrl = URL.createObjectURL(blob);
+      art.temPdfLocal = true;
+      salvarPdfLocal(art.id, blob).catch(() => {});
+      return true;
+    } catch (_) {}
+  }
   try {
     const local = await obterPdfLocal(art.id);
     if (local) {

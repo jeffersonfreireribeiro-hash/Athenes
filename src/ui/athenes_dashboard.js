@@ -180,12 +180,8 @@ export class DashboardView {
     root.innerHTML = `
       <!-- Barra Superior de Marca + Seletor de Páginas (Escrita vs Artigos Zotero/PDF) + Identificação/Login -->
       <div class="ath-dash-topbar">
-        <div class="ath-dash-brand">
-          ${svgLogo(28)}
-          <div>
-            <span class="ath-dash-brand-nome">ATHENES</span>
-            <small class="ath-dash-brand-sub">Plataforma Acadêmica Colaborativa</small>
-          </div>
+        <div class="ath-dash-brand" title="Athenes — Plataforma Acadêmica Colaborativa">
+          ${svgLogo(30)}
         </div>
 
         <!-- Seletor das Duas Páginas Principais -->
@@ -212,7 +208,7 @@ export class DashboardView {
           ` : ''}
           <button type="button" class="ath-dash-user-pill" id="athBtnPerfilLoginDash" title="Clique para identificar quem está usando, trocar perfil ou conectar Google Drive e Zotero">
             ${this.perfilUsuario.autenticadoGoogle && this.perfilUsuario.foto 
-              ? `<img src="${this.perfilUsuario.foto}" class="ath-dash-user-avatar" style="object-fit:cover; border:1px solid #CBD5E1;" alt="Avatar">`
+              ? `<img src="${this.perfilUsuario.foto}" class="ath-dash-user-avatar" style="width:28px; height:28px; border-radius:50%; object-fit:cover; border:1px solid #CBD5E1; flex-shrink:0;" alt="Avatar">`
               : `<span class="ath-dash-user-avatar" style="background:${this.perfilUsuario.cor || '#314F79'};">${iniciais}</span>`}
             <span class="ath-dash-user-info">
               <strong>${this.perfilUsuario.nome || 'Autor Principal'}</strong>
@@ -662,6 +658,12 @@ export class DashboardView {
       }
 
       return matchTipo && matchBusca && matchPasta;
+    });
+
+    filtrados.sort((a, b) => {
+      const ta = new Date(a.dataModificacao || a.atualizado_em || a.dataCriacao || 0).getTime();
+      const tb = new Date(b.dataModificacao || b.atualizado_em || b.dataCriacao || 0).getTime();
+      return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
     });
 
     if (filtrados.length === 0) {

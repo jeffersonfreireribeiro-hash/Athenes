@@ -30,7 +30,7 @@ import { tokenPodeLerTodoODrive, listarConteudoDoDrive, copiarPdfDoDriveParaAthe
 import { mostrarAviso } from './athenes_aviso.js';
 import { ModalCompartilhar } from './athenes_compartilhar_modal.js';
 import { lerSessaoSupabase } from '../core/athenes_supabase_auth.js';
-import { removerPdfLocal, PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo, definirArtigoAbertoAtivo, lerSnapshotArtigosIdb, mesclarFichamentoPreservandoDados, compartilharPdfNoDrive } from './athenes_estudo_artigos_dados.js';
+import { removerPdfLocal, PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, obterPdfComoDataUrl, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo, definirArtigoAbertoAtivo, lerSnapshotArtigosIdb, mesclarFichamentoPreservandoDados, compartilharPdfNoDrive } from './athenes_estudo_artigos_dados.js';
 import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
 import { metodosEstudoAnotacoes } from './athenes_estudo_artigos_anotacoes.js';
@@ -53,10 +53,12 @@ export class EstudoArtigosView {
     this.zoomPct = 100;
     this.ferramentaAtiva = 'cursor'; // Começa com seleção de texto ou caneta; permite alternar livremente
     this.modoLinhaReta = false; // Quando true, Caneta e Marca-Texto fazem retas perfeitas
+    this.bloquearDedoParaRolar = true; // Modo Samsung Notes ativo por padrão: Caneta escreve, Dedo rola/move e dá zoom
     this.corTinta = '#314F79';
     this.corGrifoAtiva = '#FDE047'; // Amarelo clássico por padrão; suporta verde, azul, coral, roxo, laranja
     this.espessuraTinta = 3;
     this.espessuraMarca = 18; // espessura própria do marca-texto
+    this.carregarConfigPincelSalva();
     this.abaDireita = 'resumo'; // 'resumo' | 'citacoes' | 'zotero_drive'
     this.pinEditandoId = null; // ID da nota adesiva atualmente aberta para edição na folha
     this.filtroBusca = '';
@@ -327,7 +329,12 @@ export class EstudoArtigosView {
     if (!grid) return;
     grid.innerHTML = '';
 
-    const filtrados = this.artigos.filter(art => {
+    const obterTimestampArt = (a) => {
+      const dt = a.modificadoEm || a.fichamento?.modificadoEm || a.atualizado_em || a.dataAdicionado || a.data;
+      const t = dt ? new Date(dt).getTime() : 0;
+      return isNaN(t) ? 0 : t;
+    };
+    const filtrados = this.artigos.slice().sort((a, b) => obterTimestampArt(b) - obterTimestampArt(a)).filter(art => {
       if (this.pastaFiltroId && this.pastaFiltroId !== 'todas') {
         if (!artigoEstaNaPasta(art, this.pastaFiltroId)) return false;
       }
@@ -431,8 +438,12 @@ export class EstudoArtigosView {
     }
   }
 
-  abrirModalCompartilharArtigo(art) {
+  async abrirModalCompartilharArtigo(art) {
     if (!art) return;
+    if (!art.pdfDataUrl) {
+      const dUrl = await obterPdfComoDataUrl(art.id);
+      if (dUrl) art.pdfDataUrl = dUrl;
+    }
     const sessao = lerSessaoSupabase();
     const idSufixo = sessao?.user_id ? `_${sessao.user_id.slice(0, 8)}` : '';
     const idDoc = art.docCompartilhadoId || `artigo_${art.id || 'ref'}${idSufixo}`;
@@ -492,9 +503,19 @@ export class EstudoArtigosView {
       btnReta.classList.toggle('ativo', this.modoLinhaReta);
       btnReta.setAttribute('aria-pressed', this.modoLinhaReta ? 'true' : 'false');
     }
+    const btnDedo = root.querySelector('#athBtnDedoRola');
+    if (btnDedo) {
+      btnDedo.classList.toggle('ativo', Boolean(this.bloquearDedoParaRolar));
+      btnDedo.setAttribute('aria-pressed', this.bloquearDedoParaRolar ? 'true' : 'false');
+      btnDedo.title = this.bloquearDedoParaRolar
+        ? 'Modo Samsung Notes ATIVO: Caneta Stylus escreve · Dedo apenas rola e dá zoom (clique para desenhar com o dedo)'
+        : 'Desenhar com o Dedo: Dedo e caneta riscam (clique para ativar modo Samsung Notes)';
+    }
+    this.salvarConfigPincelAtual();
     root.querySelectorAll('.ath-pdf-ink-canvas').forEach(canvas => {
       canvas.style.pointerEvents = this.ferramentaAtiva === 'cursor' ? 'none' : 'auto';
       canvas.style.cursor = this.ferramentaAtiva === 'cursor' ? 'text' : 'crosshair';
+      canvas.style.touchAction = this.bloquearDedoParaRolar ? 'pan-x pan-y' : 'none';
     });
     // Seletor de espessura: só aparece com Caneta ou Marca-Texto, com valores próprios de cada ferramenta
     const grupoEsp = root.querySelector('#athEspessuras');
@@ -816,6 +837,38 @@ export class EstudoArtigosView {
   /* ==========================================================================
      POPOVERS DE TOPO DO ESTÚDIO (ZOTERO API, GOOGLE DRIVE E CANETA)
      ========================================================================== */
+  carregarConfigPincelSalva() {
+    try {
+      const salvo = typeof localStorage !== 'undefined' ? localStorage.getItem('athenes_config_pincel_v1') : null;
+      if (salvo) {
+        const c = JSON.parse(salvo);
+        if (c.ferramentaAtiva) this.ferramentaAtiva = c.ferramentaAtiva;
+        if (c.corTinta) this.corTinta = c.corTinta;
+        if (c.corGrifoAtiva) this.corGrifoAtiva = c.corGrifoAtiva;
+        if (c.espessuraTinta) this.espessuraTinta = c.espessuraTinta;
+        if (c.espessuraMarca) this.espessuraMarca = c.espessuraMarca;
+        if (typeof c.modoLinhaReta === 'boolean') this.modoLinhaReta = c.modoLinhaReta;
+        if (typeof c.bloquearDedoParaRolar === 'boolean') this.bloquearDedoParaRolar = c.bloquearDedoParaRolar;
+      }
+    } catch (_) {}
+  }
+
+  salvarConfigPincelAtual() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('athenes_config_pincel_v1', JSON.stringify({
+          ferramentaAtiva: this.ferramentaAtiva,
+          corTinta: this.corTinta,
+          corGrifoAtiva: this.corGrifoAtiva,
+          espessuraTinta: this.espessuraTinta,
+          espessuraMarca: this.espessuraMarca,
+          modoLinhaReta: this.modoLinhaReta,
+          bloquearDedoParaRolar: this.bloquearDedoParaRolar
+        }));
+      }
+    } catch (_) {}
+  }
+
   rotuloFerramenta(tool) {
     const map = {
       cursor: 'Selecionar Texto (Grifar / Citar)',
@@ -848,8 +901,20 @@ export class EstudoArtigosView {
     const container = root || this.container;
     const palco = container?.querySelector('#athEstudioPalco');
     if (palco) {
+      const scrollLarguraAntiga = palco.scrollWidth || 1;
+      const scrollAlturaAntiga = palco.scrollHeight || 1;
+      const centroX = (palco.scrollLeft + palco.clientWidth / 2) / scrollLarguraAntiga;
+      const centroY = (palco.scrollTop + palco.clientHeight / 2) / scrollAlturaAntiga;
+
       palco.style.setProperty('--ath-zoom', String(escala)); // a etiqueta da página acompanha a largura da folha
       palco.querySelectorAll('.ath-pdf-pagina-bloco-wrap').forEach(wrap => this.aplicarEscalaNaFolha(wrap, escala));
+
+      requestAnimationFrame(() => {
+        const novaLargura = palco.scrollWidth || 1;
+        const novaAltura = palco.scrollHeight || 1;
+        palco.scrollLeft = Math.max(0, Math.round(centroX * novaLargura - palco.clientWidth / 2));
+        palco.scrollTop = Math.max(0, Math.round(centroY * novaAltura - palco.clientHeight / 2));
+      });
       // a definição do texto acompanha o zoom: refaz o bitmap das páginas perto da tela (as outras, ao se aproximarem)
       clearTimeout(this._tZoomQualidade);
       this._tZoomQualidade = setTimeout(() => {

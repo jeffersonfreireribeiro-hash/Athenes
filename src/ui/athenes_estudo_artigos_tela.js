@@ -394,15 +394,24 @@ export const metodosEstudoTela = {
         }
       }, { passive: false });
 
-      // Gesto de pinça touch com 2 dedos para Tablets e Telas Touch
+      // Gesto de pinça touch com 2 dedos + Pan simultâneo para Tablets e Telas Touch
       let distIniTouch = 0;
       let zoomBaseTouch = 100;
+      let midIniX = 0;
+      let midIniY = 0;
+      let scrollIniX = 0;
+      let scrollIniY = 0;
+
       palcoZoomEl.addEventListener('touchstart', (e) => {
         if (e.touches && e.touches.length === 2) {
           distIniTouch = Math.hypot(
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
           );
+          midIniX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          midIniY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          scrollIniX = palcoZoomEl.scrollLeft;
+          scrollIniY = palcoZoomEl.scrollTop;
           zoomBaseTouch = this.zoomPct;
         }
       }, { passive: true });
@@ -414,9 +423,19 @@ export const metodosEstudoTela = {
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
           );
+          const midAtualX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          const midAtualY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          const deltaX = midAtualX - midIniX;
+          const deltaY = midAtualY - midIniY;
+
+          palcoZoomEl.scrollLeft = scrollIniX - deltaX;
+          palcoZoomEl.scrollTop = scrollIniY - deltaY;
+
           const ratio = distAtual / distIniTouch;
           const novoZoom = Math.round((zoomBaseTouch * ratio) / 5) * 5;
-          this.aplicarZoom(novoZoom, root);
+          if (novoZoom !== this.zoomPct) {
+            this.aplicarZoom(novoZoom, root);
+          }
         }
       }, { passive: false });
 
@@ -480,6 +499,12 @@ export const metodosEstudoTela = {
       const canvasAtivo = root.querySelector(`canvas[data-canvas-pag="${this.paginaAtual}"]`);
       this.redesenharCanvasTinta(canvasAtivo, art, this.paginaAtual);
       this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, paginasPdf);
+    });
+
+    // Alternar Modo Caneta Inteligente / Samsung Notes vs Desenho com o Dedo
+    root.querySelector('#athBtnDedoRola')?.addEventListener('click', () => {
+      this.bloquearDedoParaRolar = !this.bloquearDedoParaRolar;
+      this.atualizarEstadoFerramentasNoDom(root);
     });
 
     // Alternar Modo Linha Reta
@@ -864,7 +889,11 @@ export const metodosEstudoTela = {
 
   renderizarColunaEsquerdaEstudio(colEsq, artAtivo, paginasPdf) {
     if (!colEsq) return;
-    const artigosFiltrados = this.artigos.filter(a => {
+    const artigosFiltrados = this.artigos.slice().sort((a, b) => {
+      const ta = new Date(a.modificadoEm || a.fichamento?.modificadoEm || a.atualizado_em || 0).getTime();
+      const tb = new Date(b.modificadoEm || b.fichamento?.modificadoEm || b.atualizado_em || 0).getTime();
+      return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
+    }).filter(a => {
       if (this.pastaFiltroId && this.pastaFiltroId !== 'todas') {
         if (!artigoEstaNaPasta(a, this.pastaFiltroId)) return false;
       }
