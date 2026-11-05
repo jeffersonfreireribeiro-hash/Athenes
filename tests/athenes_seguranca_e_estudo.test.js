@@ -11,6 +11,7 @@ import {
   obterOuRestaurarSelecaoDoBloco
 } from '../src/core/athenes_seguranca.js';
 import {
+  EstudoArtigosView,
   criarArtigosEstudoExemplo,
   formatarCitacaoAbntDoArtigo,
   gerarHtmlNotaZoteroDoArtigo,
@@ -157,6 +158,89 @@ test('Estúdio de Artigos renderiza todas as páginas em rolagem contínua, supo
   const diag = calcularPontoFinalLinhaReta({ x: 100, y: 100 }, { x: 250, y: 240 });
   assert.equal(diag.x, 250);
   assert.equal(diag.y, 240);
+});
+
+test('Estúdio de Artigos: Borracha apaga traços livres, linhas retas, marca-texto e grifos de seleção', () => {
+  const estudio = new EstudoArtigosView(null);
+  const art = {
+    id: 'art-teste-borracha',
+    fichamento: {
+      tracosPorPagina: {
+        1: [
+          // Traço 1: linha reta de (50, 100) a (300, 100)
+          { tipo: 'caneta', reta: true, espessura: 4, pontos: [{ x: 50, y: 100 }, { x: 300, y: 100 }] },
+          // Traço 2: marca-texto espesso em (500, 500)
+          { tipo: 'marcatexto', reta: false, espessura: 18, pontos: [{ x: 500, y: 500 }, { x: 550, y: 500 }] },
+          // Traço 3: traço distante em (800, 800)
+          { tipo: 'caneta', reta: false, espessura: 3, pontos: [{ x: 800, y: 800 }, { x: 820, y: 820 }] }
+        ]
+      },
+      grifosPorPagina: {
+        1: [
+          // Grifo de texto retangular no PDF (x: 20%, y: 30%, w: 40%, h: 5%)
+          { xPct: 20, yPct: 30, wPct: 40, hPct: 5, cor: 'rgba(250, 204, 21, 0.45)' },
+          // Grifo distante (x: 80%, y: 80%, w: 10%, h: 4%)
+          { xPct: 80, yPct: 80, wPct: 10, hPct: 4, cor: 'rgba(250, 204, 21, 0.45)' }
+        ]
+      }
+    }
+  };
+
+  // 1. Passar borracha no meio da linha reta em (180, 102) -> deve apagar Traço 1
+  estudio.apagarTracosProximos(art, 1, 180, 102, 24);
+  assert.equal(art.fichamento.tracosPorPagina[1].length, 2);
+  assert.equal(art.fichamento.tracosPorPagina[1][0].espessura, 18);
+
+  // 2. Passar borracha no marca-texto espesso em (520, 510) -> deve apagar Traço 2
+  estudio.apagarTracosProximos(art, 1, 520, 510, 24);
+  assert.equal(art.fichamento.tracosPorPagina[1].length, 1);
+  assert.equal(art.fichamento.tracosPorPagina[1][0].pontos[0].x, 800);
+
+  // 3. Passar borracha sobre o grifo de texto em xPct: 35%, yPct: 32% -> deve apagar o grifo de texto
+  estudio.apagarTracosProximos(art, 1, 0, 0, 24, { xPct: 35, yPct: 32 });
+  assert.equal(art.fichamento.grifosPorPagina[1].length, 1);
+  assert.equal(art.fichamento.grifosPorPagina[1][0].xPct, 80);
+
+  // 4. Testar apagamento de mark.ath-pdf-grifo-texto em folha com texto HTML
+  const artHtml = {
+    id: 'art-html-grifo',
+    fichamento: { tracosPorPagina: {}, grifosPorPagina: {} },
+    conteudoPaginasPdf: [{ htmlGrifado: '<p>Este é um <mark class="ath-pdf-grifo-texto">trecho selecionado e grifado</mark> no texto.</p>' }]
+  };
+  estudio.artigos = [artHtml];
+
+  const pEl = {
+    childNodes: [],
+    innerHTML: '',
+    normalize() {}
+  };
+  const textChild = { nodeType: 3, textContent: 'trecho selecionado e grifado' };
+  const markEl = {
+    classList: { contains: (c) => c === 'ath-pdf-grifo-texto' },
+    parentNode: pEl,
+    childNodes: [textChild],
+    firstChild: textChild,
+    replaceWith(...nodes) {
+      pEl.childNodes = pEl.childNodes.filter(c => c !== markEl).concat(nodes);
+    },
+    getClientRects: () => [{ left: 100, top: 200, right: 300, bottom: 220, width: 200, height: 20 }],
+    getBoundingClientRect: () => ({ left: 100, top: 200, right: 300, bottom: 220, width: 200, height: 20 }),
+    closest: () => ({ innerHTML: '<p>Este é um trecho selecionado e grifado no texto.</p>' })
+  };
+  pEl.childNodes = [markEl];
+
+  const mockFolha = {
+    dataset: { numPagina: '1', alturaReal: '1123' },
+    clientWidth: 794,
+    clientHeight: 1123,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 794, height: 1123 }),
+    querySelectorAll: (sel) => sel.includes('ath-pdf-grifo-texto') ? [markEl] : []
+  };
+
+  // Passa a borracha nas coordenadas do mark (clientX: 150, clientY: 210)
+  estudio.apagarTracosProximos(artHtml, 1, 150, 210, 28, null, mockFolha, 150, 210);
+  assert.equal(pEl.childNodes.includes(markEl), false, 'Mark de texto deve ter sido removido pela borracha');
+  assert.equal(artHtml.conteudoPaginasPdf[0].htmlGrifado.includes('<mark'), false, 'htmlGrifado não deve mais conter a tag mark');
 });
 
 test('Estúdio de Artigos preserva folhas extras no PDF real e rolarParaPagina usa scroll do palco sem cortar topo', () => {

@@ -10,6 +10,28 @@ import { carregarArtigosEstudo } from './athenes_estudo_artigos.js';
 import { svgIcone } from './athenes_icones.js';
 
 export const metodosDashboardPastas = {
+  alternarDrawerPastas() {
+    const sidebar = this.container?.querySelector('#athDashSidebar');
+    const scrim = this.container?.querySelector('#athDashScrim');
+    if (!sidebar) return;
+    const abrir = !sidebar.classList.contains('ath-aberto');
+    sidebar.classList.toggle('ath-aberto', abrir);
+    scrim?.classList.toggle('ath-aberto', abrir);
+  },
+
+  fecharDrawerPastas() {
+    const sidebar = this.container?.querySelector('#athDashSidebar');
+    const scrim = this.container?.querySelector('#athDashScrim');
+    sidebar?.classList.remove('ath-aberto');
+    scrim?.classList.remove('ath-aberto');
+  },
+
+  abrirDrawerPastas() {
+    const sidebar = this.container?.querySelector('#athDashSidebar');
+    const scrim = this.container?.querySelector('#athDashScrim');
+    sidebar?.classList.add('ath-aberto');
+    scrim?.classList.add('ath-aberto');
+  },
   renderizarPastasLateral() {
     const listaEl = this.container.querySelector('#athDashPastasLista');
     if (!listaEl) return;
@@ -180,13 +202,21 @@ export const metodosDashboardPastas = {
     if (!bannerEl) return;
 
     const ehAbaBib = this.abaAtiva === 'artigos_zotero';
+    const botaoDrawerHtml = `
+      <button type="button" class="ath-btn ath-btn-sm ath-dash-btn-toggle-pastas" id="athBtnTogglePastasBanner" title="Ver pastas e coleções do Google Drive" aria-label="Abrir pastas">
+        ${svgIcone('pasta', 14)}
+        <span class="ath-dash-btn-toggle-txt">Pastas</span>
+      </button>
+    `;
 
     if (this.pastaAtivaId === 'todas') {
       if (!ehAbaBib) {
         bannerEl.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px;">
-            ${svgIcone('pasta', 18)}
-            <div>
+          <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+            ${botaoDrawerHtml}
+            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+              ${svgIcone('pasta', 18)}
+              <div style="min-width:0;">
               <strong style="display:block; font-size:13px; color:#1E293B;">Todas as Pastas de Documentos (Visão Geral)</strong>
               <small style="font-size:11px; color:#64748B;">Exibindo todos os documentos locais e sincronizados (${this.documentos.length} no total)</small>
             </div>
@@ -195,9 +225,11 @@ export const metodosDashboardPastas = {
       } else {
         const totalArtigos = (this.estudoView?.artigos || carregarArtigosEstudo()).length;
         bannerEl.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px;">
-            ${svgIcone('livro', 18)}
-            <div>
+          <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+            ${botaoDrawerHtml}
+            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+              ${svgIcone('livro', 18)}
+              <div style="min-width:0;">
               <strong style="display:block; font-size:13px; color:#1E293B;">Todas as Pastas de Bibliografia & Leituras</strong>
               <small style="font-size:11px; color:#64748B;">Exibindo todos os artigos, fichamentos e PDFs vinculados (${totalArtigos} no total)</small>
             </div>
@@ -217,8 +249,10 @@ export const metodosDashboardPastas = {
         });
 
         bannerEl.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-            ${svgIcone('pasta', 20)}
+          <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+            ${botaoDrawerHtml}
+            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+              ${svgIcone('pasta', 20)}
             <div style="min-width:0;">
               <div style="display:flex; align-items:center; gap:6px;">
                 <span style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Pasta de Documentos:</span>
@@ -236,8 +270,10 @@ export const metodosDashboardPastas = {
         const artigosNaPasta = artigos.filter(a => artigoEstaNaPasta(a, this.pastaAtivaId));
 
         bannerEl.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-            ${svgIcone('livro', 20)}
+          <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+            ${botaoDrawerHtml}
+            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+              ${svgIcone('livro', 20)}
             <div style="min-width:0;">
               <div style="display:flex; align-items:center; gap:6px;">
                 <span style="font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase;">Pasta de Bibliografia:</span>
@@ -252,5 +288,10 @@ export const metodosDashboardPastas = {
         `;
       }
     }
+
+    bannerEl.querySelector('#athBtnTogglePastasBanner')?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this.alternarDrawerPastas();
+    });
   }
 };

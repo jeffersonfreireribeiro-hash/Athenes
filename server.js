@@ -18,6 +18,7 @@ const MIME_TYPES = {
   '.js': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
   '.ttf': 'font/ttf',
@@ -104,6 +105,11 @@ const server = http.createServer((req, res) => {
 
     if (ext === '.apk') {
       headers['Content-Disposition'] = 'attachment; filename="athenes.apk"';
+    } else if (reqPath === '/sw.js') {
+      headers['Service-Worker-Allowed'] = '/';
+      headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    } else if (reqPath === '/manifest.json') {
+      headers['Content-Type'] = 'application/manifest+json; charset=utf-8';
     }
 
     res.writeHead(200, headers);

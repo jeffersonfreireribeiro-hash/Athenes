@@ -456,10 +456,19 @@ export const metodosEstudoAnotacoes = {
           const mark = document.createElement('mark');
           mark.className = 'ath-pdf-grifo-texto';
           mark.style.backgroundColor = corGrifo;
-          range.surroundContents(mark);
-          const colEl = folhaTextoEl.querySelector(`[data-colunas-pag="${numPag}"]`);
-          if (colEl && paginasPdf[numPag - 1]) {
+          try {
+            range.surroundContents(mark);
+          } catch (_) {
+            const fragment = range.extractContents();
+            mark.appendChild(fragment);
+            range.insertNode(mark);
+          }
+          const colEl = folhaTextoEl.querySelector(`[data-colunas-pag="${numPag}"]`) || folhaTextoEl;
+          if (colEl && paginasPdf?.[numPag - 1]) {
             paginasPdf[numPag - 1].htmlGrifado = colEl.innerHTML;
+            if (art.conteudoPaginasPdf?.[numPag - 1]) {
+              art.conteudoPaginasPdf[numPag - 1].htmlGrifado = colEl.innerHTML;
+            }
             salvarArtigosEstudo(this.artigos);
           }
         } catch (_) {}
@@ -554,8 +563,8 @@ export const metodosEstudoAnotacoes = {
       return {
         x: Math.round((ev.clientX - rect.left) * scaleX),
         y: Math.round((ev.clientY - rect.top) * scaleY),
-        xPct: Math.max(4, Math.min(68, Math.round(((ev.clientX - rect.left) / rect.width) * 100))),
-        yPct: Math.max(4, Math.min(82, Math.round(((ev.clientY - rect.top) / rect.height) * 100)))
+        xPct: Math.max(0, Math.min(100, Math.round(((ev.clientX - rect.left) / rect.width) * 100))),
+        yPct: Math.max(0, Math.min(100, Math.round(((ev.clientY - rect.top) / rect.height) * 100)))
       };
     };
 
@@ -573,7 +582,9 @@ export const metodosEstudoAnotacoes = {
 
       if (this.ferramentaAtiva === 'borracha') {
         desenhando = true;
-        this.apagarTracosProximos(art, numPag, pos.x, pos.y);
+        canvas.setPointerCapture?.(ev.pointerId);
+        const folha = canvas.closest('.ath-pdf-folha-container');
+        this.apagarTracosProximos(art, numPag, pos.x, pos.y, 28, pos, folha, ev.clientX, ev.clientY);
         agendarRedesenho();
         return;
       }
@@ -597,7 +608,8 @@ export const metodosEstudoAnotacoes = {
       if (!desenhando) return;
       const pos = obterPosicaoNoCanvas(ev);
       if (this.ferramentaAtiva === 'borracha') {
-        this.apagarTracosProximos(art, numPag, pos.x, pos.y);
+        const folha = canvas.closest('.ath-pdf-folha-container');
+        this.apagarTracosProximos(art, numPag, pos.x, pos.y, 28, pos, folha, ev.clientX, ev.clientY);
         agendarRedesenho();
         return;
       }

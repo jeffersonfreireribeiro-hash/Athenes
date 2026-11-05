@@ -202,6 +202,9 @@ export class DashboardView {
 
         <!-- Identificação de Quem Está Mexendo / Login -->
         <div class="ath-dash-user-box" style="display:flex; align-items:center; gap:8px;">
+          <button type="button" class="ath-dash-btn-topo ath-dash-btn-instalar" id="athBtnInstalarPwa" style="display:none;" title="Instalar Athenes no seu celular, tablet ou computador para usar como app">
+            ${svgIcone('dispositivo', 15)}<span>Instalar App</span>
+          </button>
           ${driveCfg.pastaUrl ? `
             <a href="${driveCfg.pastaUrl}" target="_blank" rel="noopener noreferrer" class="ath-dash-btn-topo" title="Abrir a pasta do Athenes no seu Google Drive">
               ${svgIcone('drive', 15)}<span>Pasta no Drive</span><span class="ath-dash-btn-topo-seta" aria-hidden="true">↗</span>
@@ -227,7 +230,14 @@ export class DashboardView {
       </div>` : ''}
 
       <!-- Layout Principal com Barra Lateral de Pastas do Google Drive e Conteúdo Filtrado -->
-      <div class="ath-dash-layout">
+      <div class="ath-dash-layout" id="athDashLayout">
+        <div class="ath-dash-scrim" id="athDashScrim" aria-hidden="true"></div>
+
+        <!-- Alça de Toque para Abrir Pastas no Tablet e Telas Menores -->
+        <button type="button" class="ath-dash-alca-pastas" id="athDashAlcaPastas" title="Abrir pastas do Drive" aria-label="Abrir pastas do Drive">
+          ${svgIcone('pasta', 14)}
+        </button>
+
         <!-- Barra Lateral de Pastas do Google Drive -->
         <aside class="ath-dash-sidebar" id="athDashSidebar" aria-label="Pastas do Google Drive">
           <div class="ath-dash-sidebar-head">
@@ -235,9 +245,14 @@ export class DashboardView {
               ${svgIcone('drive', 16)}
               <strong style="font-size:12px; color:#314F79; letter-spacing:0.03em; text-transform:uppercase;">Pastas do Drive</strong>
             </div>
-            <button type="button" class="ath-btn ath-btn-xs" id="athBtnRecarregarPastasDrive" title="Sincronizar agora: cria as pastas e envia os documentos pendentes ao Drive" style="padding:2px 7px; height:24px; font-size:11px;">
-              ↻
-            </button>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <button type="button" class="ath-btn ath-btn-xs" id="athBtnRecarregarPastasDrive" title="Sincronizar agora: cria as pastas e envia os documentos pendentes ao Drive" style="padding:2px 7px; height:24px; font-size:11px;">
+                ↻
+              </button>
+              <button type="button" class="ath-btn ath-btn-xs ath-dash-sidebar-fechar-btn" id="athBtnFecharPastasDrawer" title="Fechar painel de pastas" aria-label="Fechar pastas">
+                ✕
+              </button>
+            </div>
           </div>
           <button type="button" id="athDriveStatus" class="ath-btn ath-btn-xs" style="margin:6px 0 0; width:100%; box-sizing:border-box; justify-content:flex-start; gap:6px; font-size:11px; font-weight:700; height:auto; padding:5px 8px; text-align:left; white-space:normal;"></button>
 
@@ -348,6 +363,32 @@ export class DashboardView {
       }
     });
 
+    // PWA Install Action
+    const btnInstalar = root.querySelector('#athBtnInstalarPwa');
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+    if (!isStandalone) {
+      if (window.deferredPwaPrompt || isIos) {
+        if (btnInstalar) btnInstalar.style.display = 'inline-flex';
+      }
+    }
+
+    btnInstalar?.addEventListener('click', async () => {
+      if (window.deferredPwaPrompt) {
+        window.deferredPwaPrompt.prompt();
+        const choice = await window.deferredPwaPrompt.userChoice;
+        if (choice && choice.outcome === 'accepted') {
+          window.deferredPwaPrompt = null;
+          if (btnInstalar) btnInstalar.style.display = 'none';
+        }
+      } else if (isIos) {
+        mostrarAviso('Para instalar no iPad ou iPhone: toque no botão Compartilhar (quadrado com seta para cima) no Safari e escolha "Adicionar à Tela de Início".', { tipo: 'info' });
+      } else {
+        mostrarAviso('Para instalar o Athenes como app, clique no ícone de instalação na barra do navegador.', { tipo: 'info' });
+      }
+    });
+
     root.querySelector('#athBtnPerfilLoginDash')?.addEventListener('click', () => {
       this.abrirModalIdentificacaoLogin();
     });
@@ -413,6 +454,10 @@ export class DashboardView {
     this.renderizarPastasLateral();
     this.renderizarBannerPasta();
 
+    root.querySelector('#athDashScrim')?.addEventListener('click', () => this.fecharDrawerPastas());
+    root.querySelector('#athBtnFecharPastasDrawer')?.addEventListener('click', () => this.fecharDrawerPastas());
+    root.querySelector('#athDashAlcaPastas')?.addEventListener('click', () => this.alternarDrawerPastas());
+
     root.querySelector('#athBtnNovaSubpastaModal')?.addEventListener('click', () => {
       this.abrirModalNovaSubpasta();
     });
@@ -458,6 +503,7 @@ export class DashboardView {
 
   selecionarPasta(pastaId) {
     this.pastaAtivaId = pastaId;
+    this.fecharDrawerPastas?.();
     this.renderizarPastasLateral();
     this.renderizarBannerPasta();
     if (this.abaAtiva === 'escrita') {

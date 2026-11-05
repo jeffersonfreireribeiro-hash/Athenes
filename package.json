@@ -6,6 +6,7 @@
   "main": "src/core/athenes_documento.js",
   "scripts": {
     "start": "node server.js",
+    "pretest": "node tests/validacao_real.js",
     "test": "node --test tests/*.test.js"
   },
   "keywords": [

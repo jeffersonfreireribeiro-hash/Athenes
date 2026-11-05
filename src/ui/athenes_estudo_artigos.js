@@ -794,23 +794,192 @@ export class EstudoArtigosView {
   /* ==========================================================================
      MOTOR DE TINTA DIGITAL + MODO LINHA RETA EM CANVAS (POR PÁGINA)
      ========================================================================== */
-  apagarTracosProximos(art, numPag, x, y, raio = 24) {
-    const lista = art.fichamento?.tracosPorPagina?.[numPag];
-    if (!Array.isArray(lista)) return;
-    art.fichamento.tracosPorPagina[numPag] = lista.filter(traco => {
-      const pts = traco.pontos || [];
-      if (pts.length === 2) {
-        // Verifica distância ponto-segmento para linhas retas
-        const [a, b] = pts;
-        const l2 = Math.hypot(b.x - a.x, b.y - a.y) ** 2;
-        if (l2 === 0) return Math.hypot(x - a.x, y - a.y) > raio;
-        const t = Math.max(0, Math.min(1, ((x - a.x) * (b.x - a.x) + (y - a.y) * (b.y - a.y)) / l2));
-        const projX = a.x + t * (b.x - a.x);
-        const projY = a.y + t * (b.y - a.y);
-        return Math.hypot(x - projX, y - projY) > raio;
+  apagarTracosProximos(art, numPag, x, y, raio = 28, posPct = null, folhaContainer = null, clientX = null, clientY = null) {
+    if (!art || !art.fichamento) return;
+
+    // 1. Apagar traços livres de caneta, marca-texto digital e linhas retas
+    const lista = art.fichamento.tracosPorPagina?.[numPag];
+    if (Array.isArray(lista)) {
+      art.fichamento.tracosPorPagina[numPag] = lista.filter(traco => {
+        const pts = traco.pontos || [];
+        if (pts.length === 0) return false;
+        const rEfetivo = (raio || 28) + ((traco.espessura || 3) / 2);
+
+        // Distância euclidiana ponto-segmento
+        const distSeg = (px, py, x1, y1, x2, y2) => {
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const l2 = dx * dx + dy * dy;
+          if (l2 === 0) return Math.hypot(px - x1, py - y1);
+          const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / l2));
+          return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+        };
+
+        if (pts.length === 1) {
+          return Math.hypot(pts[0].x - x, pts[0].y - y) > rEfetivo;
+        }
+
+        if (traco.reta && pts.length >= 2) {
+          const a = pts[0];
+          const b = pts[pts.length - 1];
+          return distSeg(x, y, a.x, a.y, b.x, b.y) > rEfetivo;
+        }
+
+        // Para qualquer traço contínuo ou pincel livre, confere todos os segmentos adjacentes
+        for (let i = 0; i < pts.length - 1; i++) {
+          if (distSeg(x, y, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y) <= rEfetivo) {
+            return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    // 2. Apagar grifos de seleção retangulares em PDF Real (art.fichamento.grifosPorPagina)
+    if (Array.isArray(art.fichamento.grifosPorPagina?.[numPag])) {
+      const qtdAntes = art.fichamento.grifosPorPagina[numPag].length;
+      const alturaReal = folhaContainer ? (parseFloat(folhaContainer.dataset.alturaReal) || folhaContainer.clientHeight || 1123) : 1123;
+      const larguraReal = folhaContainer ? (folhaContainer.clientWidth || 794) : 794;
+      const r = raio || 28;
+
+      art.fichamento.grifosPorPagina[numPag] = art.fichamento.grifosPorPagina[numPag].filter(g => {
+        // A. Distância em coordenadas canônicas da página (canvas 794 x H)
+        const gx = (g.xPct / 100) * larguraReal;
+        const gy = (g.yPct / 100) * alturaReal;
+        const gw = (g.wPct / 100) * larguraReal;
+        const gh = (g.hPct / 100) * alturaReal;
+        const dxCanvas = Math.max(gx - x, 0, x - (gx + gw));
+        const dyCanvas = Math.max(gy - y, 0, y - (gy + gh));
+        if (Math.hypot(dxCanvas, dyCanvas) <= r) return false;
+
+        // B. Distância na viewport física (clientX, clientY)
+        if (clientX != null && clientY != null && folhaContainer && typeof folhaContainer.getBoundingClientRect === 'function') {
+          const rectFolha = folhaContainer.getBoundingClientRect();
+          const screenX = rectFolha.left + (g.xPct / 100) * rectFolha.width;
+          const screenY = rectFolha.top + (g.yPct / 100) * rectFolha.height;
+          const screenW = (g.wPct / 100) * rectFolha.width;
+          const screenH = (g.hPct / 100) * rectFolha.height;
+          const dxScreen = Math.max(screenX - clientX, 0, clientX - (screenX + screenW));
+          const dyScreen = Math.max(screenY - clientY, 0, clientY - (screenY + screenH));
+          if (Math.hypot(dxScreen, dyScreen) <= r) return false;
+        }
+
+        // C. Tolerância percentual proporcional (posPct)
+        if (posPct && typeof posPct.xPct === 'number' && typeof posPct.yPct === 'number') {
+          const margemXPct = Math.max(4.5, (r / larguraReal) * 100);
+          const margemYPct = Math.max(4.5, (r / alturaReal) * 100);
+          const dentroX = posPct.xPct >= (g.xPct - margemXPct) && posPct.xPct <= (g.xPct + g.wPct + margemXPct);
+          const dentroY = posPct.yPct >= (g.yPct - margemYPct) && posPct.yPct <= (g.yPct + g.hPct + margemYPct);
+          if (dentroX && dentroY) return false;
+        }
+
+        return true;
+      });
+
+      if (art.fichamento.grifosPorPagina[numPag].length !== qtdAntes) {
+        if (folhaContainer) {
+          const layer = folhaContainer.querySelector(`[data-grifos-pag="${numPag}"]`);
+          if (layer) this.renderizarGrifosRetangularesDaPagina(layer, art, numPag);
+        }
+        salvarArtigosEstudo(this.artigos || [art]);
       }
-      return !pts.some(pt => Math.hypot(pt.x - x, pt.y - y) <= raio);
-    });
+    }
+
+    // 3. Apagar grifos de texto HTML (<mark class="ath-pdf-grifo-texto">)
+    const escopoBusca = folhaContainer || (typeof document !== 'undefined' ? document : null);
+    if (escopoBusca) {
+      const marks = Array.from(escopoBusca.querySelectorAll('mark.ath-pdf-grifo-texto, .ath-pdf-grifo-texto'));
+      let alterouHtml = false;
+      let ultimoColEl = null;
+      const r = raio || 28;
+
+      for (const mark of marks) {
+        let atingido = false;
+
+        // A. Verificação via coordenadas de tela (clientX, clientY)
+        if (clientX != null && clientY != null && typeof mark.getBoundingClientRect === 'function') {
+          const rects = (typeof mark.getClientRects === 'function' && mark.getClientRects().length > 0)
+            ? Array.from(mark.getClientRects())
+            : [mark.getBoundingClientRect()];
+          for (const mRect of rects) {
+            if (mRect.width === 0 && mRect.height === 0) continue;
+            const dx = Math.max(mRect.left - clientX, 0, clientX - mRect.right);
+            const dy = Math.max(mRect.top - clientY, 0, clientY - mRect.bottom);
+            if (Math.hypot(dx, dy) <= r) {
+              atingido = true;
+              break;
+            }
+          }
+        }
+
+        // B. Verificação geométrica relativa à folhaContainer
+        if (!atingido && folhaContainer && typeof mark.getBoundingClientRect === 'function' && typeof folhaContainer.getBoundingClientRect === 'function') {
+          const rectFolha = folhaContainer.getBoundingClientRect();
+          const rects = (typeof mark.getClientRects === 'function' && mark.getClientRects().length > 0)
+            ? Array.from(mark.getClientRects())
+            : [mark.getBoundingClientRect()];
+          for (const mRect of rects) {
+            if (mRect.width === 0 && mRect.height === 0) continue;
+            const relX = ((mRect.left - rectFolha.left) / rectFolha.width) * (folhaContainer.clientWidth || 794);
+            const relY = ((mRect.top - rectFolha.top) / rectFolha.height) * (folhaContainer.clientHeight || 1123);
+            const relW = (mRect.width / rectFolha.width) * (folhaContainer.clientWidth || 794);
+            const relH = (mRect.height / rectFolha.height) * (folhaContainer.clientHeight || 1123);
+            const dx = Math.max(relX - x, 0, x - (relX + relW));
+            const dy = Math.max(relY - y, 0, y - (relY + relH));
+            if (Math.hypot(dx, dy) <= r) {
+              atingido = true;
+              break;
+            }
+          }
+        }
+
+        // C. Fallback para document.elementsFromPoint se aplicável
+        if (!atingido && clientX != null && clientY != null && typeof document !== 'undefined' && typeof document.elementsFromPoint === 'function') {
+          const elementos = document.elementsFromPoint(clientX, clientY) || [];
+          if (elementos.includes(mark) || elementos.some(el => el.closest?.('mark.ath-pdf-grifo-texto') === mark)) {
+            atingido = true;
+          }
+        }
+
+        if (atingido && mark.parentNode) {
+          const colEl = mark.closest('[data-colunas-pag]') || mark.closest('.ath-pdf-folha-texto');
+          if (colEl) ultimoColEl = colEl;
+          const parent = mark.parentNode;
+          if (typeof mark.replaceWith === 'function') {
+            mark.replaceWith(...(mark.childNodes || []));
+          } else {
+            while (mark.firstChild) {
+              const child = mark.firstChild;
+              if (typeof mark.removeChild === 'function') {
+                mark.removeChild(child);
+              } else {
+                mark.firstChild = null;
+              }
+              parent.insertBefore(child, mark);
+            }
+            if (typeof parent.removeChild === 'function') {
+              parent.removeChild(mark);
+            }
+          }
+          if (typeof parent.normalize === 'function') parent.normalize();
+          alterouHtml = true;
+        }
+      }
+
+      if (alterouHtml) {
+        const nPag = parseInt(folhaContainer?.dataset?.numPagina, 10) || numPag;
+        const artAtivo = this.artigos?.find(a => a.id === art.id) || art;
+        if (artAtivo.conteudoPaginasPdf?.[nPag - 1]) {
+          if (ultimoColEl) {
+            artAtivo.conteudoPaginasPdf[nPag - 1].htmlGrifado = ultimoColEl.innerHTML;
+          }
+        }
+        if (this.artigoAberto?.conteudoPaginasPdf?.[nPag - 1] && ultimoColEl) {
+          this.artigoAberto.conteudoPaginasPdf[nPag - 1].htmlGrifado = ultimoColEl.innerHTML;
+        }
+        salvarArtigosEstudo(this.artigos || [artAtivo]);
+      }
+    }
   }
 
   redesenharCanvasTinta(canvas, art, numPag = this.paginaAtual) {

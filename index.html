@@ -8,6 +8,15 @@
   <meta name="theme-color" content="#314F79">
   <meta name="description" content="Ambiente completo para escrever e diagramar relatórios, artigos científicos e documentos acadêmicos em blocos.">
 
+  <!-- Progressive Web App (PWA) -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Athenes">
+  <link rel="apple-touch-icon" href="src/ui/athenes_icon_192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="src/ui/athenes_icon_512.png">
+
   <!-- Folhas de Estilo Athenes (Soft UI + Nunito + Clux.js) -->
   <link rel="stylesheet" href="src/css/athenes_base.css">
   <link rel="stylesheet" href="src/css/athenes_dashboard.css">
@@ -21,6 +30,32 @@
   <script type="module">
     import { AthenesApp } from './src/ui/athenes_app.js';
     import { carregarFontesImportadas } from './src/ui/athenes_fontes_ui.js';
+
+    // Suporte PWA — Instalação e Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+          console.warn('[Athenes PWA] Falha ao registrar Service Worker:', err);
+        });
+      });
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      window.deferredPwaPrompt = e;
+      const btn = document.getElementById('athBtnInstalarPwa');
+      if (btn) btn.style.display = 'inline-flex';
+    });
+
+    window.addEventListener('appinstalled', () => {
+      window.deferredPwaPrompt = null;
+      const btn = document.getElementById('athBtnInstalarPwa');
+      if (btn) btn.style.display = 'none';
+      if (typeof window.mostrarAviso === 'function') {
+        window.mostrarAviso('Athenes instalado com sucesso!', { tipo: 'sucesso' });
+      }
+    });
+
     window.addEventListener('DOMContentLoaded', async () => {
       // fontes importadas pelo usuário (ex.: Aptos) precisam existir antes do primeiro desenho dos documentos
       try { await Promise.race([carregarFontesImportadas(), new Promise(r => setTimeout(r, 2500))]); } catch (_) {}
