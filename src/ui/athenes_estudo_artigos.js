@@ -884,12 +884,46 @@ export class EstudoArtigosView {
     const folha = wrap?.querySelector('.ath-pdf-folha-container');
     const caixa = folha?.parentElement;
     if (!folha || !caixa?.classList.contains('ath-pdf-escala')) return;
-    const h = parseFloat(folha.dataset.alturaReal) || folha.offsetHeight || 1123;
-    wrap.style.minHeight = ''; // a altura vem da caixa escalada (antes ficava a do zoom em que a tela foi montada)
-    caixa.style.width = `${794 * escala}px`;
-    caixa.style.height = `${h * escala}px`;
-    folha.style.transformOrigin = '0 0';
-    folha.style.transform = escala === 1 ? '' : `scale(${escala})`;
+    const h = parseFloat(folha.dataset.alturaReal) || 1123;
+    const wPx = `${Math.round(794 * escala)}px`;
+    const hPx = `${Math.round(h * escala)}px`;
+    if (caixa.style.width !== wPx) caixa.style.width = wPx;
+    if (caixa.style.height !== hPx) caixa.style.height = hPx;
+    const tr = escala === 1 ? '' : `scale(${escala})`;
+    if (folha.style.transform !== tr) folha.style.transform = tr;
+  }
+
+  aplicarPinchZoom(novoZoom, root, conteudoIniX, conteudoIniY, zoomBaseTouch, midAtualX, midAtualY) {
+    const lim = Math.max(50, Math.min(250, Math.round(novoZoom * 10) / 10));
+    const container = root || this.container;
+    const palco = container?.querySelector('#athEstudioPalco');
+    if (!palco) return;
+
+    this.zoomPct = lim;
+    const escalaNova = this.zoomPct / 100;
+    const razao = this.zoomPct / zoomBaseTouch;
+
+    palco.style.setProperty('--ath-zoom', String(escalaNova));
+    palco.querySelectorAll('.ath-pdf-pagina-bloco-wrap').forEach(wrap => this.aplicarEscalaNaFolha(wrap, escalaNova));
+
+    const novoScrollX = Math.round(conteudoIniX * razao - midAtualX);
+    const novoScrollY = Math.round(conteudoIniY * razao - midAtualY);
+    palco.scrollLeft = Math.max(0, novoScrollX);
+    palco.scrollTop = Math.max(0, novoScrollY);
+
+    clearTimeout(this._tZoomQualidade);
+    this._tZoomQualidade = setTimeout(() => {
+      const obs = this._obsPerto;
+      if (!obs) return;
+      palco.querySelectorAll('.ath-pdf-folha-container[data-num-pagina]').forEach(f => {
+        if (f.querySelector('.ath-pdf-render-canvas')) { obs.unobserve(f); obs.observe(f); }
+      });
+    }, 250);
+
+    const indBarra = container.querySelector('#athBtnZoomIndicadorBarra');
+    if (indBarra) {
+      indBarra.textContent = `${Math.round(this.zoomPct)}%`;
+    }
   }
 
   aplicarZoom(novoZoom, root, pontoFoco = null) {
@@ -928,11 +962,11 @@ export class EstudoArtigosView {
       }, 220);
       const lbl = container.querySelector('#athZoomRotulo');
       if (lbl) {
-        lbl.textContent = `Escala / Zoom das Folhas PDF (${this.zoomPct}%)`;
+        lbl.textContent = `Escala / Zoom das Folhas PDF (${Math.round(this.zoomPct)}%)`;
       }
       const indBarra = container.querySelector('#athBtnZoomIndicadorBarra');
       if (indBarra) {
-        indBarra.textContent = `${this.zoomPct}%`;
+        indBarra.textContent = `${Math.round(this.zoomPct)}%`;
       }
     }
   }
