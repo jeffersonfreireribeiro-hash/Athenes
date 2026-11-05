@@ -178,10 +178,9 @@ export class EstudoArtigosView {
       : 'Conectar Zotero';
 
     const htmlBotoesAcao = `
-      <button type="button" class="ath-btn ${conectado ? 'ath-btn-zotero-ok' : ''}" id="athBtnConfigurarChaveZotero" title="${conectado ? 'Zotero conectado: clique para ver ou trocar a API Key e o User ID' : 'Inserir sua API Key e User ID do Zotero'}">
+      <button type="button" class="ath-btn ath-btn-icone ${conectado ? 'ath-btn-zotero-ok' : ''}" id="athBtnConfigurarChaveZotero" title="${conectado ? 'Zotero conectado (' + (this.zoteroClient.userId ? '#' + this.zoteroClient.userId : 'ativo') + '): clique para ver ou trocar credenciais' : 'Inserir sua API Key e User ID do Zotero'}" aria-label="Zotero">
         <span class="ath-dot-conexao ${conectado ? 'on' : ''}"></span>
-        ${svgIcone('zotero', 14)}
-        <span>${escapeHtml(labelZotero)}</span>
+        ${svgIcone('zotero', 16)}
       </button>
 
       <button type="button" class="ath-btn ath-btn-icone" id="athBtnSincronizarZoteroHub" title="Sincronizar: busca na sua biblioteca do Zotero os artigos novos" aria-label="Sincronizar biblioteca do Zotero">
@@ -189,8 +188,8 @@ export class EstudoArtigosView {
       </button>
 
       <div class="ath-menu-importar" id="athMenuImportarBib">
-        <button type="button" class="ath-btn" id="athBtnImportarBib" aria-haspopup="menu" aria-expanded="false" title="Importar referências de um arquivo">
-          ${svgIcone('importar', 15)} Importar ${svgIcone('baixo', 12)}
+        <button type="button" class="ath-btn ath-btn-icone" id="athBtnImportarBib" aria-haspopup="menu" aria-expanded="false" title="Importar referências (.bib, .txt)" aria-label="Importar referências">
+          ${svgIcone('importar', 15)} ${svgIcone('baixo', 11)}
         </button>
         <ul class="ath-menu-importar-lista" id="athMenuImportarBibLista" role="menu" hidden>
           <li><button type="button" role="menuitem" data-importar-bib=".bib">${svgIcone('documento', 14)}<span><strong>BibTeX (.bib)</strong><small>Coleção exportada do Zotero</small></span></button></li>
@@ -199,8 +198,8 @@ export class EstudoArtigosView {
         <input type="file" accept=".bib,.txt" id="athInputImportarBibEstudo" style="display:none;">
       </div>
 
-      <button type="button" class="ath-btn ath-btn-primary" id="athBtnNovoArtigoDrive">
-        ${svgIcone('mais', 14)} <span>Vincular Artigo & PDF</span>
+      <button type="button" class="ath-btn ath-btn-primary ath-btn-icone" id="athBtnNovoArtigoDrive" title="Vincular Artigo & PDF" aria-label="Vincular Artigo & PDF">
+        ${svgIcone('mais', 16)}
       </button>
     `;
 

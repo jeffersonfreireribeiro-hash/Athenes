@@ -202,8 +202,8 @@ export class DashboardView {
             ${svgIcone('dispositivo', 15)}<span>Instalar App</span>
           </button>
           ${driveCfg.pastaUrl ? `
-            <a href="${driveCfg.pastaUrl}" target="_blank" rel="noopener noreferrer" class="ath-dash-btn-topo" title="Abrir a pasta do Athenes no seu Google Drive">
-              ${svgIcone('drive', 15)}<span>Pasta no Drive</span><span class="ath-dash-btn-topo-seta" aria-hidden="true">↗</span>
+            <a href="${driveCfg.pastaUrl}" target="_blank" rel="noopener noreferrer" class="ath-dash-btn-topo ath-dash-btn-drive" title="Abrir a pasta do Athenes no seu Google Drive" aria-label="Pasta no Google Drive">
+              ${svgIcone('drive', 15)}<span class="ath-dash-btn-texto-drive">Pasta no Drive</span><span class="ath-dash-btn-topo-seta" aria-hidden="true">↗</span>
             </a>
           ` : ''}
           <button type="button" class="ath-dash-user-pill" id="athBtnPerfilLoginDash" title="Clique para identificar quem está usando, trocar perfil ou conectar Google Drive e Zotero">
