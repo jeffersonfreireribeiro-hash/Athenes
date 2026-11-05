@@ -52,6 +52,11 @@ export class EstudoArtigosView {
     this.paginaAtual = 1;
     this.zoomPct = 100;
     this.ferramentaAtiva = 'cursor'; // Começa com seleção de texto ou caneta; permite alternar livremente
+    try {
+      this.ordemReferencias = localStorage.getItem('athenes_ordem_referencias') || 'recente_desc';
+    } catch (_) {
+      this.ordemReferencias = 'recente_desc';
+    }
     this.modoLinhaReta = false; // Quando true, Caneta e Marca-Texto fazem retas perfeitas
     this.bloquearDedoParaRolar = true; // Modo Samsung Notes ativo por padrão: Caneta escreve, Dedo rola/move e dá zoom
     this.corTinta = '#314F79';
@@ -210,9 +215,32 @@ export class EstudoArtigosView {
 
     wrap.innerHTML = `
       <div class="ath-estudo-barra-topo">
-        <div class="ath-busca-box" style="flex:1; max-width:540px;">
-          ${svgIcone('busca', 16)}
-          <input type="text" class="ath-input" id="athEstudoBuscaInput" value="${escapeHtml(this.filtroBusca)}" placeholder="Buscar artigo por título, autor, tag Zotero ou citação marcada...">
+        <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:620px;">
+          <div class="ath-busca-box" style="flex:1;">
+            ${svgIcone('busca', 16)}
+            <input type="text" class="ath-input" id="athEstudoBuscaInput" value="${escapeHtml(this.filtroBusca)}" placeholder="Buscar artigo por título, autor, tag Zotero ou citação marcada...">
+          </div>
+
+          <!-- Botão de Definir Ordem das Referências -->
+          <div class="ath-menu-ordenar-bib" id="athMenuOrdenarBib">
+            <button type="button" class="ath-btn ath-btn-icone" id="athBtnOrdenarBib" title="Definir ordem das referências" aria-label="Definir ordem das referências" aria-haspopup="menu" aria-expanded="false">
+              ${svgIcone('ordenar', 17)}
+            </button>
+            <div class="ath-menu-ordenar-popover" id="athMenuOrdenarBibPopover" role="menu" hidden>
+              <div class="ath-menu-ordenar-header">
+                <strong>Ordem das Referências</strong>
+              </div>
+              <ul class="ath-menu-ordenar-lista" id="athListaOpcoesOrdemBib">
+                <li><button type="button" role="menuitem" data-ordem-bib="recente_desc" class="${this.ordemReferencias === 'recente_desc' ? 'sel' : ''}"><span>Alterado recentemente (Padrão)</span>${this.ordemReferencias === 'recente_desc' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-ordem-bib="recente_asc" class="${this.ordemReferencias === 'recente_asc' ? 'sel' : ''}"><span>Alterado mais antigo</span>${this.ordemReferencias === 'recente_asc' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-ordem-bib="titulo_asc" class="${this.ordemReferencias === 'titulo_asc' ? 'sel' : ''}"><span>Título (A → Z)</span>${this.ordemReferencias === 'titulo_asc' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-ordem-bib="titulo_desc" class="${this.ordemReferencias === 'titulo_desc' ? 'sel' : ''}"><span>Título (Z → A)</span>${this.ordemReferencias === 'titulo_desc' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-ordem-bib="autor_asc" class="${this.ordemReferencias === 'autor_asc' ? 'sel' : ''}"><span>Primeiro autor (A → Z)</span>${this.ordemReferencias === 'autor_asc' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-ordem-bib="ano_desc" class="${this.ordemReferencias === 'ano_desc' ? 'sel' : ''}"><span>Ano mais recente</span>${this.ordemReferencias === 'ano_desc' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-ordem-bib="ano_asc" class="${this.ordemReferencias === 'ano_asc' ? 'sel' : ''}"><span>Ano mais antigo</span>${this.ordemReferencias === 'ano_asc' ? svgIcone('check', 13) : ''}</button></li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         ${!containerHeaderAcoes ? `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${htmlBotoesAcao}</div>` : ''}
@@ -228,6 +256,35 @@ export class EstudoArtigosView {
       this.filtroBusca = inputBusca.value.trim().toLowerCase();
       this.atualizarGridCatalogo();
     });
+
+    const btnOrd = wrap.querySelector('#athBtnOrdenarBib');
+    const popOrd = wrap.querySelector('#athMenuOrdenarBibPopover');
+    const fecharOrd = () => {
+      if (!popOrd) return;
+      popOrd.hidden = true;
+      btnOrd?.setAttribute('aria-expanded', 'false');
+    };
+    btnOrd?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const abrir = popOrd.hidden;
+      popOrd.hidden = !abrir;
+      btnOrd.setAttribute('aria-expanded', String(abrir));
+      if (abrir) popOrd.querySelector('button')?.focus();
+    });
+    popOrd?.querySelectorAll('[data-ordem-bib]').forEach(item => {
+      item.addEventListener('click', () => {
+        this.ordemReferencias = item.dataset.ordemBib;
+        try { localStorage.setItem('athenes_ordem_referencias', this.ordemReferencias); } catch (_) {}
+        fecharOrd();
+        this.atualizarPopoverOrdem(wrap);
+        this.atualizarGridCatalogo();
+      });
+    });
+    if (this._fecharMenuOrdemBib) document.removeEventListener('click', this._fecharMenuOrdemBib);
+    this._fecharMenuOrdemBib = (ev) => {
+      if (!ev.target.closest?.('#athMenuOrdenarBib')) fecharOrd();
+    };
+    document.addEventListener('click', this._fecharMenuOrdemBib);
 
     const escopoBotoes = containerHeaderAcoes || wrap;
 
@@ -323,17 +380,82 @@ export class EstudoArtigosView {
     };
   }
 
-  atualizarGridCatalogo() {
-    const grid = this.container.querySelector('#athArtigosZoteroGrid');
-    if (!grid) return;
-    grid.innerHTML = '';
+  atualizarPopoverOrdem(root) {
+    const escopo = root || this.container;
+    const lista = escopo?.querySelector('#athListaOpcoesOrdemBib');
+    if (!lista) return;
+    const opcoes = [
+      { id: 'recente_desc', rotulo: 'Alterado recentemente (Padrão)' },
+      { id: 'recente_asc', rotulo: 'Alterado mais antigo' },
+      { id: 'titulo_asc', rotulo: 'Título (A → Z)' },
+      { id: 'titulo_desc', rotulo: 'Título (Z → A)' },
+      { id: 'autor_asc', rotulo: 'Primeiro autor (A → Z)' },
+      { id: 'ano_desc', rotulo: 'Ano mais recente' },
+      { id: 'ano_asc', rotulo: 'Ano mais antigo' }
+    ];
+    lista.innerHTML = opcoes.map(op => {
+      const isSel = (this.ordemReferencias || 'recente_desc') === op.id;
+      return `<li><button type="button" role="menuitem" data-ordem-bib="${op.id}" class="${isSel ? 'sel' : ''}"><span>${op.rotulo}</span>${isSel ? svgIcone('check', 13) : ''}</button></li>`;
+    }).join('');
+    lista.querySelectorAll('[data-ordem-bib]').forEach(item => {
+      item.addEventListener('click', () => {
+        this.ordemReferencias = item.dataset.ordemBib;
+        try { localStorage.setItem('athenes_ordem_referencias', this.ordemReferencias); } catch (_) {}
+        const pop = escopo.querySelector('#athMenuOrdenarBibPopover');
+        if (pop) pop.hidden = true;
+        this.atualizarPopoverOrdem(escopo);
+        this.atualizarGridCatalogo();
+      });
+    });
+  }
 
+  ordenarArtigos(artigos) {
     const obterTimestampArt = (a) => {
       const dt = a.modificadoEm || a.fichamento?.modificadoEm || a.atualizado_em || a.dataAdicionado || a.data;
       const t = dt ? new Date(dt).getTime() : 0;
       return isNaN(t) ? 0 : t;
     };
-    const filtrados = this.artigos.slice().sort((a, b) => obterTimestampArt(b) - obterTimestampArt(a)).filter(art => {
+
+    const obterAnoArt = (a) => {
+      const n = parseInt(String(a.ano || '').replace(/\D/g, ''), 10);
+      return isNaN(n) ? 0 : n;
+    };
+
+    const obterPrimeiroAutor = (a) => {
+      const primeiro = a.autores?.[0];
+      if (!primeiro) return '';
+      return `${primeiro.sobrenome || ''} ${primeiro.prenome || ''}`.trim().toLowerCase();
+    };
+
+    const ordem = this.ordemReferencias || 'recente_desc';
+
+    return artigos.slice().sort((a, b) => {
+      switch (ordem) {
+        case 'recente_asc':
+          return obterTimestampArt(a) - obterTimestampArt(b);
+        case 'titulo_asc':
+          return (a.titulo || '').localeCompare(b.titulo || '', 'pt-BR', { sensitivity: 'base' });
+        case 'titulo_desc':
+          return (b.titulo || '').localeCompare(a.titulo || '', 'pt-BR', { sensitivity: 'base' });
+        case 'autor_asc':
+          return obterPrimeiroAutor(a).localeCompare(obterPrimeiroAutor(b), 'pt-BR', { sensitivity: 'base' });
+        case 'ano_desc':
+          return obterAnoArt(b) - obterAnoArt(a);
+        case 'ano_asc':
+          return obterAnoArt(a) - obterAnoArt(b);
+        case 'recente_desc':
+        default:
+          return obterTimestampArt(b) - obterTimestampArt(a);
+      }
+    });
+  }
+
+  atualizarGridCatalogo() {
+    const grid = this.container.querySelector('#athArtigosZoteroGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const filtrados = this.ordenarArtigos(this.artigos).filter(art => {
       if (this.pastaFiltroId && this.pastaFiltroId !== 'todas') {
         if (!artigoEstaNaPasta(art, this.pastaFiltroId)) return false;
       }

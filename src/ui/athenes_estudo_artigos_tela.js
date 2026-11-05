@@ -946,11 +946,8 @@ export const metodosEstudoTela = {
 
   renderizarColunaEsquerdaEstudio(colEsq, artAtivo, paginasPdf) {
     if (!colEsq) return;
-    const artigosFiltrados = this.artigos.slice().sort((a, b) => {
-      const ta = new Date(a.modificadoEm || a.fichamento?.modificadoEm || a.atualizado_em || 0).getTime();
-      const tb = new Date(b.modificadoEm || b.fichamento?.modificadoEm || b.atualizado_em || 0).getTime();
-      return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
-    }).filter(a => {
+    const listaOrdenada = typeof this.ordenarArtigos === 'function' ? this.ordenarArtigos(this.artigos) : this.artigos;
+    const artigosFiltrados = listaOrdenada.filter(a => {
       if (this.pastaFiltroId && this.pastaFiltroId !== 'todas') {
         if (!artigoEstaNaPasta(a, this.pastaFiltroId)) return false;
       }
