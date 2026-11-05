@@ -46,7 +46,20 @@ export class ModalCompartilhar {
     this.btnSalvar = fundo.querySelector('#athCompSalvar');
     try {
       if (!nuvemAutenticada()) { this.mostrarLogin(); return; }
-      await salvarDocumentoNoSupabase(this.doc, this.perfil); // o documento precisa existir na nuvem para ter dono e convidados
+      try {
+        await salvarDocumentoNoSupabase(this.doc, this.perfil); // o documento precisa existir na nuvem para ter dono e convidados
+      } catch (errSave) {
+        // Se houver violação de RLS (42501) por colisão de ID pré-existente na tabela do Supabase com outro dono:
+        if (String(errSave?.message || '').includes('42501') || String(errSave?.message || '').includes('row-level security')) {
+          this.doc.id = `${this.doc.id}_${Math.random().toString(36).slice(2, 7)}`;
+          if (this.doc.artigoEstudo) {
+            this.doc.artigoEstudo.docCompartilhadoId = this.doc.id;
+          }
+          await salvarDocumentoNoSupabase(this.doc, this.perfil);
+        } else {
+          throw errSave;
+        }
+      }
       const info = await lerCompartilhamento(this.doc.id);
       if (!info) throw new Error('O documento não foi encontrado na nuvem.');
       this.dono = info.papel === 'dono';

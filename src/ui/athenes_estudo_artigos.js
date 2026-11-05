@@ -29,6 +29,7 @@ import { aplicarFilhosZoteroAoArtigo } from '../core/athenes_zotero_anexos_notas
 import { tokenPodeLerTodoODrive, listarConteudoDoDrive, copiarPdfDoDriveParaAthenes, ESCOPOS_COM_LEITURA } from '../core/athenes_drive_navegar.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import { ModalCompartilhar } from './athenes_compartilhar_modal.js';
+import { lerSessaoSupabase } from '../core/athenes_supabase_auth.js';
 import { removerPdfLocal, PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo, definirArtigoAbertoAtivo, lerSnapshotArtigosIdb, mesclarFichamentoPreservandoDados, compartilharPdfNoDrive } from './athenes_estudo_artigos_dados.js';
 import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
@@ -428,8 +429,11 @@ export class EstudoArtigosView {
 
   abrirModalCompartilharArtigo(art) {
     if (!art) return;
+    const sessao = lerSessaoSupabase();
+    const idSufixo = sessao?.user_id ? `_${sessao.user_id.slice(0, 8)}` : '';
+    const idDoc = art.docCompartilhadoId || `artigo_${art.id || 'ref'}${idSufixo}`;
     const docRef = {
-      id: art.docCompartilhadoId || `artigo_${art.id}`,
+      id: idDoc,
       titulo: `[Artigo] ${art.titulo || 'Referência'}`,
       autor: (art.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome || ''}`.trim()).filter(Boolean).join(', ') || 'Autor',
       norma: 'zotero_pdf',
@@ -1123,8 +1127,12 @@ export class EstudoArtigosView {
     }
 
     try {
+      const sessaoSync = lerSessaoSupabase();
+      const idSufixoSync = sessaoSync?.user_id ? `_${sessaoSync.user_id.slice(0, 8)}` : '';
+      const idDocSync = art.docCompartilhadoId || `artigo_${art.id || 'ref'}${idSufixoSync}`;
+      art.docCompartilhadoId = idDocSync;
       await salvarDocumentoNoSupabase({
-        id: art.docCompartilhadoId || `artigo_${art.id}`,
+        id: idDocSync,
         titulo: `[Fichamento PDF] ${art.titulo}`,
         autor: (art.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome || ''}`.trim()).filter(Boolean).join(', ') || 'Autor',
         norma: 'zotero_pdf',

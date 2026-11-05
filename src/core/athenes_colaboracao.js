@@ -4,7 +4,7 @@
  * Modos de Trabalho estilo Google Docs (Edição, Sugestão e Visualização) e Google Drive API.
  */
 
-import { cabecalhosSupabase, limparSessaoSupabase, temSessaoSupabase, trocarIdTokenPorSessao, decodificarJwt } from './athenes_supabase_auth.js';
+import { cabecalhosSupabase, limparSessaoSupabase, temSessaoSupabase, trocarIdTokenPorSessao, decodificarJwt, lerSessaoSupabase } from './athenes_supabase_auth.js';
 import { sanearBlocoDeTexto, sanearDocumentoEstilos } from './athenes_estilo_exclusivo.js';
 import { lerConta, gravarConta, definirContaAtiva, limparContaAtiva, obterContaAtiva } from './athenes_conta.js';
 export const SUPABASE_CONFIG_PADRAO = Object.freeze({
@@ -353,6 +353,7 @@ export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = 
   // a nuvem guarda de quem é o documento: a listagem só devolve os da conta que está conectada
   const conta = obterContaAtiva();
   if (conta && !deOutro) doc.proprietario = { ...(doc.proprietario || {}), conta };
+  const sessao = lerSessaoSupabase();
   const payload = {
     id: String(doc.id),
     titulo: String(doc.titulo || 'Documento sem título'),
@@ -363,6 +364,12 @@ export async function salvarDocumentoNoSupabase(doc, perfil = null, fetchImpl = 
     atualizado_em: agora,
     atualizado_por: colab.nome || 'Autor'
   };
+  if (sessao?.user_id && !deOutro) {
+    payload.user_id = sessao.user_id;
+  }
+  if (sessao?.email && !deOutro) {
+    payload.proprietario_email = sessao.email;
+  }
 
   const endpoint = `${cfg.url}/rest/v1/${cfg.tabela}?on_conflict=id`;
   const resp = await fetchImpl(endpoint, {
