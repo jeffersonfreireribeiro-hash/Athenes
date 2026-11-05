@@ -288,6 +288,17 @@ export class ModalEditorEstilo {
           </label>
         </div>
 
+        <!-- Formato: itálico, sublinhado, caixa alta e hifenização (ícones sob o tamanho) -->
+        <div>
+          <span style="display:block; font:800 11.5px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569; margin-bottom:6px;">Formato</span>
+          <div class="rm-icg ath-fmt-icones" role="group" aria-label="Formato do texto do estilo">
+            <button type="button" class="rm-ic-bt ${r.italico ? 'on' : ''}" id="athModalEstiloItalico" aria-pressed="${Boolean(r.italico)}" title="Itálico">${svgIcone('italico', 16)}</button>
+            <button type="button" class="rm-ic-bt ${r.sublinhado ? 'on' : ''}" id="athModalEstiloSublinhado" aria-pressed="${Boolean(r.sublinhado)}" title="Sublinhado">${svgIcone('sublinhado', 16)}</button>
+            <button type="button" class="rm-ic-bt ath-fmt-txt ${r.caixa_alta ? 'on' : ''}" id="athModalEstiloCaixaAlta" aria-pressed="${Boolean(r.caixa_alta)}" title="Caixa alta: todo o texto em letras maiúsculas">AA</button>
+            <button type="button" class="rm-ic-bt ath-fmt-txt ${r.hifenizacao ? 'on' : ''}" id="athModalEstiloHifen" aria-pressed="${Boolean(r.hifenizacao)}" title="Hifenização: divide palavras no fim da linha (a-b)">a-b</button>
+          </div>
+        </div>
+
         <!-- 7 Modos de Formato / Alinhamento -->
         <div>
           <span style="display:block; font:800 11.5px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:#475569; margin-bottom:6px;">
@@ -323,15 +334,6 @@ export class ModalEditorEstilo {
           <label style="font:700 12px var(--glx-font); color:#334155; display:flex; align-items:center; gap:8px;">
             Cor do Texto:
             <input type="color" id="athModalEstiloCor" value="${corAtiva.startsWith('#') ? corAtiva : '#1F2733'}" style="width:36px; height:28px; border:1px solid #CBD5E1; border-radius:6px; cursor:pointer;">
-          </label>
-          <label class="rm-chk" style="font-size:12.5px; font-weight:700; color:#334155;">
-            <input type="checkbox" id="athModalEstiloItalico" ${r.italico ? 'checked' : ''}> Itálico
-          </label>
-          <label class="rm-chk" style="font-size:12.5px; font-weight:700; color:#334155;">
-            <input type="checkbox" id="athModalEstiloSublinhado" ${r.sublinhado ? 'checked' : ''}> Sublinhado
-          </label>
-          <label class="rm-chk" style="font-size:12.5px; font-weight:700; color:#334155;">
-            <input type="checkbox" id="athModalEstiloHifen" ${r.hifenizacao ? 'checked' : ''}> Hifenização (a-b)
           </label>
         </div>
 
@@ -386,19 +388,14 @@ export class ModalEditorEstilo {
       atualizarPrevia();
     });
 
-    modal.querySelector('#athModalEstiloItalico').addEventListener('change', e => {
-      this.rascunho.italico = e.target.checked;
-      atualizarPrevia();
-    });
-
-    modal.querySelector('#athModalEstiloSublinhado').addEventListener('change', e => {
-      this.rascunho.sublinhado = e.target.checked;
-      atualizarPrevia();
-    });
-
-    modal.querySelector('#athModalEstiloHifen').addEventListener('change', e => {
-      this.rascunho.hifenizacao = e.target.checked;
-      atualizarPrevia();
+    // ícones de formato: alternam o campo no rascunho do estilo
+    [['#athModalEstiloItalico', 'italico'], ['#athModalEstiloSublinhado', 'sublinhado'], ['#athModalEstiloCaixaAlta', 'caixa_alta'], ['#athModalEstiloHifen', 'hifenizacao']].forEach(([id, campo]) => {
+      modal.querySelector(id)?.addEventListener('click', (e) => {
+        this.rascunho[campo] = !this.rascunho[campo];
+        e.currentTarget.classList.toggle('on', Boolean(this.rascunho[campo]));
+        e.currentTarget.setAttribute('aria-pressed', String(Boolean(this.rascunho[campo])));
+        atualizarPrevia();
+      });
     });
 
     ligarCamposAvancados(modal, this.rascunho, atualizarPrevia);

@@ -13,6 +13,7 @@ export const TIPOS_MARCADOR = Object.freeze([
   ['traco', '–  Travessão / alínea'],
   ['quadrado', '▪  Quadrado'],
   ['ponto_traco', '·–  Ponto-traço'],
+  ['simbolo', 'Símbolo da paleta'],
   ['numero', '1, 2, 3…  Numeração']
 ]);
 
@@ -32,11 +33,28 @@ export const SEPARADORES_NUMERO = Object.freeze([
   ['travessao', '1 –']
 ]);
 
-export const CAMPOS_MARCADOR = Object.freeze(['marcador_tipo', 'marcador_estilo_num', 'marcador_separador', 'marcador_inicio', 'marcador_nivel', 'marcador_tab_mm', 'marcador_alinhamento']);
+/** Paleta de símbolos para marcadores (qualquer um serve; fica em `marcador_simbolo` com `marcador_tipo: "simbolo"`). */
+export const SIMBOLOS_MARCADOR = Object.freeze([
+  '•', '◦', '▪', '▫', '●', '○', '■', '□', '◆', '◇', '◉', '◈',
+  '★', '☆', '✦', '✧', '❖', '✱', '✲', '※', '✓', '✔', '✗', '✘',
+  '➤', '►', '▸', '▶', '➔', '➜', '➢', '→', '⇒', '»', '❯', '‣',
+  '–', '—', '·', '⁃', '⚬', '♦', '♠', '♣', '♥', '☑', '☐', '✎'
+]);
+
+/** Formatos de sequência: cada estilo de numeração com cada pontuação (24 combinações). */
+export const FORMATOS_SEQUENCIA = Object.freeze(ESTILOS_NUMERO.flatMap(([estilo]) => SEPARADORES_NUMERO.map(([sep]) => ({ estilo, sep }))));
+
+export const CAMPOS_MARCADOR = Object.freeze(['marcador_tipo', 'marcador_simbolo', 'marcador_estilo_num', 'marcador_separador', 'marcador_inicio', 'marcador_nivel', 'marcador_tab_mm', 'marcador_alinhamento']);
 
 const GLIFOS = { circulo: '•', traco: '–', quadrado: '▪', ponto_traco: '·–' };
 const TIPOS_VALIDOS = new Set(TIPOS_MARCADOR.map(t => t[0]));
 const ALINHAMENTOS = new Set(['left', 'center', 'right']);
+
+/** Símbolo de marcador aceito: texto curto (até 2 caracteres), sem marcação nem caracteres de controle; senão ''. */
+export const simboloValido = (v) => {
+  const t = Array.from(String(v ?? '').trim());
+  return t.length >= 1 && t.length <= 2 && !/[<>&"'\\\u0000-\u001f]/.test(t.join('')) ? t.join('') : '';
+};
 
 const inteiro = (v, min, max, pad) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : pad; };
 
@@ -48,6 +66,7 @@ export function marcadorEfetivo(bloco, estilo) {
   const alin = pega('marcador_alinhamento', 'left');
   return {
     tipo,
+    simbolo: simboloValido(estilo?.marcador_simbolo) || '•',
     estiloNum: pega('marcador_estilo_num', 'decimal'),
     separador: pega('marcador_separador', 'ponto'),
     inicio: inteiro(estilo?.marcador_inicio, 1, 999, 1),
@@ -77,6 +96,7 @@ export function formatarNumeroMarcador(n, estiloNum = 'decimal') {
 /** Texto do marcador para o item de número `n` ("•", "1.", "a)", "(iii)", "01 –"…). */
 export function rotuloMarcador(cfg, n = 1) {
   if (!cfg) return '';
+  if (cfg.tipo === 'simbolo') return simboloValido(cfg.simbolo) || '•';
   if (cfg.tipo !== 'numero') return GLIFOS[cfg.tipo] || '•';
   const num = formatarNumeroMarcador(n, cfg.estiloNum);
   switch (cfg.separador) {
@@ -124,6 +144,7 @@ export function sanearCamposMarcador(estilo) {
   if (!estilo || typeof estilo !== 'object') return estilo;
   const novo = { ...estilo };
   if (!TIPOS_VALIDOS.has(novo.marcador_tipo) || novo.marcador_tipo === 'nenhum') { CAMPOS_MARCADOR.forEach(k => delete novo[k]); return novo; }
+  if (novo.marcador_tipo === 'simbolo') { const sv = simboloValido(novo.marcador_simbolo); if (sv) novo.marcador_simbolo = sv; else { novo.marcador_tipo = 'circulo'; delete novo.marcador_simbolo; } } else delete novo.marcador_simbolo;
   if (!ESTILOS_NUMERO.some(e => e[0] === novo.marcador_estilo_num)) delete novo.marcador_estilo_num;
   if (!SEPARADORES_NUMERO.some(e => e[0] === novo.marcador_separador)) delete novo.marcador_separador;
   if (novo.marcador_inicio !== undefined) novo.marcador_inicio = inteiro(novo.marcador_inicio, 1, 999, 1);
@@ -139,6 +160,7 @@ export function configListaDoBloco(bloco, estilo, padrao = {}) {
   const alin = estilo?.marcador_alinhamento ?? 'left';
   return {
     tipo: ef?.tipo || padrao.tipo || 'circulo',
+    simbolo: ef?.simbolo || simboloValido(estilo?.marcador_simbolo) || '•',
     estiloNum: ef?.estiloNum || estilo?.marcador_estilo_num || 'decimal',
     separador: ef?.separador || estilo?.marcador_separador || 'ponto',
     nivel: inteiro(estilo?.marcador_nivel, 1, 5, 1),

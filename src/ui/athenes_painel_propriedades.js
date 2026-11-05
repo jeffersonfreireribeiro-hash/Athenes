@@ -1289,6 +1289,15 @@ export class PainelPropriedades {
         </label>
       </div>
 
+      <div>
+        <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">Formato</span>
+        <div class="rm-icg ath-fmt-icones" role="group" aria-label="Formato do texto do estilo">
+          <button type="button" class="rm-ic-bt ${rasc.italico ? 'on' : ''}" id="athEstiloItalico" aria-pressed="${Boolean(rasc.italico)}" title="Itálico">${svgIcone('italico', 16)}</button>
+          <button type="button" class="rm-ic-bt ath-fmt-txt ${rasc.caixa_alta ? 'on' : ''}" id="athEstiloCaixaAlta" aria-pressed="${Boolean(rasc.caixa_alta)}" title="Caixa alta: todo o texto em letras maiúsculas">AA</button>
+          <button type="button" class="rm-ic-bt ath-fmt-txt ${rasc.hifenizacao ? 'on' : ''}" id="athEstiloHifenizacao" aria-pressed="${Boolean(rasc.hifenizacao)}" title="Hifenização: divide palavras no fim da linha (exem-plo)">a-b</button>
+        </div>
+      </div>
+
       <!-- FORMATO: 7 botões ocupando 100% da largura útil -->
       <div>
         <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">
@@ -1330,18 +1339,6 @@ export class PainelPropriedades {
       </div>
 
       ${secaoAvancadaHtml()}
-
-      <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
-        <label class="rm-chk" style="font-size:12px;">
-          <input type="checkbox" id="athEstiloItalico" ${rasc.italico ? 'checked' : ''}> Itálico
-        </label>
-        <label class="rm-chk" style="font-size:12px;">
-          <input type="checkbox" id="athEstiloCaixaAlta" ${rasc.caixa_alta ? 'checked' : ''}> Caixa Alta
-        </label>
-        <label class="rm-chk" style="font-size:12px;" title="Ativa quebra silábica de palavras com hífen (exem-plo)">
-          <input type="checkbox" id="athEstiloHifenizacao" ${rasc.hifenizacao ? 'checked' : ''}> Hifenização (exem-plo)
-        </label>
-      </div>
 
       <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px; padding-top:10px; border-top:1px solid var(--ath-primary-line, #C8D7E6);">
         <div style="display:flex; gap:8px;">
@@ -1414,22 +1411,19 @@ export class PainelPropriedades {
       atualizarPrevia();
     });
 
-    box.querySelector('#athEstiloHifenizacao')?.addEventListener('change', e => {
-      rasc.hifenizacao = e.target.checked;
+    // itálico, caixa alta e hifenização: botões de alternar (ícones sob o tamanho da fonte)
+    const alternarFormato = (id, campo) => box.querySelector(id)?.addEventListener('click', (e) => {
+      rasc[campo] = !rasc[campo];
+      e.currentTarget.classList.toggle('on', Boolean(rasc[campo]));
+      e.currentTarget.setAttribute('aria-pressed', String(Boolean(rasc[campo])));
       atualizarPrevia();
     });
+    alternarFormato('#athEstiloHifenizacao', 'hifenizacao');
 
     ligarCamposAvancados(box, rasc, atualizarPrevia);
 
-    box.querySelector('#athEstiloItalico').addEventListener('change', e => {
-      rasc.italico = e.target.checked;
-      atualizarPrevia();
-    });
-
-    box.querySelector('#athEstiloCaixaAlta').addEventListener('change', e => {
-      rasc.caixa_alta = e.target.checked;
-      atualizarPrevia();
-    });
+    alternarFormato('#athEstiloItalico', 'italico');
+    alternarFormato('#athEstiloCaixaAlta', 'caixa_alta');
 
     box.querySelector('#athBtnSalvarEstilo').addEventListener('click', () => {
       gravarRascunhoNoEstilo(est, rasc);

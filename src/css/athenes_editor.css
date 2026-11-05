@@ -2718,3 +2718,24 @@ a.ath-citacao-link { color: inherit; text-decoration: none; cursor: pointer; }
 .ath-palco-reguas.sem-reguas > .rm-prev-palco { margin: 0; }
 .rm-editor.ath-modo-revisao .ath-regua-h, .rm-editor.ath-modo-revisao .ath-regua-v, .rm-editor.ath-modo-revisao .ath-regua-canto { display: none; }
 .rm-editor.ath-modo-revisao .ath-palco-reguas > .rm-prev-palco { margin: 0; }
+ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-simbolo); }
+
+/* Marcadores e numeração do estilo: modos, paleta de símbolos e formatos de sequência */
+.ath-mk { display: flex; flex-direction: column; gap: 8px; }
+.ath-mk-titulo { font: 800 11.5px var(--glx-font); text-transform: uppercase; letter-spacing: .05em; color: #475569; }
+.ath-mk-modos { display: flex; gap: 3px; padding: 3px; background: #EEF2F6; border-radius: 10px; }
+.ath-mk-modos button { flex: 1; border: 0; background: transparent; padding: 6px 6px; border-radius: 8px; font: 700 12px var(--glx-font); color: #64748B; cursor: pointer; }
+.ath-mk-modos button.on { background: #fff; color: #314F79; box-shadow: 0 1px 3px rgba(15, 23, 42, .14); }
+.ath-mk-painel[hidden] { display: none; }
+.ath-mk-painel { display: flex; flex-direction: column; gap: 8px; }
+.ath-mk-grade { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 6px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
+.ath-mk-grade-seq { grid-template-columns: repeat(4, 1fr); }
+.ath-mk-cel { height: 32px; border: 1px solid transparent; border-radius: 8px; background: #fff; color: #1E293B; font: 600 16px/1 var(--glx-font, sans-serif); cursor: pointer; display: grid; place-items: center; padding: 0; }
+.ath-mk-cel-seq { font-size: 12.5px; font-weight: 700; }
+.ath-mk-cel:hover { background: #EEF4FA; border-color: #C8D7E6; }
+.ath-mk-cel.on { background: #314F79; border-color: #314F79; color: #fff; }
+.ath-mk-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ath-mk-campo { display: flex; flex-direction: column; gap: 3px; font: 700 11.5px var(--glx-font); color: #334155; }
+.ath-mk-campo .ath-input, .ath-mk-campo .ath-select { height: 34px; width: 100%; box-sizing: border-box; }
+.ath-mk-dica { color: #64748B; font-size: 11px; line-height: 1.4; }
+.ath-fmt-icones .ath-fmt-txt { font: 800 12px var(--glx-font, sans-serif); letter-spacing: .02em; }

@@ -2677,6 +2677,7 @@ export class EditorView {
           : lista.classList.contains('ath-lista-quadrado') ? 'quadrado'
           : 'circulo';
         lista.dataset.marcador = tipoMarc;
+        if (tipoMarc === 'simbolo') lista.querySelectorAll(':scope > li').forEach(li => { li.dataset.simbolo = cfg?.simbolo || '•'; }); // o CSS mostra o símbolo escolhido
       }
     });
   }
