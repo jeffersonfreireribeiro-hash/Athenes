@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
- * Athenes — Zoom do canvas (palco de páginas) com Ctrl/Cmd + roda do mouse.
+ * Athenes — Zoom do canvas (palco de páginas) com Ctrl/Cmd + roda do mouse e pinch-to-zoom em tablets/touchscreen.
  *
- * - Disparado só com `ctrlKey || metaKey` (inclui o pinch do trackpad, que chega como wheel+ctrl).
+ * - Disparado com `ctrlKey || metaKey` (roda / trackpad) ou gesto de pinça touch com 2 dedos.
  * - Escala exponencial suave, limitada a 25%–400%.
- * - Âncora no cursor: o ponto do conteúdo sob o ponteiro permanece sob o ponteiro.
+ * - Âncora no cursor / ponto central do toque.
  * - `preventDefault()` exige listener não passivo, por isso `{ passive: false }`.
  */
 
@@ -60,6 +60,38 @@ export function instalarZoomCanvas(palco, { obter, definir }) {
     palco.scrollTop = scrollAncorado(palco.scrollTop, oy, antigo, novo);
   };
 
+  // Suporte a Pinch-to-Zoom touch com 2 dedos em tablets
+  palco.style.touchAction = 'pan-x pan-y';
+  let distIni = 0;
+  let zoomBaseTouch = 1;
+  const aoTouchStart = (e) => {
+    if (e.touches && e.touches.length >= 2) {
+      distIni = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      zoomBaseTouch = obter();
+    }
+  };
+  const aoTouchMove = (e) => {
+    if (e.touches && e.touches.length >= 2 && distIni > 8) {
+      if (e.cancelable) e.preventDefault();
+      const distAtual = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const ratio = distAtual / distIni;
+      const novo = limitarZoom(zoomBaseTouch * ratio);
+      aplicar(novo);
+    }
+  };
+  const aoTouchEnd = (e) => {
+    if (!e.touches || e.touches.length < 2) distIni = 0;
+  };
+
   palco.addEventListener('wheel', aoRoda, { passive: false });
-  return () => palco.removeEventListener('wheel', aoRoda);
+  palco.addEventListener('touchstart', aoTouchStart, { passive: true });
+  palco.addEventListener('touchmove', aoTouchMove, { passive: false });
+  palco.addEventListener('touchend', aoTouchEnd, { passive: true });
+
+  return () => {
+    palco.removeEventListener('wheel', aoRoda);
+    palco.removeEventListener('touchstart', aoTouchStart);
+    palco.removeEventListener('touchmove', aoTouchMove);
+    palco.removeEventListener('touchend', aoTouchEnd);
+  };
 }

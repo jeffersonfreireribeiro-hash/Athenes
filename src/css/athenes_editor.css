@@ -3008,7 +3008,29 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
 }
 
 /* Barra de blocos do editor em UMA linha: o miolo (ícones de inserção) rola na horizontal, sem barra */
-.rm-barra-blocos.ath-barra-uma-linha { flex-wrap: nowrap; }
+.rm-barra-blocos.ath-barra-uma-linha {
+  flex-wrap: nowrap !important;
+}
+.rm-barra-blocos {
+  flex-wrap: nowrap !important;
+}
+.ath-barra-rolagem {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  padding: 2px 0;
+}
+.ath-barra-rolagem::-webkit-scrollbar {
+  display: none;
+}
 .ath-barra-rolagem { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; touch-action: pan-x; padding: 2px 0; }
 .ath-barra-rolagem::-webkit-scrollbar { display: none; }
 .ath-barra-rolagem > * { flex: none; }
@@ -3021,7 +3043,7 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
 #athEstudioBarraFlutuante .rm-ic-bt[data-tip]::after { display: none; }
 
 /* Barra de cima em tablets e telas menores: nada fica cortado (rótulos viram só ícone, título encolhe) */
-@media (max-width: 1180px) {
+@media (max-width: 1366px) {
   .ath-topo-shell { padding: 0 10px; gap: 8px; }
   .ath-topo-esq, .ath-topo-dir { gap: 6px; min-width: 0; }
   .ath-topo-esq { flex: 1 1 auto; }
@@ -3032,4 +3054,10 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
   .ath-topo-shell .rm-btn-menu-topo > span,
   .ath-topo-dir .glx-btn > span { display: none; }
   .ath-topo-shell .rm-btn-menu-topo, .ath-topo-dir .glx-btn { padding-left: 10px; padding-right: 10px; }
+}
+
+/* Suporte a Pinch-to-Zoom e Pan suave em tablets */
+.rm-prev-palco, #athEstudioPalco, #rmPrevPalco {
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
 }

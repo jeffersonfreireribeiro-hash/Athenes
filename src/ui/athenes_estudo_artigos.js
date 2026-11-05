@@ -358,7 +358,7 @@ export class EstudoArtigosView {
 
     filtrados.forEach(art => {
       const card = document.createElement('article');
-      card.className = 'ath-artigo-zotero-card';
+      card.className = 'ath-doc-card ath-artigo-zotero-card';
 
       const autoresFmt = (art.autores || []).map(a => `${a.sobrenome}, ${a.prenome?.[0] || ''}.`).join('; ');
       const qtdCitacoes = art.fichamento?.citacoesMarcadas?.length || 0;
@@ -366,48 +366,28 @@ export class EstudoArtigosView {
       const qtdPins = Object.values(art.fichamento?.notasPagina || {}).reduce((acc, l) => acc + (Array.isArray(l) ? l.length : 0), 0);
 
       card.innerHTML = `
-        <div class="ath-artigo-capa-pdf" style="border-top: 4px solid ${escapeHtml(art.corCapa || '#314F79')};">
-          <div class="ath-artigo-capa-folha">
-            <span class="ath-artigo-capa-periodico">${escapeHtml(art.publicacao || 'Periódico Científico')} · ${escapeHtml(art.ano)}</span>
-            <strong class="ath-artigo-capa-titulo">${escapeHtml(art.titulo)}</strong>
-            <span class="ath-artigo-capa-autores">${escapeHtml(autoresFmt)}</span>
-            <div class="ath-artigo-capa-linhas" aria-hidden="true">
-              <span></span><span class="hl"></span><span></span><span></span>
-            </div>
-          </div>
-          <div class="ath-artigo-capa-badges">
-            <span class="ath-selo-zotero" title="Chave do item no Zotero">${svgIcone('zotero', 11)} ${escapeHtml(art.chaveZotero || 'ZOTERO')}</span>
-            <span class="ath-selo-drive" title="PDF lido e salvo diretamente no Google Drive">${svgIcone('drive', 11)} PDF no Drive</span>
-          </div>
+        <div class="ath-doc-card-capa-preview" style="border-left: 4px solid ${escapeHtml(art.corCapa || '#314F79')};">
+          <div class="ath-doc-card-capa-titulo">${escapeHtml(art.titulo)}</div>
+          <div class="ath-doc-card-capa-autor">${escapeHtml(autoresFmt)} · ${escapeHtml(art.ano)}</div>
         </div>
 
-        <div class="ath-artigo-card-corpo">
-          <div class="ath-artigo-tags">
-            ${(art.palavrasChave || []).slice(0, 3).map(t => `<span class="ath-tag-chip">${escapeHtml(t)}</span>`).join('')}
-          </div>
+        <div class="ath-doc-card-header">
+          <span class="ath-badge ath-badge-primary">ARTIGO</span>
+          <span class="ath-badge ath-badge-info" title="Chave Zotero">${svgIcone('zotero', 10)} ${escapeHtml(art.chaveZotero || 'ZOTERO')}</span>
+          ${artigoTemPdf(art)
+            ? `<span class="ath-badge ath-badge-ok" title="PDF Vinculado">${svgIcone('drive', 10)} PDF</span>`
+            : (art.anexoPdfZotero?.baixavel ? `<span class="ath-badge ath-badge-info">PDF ZOTERO</span>` : `<span class="ath-badge ath-badge-warn">SEM PDF</span>`)}
+        </div>
 
-          <h3 class="ath-artigo-titulo">${escapeHtml(art.titulo)}</h3>
-          <p class="ath-artigo-autores">${escapeHtml(autoresFmt)} (${escapeHtml(art.ano)})</p>
-          <p class="ath-artigo-resumo-curto">
-            ${art.fichamento?.resumoPessoal
-              ? `<strong>Seu resumo:</strong> ${escapeHtml(art.fichamento.resumoPessoal)}`
-              : escapeHtml(art.resumoOriginal || 'Clique para abrir em tela cheia, riscar o PDF e fazer o fichamento.')}
-          </p>
+        <h3 class="ath-doc-card-titulo">${escapeHtml(art.titulo)}</h3>
+        <p class="ath-doc-card-subtitulo">${escapeHtml(art.fichamento?.resumoPessoal || art.resumoOriginal || 'Sem anotações')}</p>
 
-          <div class="ath-artigo-estatisticas">
-            <span><strong>${qtdCitacoes}</strong> citaç${qtdCitacoes === 1 ? 'ão' : 'ões'}</span>
-            <span>·</span>
-            <span><strong>${qtdTracos + qtdPins}</strong> marcaç${(qtdTracos + qtdPins) === 1 ? 'ão' : 'ões'} no PDF</span>
-            <span>·</span>
-            ${artigoTemPdf(art) ? `<span style="color:#059669; font-weight:700;">${escapeHtml(art.driveFileName || 'PDF vinculado')}</span>` : (art.anexoPdfZotero?.baixavel ? '<span style="color:#314F79; font-weight:700;">PDF disponível no Zotero</span>' : art.anexoPdfZotero ? '<span style="color:#B45309; font-weight:700;" title="Arquivo vinculado: só existe no seu computador e o Zotero não o envia">PDF só no seu computador (vinculado, não baixável)</span>' : '<span style="color:#B45309; font-weight:700;">Sem PDF vinculado</span>')}
-          </div>
-
-          <div class="ath-artigo-card-rodape">
-            <button type="button" class="ath-btn ath-btn-primary ath-btn-sm ath-btn-abrir-estudio" style="flex:1; justify-content:center;">
-              ${svgIcone('lapis', 13)} Abrir em Tela Cheia (PDF & Fichamento)
-            </button>
-            <button type="button" class="ath-btn ath-btn-sm ath-btn-compartilhar-artigo" title="Compartilhar documento com outras pessoas">${svgIcone('usuarios', 13)}</button>
-            <button type="button" class="ath-btn ath-btn-sm ath-btn-excluir-artigo" title="Remover artigo da lista">${svgIcone('lixeira', 13)}</button>
+        <div class="ath-doc-card-meta">
+          <span>${qtdCitacoes} citação(ões) · ${qtdTracos + qtdPins} marcação(ões)</span>
+          <div class="ath-doc-card-actions">
+            <button type="button" class="ath-btn ath-btn-sm ath-btn-compartilhar-artigo" title="Compartilhar documento com outras pessoas" aria-label="Compartilhar">${svgIcone('usuarios', 12)}</button>
+            <button type="button" class="ath-btn ath-btn-sm ath-btn-primary ath-btn-abrir-estudio">Abrir</button>
+            <button type="button" class="ath-btn ath-btn-sm ath-btn-excluir-artigo" title="Remover artigo da lista" aria-label="Remover">${svgIcone('lixeira', 12)}</button>
           </div>
         </div>
       `;
@@ -872,6 +852,10 @@ export class EstudoArtigosView {
       const lbl = container.querySelector('#athZoomRotulo');
       if (lbl) {
         lbl.textContent = `Escala / Zoom das Folhas PDF (${this.zoomPct}%)`;
+      }
+      const indBarra = container.querySelector('#athBtnZoomIndicadorBarra');
+      if (indBarra) {
+        indBarra.textContent = `${this.zoomPct}%`;
       }
     }
   }

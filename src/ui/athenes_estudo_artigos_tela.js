@@ -246,6 +246,13 @@ export const metodosEstudoTela = {
               ${[0, 1, 2, 3].map(() => `<button type="button" class="ath-esp-btn" data-esp="0"><span></span></button>`).join('')}
             </div>
 
+            <!-- Controles de Zoom para Tablet e Desktop -->
+            <div class="ath-zoom-controles-barra" style="display:flex; align-items:center; gap:2px; background:#F1F5F9; border:1px solid #CBD5E1; border-radius:999px; padding:2px 4px;" title="Zoom das folhas">
+              <button type="button" class="rm-ic-bt" id="athBtnZoomMenos" title="Diminuir Zoom" aria-label="Diminuir Zoom" style="width:26px; height:26px; font-weight:800; font-size:14px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer;">−</button>
+              <button type="button" id="athBtnZoomIndicadorBarra" title="Clique para alternar escala (100% · 125% · 150% · 75%)" style="border:none; background:transparent; font:800 11.5px var(--glx-font, inherit); color:#314F79; padding:0 5px; cursor:pointer; min-width:40px; text-align:center;">${this.zoomPct}%</button>
+              <button type="button" class="rm-ic-bt" id="athBtnZoomMais" title="Aumentar Zoom" aria-label="Aumentar Zoom" style="width:26px; height:26px; font-weight:800; font-size:14px; display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer;">+</button>
+            </div>
+
             <!-- Botão de Adicionar Folha Extra e Indicador de Página à Direita -->
             <div style="margin-left:auto; display:flex; align-items:center; gap:6px;">
               <span id="athIndicadorPagBarra" style="font:800 11.5px var(--glx-font); color:#314F79; background:#EEF4FA; padding:4px 10px; border-radius:999px;">
@@ -367,7 +374,7 @@ export const metodosEstudoTela = {
     };
     window.addEventListener('keydown', this._tecladoZoomHandler);
 
-    // Suporte a zoom com Ctrl + Roda do Mouse no Palco do PDF
+    // Suporte a zoom com Ctrl + Roda do Mouse e Gesto de Pinça (Pinch-to-zoom) no Palco do PDF
     const palcoZoomEl = root.querySelector('#athEstudioPalco');
     if (palcoZoomEl) {
       palcoZoomEl.addEventListener('wheel', (e) => {
@@ -377,7 +384,51 @@ export const metodosEstudoTela = {
           this.aplicarZoom(this.zoomPct + delta, root);
         }
       }, { passive: false });
+
+      // Gesto de pinça touch com 2 dedos para Tablets e Telas Touch
+      let distIniTouch = 0;
+      let zoomBaseTouch = 100;
+      palcoZoomEl.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches.length === 2) {
+          distIniTouch = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          zoomBaseTouch = this.zoomPct;
+        }
+      }, { passive: true });
+
+      palcoZoomEl.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches.length === 2 && distIniTouch > 10) {
+          e.preventDefault();
+          const distAtual = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          const ratio = distAtual / distIniTouch;
+          const novoZoom = Math.round((zoomBaseTouch * ratio) / 5) * 5;
+          this.aplicarZoom(novoZoom, root);
+        }
+      }, { passive: false });
+
+      palcoZoomEl.addEventListener('touchend', (e) => {
+        if (!e.touches || e.touches.length < 2) distIniTouch = 0;
+      }, { passive: true });
     }
+
+    // Botões dedicados de zoom na barra flutuante (Tablets e Desktop)
+    root.querySelector('#athBtnZoomMenos')?.addEventListener('click', () => {
+      this.aplicarZoom(this.zoomPct - 15, root);
+    });
+    root.querySelector('#athBtnZoomMais')?.addEventListener('click', () => {
+      this.aplicarZoom(this.zoomPct + 15, root);
+    });
+    root.querySelector('#athBtnZoomIndicadorBarra')?.addEventListener('click', () => {
+      const escalas = [100, 125, 150, 75];
+      const idx = escalas.indexOf(this.zoomPct);
+      const proximo = escalas[(idx + 1) % escalas.length];
+      this.aplicarZoom(proximo, root);
+    });
 
     root.querySelector('#athInputTituloArtigoTopo').addEventListener('change', e => {
       art.titulo = e.target.value.trim() || art.titulo;

@@ -704,8 +704,11 @@ export class EditorView {
       };
       instalarZoomCanvas(palcoNovo, { obter: () => this.zoomCanvas, definir });
       ind?.addEventListener('click', () => {
-        palcoNovo.style.setProperty('--ath-zoom', '1');
-        definir(1);
+        const escalas = [1, 1.25, 1.5, 0.8];
+        const zAtual = this.zoomCanvas || 1;
+        const prox = escalas.find(z => z > zAtual + 0.05) || escalas[0];
+        palcoNovo.style.setProperty('--ath-zoom', String(prox));
+        definir(prox);
       });
     }
     const esqNovo = root.querySelector('#rmColEsq');
