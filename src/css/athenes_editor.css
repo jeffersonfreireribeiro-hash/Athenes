@@ -2739,3 +2739,5 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
 .ath-mk-campo .ath-input, .ath-mk-campo .ath-select { height: 34px; width: 100%; box-sizing: border-box; }
 .ath-mk-dica { color: #64748B; font-size: 11px; line-height: 1.4; }
 .ath-fmt-icones .ath-fmt-txt { font: 800 12px var(--glx-font, sans-serif); letter-spacing: .02em; }
+/* modo de trabalho, réguas e grade ficam juntos, encostados à direita da barra (só o primeiro leva a margem automática) */
+.rm-barra-blocos .ath-modo-wrap ~ .rm-ic-bt, .rm-barra-blocos .ath-modo-wrap ~ .rm-ic-guia { margin-left: 0; }
