@@ -3006,3 +3006,30 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
 .rm-barra-blocos .rm-ic-guia {
   margin-left: 0 !important;
 }
+
+/* Barra de blocos do editor em UMA linha: o miolo (ícones de inserção) rola na horizontal, sem barra */
+.rm-barra-blocos.ath-barra-uma-linha { flex-wrap: nowrap; }
+.ath-barra-rolagem { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; touch-action: pan-x; padding: 2px 0; }
+.ath-barra-rolagem::-webkit-scrollbar { display: none; }
+.ath-barra-rolagem > * { flex: none; }
+.ath-barra-rolagem .rm-ic-bt[data-tip]::after { display: none; }
+.rm-barra-blocos.ath-barra-uma-linha > .ath-modo-wrap { margin-left: 0 !important; }
+/* barra de ferramentas do leitor também rola de lado em vez de quebrar */
+#athEstudioBarraFlutuante { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+#athEstudioBarraFlutuante::-webkit-scrollbar { display: none; }
+#athEstudioBarraFlutuante > * { flex: none; }
+#athEstudioBarraFlutuante .rm-ic-bt[data-tip]::after { display: none; }
+
+/* Barra de cima em tablets e telas menores: nada fica cortado (rótulos viram só ícone, título encolhe) */
+@media (max-width: 1180px) {
+  .ath-topo-shell { padding: 0 10px; gap: 8px; }
+  .ath-topo-esq, .ath-topo-dir { gap: 6px; min-width: 0; }
+  .ath-topo-esq { flex: 1 1 auto; }
+  .ath-topo-dir { flex: none; }
+  .ath-doc-titulo-topo { min-width: 0; width: auto; flex: 1 1 80px; max-width: 240px; text-overflow: ellipsis; }
+  .ath-topo-esq > *:not(.ath-doc-titulo-topo) { flex: none; }
+  .ath-selo-zotero { display: none !important; }
+  .ath-topo-shell .rm-btn-menu-topo > span,
+  .ath-topo-dir .glx-btn > span { display: none; }
+  .ath-topo-shell .rm-btn-menu-topo, .ath-topo-dir .glx-btn { padding-left: 10px; padding-right: 10px; }
+}

@@ -568,7 +568,7 @@ export class EditorView {
 
         <!-- COLUNA CENTRAL: Prévia da Folha A4 com Barra de Blocos Flutuante e Edição Direta -->
         <section class="rm-col rm-col-prev" id="rmColPrev">
-          <div class="rm-barra-blocos" id="rmBarraBlocos">
+          <div class="rm-barra-blocos ath-barra-uma-linha" id="rmBarraBlocos">
             <button type="button" class="rm-ic-bt" id="rmVoltar" title="Voltar para a Visão Geral" aria-label="Voltar">
               ${svgIcone('voltar', 16)}
             </button>
@@ -594,7 +594,8 @@ export class EditorView {
             </div>
             <span class="rm-barra-sep" aria-hidden="true"></span>
 
-            <!-- Botões de Inserção de Blocos com Ícones Glaux -->
+            <!-- Botões de Inserção de Blocos: faixa única com rolagem horizontal (arrastar), sem barra visível -->
+            <div class="ath-barra-rolagem" id="athBarraRolagem">
             <button type="button" class="rm-ic-bt" id="rmAddTitulo" data-tip="Título" title="Inserir Título">${svgIcone('titulo', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddTexto" data-tip="Texto" title="Inserir Parágrafo">${svgIcone('paragrafo', 16)}</button>
             <div class="rm-grupo-bt" data-grupo="figura">
@@ -622,6 +623,7 @@ export class EditorView {
             <button type="button" class="rm-ic-bt" id="rmAddSumario" data-tip="Sumário" title="Inserir Sumário automático (títulos em todos os níveis)">${svgIcone('sumario', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddReferencias" data-tip="Bibliografia" title="Inserir a lista de referências (gerada sozinha com as obras citadas pelo Zotero)">${svgIcone('referencias', 16)}</button>
             <button type="button" class="rm-ic-bt" id="rmAddQuebra" data-tip="Quebra" title="Inserir Quebra de Página">${svgIcone('quebra_pagina', 16)}</button>
+            </div>
 
             <!-- Modo de trabalho (como no Docs): Edição / Sugestão / Comparar / Leitura -->
             <div class="ath-modo-wrap" id="athModoWrap">
@@ -1171,7 +1173,32 @@ export class EditorView {
   }
 
   /* Menus da barra de blocos (Figura: gráfico, fotografia…; Quadro: campos…) */
+  /* Faixa de ícones com rolagem horizontal sem barra: toque rola sozinho; mouse rola arrastando */
+  ligarRolagemArrastavel(faixa) {
+    if (!faixa || faixa._arrastavel) return;
+    faixa._arrastavel = true;
+    let ativo = false, moveu = false, x0 = 0, s0 = 0;
+    faixa.addEventListener('pointerdown', ev => {
+      if (ev.pointerType !== 'mouse' || ev.button !== 0) return;
+      ativo = true; moveu = false; x0 = ev.clientX; s0 = faixa.scrollLeft;
+    });
+    window.addEventListener('pointermove', ev => {
+      if (!ativo) return;
+      const dx = ev.clientX - x0;
+      if (!moveu && Math.abs(dx) > 5) { moveu = true; faixa.style.cursor = 'grabbing'; }
+      if (moveu) faixa.scrollLeft = s0 - dx;
+    });
+    window.addEventListener('pointerup', () => {
+      if (!ativo) return;
+      ativo = false; faixa.style.cursor = '';
+    });
+    faixa.addEventListener('click', ev => {
+      if (moveu) { ev.stopPropagation(); ev.preventDefault(); moveu = false; }
+    }, true);
+  }
+
   ligarMenusDeBlocos(root, adicionar) {
+    this.ligarRolagemArrastavel(root.querySelector('#athBarraRolagem'));
     const fecharTodos = () => {
       document.querySelectorAll('.rm-menu-bloco:not([hidden])').forEach(m => {
         m.hidden = true;
@@ -1200,6 +1227,15 @@ export class EditorView {
         fecharTodos();
         menu.hidden = !abrir;
         botao.setAttribute('aria-expanded', String(abrir));
+        if (abrir) {
+          // a faixa rola e corta o que passa da borda: o menu abre solto (fixed), colado embaixo do botão
+          const r = botao.getBoundingClientRect();
+          const larg = Math.max(menu.offsetWidth, 270);
+          menu.style.position = 'fixed';
+          menu.style.transform = 'none';
+          menu.style.top = `${Math.round(r.bottom + 10)}px`;
+          menu.style.left = `${Math.round(Math.max(8, Math.min(window.innerWidth - larg - 8, r.left + r.width / 2 - larg / 2)))}px`;
+        }
       });
       menu.querySelectorAll('.rm-menu-item').forEach(el => el.addEventListener('click', ev => {
         ev.stopPropagation();
