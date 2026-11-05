@@ -561,10 +561,26 @@ export class EstudoArtigosView {
 
   async abrirModalCompartilharArtigo(art) {
     if (!art) return;
+
+    // Se o artigo tem PDF local mas ainda não subiu para o Google Drive, garante o upload antes de compartilhar
+    const idAtualDrive = String(art.driveFileId || '').trim();
+    if (!idAtualDrive || /^drive_pdf_/.test(idAtualDrive)) {
+      const local = await obterPdfLocal(art.id);
+      if (local) {
+        await enviarPdfDoArtigoAoDrive(art, local).catch(() => {});
+      }
+    }
+
     if (!art.pdfDataUrl) {
       const dUrl = await obterPdfComoDataUrl(art.id);
       if (dUrl) art.pdfDataUrl = dUrl;
     }
+
+    // Garante que o arquivo PDF no Google Drive já tenha permissão compartilhada ativa
+    if (art.driveFileId && !/^drive_pdf_/.test(String(art.driveFileId))) {
+      compartilharPdfNoDrive(art.driveFileId, { publico: true }).catch(() => {});
+    }
+
     const sessao = lerSessaoSupabase();
     const idSufixo = sessao?.user_id ? `_${sessao.user_id.slice(0, 8)}` : '';
     const idDoc = art.docCompartilhadoId || `artigo_${art.id || 'ref'}${idSufixo}`;
@@ -578,14 +594,17 @@ export class EstudoArtigosView {
     };
     art.docCompartilhadoId = docRef.id;
     salvarArtigosEstudo(this.artigos, art);
+
     new ModalCompartilhar(docRef, obterPerfilColaborador(), {
       aoSalvar: async ({ pessoas, publico }) => {
         art.compartilhamento = { pessoas, publico };
+        docRef.artigoEstudo = { ...art, compartilhamento: { pessoas, publico } };
         salvarArtigosEstudo(this.artigos, art);
         if (art.driveFileId) {
           const arrPessoas = Object.entries(pessoas || {}).map(([email, papel]) => ({ email, papel }));
-          await compartilharPdfNoDrive(art.driveFileId, { pessoas: arrPessoas, publico });
+          await compartilharPdfNoDrive(art.driveFileId, { pessoas: arrPessoas, publico: true });
         }
+        await salvarDocumentoNoSupabase(docRef, obterPerfilColaborador()).catch(() => {});
         mostrarAviso('Permissões de acesso salvas com sucesso!', { tipo: 'ok' });
       }
     });

@@ -109,12 +109,46 @@ export async function carregarDocumentoCompartilhado(docId, fetchImpl = globalTh
 
 /** Marca o documento para o app tratá-lo como "de outra pessoa": papel, dono externo e sem envio ao Drive de quem recebeu. */
 export function marcarComoCompartilhado(doc, linha, papel) {
-  if (papel === 'dono') return doc;
+  const donoNome = doc.proprietario?.nome || linha.dono || linha.conteudo_json?.proprietario?.nome || (linha.conta ? linha.conta.split('@')[0] : 'Outro autor');
+  const donoEmail = doc.proprietario?.email || linha.conta || linha.conteudo_json?.proprietario?.email || '';
+  const propCompleto = {
+    ...(doc.proprietario || {}),
+    id: `ext_${linha.user_id}`,
+    nome: donoNome,
+    email: donoEmail,
+    conta: linha.conta || donoEmail
+  };
+  const compartilhamentoInfo = {
+    pessoas: linha.permissoes || {},
+    publico: Boolean(linha.publico_leitura)
+  };
+
+  if (papel === 'dono') {
+    doc.compartilhamento = compartilhamentoInfo;
+    if (doc.artigoEstudo) {
+      doc.artigoEstudo.compartilhamento = compartilhamentoInfo;
+      doc.artigoEstudo.docCompartilhadoId = linha.id || doc.id;
+    }
+    return doc;
+  }
+
   doc.compartilhadoComigo = true;
   doc.proprietarioExterno = true;
   doc.permissao = papel;
-  doc.proprietario = { ...(doc.proprietario || {}), id: `ext_${linha.user_id}`, nome: doc.proprietario?.nome || linha.dono || 'Outra pessoa' };
+  doc.proprietario = propCompleto;
   doc.salvoNuvem = true;
+  doc.compartilhamento = compartilhamentoInfo;
+
+  if (doc.artigoEstudo) {
+    doc.artigoEstudo.compartilhadoComigo = true;
+    doc.artigoEstudo.proprietarioExterno = true;
+    doc.artigoEstudo.permissao = papel;
+    doc.artigoEstudo.proprietario = { ...propCompleto };
+    doc.artigoEstudo.docCompartilhadoId = linha.id || doc.id;
+    doc.artigoEstudo.compartilhamento = compartilhamentoInfo;
+    doc.artigoEstudo.salvoNuvem = true;
+  }
+
   return doc;
 }
 

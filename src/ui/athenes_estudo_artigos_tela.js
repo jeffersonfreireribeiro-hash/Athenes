@@ -616,13 +616,21 @@ export const metodosEstudoTela = {
         btn.disabled = true;
         const textoOriginal = btn.innerHTML;
         btn.innerHTML = 'Buscando PDF na Nuvem...';
-        const ok = await garantirPdfDoArtigo(art);
+
+        let ok = await garantirPdfDoArtigo(art);
+        if (!ok && typeof obterTokenOuConectar === 'function') {
+          try {
+            await obterTokenOuConectar();
+            ok = await garantirPdfDoArtigo(art);
+          } catch (_) {}
+        }
+
         if (ok) {
           this.abrirArtigoNoEstudio(art);
         } else {
           btn.disabled = false;
           btn.innerHTML = textoOriginal;
-          mostrarAviso('O PDF original ainda não foi anexado à nuvem pelo proprietário. Peça a ele para abrir o artigo e clicar em Salvar/Sincronizar no Athenes dele.', { tipo: 'aviso' });
+          mostrarAviso('O PDF ainda não foi localizado na nuvem ou requer conexão com o Google Drive. Peça ao proprietário para verificar o compartilhamento no Athenes dele.', { tipo: 'aviso' });
         }
       });
     });

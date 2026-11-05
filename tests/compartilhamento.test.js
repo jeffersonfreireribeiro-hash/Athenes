@@ -79,3 +79,40 @@ test('ler compartilhamento devolve o papel de quem pergunta', async () => {
   const info = await lerCompartilhamento('d1', async () => resp([{ id: 'd1', user_id: 'U-ANA', compartilhado_com: [], permissoes: null, publico_leitura: false }]));
   assert.deepEqual([info.papel, info.permissoes], ['dono', {}]);
 });
+
+test('marcarComoCompartilhado propaga metadados de colaboração para artigoEstudo e mesclagem preserva proprietario externo', async () => {
+  const { mesclarFichamentoPreservandoDados } = await import('../src/ui/athenes_estudo_artigos_dados.js');
+  const linha = {
+    id: 'artigo_zot_123',
+    user_id: 'U-DONO',
+    conta: 'orientador@universidade.edu',
+    dono: 'Prof. Orientador',
+    permissoes: { 'aluno@universidade.edu': 'edicao' },
+    compartilhado_com: ['aluno@universidade.edu'],
+    publico_leitura: false
+  };
+  const docRef = {
+    id: 'artigo_zot_123',
+    titulo: '[Artigo] Estudo de Caso',
+    norma: 'zotero_pdf',
+    artigoEstudo: {
+      id: 'zot_123',
+      titulo: 'Estudo de Caso'
+    }
+  };
+  const marcado = marcarComoCompartilhado(docRef, linha, 'edicao');
+  assert.equal(marcado.compartilhadoComigo, true);
+  assert.equal(marcado.artigoEstudo.compartilhadoComigo, true);
+  assert.equal(marcado.artigoEstudo.proprietarioExterno, true);
+  assert.equal(marcado.artigoEstudo.permissao, 'edicao');
+  assert.equal(marcado.artigoEstudo.proprietario.nome, 'Prof. Orientador');
+  assert.equal(marcado.artigoEstudo.proprietario.email, 'orientador@universidade.edu');
+
+  // Testar mesclar com artigo existente localmente
+  const artLocal = { id: 'zot_123', titulo: 'Estudo de Caso Local' };
+  mesclarFichamentoPreservandoDados(artLocal, marcado.artigoEstudo);
+  assert.equal(artLocal.compartilhadoComigo, true);
+  assert.equal(artLocal.proprietarioExterno, true);
+  assert.equal(artLocal.permissao, 'edicao');
+  assert.equal(artLocal.proprietario.nome, 'Prof. Orientador');
+});

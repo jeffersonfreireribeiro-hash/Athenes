@@ -344,8 +344,13 @@ export function mesclarFichamentoPreservandoDados(artAlvo, artFonte) {
     if (artFonte.driveStatus) artAlvo.driveStatus = artFonte.driveStatus;
   }
   if (!artAlvo.notaZoteroKey && artFonte.notaZoteroKey) artAlvo.notaZoteroKey = artFonte.notaZoteroKey;
-  if (!artAlvo.docCompartilhadoId && artFonte.docCompartilhadoId) artAlvo.docCompartilhadoId = artFonte.docCompartilhadoId;
-  if (!artAlvo.compartilhamento && artFonte.compartilhamento) artAlvo.compartilhamento = artFonte.compartilhamento;
+  if (artFonte.docCompartilhadoId) artAlvo.docCompartilhadoId = artFonte.docCompartilhadoId;
+  if (artFonte.compartilhamento) artAlvo.compartilhamento = artFonte.compartilhamento;
+  if (artFonte.compartilhadoComigo !== undefined) artAlvo.compartilhadoComigo = Boolean(artFonte.compartilhadoComigo);
+  if (artFonte.proprietarioExterno !== undefined) artAlvo.proprietarioExterno = Boolean(artFonte.proprietarioExterno);
+  if (artFonte.permissao) artAlvo.permissao = artFonte.permissao;
+  if (artFonte.proprietario) artAlvo.proprietario = { ...(artAlvo.proprietario || {}), ...artFonte.proprietario };
+  if (artFonte.salvoNuvem !== undefined) artAlvo.salvoNuvem = Boolean(artFonte.salvoNuvem);
   if ((!artAlvo.totalPaginas || artAlvo.totalPaginas <= 1) && artFonte.totalPaginas > 1) artAlvo.totalPaginas = artFonte.totalPaginas;
   if ((!Array.isArray(artAlvo.conteudoPaginasPdf) || !artAlvo.conteudoPaginasPdf.length) && Array.isArray(artFonte.conteudoPaginasPdf) && artFonte.conteudoPaginasPdf.length) {
     artAlvo.conteudoPaginasPdf = artFonte.conteudoPaginasPdf;
@@ -474,6 +479,12 @@ export async function enviarPdfDoArtigoAoDrive(art, blob) {
   art.driveFileId = salvo.id;
   art.driveStatus = 'PDF no Google Drive';
   salvarArtigosEstudo(carregarArtigosEstudo(), art); // o id do arquivo vai para o servidor
+
+  // Se o artigo já está compartilhado, aplica o compartilhamento no arquivo do Drive imediatamente
+  if (art.docCompartilhadoId || art.compartilhamento) {
+    const arrPessoas = Object.entries(art.compartilhamento?.pessoas || {}).map(([email, papel]) => ({ email, papel }));
+    compartilharPdfNoDrive(salvo.id, { pessoas: arrPessoas, publico: true }, token).catch(() => {});
+  }
   return true;
 }
 
@@ -515,18 +526,27 @@ export async function compartilharPdfNoDrive(fileId, { pessoas = [], publico = f
   const urlPerm = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(idLimpo)}/permissions?supportsAllDrives=true&sendNotificationEmail=false`;
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   let okAlgum = false;
-  if (publico) {
-    try {
-      const r = await fetch(urlPerm, { method: 'POST', headers, body: JSON.stringify({ type: 'anyone', role: papel === 'editor' ? 'writer' : 'reader' }) });
-      if (r.ok) okAlgum = true;
-    } catch (_) {}
-  }
+
+  // Garante permissão pública de leitura no arquivo para que qualquer pessoa com o link de colaboração consiga ler o PDF
+  try {
+    const rPublico = await fetch(urlPerm, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ type: 'anyone', role: 'reader' })
+    });
+    if (rPublico.ok) okAlgum = true;
+  } catch (_) {}
+
   for (const p of (Array.isArray(pessoas) ? pessoas : [])) {
     const email = String(p?.email || '').trim();
     if (!email) continue;
     const role = (p?.papel || papel) === 'editor' ? 'writer' : 'reader';
     try {
-      const r = await fetch(urlPerm, { method: 'POST', headers, body: JSON.stringify({ type: 'user', role, emailAddress: email }) });
+      const r = await fetch(urlPerm, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ type: 'user', role, emailAddress: email })
+      });
       if (r.ok) okAlgum = true;
     } catch (_) {}
   }
@@ -606,6 +626,19 @@ export async function garantirPdfDoArtigo(art) {
         return true;
       } catch (_) {}
     }
+    // Fallback: download direto do Google Drive caso o arquivo tenha permissão pública
+    try {
+      const respPub = await fetch(`https://drive.google.com/uc?export=download&id=${encodeURIComponent(idDrive)}`);
+      if (respPub.ok) {
+        const blob = await respPub.blob();
+        if (blob && blob.size > 2000 && (blob.type === 'application/pdf' || blob.size > 50000)) {
+          art.pdfBlobUrl = URL.createObjectURL(blob);
+          art.temPdfLocal = true;
+          salvarPdfLocal(art.id, blob).catch(() => {});
+          return true;
+        }
+      }
+    } catch (_) {}
   }
   return false;
 }

@@ -91,7 +91,14 @@ export class AthenesApp {
         throw new Error(`Você está conectado ${emailInfo}, mas este documento não foi compartilhado com este e-mail (ou o link público ainda não foi ativado pelo dono). Peça ao dono para compartilhar com ${sessao?.email || 'seu e-mail'}.`);
       }
       if (res.doc?.norma === 'zotero_pdf' || res.doc?.artigoEstudo || String(res.doc?.id || docIdLink).startsWith('artigo_')) {
-        const art = res.doc.artigoEstudo || res.doc;
+        const art = res.doc.artigoEstudo ? { ...res.doc.artigoEstudo } : { ...res.doc };
+        art.compartilhadoComigo = Boolean(res.doc.compartilhadoComigo);
+        art.proprietarioExterno = Boolean(res.doc.proprietarioExterno);
+        art.permissao = res.doc.permissao || res.papel || (art.compartilhadoComigo ? 'leitura' : 'dono');
+        art.proprietario = res.doc.proprietario ? { ...res.doc.proprietario } : art.proprietario;
+        art.docCompartilhadoId = res.doc.id || docIdLink;
+        art.compartilhamento = res.doc.compartilhamento || art.compartilhamento || null;
+        art.salvoNuvem = true;
         this.navegarParaDashboard();
         setTimeout(() => {
           this.dashboardView?.abrirAbaArtigosZoteroComArtigo?.(art);
@@ -162,7 +169,14 @@ export class AthenesApp {
     this.dashboardView = new DashboardView(dashBox, {
       onAbrirDocumento: (doc) => {
         if (doc?.norma === 'zotero_pdf' || doc?.artigoEstudo || String(doc?.id || '').startsWith('artigo_')) {
-          const art = doc.artigoEstudo || doc;
+          const art = doc.artigoEstudo ? { ...doc.artigoEstudo } : { ...doc };
+          if (doc.compartilhadoComigo !== undefined) art.compartilhadoComigo = Boolean(doc.compartilhadoComigo);
+          if (doc.proprietarioExterno !== undefined) art.proprietarioExterno = Boolean(doc.proprietarioExterno);
+          if (doc.permissao) art.permissao = doc.permissao;
+          if (doc.proprietario) art.proprietario = { ...doc.proprietario };
+          if (doc.id) art.docCompartilhadoId = doc.id;
+          if (doc.compartilhamento) art.compartilhamento = doc.compartilhamento;
+          art.salvoNuvem = true;
           this.dashboardView?.abrirAbaArtigosZoteroComArtigo?.(art);
           return;
         }
