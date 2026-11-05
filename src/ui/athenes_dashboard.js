@@ -44,6 +44,7 @@ import { caminhoDaPasta } from '../core/athenes_arquivos.js';
 import { listarCompartilhadosComigo, carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
 import { svgIcone, svgLogo, svgGoogleDrive } from './athenes_icones.js';
 import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
+import { escapeHtml } from '../core/athenes_seguranca.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
 import { criarDocumentoDeTemplate } from '../core/athenes_templates.js';

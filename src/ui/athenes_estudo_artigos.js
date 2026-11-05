@@ -67,6 +67,7 @@ export class EstudoArtigosView {
     this.abaDireita = 'resumo'; // 'resumo' | 'citacoes' | 'zotero_drive'
     this.pinEditandoId = null; // ID da nota adesiva atualmente aberta para edição na folha
     this.filtroBusca = '';
+    this.filtroStatus = 'todos';
     this.filtroLateralEsq = '';
     this.pastaFiltroId = opcoes.pastaFiltroId || 'todas';
     this.aoMudarPastas = opcoes.aoMudarPastas || null; // a página inicial refaz a lista de pastas quando as coleções do Zotero chegam

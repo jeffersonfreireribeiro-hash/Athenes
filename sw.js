@@ -4,7 +4,7 @@
  * Permite instalar a interface no navegador, tablet e celular, funcionando com suporte offline.
  */
 
-const CACHE_NAME = 'athenes-pwa-v23';
+const CACHE_NAME = 'athenes-pwa-v24';
 
 const ASSETS_CANONICOS = [
   './',
