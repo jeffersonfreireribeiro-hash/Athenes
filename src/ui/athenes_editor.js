@@ -625,6 +625,13 @@ export class EditorView {
             <button type="button" class="rm-ic-bt" id="rmAddQuebra" data-tip="Quebra" title="Inserir Quebra de Página">${svgIcone('quebra_pagina', 16)}</button>
             </div>
 
+            <!-- Controles de Zoom para Tablet e Telas Touch -->
+            <div class="ath-zoom-controles-barra" style="display:flex; align-items:center; gap:2px; background:#F1F5F9; border:1px solid #CBD5E1; border-radius:999px; padding:2px 4px; margin-left:6px;" title="Zoom das folhas">
+              <button type="button" class="rm-ic-bt" id="athBtnZoomMenosEditor" title="Diminuir Zoom" aria-label="Diminuir Zoom" style="width:26px; height:26px; font-weight:800; font-size:14px; border:none; background:transparent; cursor:pointer;">−</button>
+              <button type="button" id="athBtnZoomIndicadorBarraEditor" title="Clique para alternar escala (100% · 125% · 150% · 80%)" style="border:none; background:transparent; font:800 11.5px var(--glx-font, inherit); color:#314F79; padding:0 5px; cursor:pointer; min-width:40px; text-align:center;">100%</button>
+              <button type="button" class="rm-ic-bt" id="athBtnZoomMaisEditor" title="Aumentar Zoom" aria-label="Aumentar Zoom" style="width:26px; height:26px; font-weight:800; font-size:14px; border:none; background:transparent; cursor:pointer;">+</button>
+            </div>
+
             <!-- Modo de trabalho (como no Docs): Edição / Sugestão / Comparar / Leitura -->
             <div class="ath-modo-wrap" id="athModoWrap">
               <button type="button" class="ath-modo-atual" id="athBtnModoAtual" aria-haspopup="menu" aria-expanded="false" title="Modo de trabalho">
@@ -698,10 +705,37 @@ export class EditorView {
         this.limparSelecaoDeBloco();
       });
       const ind = root.querySelector('#athZoomIndicador');
+      const indBarra = root.querySelector('#athBtnZoomIndicadorBarraEditor');
       const definir = (z) => {
         this.zoomCanvas = z;
-        if (ind) ind.textContent = `${Math.round(z * 100)}%`;
+        const txt = `${Math.round(z * 100)}%`;
+        if (ind) ind.textContent = txt;
+        if (indBarra) indBarra.textContent = txt;
+        const folhas = palcoNovo.querySelectorAll('.ath-folha-a4');
+        folhas.forEach(f => {
+          f.style.zoom = String(z);
+          f.style.transformOrigin = 'top center';
+        });
       };
+
+      const aplicarNovoZoom = (novoZ) => {
+        const lim = Math.max(0.4, Math.min(3, Math.round(novoZ * 100) / 100));
+        palcoNovo.style.setProperty('--ath-zoom', String(lim));
+        definir(lim);
+      };
+
+      root.querySelector('#athBtnZoomMenosEditor')?.addEventListener('click', () => {
+        aplicarNovoZoom((this.zoomCanvas || 1) - 0.15);
+      });
+      root.querySelector('#athBtnZoomMaisEditor')?.addEventListener('click', () => {
+        aplicarNovoZoom((this.zoomCanvas || 1) + 0.15);
+      });
+      root.querySelector('#athBtnZoomIndicadorBarraEditor')?.addEventListener('click', () => {
+        const escalas = [1, 1.25, 1.5, 0.8];
+        const zAtual = this.zoomCanvas || 1;
+        const prox = escalas.find(z => z > zAtual + 0.05) || escalas[0];
+        aplicarNovoZoom(prox);
+      });
       instalarZoomCanvas(palcoNovo, { obter: () => this.zoomCanvas, definir });
       ind?.addEventListener('click', () => {
         const escalas = [1, 1.25, 1.5, 0.8];

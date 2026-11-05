@@ -381,7 +381,11 @@ export class EstudoArtigosView {
         </div>
 
         <h3 class="ath-doc-card-titulo">${escapeHtml(art.titulo)}</h3>
-        <p class="ath-doc-card-subtitulo">${escapeHtml(art.fichamento?.resumoPessoal || art.resumoOriginal || 'Sem anotações')}</p>
+        ${(() => {
+          const resRaw = (art.fichamento?.resumoPessoal || art.resumoOriginal || 'Sem anotações').replace(/\s+/g, ' ').trim();
+          const resCurto = resRaw.length > 115 ? `${resRaw.slice(0, 112)}…` : resRaw;
+          return `<p class="ath-doc-card-subtitulo" title="${escapeHtml(resRaw)}">${escapeHtml(resCurto)}</p>`;
+        })()}
 
         <div class="ath-doc-card-meta">
           <span>${qtdCitacoes} citação(ões) · ${qtdTracos + qtdPins} marcação(ões)</span>

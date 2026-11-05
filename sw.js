@@ -4,7 +4,7 @@
  * Permite instalar a interface no navegador, tablet e celular, funcionando com suporte offline.
  */
 
-const CACHE_NAME = 'athenes-pwa-v2';
+const CACHE_NAME = 'athenes-pwa-v5';
 
 const ASSETS_CANONICOS = [
   './',
@@ -27,7 +27,16 @@ const ASSETS_CANONICOS = [
   './src/ui/athenes_estudo_artigos.js',
   './src/ui/athenes_icones.js',
   './src/ui/athenes_fontes_ui.js',
-  './src/core/athenes_documento.js'
+  './src/core/athenes_documento.js',
+  './src/ui/athenes_zoom_canvas.js',
+  './src/ui/athenes_estudo_artigos_tela.js',
+  './src/ui/athenes_estudo_artigos_dados.js',
+  './src/ui/athenes_estudo_artigos_anotacoes.js',
+  './src/ui/athenes_estudo_artigos_painel_direito.js',
+  './src/ui/athenes_compartilhar_modal.js',
+  './src/core/athenes_colaboracao.js',
+  './src/core/athenes_supabase_auth.js',
+  './src/core/athenes_compartilhamento.js'
 ];
 
 self.addEventListener('install', (event) => {
