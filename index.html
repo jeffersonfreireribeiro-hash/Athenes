@@ -19,8 +19,8 @@
 
   <!-- Folhas de Estilo Athenes (Soft UI + Nunito + Clux.js) -->
   <link rel="stylesheet" href="src/css/athenes_base.css">
-  <link rel="stylesheet" href="src/css/athenes_dashboard.css?v=10">
-  <link rel="stylesheet" href="src/css/athenes_editor.css?v=10">
+  <link rel="stylesheet" href="src/css/athenes_dashboard.css?v=11">
+  <link rel="stylesheet" href="src/css/athenes_editor.css?v=11">
   <link rel="stylesheet" href="src/css/athenes_paineis.css">
   <link rel="stylesheet" href="src/css/athenes_zotero.css">
 </head>
@@ -56,12 +56,25 @@
       }
     });
 
-    window.addEventListener('DOMContentLoaded', async () => {
-      // fontes importadas pelo usuário (ex.: Aptos) precisam existir antes do primeiro desenho dos documentos
+    window.addEventListener('error', (e) => {
+      console.error('[Athenes Error]', e.error || e.message);
+      const root = document.getElementById('athenesAppRoot');
+      if (root && (!root.innerHTML || root.innerHTML.trim() === '')) {
+        root.innerHTML = '<div style="padding:32px; font-family:Nunito, sans-serif; color:#B42318;"><h3>Erro de Inicialização</h3><p>' + (e.message || 'Falha ao inicializar o Athenes') + '</p></div>';
+      }
+    });
+
+    const iniciarApp = async () => {
       try { await Promise.race([carregarFontesImportadas(), new Promise(r => setTimeout(r, 2500))]); } catch (_) {}
       const root = document.getElementById('athenesAppRoot');
-      window.athenesApp = new AthenesApp(root);
-    });
+      if (root) window.athenesApp = new AthenesApp(root);
+    };
+
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', iniciarApp);
+    } else {
+      iniciarApp();
+    }
   </script>
 </body>
 </html>
