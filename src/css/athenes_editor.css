@@ -3061,3 +3061,10 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
   touch-action: pan-x pan-y;
   -webkit-overflow-scrolling: touch;
 }
+
+/* Modo Caneta Stylus / Samsung Notes */
+.rm-barra-blocos .ath-btn-dedo-rola.ativo {
+  background: #314F79 !important;
+  color: #FFFFFF !important;
+  border-color: #314F79 !important;
+}

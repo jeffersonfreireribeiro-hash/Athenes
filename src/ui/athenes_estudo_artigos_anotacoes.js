@@ -569,6 +569,15 @@ export const metodosEstudoAnotacoes = {
     };
 
     canvas.addEventListener('pointerdown', (ev) => {
+      // Detector de Caneta estilo Samsung Notes:
+      // Se for toque de dedo ('touch') e o modo de caneta exclusiva estiver ativo,
+      // não desenha e permite que o dedo role a página ou faça gesto de pinça para zoom!
+      if (ev.pointerType === 'touch' && this.bloquearDedoParaRolar) {
+        return;
+      }
+      if (ev.pointerType === 'pen') {
+        this.canetaDetectada = true;
+      }
       if (this.ferramentaAtiva === 'cursor') return;
       this.definirPaginaAtivaSilencioso(numPag, root);
       rectCache = canvas.getBoundingClientRect();
@@ -593,11 +602,15 @@ export const metodosEstudoAnotacoes = {
       desenhando = true;
       canvas.setPointerCapture?.(ev.pointerId);
       pontoInicialReta = { x: pos.x, y: pos.y };
+      let espessuraEfetiva = this.ferramentaAtiva === 'marcatexto' ? (this.espessuraMarca || 18) : this.espessuraTinta;
+      if (ev.pointerType === 'pen' && typeof ev.pressure === 'number' && ev.pressure > 0.05 && this.ferramentaAtiva === 'caneta') {
+        espessuraEfetiva = Math.max(1, Math.round(this.espessuraTinta * (0.6 + ev.pressure * 0.8)));
+      }
       tracoAtual = {
         tipo: this.ferramentaAtiva === 'marcatexto' ? 'marcatexto' : 'caneta',
         reta: Boolean(this.modoLinhaReta || ev.shiftKey),
         cor: this.corTinta,
-        espessura: this.ferramentaAtiva === 'marcatexto' ? (this.espessuraMarca || 18) : this.espessuraTinta,
+        espessura: espessuraEfetiva,
         pontos: [{ x: pos.x, y: pos.y }]
       };
       art.fichamento.tracosPorPagina[numPag].push(tracoAtual);
@@ -606,6 +619,7 @@ export const metodosEstudoAnotacoes = {
 
     canvas.addEventListener('pointermove', (ev) => {
       if (!desenhando) return;
+      if (ev.pointerType === 'touch' && this.bloquearDedoParaRolar) return;
       const pos = obterPosicaoNoCanvas(ev);
       if (this.ferramentaAtiva === 'borracha') {
         const folha = canvas.closest('.ath-pdf-folha-container');

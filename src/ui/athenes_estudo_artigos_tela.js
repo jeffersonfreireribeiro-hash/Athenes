@@ -222,6 +222,15 @@ export const metodosEstudoTela = {
               </svg>
             </button>
 
+            <!-- Botão Modo Caneta / Samsung Notes (Caneta escreve · Dedo apenas rola e faz zoom) -->
+            <button type="button" class="rm-ic-bt ath-btn-dedo-rola ${this.bloquearDedoParaRolar ? 'ativo' : ''}" id="athBtnDedoRola" data-tip="Modo Caneta" title="${this.bloquearDedoParaRolar ? 'Modo Samsung Notes ATIVO: Caneta Stylus escreve · Dedo apenas rola e dá zoom (clique para desenhar com o dedo)' : 'Desenhar com o Dedo: Dedo e caneta riscam (clique para ativar modo Samsung Notes)'}" aria-pressed="${this.bloquearDedoParaRolar ? 'true' : 'false'}">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                <path d="M2 2l7.586 7.586"/>
+              </svg>
+            </button>
+
             <button type="button" class="rm-ic-bt ath-tool-pilula ${this.ferramentaAtiva === 'borracha' ? 'ativo' : ''}" data-tool="borracha" data-tip="Borracha" title="Borracha para apagar traços">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
             </button>
