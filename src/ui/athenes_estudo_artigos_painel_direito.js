@@ -7,7 +7,7 @@ import { obterTokenOuConectar, obterTokenDrive } from '../core/athenes_drive_syn
 import { obterConfigGoogleDrive, autenticarGoogleDrive, salvarArquivoNoGoogleDrive } from '../core/athenes_colaboracao.js';
 import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { linhasInformacoesZotero, informacoesDoArtigo } from '../core/athenes_zotero_campos.js';
-import { svgIcone } from './athenes_icones.js';
+import { svgIcone, svgGoogleDrive } from './athenes_icones.js';
 import { obterPdfLocal, registrarPdfLocalNoArtigo, garantirPdfDoArtigo, salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, artigoTemPdf, ehArtigoExemploFicticio } from './athenes_estudo_artigos_dados.js';
 
 export const metodosEstudoPainelDireito = {
@@ -102,10 +102,10 @@ export const metodosEstudoPainelDireito = {
           `).join('')}
         </ul>
 
-        <div style="padding:6px 10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; font-size:11px; color:#475569; display:flex; align-items:center; gap:6px;">
+        <div style="padding:7px 10px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; font-size:11px; color:#475569; display:flex; align-items:center; gap:6px;">
           ${linkPublico 
-            ? `<span style="color:#059669; font-weight:700; display:inline-flex; align-items:center; gap:4px;">🌐 Link Público: Qualquer pessoa com o link pode ler</span>` 
-            : `<span style="color:#64748B; display:inline-flex; align-items:center; gap:4px;">🔒 Acesso restrito apenas a pessoas convidadas</span>`}
+            ? `<span style="color:#059669; font-weight:700; display:inline-flex; align-items:center; gap:6px;">${svgIcone('globo', 13)} Link Público: Qualquer pessoa com o link pode ler</span>` 
+            : `<span style="color:#64748B; display:inline-flex; align-items:center; gap:6px;">${svgIcone('cadeado', 13)} Acesso restrito apenas a pessoas convidadas</span>`}
         </div>
       </section>
     `;
@@ -288,7 +288,7 @@ export const metodosEstudoPainelDireito = {
                 </div>
                 <blockquote class="ath-citacao-pdf-texto">"${escapeHtml(c.texto)}"</blockquote>
                 <div class="ath-citacao-pdf-ref">${escapeHtml(formatarCitacaoAbntDoArtigo(art, c.paginaCitacao || c.pagina))}</div>
-                ${c.comentario ? `<div class="ath-citacao-pdf-nota">💡 ${escapeHtml(c.comentario)}</div>` : ''}
+                ${c.comentario ? `<div class="ath-citacao-pdf-nota">${svgIcone('lampada', 13)} ${escapeHtml(c.comentario)}</div>` : ''}
               </div>
             `).join('')}
           </div>
@@ -334,45 +334,112 @@ export const metodosEstudoPainelDireito = {
       return;
     }
 
-    // Aba 3: Vínculo Zotero & Google Drive
+    // Aba 3: Vínculo Zotero & Google Drive (Redesenhada no padrão Soft UI)
     const cfgDrivePainel = obterConfigGoogleDrive();
     const driveConectadoPainel = Boolean(cfgDrivePainel.accessToken);
     const temPdfPainel = artigoTemPdf(art);
     const zoteroOk = this.temZoteroConectado();
     const idDriveReal = String(art.driveFileId || '').trim() && !/^drive_pdf_/.test(String(art.driveFileId));
     const anexoZ = art.anexoPdfZotero;
-    const situacaoPdf = art.pdfBlobUrl
-      ? { cor: 'ok', texto: idDriveReal ? 'PDF aberto e guardado no Google Drive' : 'PDF aberto só nesta sessão (envie ao Drive para guardar)' }
-      : idDriveReal ? { cor: 'ok', texto: 'PDF guardado no Google Drive' }
-      : anexoZ?.baixavel ? { cor: 'info', texto: 'PDF disponível no Zotero — baixe ao abrir o artigo' }
-      : anexoZ ? { cor: 'aviso', texto: 'PDF só no seu computador (arquivo vinculado no Zotero)' }
-      : { cor: 'aviso', texto: 'Sem PDF vinculado' };
+    const situacaoPdfTexto = art.pdfBlobUrl
+      ? (idDriveReal ? 'Sincronizado no Google Drive' : 'Aberto na sessão local')
+      : idDriveReal ? 'Guardado no Google Drive'
+      : anexoZ?.baixavel ? 'Disponível no Zotero'
+      : anexoZ ? 'Arquivo no computador local'
+      : 'Nenhum PDF vinculado';
+    const situacaoPdfOk = Boolean(art.pdfBlobUrl || idDriveReal);
+
     box.innerHTML = `
       <div class="ath-zd">
-        <!-- 1. Situação: o que está ligado e o que falta, de relance -->
-        <ul class="ath-zd-situacao" aria-label="Situação do vínculo">
-          <li class="${art.chaveZotero ? 'ok' : 'aviso'}"><i></i><span><b>Obra no Zotero</b>${art.chaveZotero ? ` · ${escapeHtml(art.chaveZotero)}` : ' · não vinculada'}</span></li>
-          <li class="${situacaoPdf.cor}"><i></i><span><b>PDF</b> · ${escapeHtml(situacaoPdf.texto)}</span></li>
-          <li class="${zoteroOk ? 'ok' : 'aviso'}"><i></i><span><b>Conta Zotero</b> · ${zoteroOk ? 'conectada' : 'sem chave de API'}</span></li>
-          <li class="${driveConectadoPainel ? 'ok' : 'aviso'}"><i></i><span><b>Google Drive</b> · ${driveConectadoPainel ? 'conectado' : 'não conectado'}</span></li>
-        </ul>
-
-        <!-- 2. PDF do artigo (a ação mais usada) -->
-        <section class="ath-zd-sec">
-          <h4>${svgIcone('drive', 13)} PDF do artigo</h4>
-          <div class="ath-zd-arquivo" title="${escapeHtml(art.driveFileName || '')}">${art.driveFileName && temPdfPainel ? escapeHtml(art.driveFileName) : '<em>Nenhum arquivo vinculado</em>'}</div>
-          <label class="ath-btn ath-btn-primary ath-btn-sm ath-btn-selecionar-pdf-painel ath-zd-principal">
-            ${svgIcone('upload', 13)} <span>${temPdfPainel ? 'Trocar PDF (computador)' : 'Selecionar PDF (computador)'}</span>
-            <input type="file" accept=".pdf,application/pdf" id="athPainelInputArquivoPdf" style="display:none;">
-          </label>
-          <div class="ath-zd-linha">
-            <button type="button" class="ath-btn ath-btn-sm" id="athBtnPainelEscolherPdfDrive">${svgIcone('drive', 13)} Buscar no Drive</button>
-            <button type="button" class="ath-btn ${driveConectadoPainel ? 'ath-btn-zotero-ok' : ''} ath-btn-sm" id="athBtnPainelConectarDrive" title="Conectar ou autorizar o Google Drive">${driveConectadoPainel ? 'Drive conectado ✓' : 'Conectar Drive'}</button>
+        <!-- 1. Status Moderno de Conexão (Zotero & Google Drive) -->
+        <div class="ath-zd-status-topo">
+          <!-- Card Zotero -->
+          <div class="ath-zd-status-card">
+            <div class="ath-zd-status-card-head">
+              <span style="display:inline-flex; align-items:center; gap:5px;">
+                ${svgIcone('zotero', 13)} Zotero
+              </span>
+              <span class="ath-zd-dot ${zoteroOk ? 'ok' : 'aviso'}" title="${zoteroOk ? 'Conta conectada' : 'Sem chave de API'}"></span>
+            </div>
+            <span class="ath-zd-status-card-sub" title="${art.chaveZotero ? 'Item ' + art.chaveZotero : 'Item não vinculado'}">
+              ${art.chaveZotero ? 'Obra ' + escapeHtml(art.chaveZotero) : (zoteroOk ? 'Conectado' : 'Desconectado')}
+            </span>
           </div>
-          ${temPdfPainel && !ehArtigoExemploFicticio(art) ? `<button type="button" class="ath-btn ath-btn-sm ath-zd-desvincular" id="athBtnDesvincularPdf" title="Vinculou o PDF errado? Solta o arquivo desta referência (nada é apagado)">${svgIcone('lixeira', 13)} Desvincular este PDF</button>` : ''}
-          ${art.pdfBlobUrl ? `<button type="button" class="ath-btn ath-btn-sm ath-zd-salvar" id="athBtnSalvarPdfNoDriveDireto" title="Guardar este PDF na pasta do Google Drive">${svgIcone('drive', 13)} Guardar este PDF no Drive</button>` : ''}
+
+          <!-- Card Google Drive com ícone oficial 2026 -->
+          <div class="ath-zd-status-card">
+            <div class="ath-zd-status-card-head">
+              <span style="display:inline-flex; align-items:center; gap:5px;">
+                ${svgGoogleDrive(14)} Drive
+              </span>
+              <span class="ath-zd-dot ${driveConectadoPainel ? 'ok' : 'aviso'}" title="${driveConectadoPainel ? 'Google Drive conectado' : 'Drive não conectado'}"></span>
+            </div>
+            <span class="ath-zd-status-card-sub" title="${driveConectadoPainel ? 'Google Drive Ativo' : 'Clique para conectar'}">
+              ${driveConectadoPainel ? 'Conectado' : 'Não conectado'}
+            </span>
+          </div>
+        </div>
+
+        <!-- 2. PDF do artigo com design limpo e Soft UI -->
+        <section class="ath-zd-sec">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h4>${svgIcone('pdf', 14)} PDF do Artigo</h4>
+            <span class="ath-badge ${situacaoPdfOk ? 'ath-badge-sucesso' : 'ath-badge-info'}" style="font-size:9.5px; text-transform:uppercase;">
+              ${situacaoPdfOk ? 'Vinculado' : 'Pendente'}
+            </span>
+          </div>
+
+          <!-- Card do arquivo -->
+          <div class="ath-zd-arquivo-card">
+            <div class="ath-zd-arquivo-icone">
+              ${svgIcone('pdf', 18)}
+            </div>
+            <div class="ath-zd-arquivo-info">
+              <div class="ath-zd-arquivo-nome" title="${escapeHtml(art.driveFileName || art.titulo || '')}">
+                ${art.driveFileName && temPdfPainel ? escapeHtml(art.driveFileName) : '<em>Nenhum PDF selecionado</em>'}
+              </div>
+              <div class="ath-zd-arquivo-status">
+                <span class="ath-zd-dot ${situacaoPdfOk ? 'ok' : 'aviso'}"></span>
+                <span>${situacaoPdfTexto}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ações do PDF com padrão Soft UI -->
+          <div class="ath-zd-acoes-pdf">
+            <label class="ath-btn ath-btn-sm ath-zd-btn-pdf principal" title="Trocar ou selecionar PDF a partir do computador">
+              ${svgIcone('upload', 13)} <span>${temPdfPainel ? 'Trocar PDF' : 'Selecionar PDF'}</span>
+              <input type="file" accept=".pdf,application/pdf" id="athPainelInputArquivoPdf" style="display:none;">
+            </label>
+            <button type="button" class="ath-btn ath-btn-sm ath-zd-btn-pdf drive" id="athBtnPainelEscolherPdfDrive" title="Buscar PDF salvo na pasta do Google Drive">
+              ${svgGoogleDrive(14)} <span>Buscar no Drive</span>
+            </button>
+          </div>
+
+          <!-- Ações secundárias discretas -->
+          <div class="ath-zd-acoes-secundarias">
+            ${temPdfPainel && !ehArtigoExemploFicticio(art) ? `
+              <button type="button" class="ath-zd-btn-sub desvincular" id="athBtnDesvincularPdf" title="Desvincula este PDF da referência (não exclui do computador)">
+                ${svgIcone('lixeira', 12)} Desvincular
+              </button>
+            ` : '<span></span>'}
+
+            ${art.pdfBlobUrl && (!idDriveReal) ? `
+              <button type="button" class="ath-zd-btn-sub guardar" id="athBtnSalvarPdfNoDriveDireto" title="Salvar este arquivo na pasta Bibliografia_PDFs do seu Drive">
+                ${svgGoogleDrive(13)} Guardar no Drive
+              </button>
+            ` : ''}
+
+            ${!driveConectadoPainel ? `
+              <button type="button" class="ath-zd-btn-sub" id="athBtnPainelConectarDrive" style="color:#0369A1;" title="Autorizar Google Drive">
+                ${svgGoogleDrive(12)} Conectar Drive
+              </button>
+            ` : ''}
+          </div>
+
+          <!-- Detalhes do arquivo em acordeão limpo -->
           <details class="ath-zd-det">
-            <summary>Detalhes do arquivo</summary>
+            <summary>Detalhes técnicos do arquivo</summary>
             <label>Nome do arquivo
               <input type="text" class="ath-input" id="athDriveNomeArqArtigo" value="${escapeHtml(art.driveFileName || '')}" placeholder="Ex.: Silva_2026.pdf">
             </label>
@@ -382,13 +449,17 @@ export const metodosEstudoPainelDireito = {
           </details>
         </section>
 
-        <!-- Compartilhamento & Quem tem Acesso a este Documento -->
+        <!-- Compartilhamento & Quem tem Acesso a este Documento (Sem emojis) -->
         ${this.htmlQuemTemAcesso(art)}
 
-        <!-- 3. A obra no Zotero -->
+        <!-- 3. Obra no Zotero -->
         <section class="ath-zd-sec">
-          <h4>${svgIcone('zotero', 13)} Obra no Zotero</h4>
-          <button type="button" class="ath-btn ath-btn-sm ath-zd-principal-suave" id="athBtnVincularRefExistenteZotero">${svgIcone('zotero', 13)} ${art.chaveZotero ? 'Trocar a referência vinculada' : 'Vincular com uma referência do Zotero'}</button>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h4>${svgIcone('zotero', 14)} Obra no Zotero</h4>
+          </div>
+          <button type="button" class="ath-btn ath-btn-sm ath-zd-principal-suave" id="athBtnVincularRefExistenteZotero" style="width:100%; height:32px; font-weight:750; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+            ${svgIcone('zotero', 13)} ${art.chaveZotero ? 'Trocar a referência vinculada' : 'Vincular com uma referência do Zotero'}
+          </button>
           <div class="ath-zd-grade">
             <label>Chave do item
               <input type="text" class="ath-input" id="athZoteroKeyArtigo" value="${escapeHtml(art.chaveZotero || '')}" placeholder="Ex.: JKCLFWH6">
@@ -399,9 +470,9 @@ export const metodosEstudoPainelDireito = {
           </div>
         </section>
 
-        <!-- 4. Conexão com a conta (feita uma vez; a chave fica guardada na sua conta e no Drive) -->
+        <!-- 4. Conexão com a conta Zotero -->
         <details class="ath-zd-sec ath-zd-det-sec" ${zoteroOk ? '' : 'open'}>
-          <summary><h4>${svgIcone('zotero', 13)} Conexão com a conta Zotero</h4></summary>
+          <summary><h4>${svgIcone('zotero', 13)} Configurar Conta Zotero</h4></summary>
           <div class="ath-zd-grade">
             <label>Chave de API
               <span class="ath-zd-segredo">
@@ -413,12 +484,14 @@ export const metodosEstudoPainelDireito = {
               <input type="text" class="ath-input" id="athDirZoteroUserId" value="${escapeHtml(this.zoteroClient.userId || '')}" placeholder="Preenchido pela chave" inputmode="numeric">
             </label>
           </div>
-          <small class="ath-zd-dica">A chave é gerada em zotero.org/settings/keys. Ao mudar, ela vai para a sua conta e para o Drive.</small>
+          <small class="ath-zd-dica">A chave é gerada em zotero.org/settings/keys e armazenada de forma segura.</small>
         </details>
 
-        <!-- 5. Ação final, sempre à vista -->
+        <!-- 5. Rodapé: Sincronização geral -->
         <div class="ath-zd-rodape">
-          <button type="button" class="ath-btn ath-btn-primary ath-zd-sync" id="athBtnSyncCompletoPainel">${svgIcone('salvar', 14)} <span>Sincronizar agora</span></button>
+          <button type="button" class="ath-btn ath-btn-primary ath-zd-sync" id="athBtnSyncCompletoPainel">
+            ${svgIcone('salvar', 14)} <span>Sincronizar agora</span>
+          </button>
           <div id="athStatusSyncArtigo" class="ath-zd-status" role="status" aria-live="polite"></div>
         </div>
       </div>

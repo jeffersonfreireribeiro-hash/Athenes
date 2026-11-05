@@ -2105,40 +2105,63 @@ mark.ath-pdf-grifo-texto {
 .ath-pdf-local code { flex: 1; min-width: 0; word-break: break-all; user-select: all; color: #1E293B; }
 .ath-pdf-local small, .ath-pdf-local-dica { display: block; color: #64748B; font-size: 11px; line-height: 1.4; }
 
-/* Aba "Zotero & Drive" do estúdio: situação no topo, seções por assunto, ação final sempre à vista */
+/* Aba "Zotero & Drive" do estúdio: design moderno e sem poluição visual */
 .ath-zd { display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
-.ath-zd-situacao { list-style: none; margin: 0; padding: 10px 12px; display: grid; gap: 6px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; font-size: 12px; color: #334155; }
-.ath-zd-situacao li { display: flex; align-items: flex-start; gap: 8px; line-height: 1.35; }
-.ath-zd-situacao i { flex: none; width: 9px; height: 9px; margin-top: 4px; border-radius: 50%; background: #94A3B8; }
-.ath-zd-situacao .ok i { background: #16A34A; }
-.ath-zd-situacao .info i { background: #314F79; }
-.ath-zd-situacao .aviso i { background: #D97706; }
-.ath-zd-situacao b { color: #1E293B; }
-.ath-zd-sec { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; }
-.ath-zd-sec h4 { display: flex; align-items: center; gap: 6px; margin: 0; font: 800 11.5px var(--glx-font, 'Nunito', sans-serif); color: #314F79; text-transform: uppercase; letter-spacing: .04em; }
-.ath-zd-arquivo { font-size: 13px; font-weight: 700; color: #1E293B; word-break: break-word; }
-.ath-zd-arquivo em { font-weight: 600; color: #94A3B8; }
-.ath-zd-principal { width: 100%; justify-content: center; cursor: pointer; white-space: normal; height: auto; padding: 8px 10px; line-height: 1.2; text-align: center; color: #fff !important; }
-.ath-zd-principal span { color: #fff !important; font-weight: 700; }
-.ath-zd-principal-suave { width: 100%; justify-content: center; white-space: normal; height: auto; padding: 7px 10px; line-height: 1.2; font-weight: 700; color: #314F79; background: #EEF4FA; border-color: #C8D7E6; }
-.ath-zd-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.ath-zd-linha .ath-btn { justify-content: center; white-space: nowrap; font-size: 11px; padding: 0 8px; }
-.ath-zd-salvar { width: 100%; justify-content: center; background: #F0FDF4; border-color: #86EFAC; color: #15803D; font-weight: 700; font-size: 11.5px; }
+
+/* Grid de Status no Topo */
+.ath-zd-status-topo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ath-zd-status-card { display: flex; flex-direction: column; gap: 2px; padding: 9px 10px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
+.ath-zd-status-card-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 800; color: #314F79; }
+.ath-zd-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.ath-zd-dot.ok { background: #16A34A; box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2); }
+.ath-zd-dot.aviso { background: #D97706; box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2); }
+.ath-zd-status-card-sub { font-size: 10.5px; color: #64748B; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Cards de Seção */
+.ath-zd-sec { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+.ath-zd-sec h4 { display: flex; align-items: center; gap: 6px; margin: 0; font: 800 11px var(--glx-font, 'Nunito', sans-serif); color: #314F79; text-transform: uppercase; letter-spacing: .05em; }
+
+/* Box do Arquivo PDF */
+.ath-zd-arquivo-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
+.ath-zd-arquivo-icone { flex: none; width: 32px; height: 32px; border-radius: 8px; background: #FEF2F2; color: #DC2626; display: flex; align-items: center; justify-content: center; }
+.ath-zd-arquivo-info { flex: 1; min-width: 0; }
+.ath-zd-arquivo-nome { font-size: 12px; font-weight: 750; color: #1E293B; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ath-zd-arquivo-status { font-size: 10.5px; color: #64748B; display: flex; align-items: center; gap: 4px; margin-top: 1px; }
+
+/* Botões do PDF */
+.ath-zd-acoes-pdf { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ath-zd-btn-pdf { height: 32px; padding: 0 10px; font-size: 11.5px; font-weight: 750; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+.ath-zd-btn-pdf.principal { background: #EEF4FA; border: 1px solid #C8D7E6; color: #314F79; }
+.ath-zd-btn-pdf.principal:hover { background: #E2ECF6; color: #1B2D47; }
+.ath-zd-btn-pdf.drive { background: #FFFFFF; border: 1px solid #CBD5E1; color: #334155; }
+.ath-zd-btn-pdf.drive:hover { background: #F8FAFC; border-color: #94A3B8; }
+
+.ath-zd-acoes-secundarias { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.ath-zd-btn-sub { height: 26px; padding: 0 8px; font-size: 11px; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; border: none; background: transparent; cursor: pointer; }
+.ath-zd-btn-sub.desvincular { color: #DC2626; }
+.ath-zd-btn-sub.desvincular:hover { background: #FEF2F2; }
+.ath-zd-btn-sub.guardar { color: #15803D; background: #F0FDF4; border: 1px solid #BBF7D0; }
+.ath-zd-btn-sub.guardar:hover { background: #DCFCE7; }
+
+/* Grades e campos */
 .ath-zd-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ath-zd label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 700; color: #475569; min-width: 0; }
-.ath-zd .ath-input { height: 30px; font-size: 12px; width: 100%; box-sizing: border-box; font-weight: 400; }
+.ath-zd .ath-input { height: 30px; font-size: 12px; width: 100%; box-sizing: border-box; font-weight: 500; border-radius: 7px; border: 1px solid #D5DEE9; background: #F8FAFC; }
+.ath-zd .ath-input:focus { outline: none; border-color: var(--ath-primary, #314F79); background: #fff; }
 .ath-zd-segredo { display: flex; gap: 4px; }
 .ath-zd-segredo .ath-btn { flex: none; font-size: 11px; padding: 0 8px; }
-.ath-zd-det summary { cursor: pointer; font-size: 11.5px; font-weight: 700; color: #64748B; padding: 2px 0; }
-.ath-zd-det label { margin-top: 8px; }
+
+.ath-zd-det summary { cursor: pointer; font-size: 11px; font-weight: 700; color: #64748B; padding: 2px 0; }
+.ath-zd-det label { margin-top: 6px; }
 .ath-zd-det-sec > summary { cursor: pointer; list-style: none; }
 .ath-zd-det-sec > summary::-webkit-details-marker { display: none; }
-.ath-zd-det-sec[open] > summary { margin-bottom: 8px; }
-.ath-zd-dica { color: #64748B; font-size: 11px; line-height: 1.4; }
-.ath-zd-rodape { position: sticky; bottom: 0; margin-top: auto; padding: 10px 0 4px; background: linear-gradient(to top, var(--ath-surface, #fff) 70%, transparent); }
-.ath-zd-sync { width: 100%; justify-content: center; font-weight: 700; color: #fff !important; }
+.ath-zd-det-sec[open] > summary { margin-bottom: 6px; }
+.ath-zd-dica { color: #64748B; font-size: 10.5px; line-height: 1.4; }
+
+.ath-zd-rodape { position: sticky; bottom: 0; margin-top: auto; padding: 10px 0 4px; background: linear-gradient(to top, var(--ath-surface, #fff) 80%, transparent); }
+.ath-zd-sync { width: 100%; height: 34px; justify-content: center; font-weight: 800; font-size: 12px; color: #fff !important; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; }
 .ath-zd-sync span { color: #fff !important; }
-.ath-zd-status { font-size: 11.5px; margin-top: 8px; color: #15803D; font-weight: 700; line-height: 1.4; }
+.ath-zd-status { font-size: 11.5px; margin-top: 6px; color: #15803D; font-weight: 700; line-height: 1.4; }
 @media (max-width: 420px) { .ath-zd-grade { grid-template-columns: 1fr; } }
 .ath-pdf-sem-arquivo .glx-btn-primary, .ath-pdf-sem-arquivo label.glx-btn-primary { color: #fff !important; background: #314F79; }
 
@@ -2179,12 +2202,13 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   padding: 24px 32px 64px 32px !important;
   box-sizing: border-box !important;
   margin: 0 auto !important;
+  gap: 16px !important;
 }
 .ath-pdf-pagina-bloco-wrap {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  margin: 0 auto 36px auto !important;
+  margin: 0 auto !important;
   flex-shrink: 0 !important;
   width: max-content !important;
 }
@@ -2202,10 +2226,10 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   will-change: transform;
 }
 .ath-pdf-pagina-bloco-wrap > .ath-pdf-etiqueta-pagina {
-  width: max(calc(794px * var(--ath-zoom, 1)), 300px) !important;
+  width: max(calc(794px * var(--ath-zoom, 1)), 260px) !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
-  margin: 0 auto 8px auto !important;
+  margin: 0 auto 6px auto !important;
 }
 .ath-zd-desvincular { width: 100%; justify-content: center; color: #B42318; border-color: #FECACA; background: #FFF; font-size: 11.5px; font-weight: 700; }
 .ath-zd-desvincular:hover { background: #FEF2F2; }

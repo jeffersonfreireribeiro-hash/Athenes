@@ -569,8 +569,15 @@ export const metodosEstudoAnotacoes = {
     };
 
     let touchPanDedo = null;
+    let tracoPointerId = null;
 
     canvas.addEventListener('pointerdown', (ev) => {
+      // Rejeição de palma: se a caneta já estiver desenhando, ignora toque de dedo/palma
+      if (desenhando && ev.pointerType === 'touch') {
+        ev.preventDefault?.();
+        return;
+      }
+
       // Detector de Caneta estilo Samsung Notes:
       // Se for toque de dedo ('touch') e o modo de caneta exclusiva estiver ativo,
       // permite rolar a página diretamente com 1 dedo pelo palco sem desenhar
@@ -591,6 +598,7 @@ export const metodosEstudoAnotacoes = {
 
       if (ev.pointerType === 'pen') {
         this.canetaDetectada = true;
+        touchPanDedo = null; // limpa qualquer pan residual caso o dedo estivesse apoiado
       }
       if (this.ferramentaAtiva === 'cursor') return;
 
@@ -608,6 +616,7 @@ export const metodosEstudoAnotacoes = {
 
       if (this.ferramentaAtiva === 'borracha') {
         desenhando = true;
+        tracoPointerId = ev.pointerId;
         canvas.setPointerCapture?.(ev.pointerId);
         const folha = canvas.closest('.ath-pdf-folha-container');
         this.apagarTracosProximos(art, numPag, pos.x, pos.y, 28, pos, folha, ev.clientX, ev.clientY);
@@ -617,6 +626,7 @@ export const metodosEstudoAnotacoes = {
 
       // Caneta ou Marca-texto (livre ou Linha Reta)
       desenhando = true;
+      tracoPointerId = ev.pointerId;
       canvas.setPointerCapture?.(ev.pointerId);
       pontoInicialReta = { x: pos.x, y: pos.y };
       let espessuraEfetiva = this.ferramentaAtiva === 'marcatexto' ? (this.espessuraMarca || 18) : this.espessuraTinta;
@@ -635,6 +645,12 @@ export const metodosEstudoAnotacoes = {
     });
 
     canvas.addEventListener('pointermove', (ev) => {
+      // Rejeição de palma: descarta toque de dedo enquanto caneta desenha
+      if (desenhando && ev.pointerType === 'touch') {
+        ev.preventDefault?.();
+        return;
+      }
+
       // Pan com o dedo quando bloqueio de dedo para desenhar estiver ativo
       if (touchPanDedo && touchPanDedo.pointerId === ev.pointerId) {
         const palco = root?.querySelector('#athEstudioPalco');
@@ -647,6 +663,9 @@ export const metodosEstudoAnotacoes = {
 
       if (!desenhando) return;
       if (ev.pointerType === 'touch' && this.bloquearDedoParaRolar) return;
+
+      // Se este evento não é do ponteiro que iniciou o traço, ignora
+      if (tracoPointerId !== null && ev.pointerId !== tracoPointerId) return;
 
       // Evita cancelamento do traço pelo navegador móvel
       ev.preventDefault();
@@ -678,8 +697,13 @@ export const metodosEstudoAnotacoes = {
         touchPanDedo = null;
         return;
       }
+      // Rejeição de palma: se outro ponteiro (ex: palma da mão) levantou, NÃO finaliza o traço da caneta!
+      if (ev && tracoPointerId !== null && ev.pointerId !== tracoPointerId) {
+        return;
+      }
       if (!desenhando) return;
       desenhando = false;
+      tracoPointerId = null;
       tracoAtual = null;
       pontoInicialReta = null;
       rectCache = null;

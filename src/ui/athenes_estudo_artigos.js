@@ -655,7 +655,7 @@ export class EstudoArtigosView {
     root.querySelectorAll('.ath-pdf-ink-canvas').forEach(canvas => {
       canvas.style.pointerEvents = this.ferramentaAtiva === 'cursor' ? 'none' : 'auto';
       canvas.style.cursor = this.ferramentaAtiva === 'cursor' ? 'text' : 'crosshair';
-      canvas.style.touchAction = this.bloquearDedoParaRolar ? 'pan-x pan-y' : 'none';
+      canvas.style.touchAction = 'none';
     });
     // Seletor de espessura: só aparece com Caneta ou Marca-Texto, com valores próprios de cada ferramenta
     const grupoEsp = root.querySelector('#athEspessuras');
@@ -1031,6 +1031,7 @@ export class EstudoArtigosView {
     const hPx = `${Math.round(h * escala)}px`;
     if (caixa.style.width !== wPx) caixa.style.width = wPx;
     if (caixa.style.height !== hPx) caixa.style.height = hPx;
+    folha.style.transformOrigin = '0 0';
     const tr = escala === 1 ? '' : `scale(${escala})`;
     if (folha.style.transform !== tr) folha.style.transform = tr;
   }
@@ -1606,8 +1607,8 @@ export class EstudoArtigosView {
       const { pastas, pdfs } = estado.itens;
       if (!pastas.length && !pdfs.length) { listaEl.innerHTML = '<div class="ath-dn-vazio">Nada por aqui: nenhuma pasta nem PDF.</div>'; return; }
       listaEl.innerHTML = [
-        ...pastas.map((p, i) => `<button type="button" class="ath-dn-item ath-dn-pasta" data-pasta="${i}"><span class="ath-dn-ic">📁</span><span class="ath-dn-nome">${escapeHtml(p.name)}</span><span class="ath-dn-seta" aria-hidden="true">›</span></button>`),
-        ...pdfs.map((a, i) => `<div class="ath-dn-item ath-dn-pdf"><span class="ath-dn-ic">📄</span><span class="ath-dn-nome" title="${escapeHtml(a.name)}">${escapeHtml(a.name)}<small>${[fmtData(a.modifiedTime), fmtTam(a.size)].filter(Boolean).join(' · ')}</small></span><button type="button" class="ath-btn ath-btn-primary ath-btn-sm" data-pdf="${i}">${estado.aba === 'athenes' ? 'Usar este PDF' : 'Copiar e usar'}</button></div>`)
+        ...pastas.map((p, i) => `<button type="button" class="ath-dn-item ath-dn-pasta" data-pasta="${i}"><span class="ath-dn-ic">${svgIcone('pasta', 16)}</span><span class="ath-dn-nome">${escapeHtml(p.name)}</span><span class="ath-dn-seta" aria-hidden="true">›</span></button>`),
+        ...pdfs.map((a, i) => `<div class="ath-dn-item ath-dn-pdf"><span class="ath-dn-ic">${svgIcone('pdf', 16)}</span><span class="ath-dn-nome" title="${escapeHtml(a.name)}">${escapeHtml(a.name)}<small>${[fmtData(a.modifiedTime), fmtTam(a.size)].filter(Boolean).join(' · ')}</small></span><button type="button" class="ath-btn ath-btn-primary ath-btn-sm" data-pdf="${i}">${estado.aba === 'athenes' ? 'Usar este PDF' : 'Copiar e usar'}</button></div>`)
       ].join('');
       listaEl.querySelectorAll('[data-pasta]').forEach(b => b.addEventListener('click', () => { const p = estado.itens.pastas[Number(b.dataset.pasta)]; buscaEl.value = ''; estado.busca = ''; estado.trilha.push({ id: p.id, nome: p.name }); carregar(); }));
       listaEl.querySelectorAll('[data-pdf]').forEach(b => b.addEventListener('click', () => escolher(estado.itens.pdfs[Number(b.dataset.pdf)], b)));

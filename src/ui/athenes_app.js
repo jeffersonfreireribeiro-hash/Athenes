@@ -86,7 +86,8 @@ export class AthenesApp {
     this.container.innerHTML = '<p style="padding:32px; font:600 14px Nunito, sans-serif; color:#314F79;">Abrindo documento compartilhado...</p>';
     carregarDocumentoCompartilhado(docIdLink).then(res => {
       if (!res) {
-        const sessao = lerSessaoSupabase();
+        let sessao = null;
+        try { sessao = typeof lerSessaoSupabase === 'function' ? lerSessaoSupabase() : null; } catch (_) {}
         const emailInfo = sessao?.email ? `com a conta ${sessao.email}` : 'sem estar conectado';
         throw new Error(`Você está conectado ${emailInfo}, mas este documento não foi compartilhado com este e-mail (ou o link público ainda não foi ativado pelo dono). Peça ao dono para compartilhar com ${sessao?.email || 'seu e-mail'}.`);
       }

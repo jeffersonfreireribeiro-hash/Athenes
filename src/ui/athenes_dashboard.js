@@ -42,7 +42,7 @@ import * as repositorio from '../core/athenes_repositorio.js';
 
 import { caminhoDaPasta } from '../core/athenes_arquivos.js';
 import { listarCompartilhadosComigo, carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
-import { svgIcone, svgLogo } from './athenes_icones.js';
+import { svgIcone, svgLogo, svgGoogleDrive } from './athenes_icones.js';
 import { GerenciadorArquivosUI } from './athenes_arquivos_ui.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import { abrirNovoDocumentoModal, abrirImportadorDocxModal } from './athenes_novo_documento_modal.js';
@@ -281,11 +281,11 @@ export class DashboardView {
                 <p>Ambiente de escrita e diagramação acadêmica em blocos com revisão estilo Google Docs e sincronia em tempo real.</p>
               </div>
               <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <button type="button" class="ath-btn ath-btn-icone ${driveConectado() ? 'ath-btn-zotero-ok' : ''}" id="athBtnBackupEspaco" title="${driveConectado() ? 'Google Drive conectado: backup, nuvem e sincronização ativos' : 'Google Drive: conectar para backup e sincronização'}" aria-label="Google Drive">
+                  ${svgGoogleDrive(20)}
+                </button>
                 <button type="button" class="ath-btn ath-btn-icone" id="athBtnSincronizarNuvem" title="Sincronizar: traz do servidor e do Drive o que mudou em outros computadores e envia o que mudou aqui" aria-label="Sincronizar">
                   ${svgIcone('sincronizar', 17)}
-                </button>
-                <button type="button" class="ath-btn ath-btn-icone" id="athBtnBackupEspaco" title="Backup e restauração do perfil, artigos e documentos no Google Drive" aria-label="Backup no Drive">
-                  ${svgIcone('drive', 17)}
                 </button>
                 <div class="ath-menu-importar" id="athMenuImportar">
                   <button type="button" class="ath-btn ath-btn-icone ath-btn-importar-coluna" id="athBtnImportar" aria-haspopup="menu" aria-expanded="false" title="Importar documento (.json, .athenes) ou template do Word (.docx)" aria-label="Importar documento ou template">

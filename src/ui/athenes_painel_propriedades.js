@@ -209,11 +209,13 @@ export class PainelPropriedades {
       avisosDiagnostico.push(`Propriedades (${b.tipo}): ${err.message}`);
     }
 
-    // 5. Inserção de Referências Cruzadas
-    try {
-      this.renderizarAjudanteReferencias(wrapper, b);
-    } catch (err) {
-      avisosDiagnostico.push(`Referências (${b.tipo}): ${err.message}`);
+    // 5. Inserção de Referências Cruzadas (apenas para blocos de conteúdo/texto, nunca em sumário ou quebras)
+    if (!['sumario', 'quebra_pagina', 'divisor', 'espacamento'].includes(b.tipo)) {
+      try {
+        this.renderizarAjudanteReferencias(wrapper, b);
+      } catch (err) {
+        avisosDiagnostico.push(`Referências (${b.tipo}): ${err.message}`);
+      }
     }
 
     if (avisosDiagnostico.length > 0) {

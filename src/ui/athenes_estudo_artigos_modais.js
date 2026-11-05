@@ -116,7 +116,7 @@ export const metodosEstudoModais = {
                 <span class="ath-pop-tag-ok">✓ PDF Vinculado</span>
                 <span class="ath-pop-nome-arquivo" title="${escapeHtml(art.driveFileName || 'arquivo.pdf')}">${escapeHtml(art.driveFileName || 'arquivo.pdf')}</span>
               ` : `
-                <span class="ath-pop-tag-aviso">⚠️ Sem PDF Vinculado</span>
+                <span class="ath-pop-tag-aviso">${svgIcone('alerta', 12)} Sem PDF Vinculado</span>
                 <span class="ath-pop-nome-arquivo-vazio">Vincule o PDF para ler as páginas originais</span>
               `}
             </div>

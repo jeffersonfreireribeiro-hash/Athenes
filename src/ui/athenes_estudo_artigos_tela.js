@@ -701,6 +701,8 @@ export const metodosEstudoTela = {
     const stack = root.querySelector('#athPdfTodasPaginasStack');
     if (!stack) return;
     stack.innerHTML = '';
+    const palcoEl = root.querySelector('#athEstudioPalco');
+    if (palcoEl) palcoEl.style.setProperty('--ath-zoom', String((this.zoomPct || 100) / 100));
 
     const temPaginasCompartilhadas = Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.some(p => Array.isArray(p.paragrafos) && p.paragrafos.length > 0 && p.paragrafos.some(txt => String(txt || '').trim()));
     // sem PDF: aviso claro no lugar das páginas (nada de folha inventada)
@@ -809,7 +811,7 @@ export const metodosEstudoTela = {
           <span class="ath-pdf-etiqueta-stats" data-stats-pag="${numPag}">${tracosDaPagina.length} risco(s) · ${pinsDaPagina.length} nota(s)</span>
         </div>
 
-        <div class="ath-folha-a4 ath-pdf-folha-container ${pagDados.extra ? 'ath-pdf-folha-extra' : ''} ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" data-altura-real="${alturaReal}" style="${ehPaginaPdfReal ? `width:794px; height:${alturaReal}px; min-height:${alturaReal}px; max-height:${alturaReal}px; padding:0; flex-shrink:0; ` : 'width:794px; height:1123px; min-height:1123px; flex-shrink:0; background:#FFFFFF; '}transform: scale(${escalaZoom}); transform-origin: top center;">
+        <div class="ath-folha-a4 ath-pdf-folha-container ${pagDados.extra ? 'ath-pdf-folha-extra' : ''} ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" data-altura-real="${alturaReal}" style="${ehPaginaPdfReal ? `width:794px; height:${alturaReal}px; min-height:${alturaReal}px; max-height:${alturaReal}px; padding:0; flex-shrink:0; ` : 'width:794px; height:1123px; min-height:1123px; flex-shrink:0; background:#FFFFFF; '}transform: scale(${escalaZoom}); transform-origin: 0 0;">
           ${ehPaginaPdfReal ? `
             <canvas class="ath-pdf-render-canvas" style="width:794px; height:${alturaReal}px;"></canvas>
             <div class="ath-pdf-grifos-layer" data-grifos-pag="${numPag}"></div>
@@ -859,7 +861,7 @@ export const metodosEstudoTela = {
                   </button>
                 </div>
                 <div class="ath-pdf-vincular-dropzone">
-                  💡 <strong>Dica rápida:</strong> Você também pode arrastar o arquivo <code>.pdf</code> e soltar em qualquer lugar desta tela!
+                  ${svgIcone('lampada', 14)} <strong>Dica rápida:</strong> Você também pode arrastar o arquivo <code>.pdf</code> e soltar em qualquer lugar desta tela!
                 </div>
               </div>
             </div>
