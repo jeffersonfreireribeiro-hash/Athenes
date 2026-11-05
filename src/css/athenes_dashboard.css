@@ -1171,10 +1171,12 @@
 }
 
 .ath-estudio-full-shell .rm-prev-palco {
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
   overflow-y: auto !important;
   height: 100% !important;
   box-sizing: border-box !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-x pan-y !important;
 }
 
 .ath-estudio-full-shell #athEstudioColEsq {

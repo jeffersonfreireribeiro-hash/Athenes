@@ -383,24 +383,29 @@ export const metodosEstudoTela = {
     };
     window.addEventListener('keydown', this._tecladoZoomHandler);
 
-    // Suporte a zoom com Ctrl + Roda do Mouse e Gesto de Pinça (Pinch-to-zoom) no Palco do PDF
+    // Suporte a zoom com foco e pan fluído no Palco do PDF
     const palcoZoomEl = root.querySelector('#athEstudioPalco');
     if (palcoZoomEl) {
+      // Zoom com roda do mouse / trackpad pinch ancorado exatamente no cursor
       palcoZoomEl.addEventListener('wheel', (e) => {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
-          const delta = e.deltaY < 0 ? 10 : -10;
-          this.aplicarZoom(this.zoomPct + delta, root);
+          const rect = palcoZoomEl.getBoundingClientRect();
+          const pontoFoco = {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+          };
+          const fator = 1 - Math.max(-0.2, Math.min(0.2, e.deltaY * 0.0035));
+          const novoZoom = this.zoomPct * fator;
+          this.aplicarZoom(novoZoom, root, pontoFoco);
         }
       }, { passive: false });
 
-      // Gesto de pinça touch com 2 dedos + Pan simultâneo para Tablets e Telas Touch
+      // Gesto de pinça contínuo e pan simultâneo ancorado no ponto focal dos dois dedos
       let distIniTouch = 0;
       let zoomBaseTouch = 100;
-      let midIniX = 0;
-      let midIniY = 0;
-      let scrollIniX = 0;
-      let scrollIniY = 0;
+      let midAntX = 0;
+      let midAntY = 0;
 
       palcoZoomEl.addEventListener('touchstart', (e) => {
         if (e.touches && e.touches.length === 2) {
@@ -408,39 +413,46 @@ export const metodosEstudoTela = {
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
           );
-          midIniX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-          midIniY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-          scrollIniX = palcoZoomEl.scrollLeft;
-          scrollIniY = palcoZoomEl.scrollTop;
+          midAntX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          midAntY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
           zoomBaseTouch = this.zoomPct;
         }
       }, { passive: true });
 
       palcoZoomEl.addEventListener('touchmove', (e) => {
-        if (e.touches && e.touches.length === 2 && distIniTouch > 10) {
+        if (e.touches && e.touches.length === 2 && distIniTouch > 8) {
           e.preventDefault();
+          const rect = palcoZoomEl.getBoundingClientRect();
+          const midAtualX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          const midAtualY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+          // Pan direto acompanhando o movimento dos dedos
+          const deltaX = midAtualX - midAntX;
+          const deltaY = midAtualY - midAntY;
+          palcoZoomEl.scrollLeft -= deltaX;
+          palcoZoomEl.scrollTop -= deltaY;
+          midAntX = midAtualX;
+          midAntY = midAtualY;
+
+          // Zoom contínuo ancorado no ponto focal atual dos dois dedos
           const distAtual = Math.hypot(
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
           );
-          const midAtualX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-          const midAtualY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-          const deltaX = midAtualX - midIniX;
-          const deltaY = midAtualY - midIniY;
-
-          palcoZoomEl.scrollLeft = scrollIniX - deltaX;
-          palcoZoomEl.scrollTop = scrollIniY - deltaY;
-
           const ratio = distAtual / distIniTouch;
-          const novoZoom = Math.round((zoomBaseTouch * ratio) / 5) * 5;
-          if (novoZoom !== this.zoomPct) {
-            this.aplicarZoom(novoZoom, root);
-          }
+          const novoZoom = zoomBaseTouch * ratio;
+          const pontoFoco = {
+            x: midAtualX - rect.left,
+            y: midAtualY - rect.top
+          };
+          this.aplicarZoom(novoZoom, root, pontoFoco);
         }
       }, { passive: false });
 
       palcoZoomEl.addEventListener('touchend', (e) => {
-        if (!e.touches || e.touches.length < 2) distIniTouch = 0;
+        if (!e.touches || e.touches.length < 2) {
+          distIniTouch = 0;
+        }
       }, { passive: true });
     }
 

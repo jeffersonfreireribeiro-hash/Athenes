@@ -892,28 +892,33 @@ export class EstudoArtigosView {
     folha.style.transform = escala === 1 ? '' : `scale(${escala})`;
   }
 
-  aplicarZoom(novoZoom, root) {
-    const lim = Math.max(50, Math.min(250, Math.round(novoZoom)));
+  aplicarZoom(novoZoom, root, pontoFoco = null) {
+    const lim = Math.max(50, Math.min(250, Math.round(novoZoom * 10) / 10));
+    if (Math.abs(this.zoomPct - lim) < 0.05) return;
+    const escalaAntiga = this.zoomPct / 100;
     this.zoomPct = lim;
-    const escala = this.zoomPct / 100;
+    const escalaNova = this.zoomPct / 100;
+    const razao = escalaNova / escalaAntiga;
 
     const container = root || this.container;
     const palco = container?.querySelector('#athEstudioPalco');
     if (palco) {
-      const scrollLarguraAntiga = palco.scrollWidth || 1;
-      const scrollAlturaAntiga = palco.scrollHeight || 1;
-      const centroX = (palco.scrollLeft + palco.clientWidth / 2) / scrollLarguraAntiga;
-      const centroY = (palco.scrollTop + palco.clientHeight / 2) / scrollAlturaAntiga;
+      // Ponto focal exato (onde estão os dedos na pinça ou o cursor do mouse)
+      const fx = pontoFoco && typeof pontoFoco.x === 'number' ? pontoFoco.x : (palco.clientWidth / 2);
+      const fy = pontoFoco && typeof pontoFoco.y === 'number' ? pontoFoco.y : (palco.clientHeight / 2);
 
-      palco.style.setProperty('--ath-zoom', String(escala)); // a etiqueta da página acompanha a largura da folha
-      palco.querySelectorAll('.ath-pdf-pagina-bloco-wrap').forEach(wrap => this.aplicarEscalaNaFolha(wrap, escala));
+      // Coordenada do conteúdo no ponto focal
+      const conteudoX = palco.scrollLeft + fx;
+      const conteudoY = palco.scrollTop + fy;
 
-      requestAnimationFrame(() => {
-        const novaLargura = palco.scrollWidth || 1;
-        const novaAltura = palco.scrollHeight || 1;
-        palco.scrollLeft = Math.max(0, Math.round(centroX * novaLargura - palco.clientWidth / 2));
-        palco.scrollTop = Math.max(0, Math.round(centroY * novaAltura - palco.clientHeight / 2));
-      });
+      palco.style.setProperty('--ath-zoom', String(escalaNova));
+      palco.querySelectorAll('.ath-pdf-pagina-bloco-wrap').forEach(wrap => this.aplicarEscalaNaFolha(wrap, escalaNova));
+
+      // Mantém exatamente o mesmo ponto sob o foco após a nova escala
+      const novoScrollX = Math.round(conteudoX * razao - fx);
+      const novoScrollY = Math.round(conteudoY * razao - fy);
+      palco.scrollLeft = Math.max(0, novoScrollX);
+      palco.scrollTop = Math.max(0, novoScrollY);
       // a definição do texto acompanha o zoom: refaz o bitmap das páginas perto da tela (as outras, ao se aproximarem)
       clearTimeout(this._tZoomQualidade);
       this._tZoomQualidade = setTimeout(() => {
