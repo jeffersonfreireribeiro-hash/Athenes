@@ -280,7 +280,7 @@ export class DashboardView {
                 <h1>Meus Documentos e Artigos</h1>
                 <p>Ambiente de escrita e diagramação acadêmica em blocos com revisão estilo Google Docs e sincronia em tempo real.</p>
               </div>
-              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                 <button type="button" class="ath-btn ath-btn-icone" id="athBtnSincronizarNuvem" title="Sincronizar: traz do servidor e do Drive o que mudou em outros computadores e envia o que mudou aqui" aria-label="Sincronizar">
                   ${svgIcone('sincronizar', 17)}
                 </button>
@@ -288,8 +288,9 @@ export class DashboardView {
                   ${svgIcone('drive', 17)}
                 </button>
                 <div class="ath-menu-importar" id="athMenuImportar">
-                  <button type="button" class="ath-btn" id="athBtnImportar" aria-haspopup="menu" aria-expanded="false" title="Importar um arquivo ou um modelo do Word">
-                    ${svgIcone('importar', 15)} Importar ${svgIcone('baixo', 12)}
+                  <button type="button" class="ath-btn ath-btn-icone ath-btn-importar-coluna" id="athBtnImportar" aria-haspopup="menu" aria-expanded="false" title="Importar documento (.json, .athenes) ou template do Word (.docx)" aria-label="Importar documento ou template">
+                    ${svgIcone('importar', 14)}
+                    ${svgIcone('baixo', 8)}
                   </button>
                   <ul class="ath-menu-importar-lista" id="athMenuImportarLista" role="menu" hidden>
                     <li><button type="button" role="menuitem" data-importar="json">${svgIcone('documento', 14)}<span><strong>Documento Athenes</strong><small>.athenes ou .json</small></span></button></li>
@@ -298,8 +299,8 @@ export class DashboardView {
                   <input type="file" accept=".json,.athenes" id="athInputImportarJson" style="display:none;">
                   <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" id="athInputImportarDocx" style="display:none;">
                 </div>
-                <button type="button" class="ath-btn ath-btn-primary" id="athBtnNovoDocModal">
-                  ${svgIcone('mais', 14)} Novo Documento
+                <button type="button" class="ath-btn ath-btn-primary ath-btn-icone" id="athBtnNovoDocModal" title="Novo Documento" aria-label="Novo Documento">
+                  ${svgIcone('mais', 16)}
                 </button>
               </div>
             </header>
