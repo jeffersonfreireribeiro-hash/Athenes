@@ -14,6 +14,7 @@ import { estaSessaoAtiva, encerrarSessao, obterPerfilColaborador, salvarDocument
 import { criarDocumento } from '../core/athenes_documento.js';
 import { carregarDocumentoDoSupabase } from '../core/athenes_colaboracao.js';
 import { carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
+import { lerSessaoSupabase } from '../core/athenes_supabase_auth.js';
 import { descarregarSalvarArtigosDebounced } from './athenes_estudo_artigos_dados.js';
 import { sanitizarDocumentoImportado } from '../core/athenes_seguranca.js';
 import { EditorView } from './athenes_editor.js';
