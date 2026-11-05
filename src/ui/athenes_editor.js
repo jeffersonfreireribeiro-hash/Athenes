@@ -1507,6 +1507,7 @@ export class EditorView {
         try { this.rolarNaLista(node); } catch (_) {}
       }
     });
+    this._reguasDoc?.atualizar();
   }
 
   /**

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Athenes — Réguas horizontal e vertical em milímetros ao redor do palco de páginas do editor. Acompanham a página que está no
- * meio da tela (rolagem, zoom e tamanho do papel) e mostram as margens dela (faixas sombreadas e marcadores).
+ * meio da tela (rolagem, zoom e tamanho do papel), mostram as margens dela (faixas sombreadas e marcadores) e indicam a caixa
+ * de texto / bloco selecionado com linha azul escura delimitadora e faixa destacada.
  */
 
 const AZUL = '#314F79'; const TRACO = '#64748B'; const FUNDO = '#FFFFFF'; const FORA = '#E5EAF1'; const MARGEM = '#F1F4F8';
@@ -29,7 +30,7 @@ export function paginaEmFoco(caixas, meio) {
 }
 
 function prepararCanvas(cv, larg, alt) {
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 1;
   const w = Math.max(1, Math.round(larg)); const h = Math.max(1, Math.round(alt));
   if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
   cv.style.width = `${w}px`; cv.style.height = `${h}px`;
@@ -39,8 +40,8 @@ function prepararCanvas(cv, larg, alt) {
   return { ctx, w, h };
 }
 
-/** Desenha uma régua. `eixo`: 'h' ou 'v'; `origem`: posição (px) do 0 da página; `mm`: tamanho da página; `margens`: [início, fim] em mm. */
-export function desenharRegua(cv, { eixo, comprimentoPx, espessura, origem, pxPorMm, mm, margens }) {
+/** Desenha uma régua. `eixo`: 'h' ou 'v'; `origem`: posição (px) do 0 da página; `mm`: tamanho da página; `margens`: [início, fim] em mm; `selecao`: { inicio, fim } em px. */
+export function desenharRegua(cv, { eixo, comprimentoPx, espessura, origem, pxPorMm, mm, margens, selecao = null }) {
   const horizontal = eixo === 'h';
   const { ctx } = prepararCanvas(cv, horizontal ? comprimentoPx : espessura, horizontal ? espessura : comprimentoPx);
   const fim = origem + mm * pxPorMm;
@@ -50,6 +51,11 @@ export function desenharRegua(cv, { eixo, comprimentoPx, espessura, origem, pxPo
   const [mIni, mFim] = margens || [0, 0];
   faixa(origem, origem + mIni * pxPorMm, MARGEM);
   faixa(fim - mFim * pxPorMm, fim, MARGEM);
+
+  // Faixa de destaque suave da caixa de texto/bloco selecionado
+  if (selecao && selecao.fim > selecao.inicio) {
+    faixa(selecao.inicio, selecao.fim, 'rgba(49, 79, 121, 0.16)');
+  }
 
   const tracos = passoDosTracosMm(pxPorMm); const numeros = passoDosNumerosMm(pxPorMm);
   ctx.strokeStyle = TRACO; ctx.fillStyle = TRACO; ctx.lineWidth = 1; ctx.font = '600 9px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
@@ -77,7 +83,61 @@ export function desenharRegua(cv, { eixo, comprimentoPx, espessura, origem, pxPo
     ctx.closePath(); ctx.fill();
   }
   ctx.strokeStyle = '#C8D7E6';
+  ctx.lineWidth = 1;
   ctx.beginPath(); if (horizontal) { ctx.moveTo(0, espessura - 0.5); ctx.lineTo(comprimentoPx, espessura - 0.5); } else { ctx.moveTo(espessura - 0.5, 0); ctx.lineTo(espessura - 0.5, comprimentoPx); } ctx.stroke();
+
+  // Linha azul mais escura e delimitadores marcando na régua o tamanho exato da caixa selecionada
+  if (selecao && selecao.fim > selecao.inicio) {
+    const s0 = Math.max(0, selecao.inicio);
+    const s1 = Math.min(comprimentoPx, selecao.fim);
+    if (s1 > s0) {
+      const COR_ESCURA = '#172E4E'; // azul marinho profundo (mais escuro que #314F79)
+      ctx.save();
+      ctx.strokeStyle = COR_ESCURA;
+      ctx.fillStyle = COR_ESCURA;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'square';
+      ctx.beginPath();
+      if (horizontal) {
+        ctx.moveTo(s0, espessura - 1.25);
+        ctx.lineTo(s1, espessura - 1.25);
+        ctx.stroke();
+
+        ctx.lineWidth = 1.5;
+        if (selecao.inicio >= 0 && selecao.inicio <= comprimentoPx) {
+          ctx.beginPath();
+          ctx.moveTo(selecao.inicio + 0.5, espessura);
+          ctx.lineTo(selecao.inicio + 0.5, espessura - 8);
+          ctx.stroke();
+        }
+        if (selecao.fim >= 0 && selecao.fim <= comprimentoPx) {
+          ctx.beginPath();
+          ctx.moveTo(selecao.fim - 0.5, espessura);
+          ctx.lineTo(selecao.fim - 0.5, espessura - 8);
+          ctx.stroke();
+        }
+      } else {
+        ctx.moveTo(espessura - 1.25, s0);
+        ctx.lineTo(espessura - 1.25, s1);
+        ctx.stroke();
+
+        ctx.lineWidth = 1.5;
+        if (selecao.inicio >= 0 && selecao.inicio <= comprimentoPx) {
+          ctx.beginPath();
+          ctx.moveTo(espessura, selecao.inicio + 0.5);
+          ctx.lineTo(espessura - 8, selecao.inicio + 0.5);
+          ctx.stroke();
+        }
+        if (selecao.fim >= 0 && selecao.fim <= comprimentoPx) {
+          ctx.beginPath();
+          ctx.moveTo(espessura, selecao.fim - 0.5);
+          ctx.lineTo(espessura - 8, selecao.fim - 0.5);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+  }
 }
 
 /**
@@ -96,20 +156,43 @@ export function ligarReguasDoDocumento(envoltorio, palco) {
     const folhas = [...palco.querySelectorAll('.ath-folha-a4[data-larg-mm]')];
     if (!folhas.length) return;
     const caixas = folhas.map(f => { const r = f.getBoundingClientRect(); return { topo: r.top - pr.top, base: r.bottom - pr.top }; });
-    const f = folhas[Math.max(0, paginaEmFoco(caixas, palco.clientHeight / 2))];
+
+    // Localiza o bloco/caixa selecionado no palco
+    const blocoSelGeral = palco.querySelector('.ath-bloco-folha.sel');
+    let f = null;
+    if (blocoSelGeral) {
+      const folhaDoBloco = blocoSelGeral.closest('.ath-folha-a4');
+      if (folhaDoBloco && folhas.includes(folhaDoBloco)) {
+        f = folhaDoBloco;
+      }
+    }
+    if (!f) {
+      f = folhas[Math.max(0, paginaEmFoco(caixas, palco.clientHeight / 2))];
+    }
     const r = f.getBoundingClientRect();
     const largMm = Number(f.dataset.largMm) || 210; const altMm = Number(f.dataset.altMm) || 297;
     const pxPorMm = r.width / largMm;
     if (!(pxPorMm > 0)) return;
     const [mt, mr, mb, ml] = (f.dataset.margens || '0,0,0,0').split(',').map(Number);
-    desenharRegua(cvH, { eixo: 'h', comprimentoPx: palco.clientWidth, espessura: ESP, origem: r.left - pr.left, pxPorMm, mm: largMm, margens: [ml || 0, mr || 0] });
-    desenharRegua(cvV, { eixo: 'v', comprimentoPx: palco.clientHeight, espessura: ESP, origem: r.top - pr.top, pxPorMm, mm: altMm, margens: [mt || 0, mb || 0] });
+
+    const blocoSel = f.querySelector('.ath-bloco-folha.sel') || (blocoSelGeral && f.contains(blocoSelGeral) ? blocoSelGeral : null);
+    let selH = null;
+    let selV = null;
+    if (blocoSel) {
+      const rb = blocoSel.getBoundingClientRect();
+      selH = { inicio: rb.left - pr.left, fim: rb.right - pr.left };
+      selV = { inicio: rb.top - pr.top, fim: rb.bottom - pr.top };
+    }
+
+    desenharRegua(cvH, { eixo: 'h', comprimentoPx: palco.clientWidth, espessura: ESP, origem: r.left - pr.left, pxPorMm, mm: largMm, margens: [ml || 0, mr || 0], selecao: selH });
+    desenharRegua(cvV, { eixo: 'v', comprimentoPx: palco.clientHeight, espessura: ESP, origem: r.top - pr.top, pxPorMm, mm: altMm, margens: [mt || 0, mb || 0], selecao: selV });
   };
   const atualizar = () => { if (pendente) return; pendente = true; requestAnimationFrame(desenhar); };
   palco.addEventListener('scroll', atualizar, { passive: true });
+  palco.addEventListener('input', atualizar, { passive: true });
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(atualizar) : null; ro?.observe(palco);
-  const mo = new MutationObserver(atualizar); mo.observe(palco, { childList: true, attributes: true, attributeFilter: ['style', 'class'] });
+  const mo = new MutationObserver(atualizar); mo.observe(palco, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
   window.addEventListener('resize', atualizar);
   atualizar();
-  return { atualizar, destruir() { palco.removeEventListener('scroll', atualizar); ro?.disconnect(); mo.disconnect(); window.removeEventListener('resize', atualizar); } };
+  return { atualizar, destruir() { palco.removeEventListener('scroll', atualizar); palco.removeEventListener('input', atualizar); ro?.disconnect(); mo.disconnect(); window.removeEventListener('resize', atualizar); } };
 }
