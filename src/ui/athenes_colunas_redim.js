@@ -3,6 +3,7 @@
  * Athenes — Barras laterais recolhíveis e de largura ajustável (arrastando pela borda), para as telas de 3 colunas
  * (editor de escrita e estúdio de PDF). Largura e estado (aberta/recolhida) ficam lembrados por tela.
  * Teclado: com o foco na alça, setas ← → ajustam (Shift = passo maior), Enter alterna recolher/abrir, Home restaura o padrão.
+ * Tablets / Telas menores (<= 1180px): funcionam como gavetas sobrepostas (overlay drawers) que nunca empilham sobre o canvas.
  */
 const CHAVE = (nome) => `athenes_colunas_${nome}`;
 const limitar = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -30,13 +31,30 @@ export function tornarColunasRedimensionaveis(grade, opcoes = {}) {
   if (!esq && !dir) return null;
   const cfg = { nome: 'tela', padraoEsq: 320, padraoDir: 340, minEsq: 200, maxEsq: 640, minDir: 240, maxDir: 720, ...opcoes };
   const saved = lerEstadoColunas(cfg.nome);
+  const ehTablet = typeof window !== 'undefined' && window.innerWidth <= 1180;
   const est = {
     esq: Number.isFinite(saved.esq) ? limitar(saved.esq, cfg.minEsq, cfg.maxEsq) : cfg.padraoEsq,
     dir: Number.isFinite(saved.dir) ? limitar(saved.dir, cfg.minDir, cfg.maxDir) : cfg.padraoDir,
-    fechadaEsq: Boolean(saved.fechadaEsq), fechadaDir: Boolean(saved.fechadaDir)
+    fechadaEsq: saved.fechadaEsq !== undefined ? Boolean(saved.fechadaEsq) : ehTablet,
+    fechadaDir: saved.fechadaDir !== undefined ? Boolean(saved.fechadaDir) : ehTablet
   };
   grade.dataset.athRedim = '1';
   grade.classList.add('ath-redim');
+
+  // Scrim de fundo para fechar a gaveta no tablet ao clicar fora
+  let scrim = grade.querySelector(':scope > .ath-redim-scrim');
+  if (!scrim) {
+    scrim = document.createElement('div');
+    scrim.className = 'ath-redim-scrim';
+    scrim.setAttribute('aria-hidden', 'true');
+    scrim.addEventListener('click', () => {
+      est.fechadaEsq = true;
+      est.fechadaDir = true;
+      aplicar();
+      salvar();
+    });
+    grade.appendChild(scrim);
+  }
 
   const aplicar = () => {
     grade.style.setProperty('--ath-col-esq', `${est.fechadaEsq || !esq ? 0 : est.esq}px`);
@@ -63,7 +81,22 @@ export function tornarColunasRedimensionaveis(grade, opcoes = {}) {
     alca.setAttribute('aria-label', lado === 'esq' ? 'Largura da barra lateral esquerda' : 'Largura da barra lateral direita');
     alca.setAttribute('aria-valuemin', String(min)); alca.setAttribute('aria-valuemax', String(max));
     alca.innerHTML = '<span class="ath-redim-linha"></span><button type="button" class="ath-redim-bt" tabindex="-1"></button>';
-    const alternar = () => { if (lado === 'esq') est.fechadaEsq = !est.fechadaEsq; else est.fechadaDir = !est.fechadaDir; aplicar(); salvar(); };
+    const alternar = () => {
+      if (typeof window !== 'undefined' && window.innerWidth <= 1180) {
+        if (lado === 'esq') {
+          est.fechadaEsq = !est.fechadaEsq;
+          if (!est.fechadaEsq) est.fechadaDir = true;
+        } else {
+          est.fechadaDir = !est.fechadaDir;
+          if (!est.fechadaDir) est.fechadaEsq = true;
+        }
+      } else {
+        if (lado === 'esq') est.fechadaEsq = !est.fechadaEsq;
+        else est.fechadaDir = !est.fechadaDir;
+      }
+      aplicar();
+      salvar();
+    };
     const ajustar = (px) => { if (lado === 'esq') { est.esq = limitar(px, min, max); est.fechadaEsq = false; } else { est.dir = limitar(px, min, max); est.fechadaDir = false; } aplicar(); };
     alca.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); alternar(); });
     alca.addEventListener('pointerdown', (e) => {
@@ -94,7 +127,12 @@ export function tornarColunasRedimensionaveis(grade, opcoes = {}) {
   if (dir) criarAlca('dir');
   aplicar();
   return {
-    destruir() { Object.values(alcas).forEach(a => a.remove()); grade.classList.remove('ath-redim', 'ath-redim-fechada-esq', 'ath-redim-fechada-dir'); delete grade.dataset.athRedim; },
+    destruir() {
+      scrim?.remove();
+      Object.values(alcas).forEach(a => a.remove());
+      grade.classList.remove('ath-redim', 'ath-redim-fechada-esq', 'ath-redim-fechada-dir');
+      delete grade.dataset.athRedim;
+    },
     abrirOuFechar(lado) { alcas[lado]?.querySelector('button')?.click(); }
   };
 }

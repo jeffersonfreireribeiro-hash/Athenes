@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { larguraAoArrastar, lerEstadoColunas, gravarEstadoColunas } from '../src/ui/athenes_colunas_redim.js';
 
 const caixa = { left: 100, right: 1500 };
@@ -21,4 +23,18 @@ test('largura e estado das colunas ficam lembrados por tela; armazenamento quebr
   const ruim = { getItem: () => '{nao json', setItem: () => { throw new Error('cheio'); } };
   assert.deepEqual(lerEstadoColunas('x', ruim), {});
   assert.doesNotThrow(() => gravarEstadoColunas('x', {}, ruim));
+});
+
+test('tablets e telas menores: barras laterais viram gavetas sobrepostas e nunca empilham sobre o canvas', () => {
+  const css = fs.readFileSync(path.resolve('src/css/athenes_editor.css'), 'utf8');
+
+  // Não deve haver regra de grid-template-columns: 1fr que empilha as colunas na vertical
+  assert.doesNotMatch(css, /@media\s*\(max-width:\s*1180px\)\s*\{\s*\.rm-ed-grade\s*\{\s*grid-template-columns:\s*1fr;\s*\}\s*\}/,
+    'Não deve empilhar a grade verticalmente');
+
+  // Deve ter regra de adaptação com canvas em 100% e colunas como overlay drawers com scrim
+  assert.match(css, /\.rm-col-esq\s*\{[^}]*position:\s*absolute\s*!important/);
+  assert.match(css, /\.rm-col-dir\s*\{[^}]*position:\s*absolute\s*!important/);
+  assert.match(css, /\.ath-redim-scrim\s*\{[^}]*position:\s*absolute\s*!important/);
+  assert.match(css, /\.ath-redim-alca\s*\{[^}]*display:\s*flex\s*!important/);
 });

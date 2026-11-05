@@ -24,7 +24,6 @@
 .rm-ed-aviso[data-tipo="ok"] { color: #15803D; }
 .rm-ed-grade { display: grid; grid-template-columns: 310px minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
 .rm-col { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-@media (max-width: 1180px) { .rm-ed-grade { grid-template-columns: 1fr; } }
 .rm-bloco-cfg, .rm-sec, .rm-props, .rm-vars { background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.04); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
 .rm-sec > summary { cursor: pointer; font: 800 12px var(--glx-font); text-transform: uppercase; letter-spacing: .08em; color: var(--glx-muted, #6B7585); }
 .rm-sec[open] > summary { margin-bottom: 6px; }
@@ -167,15 +166,13 @@
 .rm-main label.rm-arquivo { width: fit-content !important; align-self: flex-start !important; }
 
 /* Editor com altura fixa: o canvas (prévia) não se move; só as colunas laterais rolam, cada uma sozinha. */
-@media (min-width: 1181px) {
-  .rm-conteudo:has(> .rm-editor:not([hidden])) { overflow: hidden; }
-  .rm-editor:not([hidden]) { flex: 1 1 0; min-height: 0; }
-  .rm-ed-grade { flex: 1 1 0; min-height: 0; align-items: stretch; }
-  .rm-col-esq, .rm-col-dir { min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
-  .rm-col-prev { position: static; min-height: 0; }
-  .rm-col-prev .rm-prev { flex: 1 1 0; height: auto; min-height: 0; }
-  .rm-col-dir .rm-vars { max-height: none; flex: 0 0 auto; }
-}
+.rm-conteudo:has(> .rm-editor:not([hidden])) { overflow: hidden; height: 100vh; }
+.rm-editor:not([hidden]) { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.rm-ed-grade { flex: 1 1 0; min-height: 0; align-items: stretch; height: 100%; overflow: hidden; }
+.rm-col-esq, .rm-col-dir { min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
+.rm-col-prev { position: static; min-height: 0; flex: 1 1 0; height: 100%; }
+.rm-col-prev .rm-prev { flex: 1 1 0; height: auto; min-height: 0; }
+.rm-col-dir .rm-vars { max-height: none; flex: 0 0 auto; }
 
 
 /* Folha A4 real na prévia, blocos ao lado dela e seletor de grade */
@@ -2710,7 +2707,159 @@ a.ath-citacao-link { color: inherit; text-decoration: none; cursor: pointer; }
 .ath-redim-alca:hover .ath-redim-bt, .ath-redim-alca:focus-within .ath-redim-bt, .ath-redim-fechada-esq .ath-redim-alca-esq .ath-redim-bt, .ath-redim-fechada-dir .ath-redim-alca-dir .ath-redim-bt { opacity: 1; }
 .ath-redim-bt:hover { background: #EEF4FA; }
 @media (hover: none) { .ath-redim-bt { opacity: 1; } }
-@media (max-width: 1180px) { .rm-editor .rm-ed-grade.ath-redim { grid-template-columns: 1fr !important; } .ath-redim-alca { display: none; } }
+/* Adaptação inteligente para tablets e telas menores (<= 1180px):
+   O canvas (palco) ocupa 100% da área útil com altura total.
+   As barras laterais NUNCA vão para cima nem empilham verticalmente:
+   abrem como gavetas deslizantes (overlay drawers) sobre o canvas e recolhem com um toque. */
+@media (max-width: 1180px) {
+  .rm-ed-grade,
+  .rm-editor .rm-ed-grade.ath-redim,
+  .ath-estudio-full-shell .rm-ed-grade {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    position: relative !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .rm-col-prev {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    z-index: 1 !important;
+  }
+
+  .rm-col-esq {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    position: absolute !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: min(340px, 86vw) !important;
+    max-width: 86vw !important;
+    height: 100% !important;
+    z-index: 50 !important;
+    background: #fff !important;
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18) !important;
+    border-radius: 0 16px 16px 0 !important;
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s ease !important;
+    overflow-y: auto !important;
+    padding: 12px 14px !important;
+    box-sizing: border-box !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  .rm-col-dir {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    position: absolute !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    right: 0 !important;
+    width: min(340px, 86vw) !important;
+    max-width: 86vw !important;
+    height: 100% !important;
+    z-index: 50 !important;
+    background: #fff !important;
+    box-shadow: -4px 0 24px rgba(15, 23, 42, 0.18) !important;
+    border-radius: 16px 0 0 16px !important;
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s ease !important;
+    overflow-y: auto !important;
+    padding: 12px 14px !important;
+    box-sizing: border-box !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  .rm-ed-grade.ath-redim-fechada-esq > .rm-col-esq,
+  .rm-ed-grade.ath-redim-fechada-esq #rmColEsq,
+  .rm-ed-grade.ath-redim-fechada-esq #athEstudioColEsq {
+    transform: translateX(-105%) !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  .rm-ed-grade.ath-redim-fechada-dir > .rm-col-dir,
+  .rm-ed-grade.ath-redim-fechada-dir #athInspectorContainer,
+  .rm-ed-grade.ath-redim-fechada-dir #athEstudioColDir {
+    transform: translateX(105%) !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  /* Alças de toque no tablet: sempre visíveis nas bordas */
+  .ath-redim-alca {
+    display: flex !important;
+    z-index: 60 !important;
+    position: absolute !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    height: auto !important;
+    width: auto !important;
+  }
+
+  .ath-redim-alca-esq {
+    left: 0 !important;
+    transition: left 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+  .rm-ed-grade:not(.ath-redim-fechada-esq) .ath-redim-alca-esq {
+    left: min(340px, 86vw) !important;
+  }
+
+  .ath-redim-alca-dir {
+    right: 0 !important;
+    transition: right 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+  .rm-ed-grade:not(.ath-redim-fechada-dir) .ath-redim-alca-dir {
+    right: min(340px, 86vw) !important;
+  }
+
+  .ath-redim-linha {
+    display: none !important;
+  }
+
+  .ath-redim-bt {
+    opacity: 1 !important;
+    width: 26px !important;
+    height: 48px !important;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18) !important;
+    background: #fff !important;
+    border: 1px solid #C8D7E6 !important;
+    color: #314F79 !important;
+  }
+  .ath-redim-alca-esq .ath-redim-bt {
+    border-radius: 0 10px 10px 0 !important;
+    border-left: 0 !important;
+  }
+  .ath-redim-alca-dir .ath-redim-bt {
+    border-radius: 10px 0 0 10px !important;
+    border-right: 0 !important;
+  }
+
+  /* Scrim transparente de fundo para fechar gaveta com toque fora */
+  .ath-redim-scrim {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(15, 23, 42, 0.25) !important;
+    z-index: 45 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.2s ease !important;
+  }
+  .rm-ed-grade:not(.ath-redim-fechada-esq) .ath-redim-scrim,
+  .rm-ed-grade:not(.ath-redim-fechada-dir) .ath-redim-scrim {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
 .rm-editor.ath-modo-revisao .rm-ed-grade.ath-redim { grid-template-columns: minmax(0, 1fr) !important; }
 .rm-editor.ath-modo-revisao .ath-redim-alca { display: none; }
 

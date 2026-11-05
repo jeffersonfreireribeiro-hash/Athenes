@@ -1065,7 +1065,8 @@
 }
 
 .ath-estudio-full-shell .rm-ed-grade {
-  grid-template-columns: 340px minmax(0, 1fr) 350px !important;
+  grid-template-columns: 340px minmax(0, 1fr) 350px;
+  grid-template-columns: var(--ath-col-esq, 340px) minmax(0, 1fr) var(--ath-col-dir, 350px) !important;
   gap: 12px !important;
   height: 100% !important;
   overflow: hidden !important;
