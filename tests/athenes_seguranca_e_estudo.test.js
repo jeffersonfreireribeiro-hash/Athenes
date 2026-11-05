@@ -410,3 +410,59 @@ test('Todos os módulos frontend (UI e Core) importam sem SyntaxError ou referê
     assert.ok(mod, `Módulo ${m} deve ser carregado com sucesso.`);
   }
 });
+
+test('Estúdio de Artigos preserva fichamento com traços/citações na mesclagem e suporta compartilhamento de referências', async () => {
+  const { mesclarLista } = await import('../src/core/athenes_lista_sincronizada.js');
+  const { decodificarMetadadosNotaZotero, codificarMetadadosNotaZotero, aplicarFilhosZoteroAoArtigo } = await import('../src/core/athenes_zotero_anexos_notas.js');
+  const { mesclarFichamentoPreservandoDados, gerarHtmlNotaZoteroDoArtigo } = await import('../src/ui/athenes_estudo_artigos_dados.js');
+
+  // 1. Preservação de dados ricos na mesclagem mesmo se o outro lado for mais recente mas tiver fichamento vazio
+  const localRico = {
+    id: 'art_100',
+    titulo: 'Artigo com riscos e notas',
+    atualizadoEm: '2026-11-01T10:00:00Z',
+    fichamento: {
+      resumoPessoal: 'Meu resumo importante',
+      citacoesMarcadas: [{ id: 'c1', texto: 'Trecho 1', pagina: 2 }],
+      tracosPorPagina: { 1: [{ tipo: 'caneta', pontos: [{ x: 10, y: 20 }] }] }
+    }
+  };
+  const servidorReimportado = {
+    id: 'art_100',
+    titulo: 'Artigo com riscos e notas',
+    atualizadoEm: '2026-11-05T12:00:00Z', // Data mais recente de reimportação
+    fichamento: { resumoPessoal: '', citacoesMarcadas: [], tracosPorPagina: {} }
+  };
+
+  const { valor } = mesclarLista({ itens: [servidorReimportado], excluidos: {} }, { itens: [localRico], excluidos: {} });
+  const itemMesclado = valor.itens.find(x => x.id === 'art_100');
+  assert.ok(itemMesclado, 'Artigo mesclado deve existir');
+  assert.equal(itemMesclado.fichamento.resumoPessoal, 'Meu resumo importante', 'Resumo não deve sumir na mesclagem');
+  assert.equal(itemMesclado.fichamento.citacoesMarcadas.length, 1, 'Citações devem ser preservadas');
+  assert.equal(itemMesclado.fichamento.tracosPorPagina[1].length, 1, 'Traços de caneta devem ser preservados');
+
+  // 2. Codificação e decodificação de metadados em base64 na nota espelho Zotero
+  const htmlNota = gerarHtmlNotaZoteroDoArtigo(localRico);
+  assert.ok(htmlNota.includes('ATHENES_FICHAMENTO_B64:'), 'Nota Zotero deve conter metadados base64');
+  const metaRecuperado = decodificarMetadadosNotaZotero(htmlNota);
+  assert.ok(metaRecuperado, 'Metadados b64 devem ser decodificados com sucesso');
+  assert.equal(metaRecuperado.fichamento.resumoPessoal, 'Meu resumo importante');
+  assert.equal(metaRecuperado.fichamento.citacoesMarcadas[0].texto, 'Trecho 1');
+
+  // 3. Restauração automática via aplicarFilhosZoteroAoArtigo
+  const artLimpo = { id: 'art_100', titulo: 'Artigo limpo' };
+  const mockFilhos = {
+    anexos: new Map(),
+    notas: new Map([['PAI_ZOT', [{ chave: 'NOTA_1', html: htmlNota, data: '2026-11-05T12:00:00Z' }]]]),
+    anotacoes: new Map()
+  };
+  aplicarFilhosZoteroAoArtigo(artLimpo, 'PAI_ZOT', mockFilhos);
+  assert.equal(artLimpo.fichamento.resumoPessoal, 'Meu resumo importante', 'Fichamento deve ser restaurado a partir da nota Zotero');
+  assert.equal(artLimpo.fichamento.citacoesMarcadas.length, 1, 'Citações devem ser restauradas');
+  assert.equal(artLimpo.fichamento.tracosPorPagina[1].length, 1, 'Traços de caneta devem ser restaurados');
+
+  // 4. Verificação de suporte a compartilhamento no Estúdio de Artigos
+  const codigoEstudo = fs.readFileSync('src/ui/athenes_estudo_artigos.js', 'utf8');
+  assert.ok(codigoEstudo.includes('abrirModalCompartilharArtigo'), 'Estúdio deve ter método abrirModalCompartilharArtigo');
+  assert.ok(codigoEstudo.includes('abrirArtigoCompartilhadoRecebido'), 'Estúdio deve suportar abrir artigo recebido via link compartilhado');
+});

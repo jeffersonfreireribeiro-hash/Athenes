@@ -10,7 +10,7 @@ import { artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js';
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { mostrarAviso } from './athenes_aviso.js';
-import { registrarPdfLocalNoArtigo, salvarArtigosEstudo, formatarCitacaoAbntDoArtigo, artigoTemPdf, ehArtigoExemploFicticio } from './athenes_estudo_artigos_dados.js';
+import { registrarPdfLocalNoArtigo, salvarArtigosEstudo, definirArtigoAbertoAtivo, formatarCitacaoAbntDoArtigo, artigoTemPdf, ehArtigoExemploFicticio } from './athenes_estudo_artigos_dados.js';
 
 /**
  * PDF guardado pelo próprio Zotero (arquivo importado): fica na pasta de dados do Zotero, em storage/CHAVE-DO-ANEXO/arquivo.pdf.
@@ -41,8 +41,9 @@ function htmlLocalDoPdf(anexo) {
 
 export const metodosEstudoTela = {
   renderizarEstudioPdfFullScreen(art, scrollSalvo = 0) {
+    definirArtigoAbertoAtivo(art);
     if (!art.fichamento) {
-      art.fichamento = { resumoPessoal: '', metodologiaNotas: '', citacoesMarcadas: [], notasPagina: {}, tracosPorPagina: {} };
+      art.fichamento = { resumoPessoal: '', metodologiaNotas: '', citacoesMarcadas: [], notasPagina: {}, tracosPorPagina: {}, grifosPorPagina: {} };
     }
 
     const pdfInfo = art.pdfBlobUrl ? this._pdfDocs?.get(art.pdfBlobUrl) : null;
@@ -67,7 +68,8 @@ export const metodosEstudoTela = {
     }
 
     // sem PDF vinculado não se inventam páginas: o palco avisa e oferece vincular (o fichamento e o resumo seguem disponíveis)
-    const semPdf = !art.pdfBlobUrl && !ehArtigoExemploFicticio(art);
+    const temPaginasCompartilhadas = Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.some(p => Array.isArray(p.paragrafos) && p.paragrafos.length > 0 && p.paragrafos.some(txt => String(txt || '').trim()));
+    const semPdf = !art.pdfBlobUrl && !ehArtigoExemploFicticio(art) && !temPaginasCompartilhadas;
     const paginasPdf = semPdf ? [] : (Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.length > 0
       ? art.conteudoPaginasPdf
       : [{ numero: 1, cabecalho: art.publicacao || 'Artigo PDF', titulo: art.titulo, autores: '', paragrafos: [art.resumoOriginal || ''] }]);
@@ -112,9 +114,14 @@ export const metodosEstudoTela = {
           <input type="file" accept="application/pdf" id="athInputCarregarPdfReal" style="display:none;">
         </label>
 
-        <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="athBtnSalvarDriveEZotero">
+        <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="athBtnCompartilharArtigo" title="Compartilhar este artigo, PDF e anotações com outras pessoas">
+          ${svgIcone('usuarios', 14)}
+          <span>Compartilhar</span>
+        </button>
+
+        <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="athBtnSalvarDriveEZotero" title="Salvar alterações, traços de caneta, citações e sincronizar com Nuvem, Google Drive e Zotero">
           ${svgIcone('salvar', 14)}
-          <span>Salvar no Drive & Zotero</span>
+          <span>Salvar</span>
         </button>
       </div>
     `;
@@ -179,8 +186,11 @@ export const metodosEstudoTela = {
             <button type="button" class="rm-ic-bt" id="athBtnVoltarCatalogoArtigos" title="Voltar para o Catálogo de Artigos" aria-label="Voltar">
               ${svgIcone('voltar', 16)}
             </button>
-            <button type="button" class="rm-ic-bt rm-ic-primario" id="athBtnSalvarPilula" title="Salvar no Google Drive, Zotero e Supabase" aria-label="Salvar">
+            <button type="button" class="rm-ic-bt rm-ic-primario" id="athBtnSalvarPilula" title="Salvar alterações, traços de caneta e citações" aria-label="Salvar">
               ${svgIcone('salvar', 16)}
+            </button>
+            <button type="button" class="rm-ic-bt" id="athBtnCompartilharPilula" title="Compartilhar este documento com outras pessoas" aria-label="Compartilhar">
+              ${svgIcone('usuarios', 16)}
             </button>
             <span class="rm-barra-sep" aria-hidden="true"></span>
 
@@ -327,7 +337,8 @@ export const metodosEstudoTela = {
         document.removeEventListener('selectionchange', this._selectionChangeHandler);
         this._selectionChangeHandler = null;
       }
-      salvarArtigosEstudo(this.artigos);
+      salvarArtigosEstudo(this.artigos, art);
+      definirArtigoAbertoAtivo(null);
       this.artigoAberto = null;
       this.renderizar();
     };
@@ -370,13 +381,19 @@ export const metodosEstudoTela = {
 
     root.querySelector('#athInputTituloArtigoTopo').addEventListener('change', e => {
       art.titulo = e.target.value.trim() || art.titulo;
-      salvarArtigosEstudo(this.artigos);
+      salvarArtigosEstudo(this.artigos, art);
       this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, paginasPdf);
     });
 
     root.querySelector('#athBtnTopoZoteroCredenciais').addEventListener('click', () => {
       this.abrirModalCredenciaisZotero();
     });
+
+    const acionarCompartilhar = () => {
+      this.abrirModalCompartilharArtigo(art);
+    };
+    root.querySelector('#athBtnCompartilharArtigo')?.addEventListener('click', acionarCompartilhar);
+    root.querySelector('#athBtnCompartilharPilula')?.addEventListener('click', acionarCompartilhar);
 
     const acionarSalvarCompleto = (btnRef) => {
       this.sincronizarArtigoComDriveEZotero(art, btnRef);
@@ -389,7 +406,7 @@ export const metodosEstudoTela = {
       const lista = art.fichamento?.tracosPorPagina?.[this.paginaAtual];
       if (Array.isArray(lista) && lista.length > 0) {
         lista.pop();
-        salvarArtigosEstudo(this.artigos);
+        salvarArtigosEstudo(this.artigos, art);
         const canvasAtivo = root.querySelector(`canvas[data-canvas-pag="${this.paginaAtual}"]`);
         this.redesenharCanvasTinta(canvasAtivo, art, this.paginaAtual);
         this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, paginasPdf);
@@ -399,7 +416,7 @@ export const metodosEstudoTela = {
     root.querySelector('#athBtnLimparTracosPagina').addEventListener('click', () => {
       if (!art.fichamento.tracosPorPagina) art.fichamento.tracosPorPagina = {};
       art.fichamento.tracosPorPagina[this.paginaAtual] = [];
-      salvarArtigosEstudo(this.artigos);
+      salvarArtigosEstudo(this.artigos, art);
       const canvasAtivo = root.querySelector(`canvas[data-canvas-pag="${this.paginaAtual}"]`);
       this.redesenharCanvasTinta(canvasAtivo, art, this.paginaAtual);
       this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, paginasPdf);
@@ -459,7 +476,7 @@ export const metodosEstudoTela = {
       if (!file) return;
       registrarPdfLocalNoArtigo(art, file);
       if (this._pdfFalhou) this._pdfFalhou.clear();
-      salvarArtigosEstudo(this.artigos);
+      salvarArtigosEstudo(this.artigos, art);
       this.renderizar();
     });
 
@@ -470,7 +487,7 @@ export const metodosEstudoTela = {
         if (!file) return;
         registrarPdfLocalNoArtigo(art, file);
         if (this._pdfFalhou) this._pdfFalhou.clear();
-        salvarArtigosEstudo(this.artigos);
+        salvarArtigosEstudo(this.artigos, art);
         this.renderizar();
       });
     });
@@ -511,7 +528,7 @@ export const metodosEstudoTela = {
           if (pdfFile) {
             registrarPdfLocalNoArtigo(art, pdfFile);
             if (this._pdfFalhou) this._pdfFalhou.clear();
-            salvarArtigosEstudo(this.artigos);
+            salvarArtigosEstudo(this.artigos, art);
             this.renderizar();
           }
         }
@@ -542,8 +559,9 @@ export const metodosEstudoTela = {
     if (!stack) return;
     stack.innerHTML = '';
 
+    const temPaginasCompartilhadas = Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.some(p => Array.isArray(p.paragrafos) && p.paragrafos.length > 0 && p.paragrafos.some(txt => String(txt || '').trim()));
     // sem PDF: aviso claro no lugar das páginas (nada de folha inventada)
-    if (!art.pdfBlobUrl && !ehArtigoExemploFicticio(art)) {
+    if (!art.pdfBlobUrl && !ehArtigoExemploFicticio(art) && !temPaginasCompartilhadas) {
       const carregando = this._carregandoPdf === art;
       const aviso = document.createElement('div');
       aviso.className = 'ath-pdf-sem-arquivo';
@@ -563,7 +581,7 @@ export const metodosEstudoTela = {
         if (!arq) return;
         registrarPdfLocalNoArtigo(art, arq);
         if (this._pdfFalhou) this._pdfFalhou.clear();
-        salvarArtigosEstudo(this.artigos);
+        salvarArtigosEstudo(this.artigos, art);
         this.renderizar();
       });
       aviso.querySelector('[data-baixar-pdf-zotero]')?.addEventListener('click', async (e) => {
@@ -574,7 +592,7 @@ export const metodosEstudoTela = {
           const nome = String(art.anexoPdfZotero.nomeArquivo || `${art.id}.pdf`).replace(/(\.pdf)?$/i, '.pdf');
           registrarPdfLocalNoArtigo(art, new File([blob], nome, { type: 'application/pdf' })); // abre e envia ao Drive
           if (this._pdfFalhou) this._pdfFalhou.clear();
-          salvarArtigosEstudo(this.artigos);
+          salvarArtigosEstudo(this.artigos, art);
           this.renderizar();
         } catch (err) {
           btn.disabled = false; btn.textContent = 'Baixar do Zotero';
@@ -583,7 +601,7 @@ export const metodosEstudoTela = {
       });
       aviso.querySelectorAll('[data-copiar]').forEach(b => b.addEventListener('click', async () => {
         const texto = b.dataset.copiar;
-        try { await navigator.clipboard.writeText(texto); } catch (_) { // sem permissão da área de transferência: seleciona o texto para copiar à mão
+        try { await navigator.clipboard.writeText(texto); } catch (_) {
           const r = document.createRange(); const alvo = b.closest('.ath-pdf-local')?.querySelector('code'); if (alvo) { r.selectNodeContents(alvo); getSelection().removeAllRanges(); getSelection().addRange(r); }
         }
         const rot = b.textContent; b.textContent = 'Copiado ✓'; setTimeout(() => { b.textContent = rot; }, 1500);
@@ -746,7 +764,6 @@ export const metodosEstudoTela = {
       const desenhar = (folha) => this.renderizarPaginaPdfReal(pdfInfo, folha, parseInt(folha.dataset.numPagina, 10));
       if (typeof IntersectionObserver !== 'undefined' && palcoRender) {
         this._obsPerto?.disconnect(); this._obsLonge?.disconnect();
-        // perto da tela: desenha (ou refaz, se o zoom mudou); muito longe: larga o bitmap para não estourar a memória
         this._obsPerto = new IntersectionObserver(entradas => { entradas.forEach(en => { if (en.isIntersecting) desenhar(en.target); }); }, { root: palcoRender, rootMargin: '900px 0px' });
         this._obsLonge = new IntersectionObserver(entradas => { entradas.forEach(en => { if (!en.isIntersecting) this.liberarBitmapDaFolha(en.target); }); }, { root: palcoRender, rootMargin: '4500px 0px' });
         folhasReais.forEach(f => { this._obsPerto.observe(f); this._obsLonge.observe(f); });
@@ -862,7 +879,7 @@ export const metodosEstudoTela = {
               const isPagAtiva = numPag === this.paginaAtual;
               const qtdRiscos = (artAtivo.fichamento?.tracosPorPagina?.[numPag] || []).length;
               const qtdNotas = (artAtivo.fichamento?.notasPagina?.[numPag] || []).length;
-              const qtdCitsPag = (artAtivo.fichamento?.citacoesMarcadas || []).filter(c => c.pagina === numPag).length;
+              const qtdCitsPag = (artAtivo.fichamento?.citacoesMarcadas || []).filter(c => Number(c.pagina) === Number(numPag)).length;
               const ehExtra = Boolean(pg.extra || (!pg.real && artAtivo.pdfBlobUrl && this._pdfDocs?.has(artAtivo.pdfBlobUrl) && idx >= (this._pdfDocs.get(artAtivo.pdfBlobUrl)?.n || 0)));
               return `
                 <li class="rm-bl ${isPagAtiva ? 'sel' : ''}" data-ir-pagina-esq="${numPag}">
@@ -907,6 +924,7 @@ export const metodosEstudoTela = {
       card.addEventListener('click', () => {
         const alvo = this.artigos.find(a => a.id === card.dataset.abrirArtigoEsq);
         if (alvo && alvo.id !== artAtivo.id) {
+          salvarArtigosEstudo(this.artigos, artAtivo);
           this.abrirArtigoNoEstudio(alvo);
         }
       });
@@ -929,7 +947,7 @@ export const metodosEstudoTela = {
         artAtivo.conteudoPaginasPdf.forEach((p, i) => { p.numero = i + 1; });
         artAtivo.totalPaginas = artAtivo.conteudoPaginasPdf.length;
         if (this.paginaAtual > artAtivo.totalPaginas) this.paginaAtual = artAtivo.totalPaginas;
-        salvarArtigosEstudo(this.artigos);
+        salvarArtigosEstudo(this.artigos, artAtivo);
         this.renderizar();
       });
     });

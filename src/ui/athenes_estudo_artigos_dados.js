@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
- * Athenes — Estúdio de Artigos: dados da biblioteca (artigos de exemplo, persistência), PDFs (pdf.js, Drive, IndexedDB legado),
+ * Athenes — Estúdio de Artigos: dados da biblioteca (artigos de exemplo, persistência), PDFs (pdf.js, Drive, IndexedDB),
  * citação ABNT e utilidades do desenho à mão livre. Separado da tela (athenes_estudo_artigos.js) para o arquivo não crescer sem fim.
  */
 import * as bib from '../core/athenes_biblioteca_artigos.js';
@@ -8,6 +8,7 @@ import { obterTokenDrive, obterPastaRaizDrive, buscarOuCriarPasta } from '../cor
 import { mostrarAviso } from './athenes_aviso.js';
 import { salvarArquivoNoGoogleDrive } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
+import { codificarMetadadosNotaZotero } from '../core/athenes_zotero_anexos_notas.js';
 
 export const STORAGE_KEY_ARTIGOS = 'athenes_estudo_artigos_v1';
 export const IDS_ARTIGOS_EXEMPLO = new Set(['zot_art_01', 'zot_art_02', 'zot_art_03']);
@@ -22,6 +23,7 @@ export function ehArtigoExemploFicticio(art) {
 export function artigoTemPdf(art) {
   if (!art) return false;
   if (ehArtigoExemploFicticio(art) || art.pdfBlobUrl || art.temPdfLocal) return true;
+  if (Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.length > 0) return true;
   const id = String(art.driveFileId || '').trim();
   return Boolean(id) && !/^drive_pdf_/.test(id);
 }
@@ -239,6 +241,12 @@ export function criarArtigosEstudoExemplo() {
 }
 
 export let _timerDebounceSalvarArtigos = null;
+let _pendenteDebounce = null;
+let _artigoAbertoAtivo = null;
+
+export function definirArtigoAbertoAtivo(art) {
+  _artigoAbertoAtivo = art || null;
+}
 
 export const PDFJS_VERSAO = '4.10.38';
 export let _pdfjsPromise = null;
@@ -255,13 +263,12 @@ export function carregarPdfJs() {
 }
 
 /* ==========================================================================
-   PDFs: ficam no GOOGLE DRIVE da pessoa (nunca só no computador, nunca no Zotero)
-   Na sessão o PDF é aberto a partir de uma URL em memória; ao escolher um arquivo ele sobe para o Drive e o artigo guarda o
-   `driveFileId`. O IndexedDB de versões antigas só é lido para MOVER o que ficou só neste computador para o Drive.
+   PDFs e Snapshot Local em IndexedDB + Google Drive
    ========================================================================== */
 export const IDB_NOME = 'athenes_pdfs_v1';
 export const IDB_STORE = 'pdfs';
 export const PASTA_PDFS_DRIVE = 'Bibliografia_PDFs';
+const CHAVE_SNAPSHOT_IDB = '__athenes_estudo_snapshot_v1__';
 
 export function abrirIdbPdfs() {
   return new Promise((resolve, reject) => {
@@ -273,7 +280,6 @@ export function abrirIdbPdfs() {
   });
 }
 
-/** (só legado) PDF que uma versão antiga deixou neste computador. */
 export async function obterPdfLocal(artId) {
   try {
     const db = await abrirIdbPdfs();
@@ -284,6 +290,22 @@ export async function obterPdfLocal(artId) {
     });
   } catch (_) {
     return null;
+  }
+}
+
+export async function salvarPdfLocal(artId, blob) {
+  if (!artId || !blob) return false;
+  try {
+    const db = await abrirIdbPdfs();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(blob, String(artId));
+      tx.oncomplete = res;
+      tx.onerror = () => rej(tx.error);
+    });
+    return true;
+  } catch (_) {
+    return false;
   }
 }
 
@@ -299,6 +321,145 @@ export async function removerPdfLocal(artId) {
   } catch (_) {}
 }
 
+function mapaTemItens(m) {
+  return Boolean(m && typeof m === 'object' && Object.values(m).some(arr => Array.isArray(arr) && arr.length > 0));
+}
+
+export function fichamentoPossuiConteudo(f) {
+  if (!f || typeof f !== 'object') return false;
+  if (String(f.resumoPessoal || '').trim() || String(f.metodologiaNotas || '').trim()) return true;
+  if (Array.isArray(f.citacoesMarcadas) && f.citacoesMarcadas.length > 0) return true;
+  if (mapaTemItens(f.tracosPorPagina) || mapaTemItens(f.notasPagina) || mapaTemItens(f.grifosPorPagina)) return true;
+  return false;
+}
+
+/**
+ * Mescla o fichamento e os vínculos de `artFonte` em `artAlvo` sem perder traços de caneta, citações, notas ou grifos.
+ */
+export function mesclarFichamentoPreservandoDados(artAlvo, artFonte) {
+  if (!artAlvo || !artFonte || artAlvo === artFonte) return artAlvo;
+  if ((!artAlvo.driveFileId || /^drive_pdf_/.test(String(artAlvo.driveFileId))) && artFonte.driveFileId && !/^drive_pdf_/.test(String(artFonte.driveFileId))) {
+    artAlvo.driveFileId = artFonte.driveFileId;
+    if (artFonte.driveFileName) artAlvo.driveFileName = artFonte.driveFileName;
+    if (artFonte.driveStatus) artAlvo.driveStatus = artFonte.driveStatus;
+  }
+  if (!artAlvo.notaZoteroKey && artFonte.notaZoteroKey) artAlvo.notaZoteroKey = artFonte.notaZoteroKey;
+  if (!artAlvo.docCompartilhadoId && artFonte.docCompartilhadoId) artAlvo.docCompartilhadoId = artFonte.docCompartilhadoId;
+  if (!artAlvo.compartilhamento && artFonte.compartilhamento) artAlvo.compartilhamento = artFonte.compartilhamento;
+  if ((!artAlvo.totalPaginas || artAlvo.totalPaginas <= 1) && artFonte.totalPaginas > 1) artAlvo.totalPaginas = artFonte.totalPaginas;
+  if ((!Array.isArray(artAlvo.conteudoPaginasPdf) || !artAlvo.conteudoPaginasPdf.length) && Array.isArray(artFonte.conteudoPaginasPdf) && artFonte.conteudoPaginasPdf.length) {
+    artAlvo.conteudoPaginasPdf = artFonte.conteudoPaginasPdf;
+  }
+
+  const fAlvo = artAlvo.fichamento || (artAlvo.fichamento = { resumoPessoal: '', metodologiaNotas: '', citacoesMarcadas: [], notasPagina: {}, tracosPorPagina: {}, grifosPorPagina: {} });
+  const fFonte = artFonte.fichamento;
+  if (!fFonte || typeof fFonte !== 'object') return artAlvo;
+
+  const fonteMaisNova = (fFonte.atualizadoEm || '') > (fAlvo.atualizadoEm || '');
+  if ((!fAlvo.resumoPessoal || fonteMaisNova) && fFonte.resumoPessoal) fAlvo.resumoPessoal = fFonte.resumoPessoal;
+  if ((!fAlvo.metodologiaNotas || fonteMaisNova) && fFonte.metodologiaNotas) fAlvo.metodologiaNotas = fFonte.metodologiaNotas;
+
+  if (Array.isArray(fFonte.citacoesMarcadas) && fFonte.citacoesMarcadas.length > 0) {
+    if (!Array.isArray(fAlvo.citacoesMarcadas) || fAlvo.citacoesMarcadas.length === 0) {
+      fAlvo.citacoesMarcadas = [...fFonte.citacoesMarcadas];
+    } else if (fonteMaisNova) {
+      fAlvo.citacoesMarcadas = [...fFonte.citacoesMarcadas];
+    } else {
+      const ids = new Set(fAlvo.citacoesMarcadas.map(c => c?.id));
+      for (const c of fFonte.citacoesMarcadas) {
+        if (c?.id && !ids.has(c.id)) { fAlvo.citacoesMarcadas.push(c); ids.add(c.id); }
+      }
+    }
+  }
+
+  for (const campo of ['tracosPorPagina', 'notasPagina', 'grifosPorPagina']) {
+    if (!fAlvo[campo] || typeof fAlvo[campo] !== 'object') fAlvo[campo] = {};
+    const mFonte = fFonte[campo];
+    if (!mFonte || typeof mFonte !== 'object') continue;
+    if (!mapaTemItens(fAlvo[campo]) && mapaTemItens(mFonte)) {
+      fAlvo[campo] = JSON.parse(JSON.stringify(mFonte));
+    } else if (fonteMaisNova && (mapaTemItens(mFonte) || fFonte.atualizadoEm)) {
+      fAlvo[campo] = JSON.parse(JSON.stringify(mFonte));
+    } else {
+      for (const [pg, arr] of Object.entries(mFonte)) {
+        if (!Array.isArray(arr) || !arr.length) continue;
+        if (!Array.isArray(fAlvo[campo][pg]) || fAlvo[campo][pg].length === 0) {
+          fAlvo[campo][pg] = JSON.parse(JSON.stringify(arr));
+        }
+      }
+    }
+  }
+
+  if (fonteMaisNova && fFonte.atualizadoEm) fAlvo.atualizadoEm = fFonte.atualizadoEm;
+  return artAlvo;
+}
+
+export async function guardarSnapshotArtigosIdb(lista) {
+  if (!Array.isArray(lista) || typeof indexedDB === 'undefined') return false;
+  try {
+    const db = await abrirIdbPdfs();
+    const existente = await new Promise((res) => {
+      const r = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(CHAVE_SNAPSHOT_IDB);
+      r.onsuccess = () => res(r.result || null);
+      r.onerror = () => res(null);
+    });
+    const porChave = { ...(existente?.porChave || {}) };
+    const artigosLimpos = [];
+    for (const a of lista) {
+      if (!a?.id || ehArtigoExemploFicticio(a)) continue;
+      const copia = { ...a };
+      delete copia.pdfBlobUrl;
+      delete copia.pdfBlob;
+      delete copia.temPdfLocal;
+      artigosLimpos.push(copia);
+      const dadosPreservar = {
+        id: a.id,
+        chaveZotero: a.chaveZotero || '',
+        atualizadoEm: a.atualizadoEm || '',
+        driveFileId: a.driveFileId || '',
+        driveFileName: a.driveFileName || '',
+        driveStatus: a.driveStatus || '',
+        notaZoteroKey: a.notaZoteroKey || '',
+        docCompartilhadoId: a.docCompartilhadoId || '',
+        compartilhamento: a.compartilhamento || null,
+        totalPaginas: a.totalPaginas || 1,
+        conteudoPaginasPdf: Array.isArray(a.conteudoPaginasPdf) ? a.conteudoPaginasPdf : [],
+        fichamento: a.fichamento ? JSON.parse(JSON.stringify(a.fichamento)) : null
+      };
+      porChave[String(a.id)] = dadosPreservar;
+      if (a.chaveZotero) porChave[`zot:${a.chaveZotero}`] = dadosPreservar;
+    }
+    const payload = {
+      atualizadoEm: new Date().toISOString(),
+      artigos: artigosLimpos,
+      porChave
+    };
+    await new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(payload, CHAVE_SNAPSHOT_IDB);
+      tx.oncomplete = res;
+      tx.onerror = () => rej(tx.error);
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+export async function lerSnapshotArtigosIdb() {
+  if (typeof indexedDB === 'undefined') return null;
+  try {
+    const db = await abrirIdbPdfs();
+    return await new Promise((res) => {
+      const r = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(CHAVE_SNAPSHOT_IDB);
+      r.onsuccess = () => res(r.result || null);
+      r.onerror = () => res(null);
+    });
+  } catch (_) {
+    return null;
+  }
+}
+
 /** Envia o PDF do artigo à pasta "Bibliografia_PDFs" do Drive (dentro da raiz Athenes) e guarda o id. Devolve true se subiu. */
 export async function enviarPdfDoArtigoAoDrive(art, blob) {
   const token = await obterTokenDrive();
@@ -312,26 +473,31 @@ export async function enviarPdfDoArtigoAoDrive(art, blob) {
   });
   art.driveFileId = salvo.id;
   art.driveStatus = 'PDF no Google Drive';
-  salvarArtigosEstudo(carregarArtigosEstudo()); // o id do arquivo vai para o servidor
+  salvarArtigosEstudo(carregarArtigosEstudo(), art); // o id do arquivo vai para o servidor
   return true;
 }
 
-/** Registra um arquivo PDF escolhido no computador: abre na sessão e sobe para o Drive (sem guardar no navegador). */
+/** Registra um arquivo PDF escolhido no computador: abre na sessão, guarda no cache local (IndexedDB) e sobe para o Drive. */
 export function registrarPdfLocalNoArtigo(art, file) {
   art.driveFileName = file.name;
   art.driveStatus = 'Enviando o PDF ao Google Drive…';
   art.pdfBlobUrl = URL.createObjectURL(file);
   art.temPdfLocal = true;
+  salvarPdfLocal(art.id, file).catch(() => {});
   enviarPdfDoArtigoAoDrive(art, file).then(ok => {
-    if (!ok) { art.driveStatus = 'PDF só nesta sessão (Drive desconectado)'; mostrarAviso('O PDF está aberto só nesta sessão: conecte o Google Drive para guardá-lo (o Athenes não grava arquivos no navegador).', { tipo: 'info' }); }
+    if (!ok) {
+      art.driveStatus = 'PDF salvo neste dispositivo (Drive desconectado)';
+      salvarArtigosEstudo(carregarArtigosEstudo(), art);
+    }
   }).catch(e => {
-    art.driveStatus = 'PDF só nesta sessão (falha ao enviar ao Drive)';
-    mostrarAviso(`Não foi possível enviar o PDF ao Google Drive: ${e.message}`);
+    art.driveStatus = 'PDF salvo neste dispositivo (falha ao enviar ao Drive)';
+    salvarArtigosEstudo(carregarArtigosEstudo(), art);
+    mostrarAviso(`Não foi possível enviar o PDF ao Google Drive (mantido neste aparelho): ${e.message}`, { tipo: 'info' });
   });
 }
 
 export async function baixarPdfBlobDoDrive(fileId, accessToken) {
-  const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
+  const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, {
     headers: { Authorization: `Bearer ${accessToken}` }
   });
   if (!resp.ok) throw new Error(`Drive respondeu ${resp.status}`);
@@ -339,12 +505,52 @@ export async function baixarPdfBlobDoDrive(fileId, accessToken) {
 }
 
 /**
- * Garante que o artigo tenha um PDF real para exibir: o que já está em memória, depois o do Google Drive. Se só existir o PDF
- * antigo deste computador, ele é aberto e MOVIDO para o Drive. Retorna true quando conseguiu um PDF.
+ * Concede permissão de leitura/edição no arquivo PDF do Google Drive para as pessoas convidadas ou link público.
+ */
+export async function compartilharPdfNoDrive(fileId, { pessoas = [], publico = false, papel = 'leitor' } = {}, accessToken = null) {
+  const idLimpo = String(fileId || '').trim();
+  if (!idLimpo || /^drive_pdf_/.test(idLimpo)) return false;
+  const token = accessToken || await obterTokenDrive();
+  if (!token) return false;
+  const urlPerm = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(idLimpo)}/permissions?supportsAllDrives=true&sendNotificationEmail=false`;
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  let okAlgum = false;
+  if (publico) {
+    try {
+      const r = await fetch(urlPerm, { method: 'POST', headers, body: JSON.stringify({ type: 'anyone', role: papel === 'editor' ? 'writer' : 'reader' }) });
+      if (r.ok) okAlgum = true;
+    } catch (_) {}
+  }
+  for (const p of (Array.isArray(pessoas) ? pessoas : [])) {
+    const email = String(p?.email || '').trim();
+    if (!email) continue;
+    const role = (p?.papel || papel) === 'editor' ? 'writer' : 'reader';
+    try {
+      const r = await fetch(urlPerm, { method: 'POST', headers, body: JSON.stringify({ type: 'user', role, emailAddress: email }) });
+      if (r.ok) okAlgum = true;
+    } catch (_) {}
+  }
+  return okAlgum;
+}
+
+/**
+ * Garante que o artigo tenha um PDF real para exibir: primeiro em memória, depois no cache IndexedDB local e no Google Drive.
  */
 export async function garantirPdfDoArtigo(art) {
   if (!art) return false;
   if (art.pdfBlobUrl) return true;
+  try {
+    const local = await obterPdfLocal(art.id);
+    if (local) {
+      art.pdfBlobUrl = URL.createObjectURL(local);
+      art.temPdfLocal = true;
+      const idDrive = String(art.driveFileId || '').trim();
+      if (!idDrive || /^drive_pdf_/.test(idDrive)) {
+        enviarPdfDoArtigoAoDrive(art, local).catch(() => {});
+      }
+      return true;
+    }
+  } catch (_) {}
   const idDrive = String(art.driveFileId || '').trim();
   if (idDrive && !/^drive_pdf_/.test(idDrive)) {
     const tokenDrive = await obterTokenDrive();
@@ -353,25 +559,16 @@ export async function garantirPdfDoArtigo(art) {
         const blob = await baixarPdfBlobDoDrive(idDrive, tokenDrive);
         art.pdfBlobUrl = URL.createObjectURL(blob);
         art.temPdfLocal = true;
+        salvarPdfLocal(art.id, blob).catch(() => {});
         return true;
       } catch (_) {}
     }
   }
-  try { // legado: PDF que ficou só neste computador
-    const local = await obterPdfLocal(art.id);
-    if (local) {
-      art.pdfBlobUrl = URL.createObjectURL(local);
-      art.temPdfLocal = true;
-      enviarPdfDoArtigoAoDrive(art, local).then(ok => { if (ok) removerPdfLocal(art.id); }).catch(() => {});
-      return true;
-    }
-  } catch (_) {}
   return false;
 }
 
 /**
- * Move para o Drive os PDFs que versões antigas deixaram só neste computador e apaga a cópia local DEPOIS de enviada.
- * PDF já no Drive (id real e o arquivo existe) apenas libera o espaço local. Devolve quantos foram movidos.
+ * Garante que os PDFs locais estejam sincronizados no Google Drive.
  */
 export async function migrarPdfsLocaisParaODrive() {
   const token = await obterTokenDrive();
@@ -388,28 +585,89 @@ export async function migrarPdfsLocaisParaODrive() {
         noDrive = r.ok && !(await r.json()).trashed;
       }
       if (!noDrive) noDrive = await enviarPdfDoArtigoAoDrive(art, local);
-      if (noDrive) { await removerPdfLocal(art.id); movidos++; }
+      if (noDrive) movidos++;
     } catch (_) {}
   }
   return movidos;
 }
 
-/** Biblioteca da sessão (memória), sincronizada com o servidor; nada é lido nem gravado no armazenamento do navegador. */
+/** Biblioteca da sessão (memória), sincronizada com o servidor; nada é lido nem gravado no localStorage. */
 export function carregarArtigosEstudo() {
   bib.definirFiltroDeExemplos(ehArtigoExemploFicticio);
   return bib.obterArtigos();
 }
 
-export function salvarArtigosEstudo(lista) {
-  bib.definirArtigos(lista); // memória + envio ao servidor (2 s depois da última alteração)
-  return lista;
+function sincronizarArtigoNaLista(lista, artAlvo, carimbarAgora = false) {
+  if (!artAlvo?.id || !Array.isArray(lista)) return;
+  if (carimbarAgora) {
+    const agora = new Date().toISOString();
+    artAlvo.atualizadoEm = agora;
+    if (!artAlvo.fichamento || typeof artAlvo.fichamento !== 'object') {
+      artAlvo.fichamento = { resumoPessoal: '', metodologiaNotas: '', citacoesMarcadas: [], notasPagina: {}, tracosPorPagina: {}, grifosPorPagina: {} };
+    }
+    artAlvo.fichamento.atualizadoEm = agora;
+  }
+  const idx = lista.findIndex(x => x && (String(x.id) === String(artAlvo.id) || (artAlvo.chaveZotero && x.chaveZotero === artAlvo.chaveZotero)));
+  if (idx >= 0) {
+    if (lista[idx] !== artAlvo) {
+      Object.assign(lista[idx], artAlvo);
+    }
+  } else if (!ehArtigoExemploFicticio(artAlvo)) {
+    lista.unshift(artAlvo);
+  }
 }
 
-export function salvarArtigosEstudoDebounced(lista, delayMs = 320) {
+export function salvarArtigosEstudo(lista, artModificado = null) {
+  if (_timerDebounceSalvarArtigos) {
+    clearTimeout(_timerDebounceSalvarArtigos);
+    _timerDebounceSalvarArtigos = null;
+  }
+  _pendenteDebounce = null;
+  const arr = Array.isArray(lista) ? lista : carregarArtigosEstudo();
+  const alvo = artModificado || _artigoAbertoAtivo;
+  if (alvo) {
+    sincronizarArtigoNaLista(arr, alvo, Boolean(artModificado));
+  }
+  const memBib = bib.obterArtigos();
+  if (alvo && memBib !== arr) {
+    sincronizarArtigoNaLista(memBib, alvo, false);
+  }
+  bib.definirArtigos(arr); // memória + envio ao servidor
+  guardarSnapshotArtigosIdb(bib.obterArtigos()).catch(() => {});
+  return arr;
+}
+
+export function salvarArtigosEstudoDebounced(lista, delayMs = 320, artModificado = null) {
+  const alvo = artModificado || _artigoAbertoAtivo;
+  if (alvo) {
+    const agora = new Date().toISOString();
+    alvo.atualizadoEm = agora;
+    if (alvo.fichamento && typeof alvo.fichamento === 'object') {
+      alvo.fichamento.atualizadoEm = agora;
+    }
+  }
+  _pendenteDebounce = { lista, artModificado: alvo };
   if (_timerDebounceSalvarArtigos) clearTimeout(_timerDebounceSalvarArtigos);
   _timerDebounceSalvarArtigos = setTimeout(() => {
-    salvarArtigosEstudo(lista);
+    const p = _pendenteDebounce;
+    _timerDebounceSalvarArtigos = null;
+    _pendenteDebounce = null;
+    if (p) salvarArtigosEstudo(p.lista, p.artModificado);
   }, delayMs);
+}
+
+export function descarregarSalvarArtigosDebounced() {
+  if (_timerDebounceSalvarArtigos) {
+    clearTimeout(_timerDebounceSalvarArtigos);
+    _timerDebounceSalvarArtigos = null;
+  }
+  if (_pendenteDebounce) {
+    const p = _pendenteDebounce;
+    _pendenteDebounce = null;
+    salvarArtigosEstudo(p.lista, p.artModificado);
+  } else if (_artigoAbertoAtivo) {
+    salvarArtigosEstudo(carregarArtigosEstudo(), _artigoAbertoAtivo);
+  }
 }
 
 export function formatarCitacaoAbntDoArtigo(artigo, pagina = null) {
@@ -426,11 +684,35 @@ export function gerarHtmlNotaZoteroDoArtigo(artigo) {
   const f = artigo?.fichamento || {};
   const citacoes = Array.isArray(f.citacoesMarcadas) ? f.citacoesMarcadas : [];
   const notasPag = f.notasPagina || {};
+  const tracosPag = f.tracosPorPagina || {};
+  const grifosPag = f.grifosPorPagina || {};
   const todosPins = [];
   Object.keys(notasPag).forEach(pg => {
     (notasPag[pg] || []).forEach(pin => {
       todosPins.push({ pagina: pg, ...pin });
     });
+  });
+  const paginasComTracos = Object.keys(tracosPag).filter(pg => Array.isArray(tracosPag[pg]) && tracosPag[pg].length > 0);
+  const totalTracos = paginasComTracos.reduce((acc, pg) => acc + tracosPag[pg].length, 0);
+  const paginasComGrifos = Object.keys(grifosPag).filter(pg => Array.isArray(grifosPag[pg]) && grifosPag[pg].length > 0);
+  const totalGrifos = paginasComGrifos.reduce((acc, pg) => acc + grifosPag[pg].length, 0);
+
+  const b64Meta = codificarMetadadosNotaZotero({
+    v: 1,
+    id: artigo?.id || '',
+    chaveZotero: artigo?.chaveZotero || '',
+    driveFileId: artigo?.driveFileId || '',
+    driveFileName: artigo?.driveFileName || '',
+    docCompartilhadoId: artigo?.docCompartilhadoId || '',
+    fichamento: {
+      atualizadoEm: f.atualizadoEm || new Date().toISOString(),
+      resumoPessoal: f.resumoPessoal || '',
+      metodologiaNotas: f.metodologiaNotas || '',
+      citacoesMarcadas: citacoes,
+      notasPagina: notasPag,
+      tracosPorPagina: tracosPag,
+      grifosPorPagina: grifosPag
+    }
   });
 
   return [
@@ -447,7 +729,11 @@ export function gerarHtmlNotaZoteroDoArtigo(artigo) {
       ? `<h3>Marcações e Notificações nas Páginas (${todosPins.length})</h3><ul>` +
         todosPins.map(p => `<li><strong>[p. ${escapeHtml(p.pagina)} — ${escapeHtml(p.titulo || 'Nota')}]:</strong> ${escapeHtml(p.texto)}</li>`).join('') +
         `</ul>`
-      : ''
+      : '',
+    (totalTracos > 0 || totalGrifos > 0)
+      ? `<p><em>Camada de tinta e destaques salva no Athenes: ${totalTracos} traço(s) em ${paginasComTracos.length} página(s), ${totalGrifos} grifo(s) em ${paginasComGrifos.length} página(s).</em></p>`
+      : '',
+    b64Meta ? `<!--ATHENES_FICHAMENTO_B64:${b64Meta}-->` : ''
   ].filter(Boolean).join('\n');
 }
 

@@ -14,6 +14,7 @@ import { estaSessaoAtiva, encerrarSessao, obterPerfilColaborador, salvarDocument
 import { criarDocumento } from '../core/athenes_documento.js';
 import { carregarDocumentoDoSupabase } from '../core/athenes_colaboracao.js';
 import { carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
+import { descarregarSalvarArtigosDebounced } from './athenes_estudo_artigos_dados.js';
 import { sanitizarDocumentoImportado } from '../core/athenes_seguranca.js';
 import { EditorView } from './athenes_editor.js';
 import { PainelPropriedades } from './athenes_painel_propriedades.js';
@@ -84,6 +85,14 @@ export class AthenesApp {
     this.container.innerHTML = '<p style="padding:32px; font:600 14px Nunito, sans-serif; color:#314F79;">Abrindo documento compartilhado...</p>';
     carregarDocumentoCompartilhado(docIdLink).then(res => {
       if (!res) throw new Error('Você não tem acesso a este documento (ou ele não existe). Peça ao dono para compartilhá-lo com o e-mail da sua conta Google.');
+      if (res.doc?.norma === 'zotero_pdf' || res.doc?.artigoEstudo || String(res.doc?.id || docIdLink).startsWith('artigo_')) {
+        const art = res.doc.artigoEstudo || res.doc;
+        this.navegarParaDashboard();
+        setTimeout(() => {
+          this.dashboardView?.abrirAbaArtigosZoteroComArtigo?.(art);
+        }, 120);
+        return;
+      }
       this.documentoAtivo = sanitizarDocumentoImportado(res.doc);
       Object.assign(this.documentoAtivo, { compartilhadoComigo: res.doc.compartilhadoComigo, proprietarioExterno: res.doc.proprietarioExterno, permissao: res.doc.permissao, proprietario: res.doc.proprietario, salvoNuvem: true });
       this.autoSalvar();
@@ -147,6 +156,11 @@ export class AthenesApp {
 
     this.dashboardView = new DashboardView(dashBox, {
       onAbrirDocumento: (doc) => {
+        if (doc?.norma === 'zotero_pdf' || doc?.artigoEstudo || String(doc?.id || '').startsWith('artigo_')) {
+          const art = doc.artigoEstudo || doc;
+          this.dashboardView?.abrirAbaArtigosZoteroComArtigo?.(art);
+          return;
+        }
         this.documentoAtivo = sanitizarDocumentoImportado(doc);
         this.navegarParaEditor();
       },
@@ -368,6 +382,9 @@ export class AthenesApp {
   descarregarSalvamento() {
     clearTimeout(this._tSalvar);
     this._tSalvar = null;
+    try {
+      descarregarSalvarArtigosDebounced();
+    } catch (_) {}
     let doc = this._docPendente;
     this._docPendente = null;
     // um snapshot de colaboração troca `editorView.doc` sem passar por onAlterado: gravar o objeto antigo sobrescreveria o mais novo

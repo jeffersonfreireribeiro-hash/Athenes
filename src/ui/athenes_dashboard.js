@@ -497,6 +497,15 @@ export class DashboardView {
     }
   }
 
+  abrirAbaArtigosZoteroComArtigo(art) {
+    if (!art) return;
+    this.abaAtiva = 'artigos_zotero';
+    this.renderizar();
+    if (this.estudoView && typeof this.estudoView.abrirArtigoCompartilhadoRecebido === 'function') {
+      this.estudoView.abrirArtigoCompartilhadoRecebido(art);
+    }
+  }
+
   abrirModalLogin() {
     this.abrirModalIdentificacaoLogin();
   }

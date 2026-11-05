@@ -28,7 +28,8 @@ import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta } from
 import { aplicarFilhosZoteroAoArtigo } from '../core/athenes_zotero_anexos_notas.js';
 import { tokenPodeLerTodoODrive, listarConteudoDoDrive, copiarPdfDoDriveParaAthenes, ESCOPOS_COM_LEITURA } from '../core/athenes_drive_navegar.js';
 import { mostrarAviso } from './athenes_aviso.js';
-import { removerPdfLocal, PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo } from './athenes_estudo_artigos_dados.js';
+import { ModalCompartilhar } from './athenes_compartilhar_modal.js';
+import { removerPdfLocal, PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo, definirArtigoAbertoAtivo, lerSnapshotArtigosIdb, mesclarFichamentoPreservandoDados, compartilharPdfNoDrive } from './athenes_estudo_artigos_dados.js';
 import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
 import { metodosEstudoAnotacoes } from './athenes_estudo_artigos_anotacoes.js';
@@ -63,7 +64,26 @@ export class EstudoArtigosView {
     this.aoMudarPastas = opcoes.aoMudarPastas || null; // a página inicial refaz a lista de pastas quando as coleções do Zotero chegam
     this.zoteroClient = new ZoteroClient();
     this.carregarConfigZotero();
+    this.hidratarSnapshotIndexedDb();
     this.renderizar();
+  }
+
+  hidratarSnapshotIndexedDb() {
+    lerSnapshotArtigosIdb().then(snapshot => {
+      if (snapshot?.porChave) {
+        let mudou = false;
+        for (const a of this.artigos) {
+          const dados = snapshot.porChave[String(a.id)] || (a.chaveZotero && snapshot.porChave[`zot:${a.chaveZotero}`]);
+          if (dados) {
+            mesclarFichamentoPreservandoDados(a, dados);
+            mudou = true;
+          }
+        }
+        if (mudou && !this.artigoAberto) {
+          this.atualizarGridCatalogo();
+        }
+      }
+    }).catch(() => {});
   }
 
   carregarConfigZotero() {
@@ -386,12 +406,18 @@ export class EstudoArtigosView {
             <button type="button" class="ath-btn ath-btn-primary ath-btn-sm ath-btn-abrir-estudio" style="flex:1; justify-content:center;">
               ${svgIcone('lapis', 13)} Abrir em Tela Cheia (PDF & Fichamento)
             </button>
+            <button type="button" class="ath-btn ath-btn-sm ath-btn-compartilhar-artigo" title="Compartilhar documento com outras pessoas">${svgIcone('usuarios', 13)}</button>
             <button type="button" class="ath-btn ath-btn-sm ath-btn-excluir-artigo" title="Remover artigo da lista">${svgIcone('lixeira', 13)}</button>
           </div>
         </div>
       `;
 
       card.addEventListener('click', (e) => {
+        if (e.target.closest('.ath-btn-compartilhar-artigo')) {
+          e.stopPropagation();
+          this.abrirModalCompartilharArtigo(art);
+          return;
+        }
         if (e.target.closest('.ath-btn-excluir-artigo')) {
           e.stopPropagation();
           this.artigos = this.artigos.filter(x => x.id !== art.id);
@@ -406,7 +432,47 @@ export class EstudoArtigosView {
     });
   }
 
+  abrirArtigoCompartilhadoRecebido(art) {
+    if (!art) return;
+    const existente = this.artigos.find(a => a.id === art.id || (art.chaveZotero && a.chaveZotero === art.chaveZotero));
+    if (existente) {
+      mesclarFichamentoPreservandoDados(existente, art);
+      salvarArtigosEstudo(this.artigos, existente);
+      this.abrirArtigoNoEstudio(existente);
+    } else {
+      this.artigos.unshift(art);
+      salvarArtigosEstudo(this.artigos, art);
+      this.abrirArtigoNoEstudio(art);
+    }
+  }
+
+  abrirModalCompartilharArtigo(art) {
+    if (!art) return;
+    const docRef = {
+      id: art.docCompartilhadoId || `artigo_${art.id}`,
+      titulo: `[Artigo] ${art.titulo || 'Referência'}`,
+      autor: (art.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome || ''}`.trim()).filter(Boolean).join(', ') || 'Autor',
+      norma: 'zotero_pdf',
+      secoes: [],
+      artigoEstudo: art
+    };
+    art.docCompartilhadoId = docRef.id;
+    salvarArtigosEstudo(this.artigos, art);
+    new ModalCompartilhar(docRef, obterPerfilColaborador(), {
+      aoSalvar: async ({ pessoas, publico }) => {
+        art.compartilhamento = { pessoas, publico };
+        salvarArtigosEstudo(this.artigos, art);
+        if (art.driveFileId) {
+          const arrPessoas = Object.entries(pessoas || {}).map(([email, papel]) => ({ email, papel }));
+          await compartilharPdfNoDrive(art.driveFileId, { pessoas: arrPessoas, publico });
+        }
+        mostrarAviso('Permissões de acesso salvas com sucesso!', { tipo: 'ok' });
+      }
+    });
+  }
+
   abrirArtigoNoEstudio(art) {
+    definirArtigoAbertoAtivo(art);
     this.artigoAberto = art;
     this.paginaAtual = 1;
     this.pinEditandoId = null;
@@ -1039,32 +1105,44 @@ export class EstudoArtigosView {
      MODAL DE CONFIGURAÇÃO RÁPIDA DE CREDENCIAIS DO ZOTERO (API KEY + USER ID)
      ========================================================================== */
   async sincronizarArtigoComDriveEZotero(art, btnEl = null, statusEl = null) {
-    salvarArtigosEstudo(this.artigos);
+    definirArtigoAbertoAtivo(art);
+    salvarArtigosEstudo(this.artigos, art);
     const txtOriginal = btnEl ? btnEl.innerHTML : '';
-    if (btnEl) btnEl.textContent = 'Sincronizando...';
+    if (btnEl) btnEl.textContent = 'Salvando...';
 
     const resultados = [];
 
+    try {
+      await bib.sincronizarBiblioteca();
+      resultados.push('Biblioteca sincronizada ✓');
+    } catch (_) {}
+
     const htmlNotaZotero = gerarHtmlNotaZoteroDoArtigo(art);
-    const resZot = await this.zoteroClient.sincronizarNotaFilhaNoZotero({
-      parentItemKey: art.chaveZotero,
-      noteKey: art.notaZoteroKey || null,
-      htmlNota: htmlNotaZotero,
-      tags: ['Athenes', 'Fichamento PDF', ...(art.palavrasChave || []).slice(0, 3)],
-      artigoMetadados: art
-    });
-    if (resZot.parentKey) art.chaveZotero = resZot.parentKey;
-    if (resZot.noteKey) art.notaZoteroKey = resZot.noteKey;
-    if (this.zoteroClient.userId) {
-      this.salvarConfigZotero({ userId: this.zoteroClient.userId });
+    if (this.temZoteroConectado() && art.chaveZotero) {
+      try {
+        const resZot = await this.zoteroClient.sincronizarNotaFilhaNoZotero({
+          parentItemKey: art.chaveZotero,
+          noteKey: art.notaZoteroKey || null,
+          htmlNota: htmlNotaZotero,
+          tags: ['Athenes', 'Fichamento PDF', ...(art.palavrasChave || []).slice(0, 3)],
+          artigoMetadados: art
+        });
+        if (resZot.parentKey) art.chaveZotero = resZot.parentKey;
+        if (resZot.noteKey) art.notaZoteroKey = resZot.noteKey;
+        if (this.zoteroClient.userId) {
+          this.salvarConfigZotero({ userId: this.zoteroClient.userId });
+        }
+        if (resZot.ok) resultados.push('Zotero ✓');
+      } catch (e) {
+        console.warn('[Athenes] Zotero sync nota:', e.message);
+      }
     }
-    resultados.push(resZot.ok ? 'Zotero sincronizado ✓' : 'Fichamento salvo localmente ✓');
 
     try {
       await salvarDocumentoNoSupabase({
-        id: `artigo_${art.id}`,
+        id: art.docCompartilhadoId || `artigo_${art.id}`,
         titulo: `[Fichamento PDF] ${art.titulo}`,
-        autor: (art.autores || []).map(a => a.sobrenome).join(', '),
+        autor: (art.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome || ''}`.trim()).filter(Boolean).join(', ') || 'Autor',
         norma: 'zotero_pdf',
         secoes: [],
         artigoEstudo: art
@@ -1100,6 +1178,7 @@ export class EstudoArtigosView {
             if (salvoPdf?.id) {
               art.driveFileId = salvoPdf.id;
               art.driveFileName = salvoPdf.name || nomePdf;
+              art.driveStatus = 'PDF no Google Drive';
             }
           }
         }
@@ -1107,14 +1186,15 @@ export class EstudoArtigosView {
       } catch (_) {}
     }
 
-    salvarArtigosEstudo(this.artigos);
+    salvarArtigosEstudo(this.artigos, art);
     if (btnEl) {
-      btnEl.textContent = 'Salvo & Sincronizado ✓';
+      btnEl.textContent = 'Salvo ✓';
       setTimeout(() => { btnEl.innerHTML = txtOriginal; }, 1800);
     }
     if (statusEl) {
       statusEl.textContent = resultados.join(' · ');
     }
+    mostrarAviso('Alterações, riscos e citações salvos com sucesso!', { tipo: 'ok' });
   }
 
   async sincronizarComZoteroApi({ silencioso = false } = {}) {

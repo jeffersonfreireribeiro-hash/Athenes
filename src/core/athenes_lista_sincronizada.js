@@ -13,6 +13,38 @@ import { sincronizarDado } from './athenes_dados_servidor.js';
 
 const canon = (o) => JSON.stringify(o, (_, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v)); // o banco reordena as chaves
 
+function fichamentoTemDados(f) {
+  if (!f || typeof f !== 'object') return false;
+  if (String(f.resumoPessoal || '').trim() || String(f.metodologiaNotas || '').trim()) return true;
+  if (Array.isArray(f.citacoesMarcadas) && f.citacoesMarcadas.length > 0) return true;
+  for (const k of ['tracosPorPagina', 'notasPagina', 'grifosPorPagina']) {
+    const mapa = f[k];
+    if (mapa && typeof mapa === 'object' && Object.values(mapa).some(arr => Array.isArray(arr) && arr.length > 0)) return true;
+  }
+  return false;
+}
+
+function enriquecerItemMesclado(vencedor, outro) {
+  if (!vencedor || !outro) return vencedor;
+  const fVenc = vencedor.fichamento;
+  const fOut = outro.fichamento;
+  let copia = vencedor;
+  const clonar = () => { if (copia === vencedor) copia = { ...vencedor }; return copia; };
+  if (!fichamentoTemDados(fVenc) && fichamentoTemDados(fOut) && !fVenc?.atualizadoEm) {
+    clonar().fichamento = fOut;
+  } else if (fVenc && fOut && (fOut.atualizadoEm || '') > (fVenc.atualizadoEm || '')) {
+    clonar().fichamento = fOut;
+  }
+  if ((!copia.driveFileId || /^drive_pdf_/.test(String(copia.driveFileId))) && outro.driveFileId && !/^drive_pdf_/.test(String(outro.driveFileId))) {
+    clonar().driveFileId = outro.driveFileId;
+    if (outro.driveFileName) clonar().driveFileName = outro.driveFileName;
+    if (outro.driveStatus) clonar().driveStatus = outro.driveStatus;
+  }
+  if (!copia.notaZoteroKey && outro.notaZoteroKey) clonar().notaZoteroKey = outro.notaZoteroKey;
+  if (!copia.docCompartilhadoId && outro.docCompartilhadoId) clonar().docCompartilhadoId = outro.docCompartilhadoId;
+  return copia;
+}
+
 /**
  * Junta o servidor com o local. Cada lado: { itens[], excluidos{ id: quando } }.
  */
@@ -22,8 +54,15 @@ export function mesclarLista(servidor, local) {
   const porId = new Map();
   for (const a of [...(srv.itens || []), ...(local.itens || [])]) {
     if (!a?.id) continue;
-    const atual = porId.get(String(a.id));
-    if (!atual || (a.atualizadoEm || '') > (atual.atualizadoEm || '')) porId.set(String(a.id), a);
+    const idStr = String(a.id);
+    const atual = porId.get(idStr);
+    if (!atual) {
+      porId.set(idStr, a);
+    } else if ((a.atualizadoEm || '') > (atual.atualizadoEm || '')) {
+      porId.set(idStr, enriquecerItemMesclado(a, atual));
+    } else {
+      porId.set(idStr, enriquecerItemMesclado(atual, a));
+    }
   }
   for (const [id, a] of [...porId]) {
     const quando = excluidos[id];
@@ -46,7 +85,7 @@ export function mesclarLista(servidor, local) {
  *  - atrasoEnvioMs: espera depois da última alteração antes de enviar
  */
 export function criarListaSincronizada({ chave, legados = [], efemeros = [], filtroLegado = () => false, atrasoEnvioMs = 1500 }) {
-  const memoria = { conta: undefined, itens: [], excluidos: {}, assin: new Map(), legadoLido: false, ouvintes: new Set(), emCurso: false, temporizador: null };
+  const memoria = { conta: undefined, itens: [], excluidos: {}, assin: new Map(), legadoLido: false, ouvintes: new Set(), emCurso: false, promessaEmCurso: null, temporizador: null };
   let filtro = filtroLegado;
 
   const semEfemeros = (a) => { const r = { ...a }; efemeros.forEach(k => delete r[k]); return r; };
@@ -54,7 +93,7 @@ export function criarListaSincronizada({ chave, legados = [], efemeros = [], fil
 
   function garantirConta() {
     const conta = obterContaAtiva?.() || '';
-    if (memoria.conta !== conta) { clearTimeout(memoria.temporizador); Object.assign(memoria, { conta, itens: [], excluidos: {}, assin: new Map(), legadoLido: false, temporizador: null }); }
+    if (memoria.conta !== conta) { clearTimeout(memoria.temporizador); Object.assign(memoria, { conta, itens: [], excluidos: {}, assin: new Map(), legadoLido: false, temporizador: null, promessaEmCurso: null }); }
   }
 
   function lerLegado() {
@@ -102,31 +141,65 @@ export function criarListaSincronizada({ chave, legados = [], efemeros = [], fil
   async function sincronizar({ fetchImpl = globalThis.fetch } = {}) {
     garantirConta();
     obter();
-    if (!nuvemAutenticada() || memoria.emCurso) return null;
-    memoria.emCurso = true;
-    try {
-      const local = { itens: memoria.itens.map(semEfemeros), excluidos: { ...memoria.excluidos } };
-      const r = await sincronizarDado(chave, local, mesclarLista, { fetchImpl });
-      let mudou = false;
-      const atuais = new Map(memoria.itens.map(a => [String(a.id), a]));
-      const resultado = [];
-      for (const n of r.valor.itens) {
-        const atual = atuais.get(String(n.id));
-        if (atual && assinatura(atual) === assinatura(n) && (atual.atualizadoEm || '') >= (n.atualizadoEm || '')) { resultado.push(atual); continue; } // igual: mantém o objeto (e o que é só desta sessão)
-        mudou = true;
-        const extras = Object.fromEntries(efemeros.map(k => [k, atual?.[k] ?? null]));
-        resultado.push({ ...n, ...extras });
-      }
-      if (resultado.length !== memoria.itens.length) mudou = true;
-      memoria.itens.splice(0, memoria.itens.length, ...resultado);
-      memoria.excluidos = r.valor.excluidos || {};
-      memoria.assin = new Map(resultado.map(a => [String(a.id), assinatura(a)]));
-      legados.forEach(k => removerConta(k)); // a cópia antiga do navegador sai: o servidor já tem tudo
-      if (mudou) memoria.ouvintes.forEach(cb => { try { cb(memoria.itens); } catch (_) {} });
-      return { mudou };
-    } finally {
-      memoria.emCurso = false;
+    if (!nuvemAutenticada()) return null;
+    if (memoria.promessaEmCurso) {
+      try { await memoria.promessaEmCurso; } catch (_) {}
+      if (!nuvemAutenticada()) return null;
     }
+    clearTimeout(memoria.temporizador);
+    memoria.temporizador = null;
+    memoria.emCurso = true;
+    const executar = async () => {
+      try {
+        const local = { itens: memoria.itens.map(semEfemeros), excluidos: { ...memoria.excluidos } };
+        const sigEnviada = new Map(memoria.itens.map(a => [String(a.id), assinatura(a)]));
+        const r = await sincronizarDado(chave, local, mesclarLista, { fetchImpl });
+        let mudou = false;
+        let mudouDuranteEnvio = false;
+        const atuais = new Map(memoria.itens.map(a => [String(a.id), a]));
+        const resultado = [];
+        for (const n of r.valor.itens) {
+          const idStr = String(n.id);
+          const atual = atuais.get(idStr);
+          if (atual && sigEnviada.has(idStr) && assinatura(atual) !== sigEnviada.get(idStr)) {
+            atual.atualizadoEm = new Date().toISOString();
+            resultado.push(atual);
+            mudouDuranteEnvio = true;
+            continue;
+          }
+          if (atual && assinatura(atual) === assinatura(n) && (atual.atualizadoEm || '') >= (n.atualizadoEm || '')) { resultado.push(atual); continue; } // igual: mantém o objeto (e o que é só desta sessão)
+          mudou = true;
+          const extras = Object.fromEntries(efemeros.map(k => [k, atual?.[k] ?? null]));
+          if (atual) {
+            for (const k of Object.keys(atual)) { if (!efemeros.includes(k)) delete atual[k]; }
+            Object.assign(atual, n, extras);
+            resultado.push(atual);
+          } else {
+            resultado.push({ ...n, ...extras });
+          }
+        }
+        for (const [idStr, atual] of atuais) {
+          if (!sigEnviada.has(idStr) && !resultado.some(x => String(x.id) === idStr)) {
+            atual.atualizadoEm = new Date().toISOString();
+            resultado.push(atual);
+            mudouDuranteEnvio = true;
+          }
+        }
+        if (resultado.length !== memoria.itens.length) mudou = true;
+        memoria.itens.splice(0, memoria.itens.length, ...resultado);
+        memoria.excluidos = r.valor.excluidos || {};
+        memoria.assin = new Map(resultado.map(a => [String(a.id), assinatura(a)]));
+        legados.forEach(k => removerConta(k)); // a cópia antiga do navegador sai: o servidor já tem tudo
+        if (mudou) memoria.ouvintes.forEach(cb => { try { cb(memoria.itens); } catch (_) {} });
+        if (mudouDuranteEnvio) agendarEnvio();
+        return { mudou };
+      } finally {
+        memoria.emCurso = false;
+        memoria.promessaEmCurso = null;
+      }
+    };
+    memoria.promessaEmCurso = executar();
+    return memoria.promessaEmCurso;
   }
 
   return {
@@ -135,6 +208,6 @@ export function criarListaSincronizada({ chave, legados = [], efemeros = [], fil
     definirFiltroLegado(fn) { filtro = fn; },
     legadoPendente: () => lerLegado().length > 0,
     temEnvioPendente: () => Boolean(memoria.temporizador) || memoria.emCurso,
-    reiniciar() { clearTimeout(memoria.temporizador); Object.assign(memoria, { conta: undefined, itens: [], excluidos: {}, assin: new Map(), legadoLido: false, temporizador: null, emCurso: false }); }
+    reiniciar() { clearTimeout(memoria.temporizador); Object.assign(memoria, { conta: undefined, itens: [], excluidos: {}, assin: new Map(), legadoLido: false, temporizador: null, emCurso: false, promessaEmCurso: null }); }
   };
 }

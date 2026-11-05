@@ -10,6 +10,28 @@ export function anexoPdfBaixavel(data) {
   return data?.linkMode === 'imported_file' || data?.linkMode === 'imported_url';
 }
 
+export function codificarMetadadosNotaZotero(obj) {
+  try {
+    const json = JSON.stringify(obj);
+    if (typeof btoa === 'function') return btoa(unescape(encodeURIComponent(json)));
+    if (typeof Buffer !== 'undefined') return Buffer.from(json, 'utf8').toString('base64');
+  } catch (_) {}
+  return '';
+}
+
+export function decodificarMetadadosNotaZotero(html) {
+  try {
+    const m = /<!--ATHENES_FICHAMENTO_B64:([A-Za-z0-9+/=]+)-->/.exec(String(html || ''));
+    if (!m?.[1]) return null;
+    let json = '';
+    if (typeof atob === 'function') json = decodeURIComponent(escape(atob(m[1])));
+    else if (typeof Buffer !== 'undefined') json = Buffer.from(m[1], 'base64').toString('utf8');
+    return json ? JSON.parse(json) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 /**
  * Recebe os itens brutos (anexos, notas, anotações) e devolve, por item pai:
  *  - anexos: Map<chavePai, { chave, nomeArquivo, baixavel, linkMode }> (o melhor PDF: importado antes de vinculado)
@@ -78,18 +100,71 @@ export function textoDeNotaHtml(html) {
   return String(html || '').replace(/<br\s*\/?>|<\/p>|<\/div>|<\/li>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
 }
 
+function mapaDeListasTemItens(m) {
+  return Boolean(m && typeof m === 'object' && Object.values(m).some(arr => Array.isArray(arr) && arr.length > 0));
+}
+
 /**
  * Aplica ao artigo: selo do PDF, notas do Zotero (somente leitura, substituídas a cada sincronização) e anotações
  * de PDF com texto como citações marcadas (id estável `zot_ann_<chave>`; as já existentes não são tocadas).
+ * Também restaura o fichamento salvo na nota espelho "Fichamento Athenes" caso o artigo local ainda esteja vazio.
  * Devolve quantas citações novas entraram.
  */
 export function aplicarFilhosZoteroAoArtigo(art, chavePai, { anexos, notas, anotacoes }) {
   if (!art || !chavePai) return 0;
   art.anexoPdfZotero = anexos.get(chavePai) || null;
-  art.notasZotero = (notas.get(chavePai) || []).filter(n => textoDeNotaHtml(n.html)).map(n => ({ id: `zot_nota_${n.chave}`, chave: n.chave, html: n.html, data: n.data, origem: 'zotero' }));
-
-  const f = art.fichamento || (art.fichamento = { resumoPessoal: '', metodologiaNotas: '', citacoesMarcadas: [], notasPagina: {}, tracosPorPagina: {} });
+  const f = art.fichamento || (art.fichamento = { resumoPessoal: '', metodologiaNotas: '', citacoesMarcadas: [], notasPagina: {}, tracosPorPagina: {}, grifosPorPagina: {} });
   if (!Array.isArray(f.citacoesMarcadas)) f.citacoesMarcadas = [];
+  if (!f.notasPagina || typeof f.notasPagina !== 'object') f.notasPagina = {};
+  if (!f.tracosPorPagina || typeof f.tracosPorPagina !== 'object') f.tracosPorPagina = {};
+  if (!f.grifosPorPagina || typeof f.grifosPorPagina !== 'object') f.grifosPorPagina = {};
+
+  const notasBrutas = notas.get(chavePai) || [];
+  const notasExternas = [];
+  for (const n of notasBrutas) {
+    const html = String(n.html || '');
+    const ehNotaAthenes = /<h2>\s*Fichamento Athenes/i.test(html) || /<!--ATHENES_FICHAMENTO_B64:/.test(html);
+    if (ehNotaAthenes) {
+      if (!art.notaZoteroKey) art.notaZoteroKey = n.chave;
+      const meta = decodificarMetadadosNotaZotero(html);
+      if (meta && typeof meta === 'object') {
+        if ((!art.driveFileId || /^drive_pdf_/.test(String(art.driveFileId))) && meta.driveFileId && !/^drive_pdf_/.test(String(meta.driveFileId))) {
+          art.driveFileId = meta.driveFileId;
+          if (meta.driveFileName) art.driveFileName = meta.driveFileName;
+          art.driveStatus = 'PDF no Google Drive';
+        }
+        if (!art.docCompartilhadoId && meta.docCompartilhadoId) art.docCompartilhadoId = meta.docCompartilhadoId;
+        const mf = meta.fichamento;
+        if (mf && typeof mf === 'object') {
+          const remotoMaisNovo = (mf.atualizadoEm || '') > (f.atualizadoEm || '');
+          if (!f.resumoPessoal && mf.resumoPessoal) f.resumoPessoal = mf.resumoPessoal;
+          if (!f.metodologiaNotas && mf.metodologiaNotas) f.metodologiaNotas = mf.metodologiaNotas;
+          if (Array.isArray(mf.citacoesMarcadas) && mf.citacoesMarcadas.length > 0) {
+            const idsAtuais = new Set(f.citacoesMarcadas.map(c => c.id));
+            for (const c of mf.citacoesMarcadas) {
+              if (c?.id && !idsAtuais.has(c.id)) { f.citacoesMarcadas.push(c); idsAtuais.add(c.id); }
+            }
+          }
+          if ((!mapaDeListasTemItens(f.tracosPorPagina) || remotoMaisNovo) && mapaDeListasTemItens(mf.tracosPorPagina)) {
+            f.tracosPorPagina = mf.tracosPorPagina;
+          }
+          if ((!mapaDeListasTemItens(f.notasPagina) || remotoMaisNovo) && mapaDeListasTemItens(mf.notasPagina)) {
+            f.notasPagina = mf.notasPagina;
+          }
+          if ((!mapaDeListasTemItens(f.grifosPorPagina) || remotoMaisNovo) && mapaDeListasTemItens(mf.grifosPorPagina)) {
+            f.grifosPorPagina = mf.grifosPorPagina;
+          }
+          if (remotoMaisNovo && mf.atualizadoEm) f.atualizadoEm = mf.atualizadoEm;
+        }
+      }
+      continue;
+    }
+    if (textoDeNotaHtml(html)) {
+      notasExternas.push({ id: `zot_nota_${n.chave}`, chave: n.chave, html, data: n.data, origem: 'zotero' });
+    }
+  }
+  art.notasZotero = notasExternas;
+
   const ids = new Set(f.citacoesMarcadas.map(c => c.id));
   let novas = 0;
   for (const an of anotacoes.get(chavePai) || []) {
