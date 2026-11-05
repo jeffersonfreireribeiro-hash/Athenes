@@ -1238,7 +1238,35 @@
 .ath-btn-zotero-ok {
   border-color: #A7F3D0 !important;
   background: #ECFDF5 !important;
-  color: #065F46 !important;
+  color: #059669 !important;
+}
+
+.ath-btn-zotero-ok svg {
+  stroke: #10B981 !important;
+  color: #10B981 !important;
+}
+
+.ath-btn-importar-coluna {
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 1px !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+}
+
+.ath-btn-importar-coluna svg {
+  display: block !important;
+  margin: 0 !important;
+}
+
+.ath-btn-importar-coluna svg:first-child {
+  margin-top: 1px !important;
+}
+
+.ath-btn-importar-coluna svg:last-child {
+  margin-top: -1px !important;
 }
 
 /* ==========================================================================
