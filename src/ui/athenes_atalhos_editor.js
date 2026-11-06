@@ -210,6 +210,8 @@ export class AtalhosDoEditor {
       const alvo = e.target instanceof Element ? e.target : e.target?.parentElement;
       const editavel = alvo?.closest?.('[contenteditable="true"]');
       if (!editavel || !this.ed.container.contains(editavel)) return;
+      // O menu nativo mostra as sugestões de ortografia; Alt abre as ações do Athenes.
+      if (!e.altKey && e.button !== -1) { fechar(); return; }
       e.preventDefault();
       fechar();
       const selecao = getSelection();
@@ -256,7 +258,16 @@ export class AtalhosDoEditor {
       this.menuContexto = menu;
     };
     const aoClique = e => { if (!this.menuContexto?.contains(e.target)) fechar(); };
-    const aoTeclar = e => { if (e.key === 'Escape') fechar(); };
+    const aoTeclar = e => {
+      if (e.key === 'Escape') fechar();
+      if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
+        const editavel = document.activeElement?.closest?.('[contenteditable="true"]');
+        if (!editavel || !this.ed.container.contains(editavel)) return;
+        e.preventDefault();
+        const rect = getSelection()?.rangeCount ? getSelection().getRangeAt(0).getBoundingClientRect() : editavel.getBoundingClientRect();
+        aoContexto({ target: editavel, altKey: true, button: -1, clientX: rect.left, clientY: rect.bottom, preventDefault() {} });
+      }
+    };
     this.ed.container.addEventListener('contextmenu', aoContexto);
     document.addEventListener('pointerdown', aoClique);
     document.addEventListener('keydown', aoTeclar);
@@ -559,7 +570,7 @@ export class AtalhosDoEditor {
     const desenhar = () => {
       const g = filtrarCatalogo(q.value, this.mac, this.gerenciador.personalizados);
       const html = Object.keys(CATEGORIAS).filter(c => g[c]).map(c => `<h4>${esc(CATEGORIAS[c])}</h4>${g[c].map(a => `<div class="ath-at-lin"><span>${esc(a.rotulo)}</span><span>${a.texto.split(' / ').map(t => `<kbd>${esc(t)}</kbd>`).join(' ')}</span></div>`).join('')}`).join('');
-      corpo.innerHTML = html || '<p style="color:#64748B;padding:14px 0">Nenhum atalho encontrado.</p>';
+      corpo.innerHTML = (html || '<p style="color:#64748B;padding:14px 0">Nenhum atalho encontrado.</p>') + (!q.value ? '<p style="color:#64748B;padding:10px 0">Ortografia: clique com o botão direito em uma palavra sublinhada para ver correções. Alt + clique direito ou Shift + F10 abre as ações do Athenes.</p>' : '');
     };
     desenhar(); q.focus();
     q.addEventListener('input', desenhar);

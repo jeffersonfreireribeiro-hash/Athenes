@@ -607,6 +607,12 @@ export const metodosBlocoNaFolha = {
     el.appendChild(alca);
     this.ligarAlvoDeSolta(el, b);
 
+    // O navegador usa o idioma do bloco para sublinhar erros e oferecer correções no menu nativo.
+    el.querySelectorAll('[contenteditable="true"]').forEach(campo => {
+      campo.lang = 'pt-BR';
+      campo.spellcheck = true;
+    });
+
     return el;
   }
 };
