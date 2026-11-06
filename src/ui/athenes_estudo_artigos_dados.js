@@ -495,6 +495,7 @@ export function registrarPdfLocalNoArtigo(art, file) {
   art.pdfBlobUrl = URL.createObjectURL(file);
   art.temPdfLocal = true;
   salvarPdfLocal(art.id, file).catch(() => {});
+  if (art.chaveZotero) salvarPdfLocal(`zot_${art.chaveZotero}`, file).catch(() => {});
   enviarPdfDoArtigoAoDrive(art, file).then(ok => {
     if (!ok) {
       art.driveStatus = 'PDF salvo neste dispositivo (Drive desconectado)';
@@ -585,7 +586,10 @@ export async function garantirPdfDoArtigo(art) {
     } catch (_) {}
   }
   try {
-    const local = await obterPdfLocal(art.id);
+    let local = await obterPdfLocal(art.id);
+    if (!local && art.chaveZotero) {
+      local = await obterPdfLocal(`zot_${art.chaveZotero}`) || await obterPdfLocal(art.chaveZotero);
+    }
     if (local) {
       art.pdfBlobUrl = URL.createObjectURL(local);
       art.temPdfLocal = true;

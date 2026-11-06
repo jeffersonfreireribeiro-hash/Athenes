@@ -348,6 +348,12 @@ export const metodosEstudoTela = {
         document.removeEventListener('selectionchange', this._selectionChangeHandler);
         this._selectionChangeHandler = null;
       }
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem('athenes_estudio_artigo_id');
+          sessionStorage.removeItem('athenes_estudio_pag');
+        }
+      } catch (_) {}
       salvarArtigosEstudo(this.artigos, art);
       definirArtigoAbertoAtivo(null);
       this.artigoAberto = null;
@@ -505,8 +511,8 @@ export const metodosEstudoTela = {
     const acionarSalvarCompleto = (btnRef) => {
       this.sincronizarArtigoComDriveEZotero(art, btnRef);
     };
-    root.querySelector('#athBtnSalvarDriveEZotero').addEventListener('click', (e) => acionarSalvarCompleto(e.currentTarget));
-    root.querySelector('#athBtnSalvarPilula').addEventListener('click', () => acionarSalvarCompleto(root.querySelector('#athBtnSalvarDriveEZotero')));
+    root.querySelector('#athBtnSalvarDriveEZotero')?.addEventListener('click', (e) => acionarSalvarCompleto(e.currentTarget));
+    root.querySelector('#athBtnSalvarPilula')?.addEventListener('click', (e) => acionarSalvarCompleto(e.currentTarget));
 
     // Desfazer último risco e limpar riscos da página ativa
     root.querySelector('#athBtnDesfazerTraco').addEventListener('click', () => {
@@ -756,6 +762,8 @@ export const metodosEstudoTela = {
     if (art.pdfBlobUrl && !pdfInfo && !this._pdfFalhou?.has(art.pdfBlobUrl)) {
       stack.innerHTML = '<div class="ath-pdf-carregando">Carregando as páginas do PDF...</div>';
       this.carregarPdfReal(art).then(() => {
+        if (this.artigoAberto === art) this.renderizar();
+      }).catch(() => {
         if (this.artigoAberto === art) this.renderizar();
       });
       return;

@@ -56,7 +56,7 @@ export async function obterTokenOuConectar(cfg = obterConfigGoogleDrive()) {
 export async function obterTokenDrive({ renovar = null, cfg = obterConfigGoogleDrive(), agora = Date.now() } = {}) {
   if (tokenDriveValido(cfg, agora)) return cfg.accessToken;
   if (!cfg.accessToken && !cfg.accessTokenExpiraEm) return null; // nunca conectou
-  const tentar = renovar || (async () => (await import('./athenes_colaboracao.js')).autenticarGoogleDrive(cfg.clientId, undefined, { silencioso: true }));
+  const tentar = renovar || (async () => Promise.race([(await import('./athenes_colaboracao.js')).autenticarGoogleDrive(cfg.clientId, undefined, { silencioso: true }), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3500))]));
   renovacaoEmCurso = renovacaoEmCurso || Promise.resolve().then(tentar).catch(() => null).finally(() => { renovacaoEmCurso = null; });
   return renovacaoEmCurso;
 }

@@ -70,7 +70,9 @@ export class AthenesApp {
         this.abrirDocumentoCompartilhado(docIdLink);
         return;
       }
-      if (params.get('tela') === 'editor' || params.get('editor') === '1') {
+      let telaSalva = null;
+      try { telaSalva = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('athenes_nav_tela') : null; } catch (_) {}
+      if (params.get('tela') === 'editor' || params.get('editor') === '1' || telaSalva === 'editor') {
         this.carregarUltimoDocENavegarEditor();
         return;
       }
@@ -119,8 +121,25 @@ export class AthenesApp {
   carregarUltimoDocENavegarEditor() {
     // não há mais cópia no navegador: abre o painel, que traz a lista do servidor, e o documento é aberto de lá
     repositorio.carregarLegadoUmaVez();
+    let docIdSalvo = null;
+    let docCacheSalvo = null;
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        docIdSalvo = sessionStorage.getItem('athenes_nav_doc_id');
+        const raw = sessionStorage.getItem('athenes_nav_doc_cache');
+        if (raw) docCacheSalvo = JSON.parse(raw);
+      }
+    } catch (_) {}
     const lista = repositorio.listar();
-    if (lista.length > 0 && !lista[0].precisaCarregarConteudo) this.documentoAtivo = lista[0];
+    if (docIdSalvo) {
+      const achado = lista.find(d => String(d.id) === String(docIdSalvo) && !d.precisaCarregarConteudo);
+      if (achado) this.documentoAtivo = achado;
+    }
+    if (!this.documentoAtivo && docCacheSalvo && docCacheSalvo.id) {
+      this.documentoAtivo = sanitizarDocumentoImportado(docCacheSalvo);
+      repositorio.gravarDocumento(this.documentoAtivo);
+    }
+    if (!this.documentoAtivo && lista.length > 0 && !lista[0].precisaCarregarConteudo) this.documentoAtivo = lista[0];
     if (!this.documentoAtivo) { this.navegarParaDashboard(); return; }
     this.navegarParaEditor();
   }
@@ -146,6 +165,11 @@ export class AthenesApp {
 
   fazerLogout() {
     encerrarSessao();
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        ['athenes_nav_tela', 'athenes_nav_doc_id', 'athenes_nav_doc_cache', 'athenes_dash_aba', 'athenes_dash_pasta', 'athenes_estudio_artigo_id', 'athenes_estudio_pag'].forEach(k => sessionStorage.removeItem(k));
+      }
+    } catch (_) {}
     document.querySelectorAll('.ath-modal-backdrop').forEach(m => m.remove());
     try {
       if (window.history && window.history.replaceState) {
@@ -160,10 +184,19 @@ export class AthenesApp {
     this.navegarParaLogin();
   }
 
-  navegarParaDashboard() {
+  navegarParaDashboard({ limparSessaoEditor = false } = {}) {
     this.descarregarSalvamento(); // o painel lê os documentos do armazenamento: grava antes o que ainda estava pendente
     this.editorView?.desmontarAtalhos?.(); // remove os listeners globais do editor que está saindo
     this.tela = 'dashboard';
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('athenes_nav_tela', 'dashboard');
+        if (limparSessaoEditor) {
+          sessionStorage.removeItem('athenes_nav_doc_id');
+          sessionStorage.removeItem('athenes_nav_doc_cache');
+        }
+      }
+    } catch (_) {}
     this.container.innerHTML = '<div id="athAppDashboard"></div>';
     const dashBox = this.container.querySelector('#athAppDashboard');
 
@@ -193,6 +226,13 @@ export class AthenesApp {
   navegarParaEditor() {
     this.editorView?.desmontarAtalhos?.();
     this.tela = 'editor';
+    try {
+      if (typeof sessionStorage !== 'undefined' && this.documentoAtivo) {
+        sessionStorage.setItem('athenes_nav_tela', 'editor');
+        if (this.documentoAtivo.id) sessionStorage.setItem('athenes_nav_doc_id', String(this.documentoAtivo.id));
+        sessionStorage.setItem('athenes_nav_doc_cache', JSON.stringify(this.documentoAtivo));
+      }
+    } catch (_) {}
     this.container.innerHTML = '<div id="athAppEditor"></div>';
     const editorBox = this.container.querySelector('#athAppEditor');
     this.painelProps = null;
@@ -214,7 +254,7 @@ export class AthenesApp {
       onRenderizado: (inspetorEl) => this.montarPainelProps(inspetorEl),
       onVoltarDashboard: () => {
         this.autoSalvar();
-        this.navegarParaDashboard();
+        this.navegarParaDashboard({ limparSessaoEditor: true });
       },
       onLogout: () => {
         this.fazerLogout();
@@ -423,6 +463,12 @@ export class AthenesApp {
   gravarDocumento(doc, { semDrive = false } = {}) {
     if (!doc) return;
     repositorio.gravarDocumento(doc);
+    try {
+      if (typeof sessionStorage !== 'undefined' && this.tela === 'editor' && doc.id) {
+        sessionStorage.setItem('athenes_nav_doc_id', String(doc.id));
+        sessionStorage.setItem('athenes_nav_doc_cache', JSON.stringify(doc));
+      }
+    } catch (_) {}
     if (semDrive) return;
     this.agendarEnvioDrive(doc);
     this.agendarEnvioNuvem(doc);

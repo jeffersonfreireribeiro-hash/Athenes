@@ -20,12 +20,13 @@ const CSS = `
 .ath-sum * { box-sizing: border-box; }
 
 /* Topo do painel */
-.ath-sum-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; flex-wrap: nowrap; overflow-x: auto; }
-.ath-sum-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 0 10px; border-radius: 999px; height: 32px; white-space: nowrap; flex-shrink: 0; }
+.ath-sum-topo { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; }
+.ath-sum-topo-info { display: flex; align-items: center; min-width: 0; width: 100%; }
+.ath-sum-chip { display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 0 10px; border-radius: 999px; height: 28px; white-space: nowrap; width: 100%; }
 .ath-sum-chip.padrao { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
 .ath-sum-chip.custom { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
-.ath-sum-topo-acoes { display: flex; gap: 6px; }
-.ath-sum-btn-topo { height: 32px; padding: 0 10px; font-size: 11px; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; background: #FFFFFF; border: 1px solid #CBD5E1; color: #334155; white-space: nowrap; flex-shrink: 0; }
+.ath-sum-topo-acoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 6px; width: 100%; }
+.ath-sum-btn-topo { height: 32px; padding: 0 8px; font-size: 11px; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; background: #FFFFFF; border: 1px solid #CBD5E1; color: #334155; white-space: nowrap; width: 100%; cursor: pointer; }
 .ath-sum-btn-topo:hover { background: #F1F5F9; border-color: #94A3B8; color: #1E293B; }
 
 /* Cards colapsáveis */

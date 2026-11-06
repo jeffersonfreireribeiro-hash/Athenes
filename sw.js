@@ -4,7 +4,7 @@
  * Permite instalar a interface no navegador, tablet e celular, funcionando com suporte offline.
  */
 
-const CACHE_NAME = 'athenes-pwa-v24';
+const CACHE_NAME = 'athenes-pwa-v26';
 
 const ASSETS_CANONICOS = [
   './',
@@ -67,10 +67,13 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
-  // NÃ£o intercepta chamadas de nuvem (Google Drive, Supabase, Zotero API) nem rotas da API local
+  // NÃ£o intercepta chamadas de nuvem (Google Drive, Supabase, Zotero API, CDNs externas) nem rotas da API local
   if (
+    url.origin !== self.location.origin ||
     url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('google.com') ||
     url.hostname.includes('supabase.co') ||
     url.hostname.includes('zotero.org') ||
     url.pathname.startsWith('/api/')

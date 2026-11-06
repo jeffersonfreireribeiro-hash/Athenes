@@ -45,7 +45,13 @@ export class EstudoArtigosView {
     this.onModoFullScreenChange = opcoes.onModoFullScreenChange || (() => {});
     this.artigos = carregarArtigosEstudo();
     // a biblioteca vem do servidor: chegou algo de outro computador → atualiza a tela (sem interromper quem está lendo um artigo)
-    this._cancelarBib = bib.aoMudarBiblioteca(() => { this.artigos = carregarArtigosEstudo(); if (!this.artigoAberto && typeof this.renderizar === 'function') this.renderizar(); });
+    this._cancelarBib = bib.aoMudarBiblioteca(() => {
+      this.artigos = carregarArtigosEstudo();
+      if (!this.artigoAberto) {
+        this.restaurarArtigoAbertoSessao();
+        if (!this.artigoAberto && typeof this.renderizar === 'function') this.renderizar();
+      }
+    });
     bib.sincronizarBiblioteca().catch(e => console.warn('[Athenes] Biblioteca no servidor:', e.message));
     migrarPdfsLocaisParaODrive().catch(() => {}); // PDFs que ficaram só neste computador vão para o Drive
     this.artigoAberto = null;
@@ -74,7 +80,23 @@ export class EstudoArtigosView {
     this.zoteroClient = new ZoteroClient();
     this.carregarConfigZotero();
     this.hidratarSnapshotIndexedDb();
-    this.renderizar();
+    this.restaurarArtigoAbertoSessao();
+    if (!this.artigoAberto) this.renderizar();
+  }
+
+  restaurarArtigoAbertoSessao() {
+    try {
+      if (typeof sessionStorage === 'undefined' || this.artigoAberto) return false;
+      const idSalvo = sessionStorage.getItem('athenes_estudio_artigo_id');
+      if (!idSalvo) return false;
+      const achado = (this.artigos || []).find(a => String(a.id) === String(idSalvo) || (a.chaveZotero && String(a.chaveZotero) === String(idSalvo)));
+      if (!achado) return false;
+      const pagSalva = parseInt(sessionStorage.getItem('athenes_estudio_pag') || '1', 10) || 1;
+      this.abrirArtigoNoEstudio(achado, pagSalva);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   hidratarSnapshotIndexedDb() {
@@ -88,6 +110,7 @@ export class EstudoArtigosView {
             mudou = true;
           }
         }
+        if (!this.artigoAberto && this.restaurarArtigoAbertoSessao()) return;
         if (mudou && !this.artigoAberto) {
           this.atualizarGridCatalogo();
         }
@@ -140,6 +163,9 @@ export class EstudoArtigosView {
       const banner = dashEl.querySelector('#athDashPastaBanner');
       if (sidebar) sidebar.style.display = ativo ? 'none' : '';
       if (banner) banner.style.display = ativo ? 'none' : '';
+      dashEl.querySelectorAll('.ath-dash-head, .ath-dash-topbar').forEach(el => {
+        el.style.display = ativo ? 'none' : '';
+      });
     }
     this.onModoFullScreenChange(Boolean(ativo));
   }
@@ -684,25 +710,34 @@ export class EstudoArtigosView {
     });
   }
 
-  abrirArtigoNoEstudio(art) {
+  abrirArtigoNoEstudio(art, paginaInicial = 1) {
     definirArtigoAbertoAtivo(art);
     this.artigoAberto = art;
-    this.paginaAtual = 1;
+    this.paginaAtual = Math.max(1, parseInt(paginaInicial, 10) || 1);
     this.pinEditandoId = null;
+    try {
+      if (typeof sessionStorage !== 'undefined' && art?.id) {
+        sessionStorage.setItem('athenes_estudio_artigo_id', String(art.id));
+        sessionStorage.setItem('athenes_estudio_pag', String(this.paginaAtual));
+      }
+    } catch (_) {}
     if (typeof window !== 'undefined') {
       if (window.scrollY > 0) window.scrollTo(0, 0);
       if (document.documentElement?.scrollTop > 0) document.documentElement.scrollTop = 0;
       if (document.body?.scrollTop > 0) document.body.scrollTop = 0;
     }
     this._carregandoPdf = !art.pdfBlobUrl && artigoTemPdf(art) ? art : null; // PDF no Drive: "Carregando…" em vez de aviso de "sem PDF"
-    this.renderizar();
     if (!art.pdfBlobUrl) {
       garantirPdfDoArtigo(art).then(carregou => {
         if (this._carregandoPdf === art) this._carregandoPdf = null;
         if (this.artigoAberto === art) this.renderizar();
         return carregou;
-      }).catch(() => { if (this._carregandoPdf === art) this._carregandoPdf = null; if (this.artigoAberto === art) this.renderizar(); });
+      }).catch(() => {
+        if (this._carregandoPdf === art) this._carregandoPdf = null;
+        if (this.artigoAberto === art) this.renderizar();
+      });
     }
+    this.renderizar();
   }
 
   /* ==========================================================================

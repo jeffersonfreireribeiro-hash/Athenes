@@ -63,8 +63,8 @@ export class DashboardView {
     this.filtroBusca = '';
     this.filtroTipo = 'todos';
     this.ordemDocumentos = 'recente_desc';
-    this.abaAtiva = opcoes.abaInicial || 'escrita'; // 'escrita' | 'artigos_zotero'
-    this.pastaAtivaId = opcoes.pastaInicialId || 'todas';
+    this.abaAtiva = opcoes.abaInicial || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('athenes_dash_aba')) || 'escrita'; // 'escrita' | 'artigos_zotero'
+    this.pastaAtivaId = opcoes.pastaInicialId || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('athenes_dash_pasta')) || 'todas';
     this.pastasDrive = obterPastasDriveLocais();
     this.perfilUsuario = obterPerfilColaborador();
     this.estudoView = null;
@@ -372,7 +372,7 @@ export class DashboardView {
       btn.addEventListener('click', () => {
         const novaAba = btn.dataset.abaDash;
         if (this.abaAtiva !== novaAba) {
-          this.abaAtiva = novaAba;
+          this.abaAtiva = novaAba; try { if (typeof sessionStorage !== 'undefined') { sessionStorage.setItem('athenes_dash_aba', novaAba); sessionStorage.setItem('athenes_dash_pasta', 'todas'); } } catch (_) {}
           this.pastaAtivaId = 'todas';
           this.renderizar();
         }
@@ -579,7 +579,7 @@ export class DashboardView {
 
   abrirAbaArtigosZoteroComArtigo(art) {
     if (!art) return;
-    this.abaAtiva = 'artigos_zotero';
+    this.abaAtiva = 'artigos_zotero'; try { if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('athenes_dash_aba', 'artigos_zotero'); } catch (_) {}
     this.renderizar();
     if (this.estudoView && typeof this.estudoView.abrirArtigoCompartilhadoRecebido === 'function') {
       this.estudoView.abrirArtigoCompartilhadoRecebido(art);
@@ -591,7 +591,7 @@ export class DashboardView {
   }
 
   selecionarPasta(pastaId) {
-    this.pastaAtivaId = pastaId;
+    this.pastaAtivaId = pastaId; try { if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('athenes_dash_pasta', String(pastaId || 'todas')); } catch (_) {}
     this.fecharDrawerPastas?.();
     this.renderizarPastasLateral();
     this.renderizarBannerPasta();
