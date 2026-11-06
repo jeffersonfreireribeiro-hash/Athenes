@@ -1317,6 +1317,37 @@ html, body, button, input, select, textarea, option, summary, label, table,
   color: #FFFFFF;
 }
 
+.ath-pill-btn-circulo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--ath-primary-line, #D6E4F0);
+  background: var(--ath-primary-soft, #EEF4FA);
+  color: var(--ath-primary, #314F79);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .12s ease;
+  padding: 0;
+  box-sizing: border-box;
+  flex: none;
+}
+.ath-pill-btn-circulo:hover {
+  background: var(--ath-primary, #314F79);
+  color: #FFFFFF;
+  border-color: var(--ath-primary, #314F79);
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px rgba(49, 79, 121, 0.28);
+}
+.ath-pill-btn-circulo:hover svg {
+  color: #FFFFFF !important;
+  stroke: #FFFFFF !important;
+}
+.ath-pill-btn-circulo:active {
+  transform: scale(0.95);
+}
+
 /* Alça de arraste da pílula móvel e barra contextual */
 .ath-pill-drag-handle {
   display: flex;
@@ -3139,8 +3170,8 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
 .ath-switch-label {
   position: relative;
   display: inline-block;
-  width: 36px;
-  height: 20px;
+  width: 40px;
+  height: 22px;
   flex: none;
   cursor: pointer;
 }
@@ -3154,26 +3185,30 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
   cursor: pointer;
   inset: 0;
   background-color: #CBD5E1;
-  transition: .2s;
-  border-radius: 20px;
+  transition: all .18s ease;
+  border-radius: 999px;
+  border: 1.5px solid #94A3B8;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
 }
 .ath-switch-slider:before {
   position: absolute;
   content: "";
   height: 14px;
   width: 14px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: .2s;
+  left: 2px;
+  bottom: 2px;
+  background-color: #FFFFFF;
+  transition: all .18s ease;
   border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 .ath-switch-label input:checked + .ath-switch-slider {
   background-color: #314F79;
+  border-color: #314F79;
+  box-shadow: 0 0 0 2px rgba(49, 79, 121, 0.25), inset 0 1px 2px rgba(0,0,0,0.2);
 }
 .ath-switch-label input:checked + .ath-switch-slider:before {
-  transform: translateX(16px);
+  transform: translateX(18px);
 }
 
 .ath-sem-pop-botoes-topo {

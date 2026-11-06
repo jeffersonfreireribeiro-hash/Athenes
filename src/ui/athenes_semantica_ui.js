@@ -32,11 +32,24 @@ import { escapeHtml } from '../core/athenes_seguranca.js';
 export class CamadaSemanticaEditorUI {
   constructor(editor) {
     this.editor = editor;
-    this.doc = editor.doc;
-    this.estado = inicializarEstadoSemantico(this.doc);
+    if (editor?.doc) {
+      inicializarEstadoSemantico(editor.doc);
+    }
     this.badgeFlutuanteEl = null;
     this.trechoEmHover = null;
     this._fecharPopoverExterno = null;
+  }
+
+  get doc() {
+    return this.editor?.doc;
+  }
+
+  get estado() {
+    if (!this.doc) return { showSemanticOverlay: true, availableTags: [] };
+    if (!this.doc.semanticOverlay) {
+      this.doc.semanticOverlay = inicializarEstadoSemantico(this.doc);
+    }
+    return this.doc.semanticOverlay;
   }
 
   /**
@@ -57,7 +70,7 @@ export class CamadaSemanticaEditorUI {
       palco.classList.toggle('ath-semantic-overlay-active', !!this.estado.showSemanticOverlay);
     }
 
-    const btnTopo = this.editor.container?.querySelector('#athBtnSemanticaTopo');
+    const btnTopo = this.editor.container?.querySelector('#athBtnSemanticaTopo, #athBtnMenuSemantica');
     if (btnTopo) {
       btnTopo.classList.toggle('on', !!this.estado.showSemanticOverlay);
       btnTopo.setAttribute('aria-pressed', String(!!this.estado.showSemanticOverlay));
@@ -168,7 +181,7 @@ export class CamadaSemanticaEditorUI {
 
   fecharPopover() {
     const pop = this.editor.container?.querySelector('#athPopoverSemantica');
-    const btn = this.editor.container?.querySelector('#athBtnSemanticaTopo');
+    const btn = this.editor.container?.querySelector('#athBtnSemanticaTopo, #athBtnMenuSemantica');
     if (pop) pop.hidden = true;
     if (btn) {
       btn.setAttribute('aria-expanded', 'false');

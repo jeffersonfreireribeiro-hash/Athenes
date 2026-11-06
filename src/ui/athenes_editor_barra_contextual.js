@@ -107,13 +107,13 @@ export const metodosBarraContextual = {
         <div class="ath-pill-drag-handle" title="Arrastar controle de ações" aria-label="Arrastar">
           ${svgIcone('alca', 12)}
         </div>
-        <span class="ath-pill-sep"></span>
-        <button type="button" class="ath-pill-bt" id="athBtnPillDividir" title="Dividir este bloco de texto em dois no cursor">
-          ${svgIcone('divisor', 13)} <span>Dividir Bloco Aqui</span>
+        <button type="button" class="ath-pill-btn-circulo ath-pill-bt-citar" id="athBtnPillCitar" title="Inserir citação bibliográfica do Zotero (Citar)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" stroke="none" aria-hidden="true">
+            <path d="M4.583 17.321C3.553 16.227 3 15 3 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179zm10 0C13.553 16.227 13 15 13 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179z"/>
+          </svg>
         </button>
-        <span class="ath-pill-sep"></span>
-        <button type="button" class="ath-pill-bt ath-pill-bt-zotero" id="athBtnPillCitar" title="Inserir citação bibliográfica do Zotero no cursor">
-          ${svgIcone('zotero', 14)} <span>Citar Zotero</span>
+        <button type="button" class="ath-pill-btn-circulo ath-pill-bt-dividir" id="athBtnPillDividir" title="Dividir este bloco de texto em dois no cursor">
+          ${svgIcone('tesoura', 15)}
         </button>
       `;
       document.body.appendChild(pillCaret);
@@ -164,9 +164,13 @@ export const metodosBarraContextual = {
 
     const menuEstilo = barra.querySelector('#athMenuContextEstilo');
     const btnEstiloMenu = barra.querySelector('#athBtnContextEstiloMenu');
+    const menuSemantica = barra.querySelector('#athMenuContextSemantica');
+    const btnSemanticaMenu = barra.querySelector('#athBtnContextSemanticaMenu');
+    const listaSemanticaEl = barra.querySelector('#athListaItensCtxSemantica');
 
     const fecharDropdownsCtx = () => {
       if (menuEstilo) menuEstilo.hidden = true;
+      if (menuSemantica) menuSemantica.hidden = true;
     };
 
     const renderizarListaSemanticaContextual = () => {
@@ -555,10 +559,15 @@ export const metodosBarraContextual = {
       if (sel.isCollapsed && editable) {
         let r = null;
         const rects = range.getClientRects();
-        if (rects.length > 0) {
+        if (rects.length > 0 && rects[0].height > 0) {
           r = rects[0];
         } else {
-          r = editable.getBoundingClientRect();
+          const b = range.getBoundingClientRect();
+          if (b && b.height > 0 && (b.top > 0 || b.left > 0)) {
+            r = b;
+          } else {
+            r = editable.getBoundingClientRect();
+          }
         }
         const blocoEl = editable?.closest('[data-bloco-id]');
         const blocoId = blocoEl?.dataset?.blocoId || this.blocoSelecionado?.id;
@@ -576,7 +585,7 @@ export const metodosBarraContextual = {
           const rectBloco = blocoEl?.getBoundingClientRect();
 
           if (off && rectBloco) {
-            const dim = { width: pillCaret.offsetWidth || 220, height: pillCaret.offsetHeight || 36 };
+            const dim = { width: pillCaret.offsetWidth || 104, height: pillCaret.offsetHeight || 38 };
             const targetPos = { left: rectBloco.left + off.relX, top: rectBloco.top + off.relY };
             const clamped = clampPosicaoPilula(targetPos, rectBloco, area, dim, 80);
             pillCaret.style.left = `${clamped.left}px`;

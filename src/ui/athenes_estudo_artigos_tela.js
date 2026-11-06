@@ -703,10 +703,15 @@ export const metodosEstudoTela = {
     this.renderizarPainelDireitoEstudio(root.querySelector('#athEstudioPainelCorpo'), art);
 
     // Restaura rolagem do palco se houver
-    const palcoNovo = root.querySelector('#athEstudioPalco');
-    if (palcoNovo && scrollSalvo > 0) {
-      palcoNovo.scrollTop = scrollSalvo;
-    }
+    const restaurarScroll = () => {
+      const palcoNovo = root.querySelector('#athEstudioPalco');
+      if (palcoNovo && scrollSalvo > 0) palcoNovo.scrollTop = scrollSalvo;
+    };
+    restaurarScroll();
+    if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(restaurarScroll);
+    setTimeout(restaurarScroll, 40);
+    setTimeout(restaurarScroll, 120);
+    setTimeout(restaurarScroll, 300);
   },
 
   renderizarTodasAsPaginasNoPalco(root, art, paginasPdf) {

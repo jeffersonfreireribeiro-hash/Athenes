@@ -23,14 +23,16 @@ export const metodosMenusTopo = {
     const popEstilos = root.querySelector('#athPopoverEstilos');
     const popNuvem = root.querySelector('#athPopoverNuvem');
     const popConfig = root.querySelector('#athPopoverConfig');
+    const popSemantica = root.querySelector('#athPopoverSemantica');
 
     const btnArquivo = root.querySelector('#athBtnMenuArquivo');
     const btnCabRod = root.querySelector('#athBtnMenuCabRod');
     const btnEstilos = root.querySelector('#athBtnMenuEstilos');
     const btnConfig = root.querySelector('#athBtnMenuConfig'); // a engrenagem abre o menu e também "acende" quando a Nuvem está aberta
+    const btnSemantica = root.querySelector('#athBtnMenuSemantica, #athBtnSemanticaTopo');
 
-    const popovers = { arquivo: popArquivo, estilos: popEstilos, config: popConfig, nuvem: popNuvem };
-    const botoes = { arquivo: btnArquivo, estilos: btnEstilos, config: btnConfig, nuvem: btnConfig };
+    const popovers = { arquivo: popArquivo, estilos: popEstilos, config: popConfig, nuvem: popNuvem, semantica: popSemantica };
+    const botoes = { arquivo: btnArquivo, estilos: btnEstilos, config: btnConfig, nuvem: btnConfig, semantica: btnSemantica };
 
     const fecharTodos = () => {
       Object.values(popovers).forEach(p => { if (p) p.hidden = true; });
@@ -56,6 +58,8 @@ export const metodosMenusTopo = {
         this.menuTopoAberto = chave;
         if (chave === 'arquivo') {
           this.pintarDiagramaMargens();
+        } else if (chave === 'semantica' && p) {
+          this.semanticaUI?.renderizarConteudoPopover(p);
         }
       }
     };
@@ -81,6 +85,11 @@ export const metodosMenusTopo = {
     btnEstilos.addEventListener('click', (e) => {
       e.stopPropagation();
       togglePopover('estilos');
+    });
+
+    btnSemantica?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePopover('semantica');
     });
 
     btnConfig?.addEventListener('click', (e) => {

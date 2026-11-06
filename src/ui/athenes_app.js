@@ -72,15 +72,17 @@ export class AthenesApp {
       }
       let telaSalva = null;
       let idSalvo = null;
+      let abaSalva = null;
       try {
         telaSalva = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('athenes_nav_tela') : null;
         idSalvo = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('athenes_estudio_artigo_id') : null;
+        abaSalva = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('athenes_dash_aba') : null;
       } catch (_) {}
       if (params.get('tela') === 'editor' || params.get('editor') === '1' || telaSalva === 'editor') {
         this.carregarUltimoDocENavegarEditor();
         return;
       }
-      const ehEstudio = params.get('tela') === 'estudio' || telaSalva === 'estudio';
+      const ehEstudio = params.get('tela') === 'estudio' || telaSalva === 'estudio' || abaSalva === 'artigos_zotero' || Boolean(idSalvo);
       if (ehEstudio) {
         this.navegarParaDashboard({
           abaInicial: 'artigos_zotero',

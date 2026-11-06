@@ -1214,8 +1214,33 @@ export function obterPastasDriveLocais() {
     if (typeof localStorage !== 'undefined') {
       const salvo = lerConta(STORAGE_KEY_PASTAS_DRIVE);
       if (salvo) {
-        const parsed = JSON.parse(salvo);
+        let parsed = JSON.parse(salvo);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          try {
+            const excluidasRaw = JSON.parse(lerConta('athenes_pastas_excluidas') || '[]');
+            if (Array.isArray(excluidasRaw) && excluidasRaw.length > 0) {
+              const mapaExcl = new Set();
+              for (const ex of excluidasRaw) {
+                if (ex.id) mapaExcl.add(ex.id);
+                if (ex.driveId) mapaExcl.add(ex.driveId);
+                if (ex.nome) mapaExcl.add(String(ex.nome).trim().toLowerCase());
+              }
+              const filtrarExcluidas = (lista) => lista.filter(item => {
+                if (mapaExcl.has(item.id) || (item.driveId && mapaExcl.has(item.driveId)) || (item.nome && mapaExcl.has(String(item.nome).trim().toLowerCase()))) {
+                  return false;
+                }
+                if (item.subpastas && item.subpastas.length > 0) {
+                  item.subpastas = filtrarExcluidas(item.subpastas);
+                }
+                return true;
+              });
+              const filtrado = filtrarExcluidas(parsed);
+              if (filtrado.length !== parsed.length) {
+                gravarConta(STORAGE_KEY_PASTAS_DRIVE, JSON.stringify(filtrado));
+                parsed = filtrado;
+              }
+            }
+          } catch (_) {}
           return parsed;
         }
       }
