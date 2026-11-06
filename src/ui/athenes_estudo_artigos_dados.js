@@ -9,10 +9,12 @@ import { mostrarAviso } from './athenes_aviso.js';
 import { salvarArquivoNoGoogleDrive } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { codificarMetadadosNotaZotero } from '../core/athenes_zotero_anexos_notas.js';
+import { blobEhPdf, normalizarDoi, normalizarIsbn } from '../core/athenes_pdf_identificadores.js';
 
 export const STORAGE_KEY_ARTIGOS = 'athenes_estudo_artigos_v1';
 export const IDS_ARTIGOS_EXEMPLO = new Set(['zot_art_01', 'zot_art_02', 'zot_art_03']);
 export const CHAVES_ZOTERO_EXEMPLO = new Set(['ZOT8K2M9', 'ZOT4P9L2', 'ZOT9R3X7']);
+const buscasPdfPublico = new WeakSet();
 
 export function ehArtigoExemploFicticio(art) {
   if (!art) return false;
@@ -22,8 +24,8 @@ export function ehArtigoExemploFicticio(art) {
 /** O artigo tem (ou pode abrir) um PDF de verdade? Sem ele o estúdio avisa, em vez de inventar páginas. */
 export function artigoTemPdf(art) {
   if (!art) return false;
-  if (ehArtigoExemploFicticio(art) || art.pdfBlobUrl || art.temPdfLocal) return true;
-  if (Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.length > 0) return true;
+  if (art.pdfVerificadoInvalido) return false;
+  if (ehArtigoExemploFicticio(art) || art.pdfBlobUrl || art.temPdfLocal || art.pdfDataUrl) return true;
   const id = String(art.driveFileId || '').trim();
   return Boolean(id) && !/^drive_pdf_/.test(id);
 }
@@ -467,6 +469,7 @@ export async function lerSnapshotArtigosIdb() {
 
 /** Envia o PDF do artigo à pasta "Bibliografia_PDFs" do Drive (dentro da raiz Athenes) e guarda o id. Devolve true se subiu. */
 export async function enviarPdfDoArtigoAoDrive(art, blob) {
+  if (!await blobEhPdf(blob)) throw new Error('O arquivo não é um PDF válido.');
   const token = await obterTokenDrive();
   if (!token) return false;
   const raizId = await obterPastaRaizDrive(token);
@@ -474,9 +477,10 @@ export async function enviarPdfDoArtigoAoDrive(art, blob) {
   const idAtual = String(art.driveFileId || '').trim();
   const salvo = await salvarArquivoNoGoogleDrive({
     nomeArquivo: art.driveFileName || blob.name || `${art.id}.pdf`, conteudoBlobOuTexto: blob, mimeType: 'application/pdf', accessToken: token,
-    driveFileId: idAtual && !/^drive_pdf_/.test(idAtual) ? idAtual : null, pastaId
+    driveFileId: idAtual && !art.pdfVerificadoInvalido && !/^drive_pdf_/.test(idAtual) ? idAtual : null, pastaId
   });
   art.driveFileId = salvo.id;
+  art.pdfVerificadoInvalido = false;
   art.driveStatus = 'PDF no Google Drive';
   salvarArtigosEstudo(carregarArtigosEstudo(), art); // o id do arquivo vai para o servidor
 
@@ -489,7 +493,13 @@ export async function enviarPdfDoArtigoAoDrive(art, blob) {
 }
 
 /** Registra um arquivo PDF escolhido no computador: abre na sessão, guarda no cache local (IndexedDB) e sobe para o Drive. */
-export function registrarPdfLocalNoArtigo(art, file) {
+export async function registrarPdfLocalNoArtigo(art, file) {
+  if (!await blobEhPdf(file)) {
+    mostrarAviso('O arquivo selecionado não é um PDF válido.', { tipo: 'aviso' });
+    return false;
+  }
+  if (art.pdfVerificadoInvalido) art.driveFileId = '';
+  art.pdfVerificadoInvalido = false;
   art.driveFileName = file.name;
   art.driveStatus = 'Enviando o PDF ao Google Drive…';
   art.pdfBlobUrl = URL.createObjectURL(file);
@@ -506,6 +516,7 @@ export function registrarPdfLocalNoArtigo(art, file) {
     salvarArtigosEstudo(carregarArtigosEstudo(), art);
     mostrarAviso(`Não foi possível enviar o PDF ao Google Drive (mantido neste aparelho): ${e.message}`, { tipo: 'info' });
   });
+  return true;
 }
 
 export async function baixarPdfBlobDoDrive(fileId, accessToken) {
@@ -572,13 +583,55 @@ export async function obterPdfComoDataUrl(artId) {
   }
 }
 
-export async function garantirPdfDoArtigo(art) {
+async function buscarPdfPublicoParaArtigo(art, forcar = false) {
+  if (art.compartilhadoComigo || art.proprietarioExterno || (!forcar && buscasPdfPublico.has(art))) return false;
+  const doi = normalizarDoi(art.doi || art.camposZotero?.DOI);
+  const isbn = normalizarIsbn(art.isbn || art.camposZotero?.ISBN);
+  if (!doi && !isbn) return false;
+  buscasPdfPublico.add(art);
+  for (const [tipo, valor] of [['doi', doi], ['isbn', isbn]]) {
+    if (!valor) continue;
+    try {
+      const resposta = await fetch(`/api/pdf-aberto?${tipo}=${encodeURIComponent(valor)}`);
+      if (!resposta.ok) continue;
+      const blob = await resposta.blob();
+      if (!await blobEhPdf(blob)) continue;
+      const arquivo = new File([blob], `${String(art.titulo || 'Artigo').replace(/[\\/:*?"<>|]/g, '').slice(0, 90)}.pdf`, { type: 'application/pdf' });
+      art.pdfBlobUrl = URL.createObjectURL(arquivo);
+      art.temPdfLocal = true;
+      if (art.pdfVerificadoInvalido) art.driveFileId = '';
+      art.pdfVerificadoInvalido = false;
+      art.driveFileName = arquivo.name;
+      art.driveStatus = 'PDF público encontrado; enviando ao Google Drive…';
+      await salvarPdfLocal(art.id, arquivo);
+      if (art.chaveZotero) await salvarPdfLocal(`zot_${art.chaveZotero}`, arquivo);
+      try {
+        const enviado = await enviarPdfDoArtigoAoDrive(art, arquivo);
+        if (!enviado) art.driveStatus = 'PDF salvo neste dispositivo (Drive desconectado)';
+      } catch (e) {
+        art.driveStatus = 'PDF salvo neste dispositivo (falha ao enviar ao Drive)';
+        console.warn('[Athenes] PDF público no Drive:', e.message);
+      }
+      salvarArtigosEstudo(carregarArtigosEstudo(), art);
+      return true;
+    } catch (e) { console.warn('[Athenes] Busca de PDF público:', e.message); }
+  }
+  return false;
+}
+
+export async function garantirPdfDoArtigo(art, { forcarBuscaIdentificadores = false } = {}) {
   if (!art) return false;
   if (art.pdfBlobUrl) return true;
   if (art.pdfDataUrl) {
     try {
       const r = await fetch(art.pdfDataUrl);
       const blob = await r.blob();
+      if (!await blobEhPdf(blob)) {
+        art.pdfVerificadoInvalido = true;
+        salvarArtigosEstudo(carregarArtigosEstudo(), art);
+        throw new Error('O conteúdo salvo não é um PDF.');
+      }
+      art.pdfVerificadoInvalido = false;
       art.pdfBlobUrl = URL.createObjectURL(blob);
       art.temPdfLocal = true;
       salvarPdfLocal(art.id, blob).catch(() => {});
@@ -590,7 +643,7 @@ export async function garantirPdfDoArtigo(art) {
     if (!local && art.chaveZotero) {
       local = await obterPdfLocal(`zot_${art.chaveZotero}`) || await obterPdfLocal(art.chaveZotero);
     }
-    if (local) {
+    if (local && await blobEhPdf(local)) {
       art.pdfBlobUrl = URL.createObjectURL(local);
       art.temPdfLocal = true;
       const idDrive = String(art.driveFileId || '').trim();
@@ -611,6 +664,7 @@ export async function garantirPdfDoArtigo(art) {
         art.pdfDataUrl = artRemoto.pdfDataUrl;
         const r = await fetch(art.pdfDataUrl);
         const blob = await r.blob();
+        if (!await blobEhPdf(blob)) throw new Error('O conteúdo compartilhado não é um PDF.');
         art.pdfBlobUrl = URL.createObjectURL(blob);
         art.temPdfLocal = true;
         salvarPdfLocal(art.id, blob).catch(() => {});
@@ -624,6 +678,13 @@ export async function garantirPdfDoArtigo(art) {
     if (tokenDrive) {
       try {
         const blob = await baixarPdfBlobDoDrive(idDrive, tokenDrive);
+        if (!await blobEhPdf(blob)) {
+          art.pdfVerificadoInvalido = true;
+          art.driveStatus = 'Arquivo vinculado não é PDF';
+          salvarArtigosEstudo(carregarArtigosEstudo(), art);
+          throw new Error('O arquivo no Drive não é PDF.');
+        }
+        art.pdfVerificadoInvalido = false;
         art.pdfBlobUrl = URL.createObjectURL(blob);
         art.temPdfLocal = true;
         salvarPdfLocal(art.id, blob).catch(() => {});
@@ -635,7 +696,8 @@ export async function garantirPdfDoArtigo(art) {
       const respPub = await fetch(`https://drive.google.com/uc?export=download&id=${encodeURIComponent(idDrive)}`);
       if (respPub.ok) {
         const blob = await respPub.blob();
-        if (blob && blob.size > 2000 && (blob.type === 'application/pdf' || blob.size > 50000)) {
+        if (await blobEhPdf(blob)) {
+          art.pdfVerificadoInvalido = false;
           art.pdfBlobUrl = URL.createObjectURL(blob);
           art.temPdfLocal = true;
           salvarPdfLocal(art.id, blob).catch(() => {});
@@ -644,7 +706,7 @@ export async function garantirPdfDoArtigo(art) {
       }
     } catch (_) {}
   }
-  return false;
+  return buscarPdfPublicoParaArtigo(art, forcarBuscaIdentificadores);
 }
 
 /**

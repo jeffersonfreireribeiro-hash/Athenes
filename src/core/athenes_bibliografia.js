@@ -176,6 +176,7 @@ export function parseBibTeX(conteudoBib) {
       numero: campos.number || '',
       paginas: campos.pages?.replace(/--/g, '–') || '',
       doi: campos.doi || '',
+      isbn: campos.isbn || '',
       url: campos.url || '',
       resumo: campos.abstract || '',
       palavrasChave: (campos.keywords || '').split(/[,;]/).map(k => k.trim()).filter(Boolean)

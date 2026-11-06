@@ -546,30 +546,12 @@ export const metodosEstudoPainelDireito = {
     box.querySelector('#athPainelInputArquivoPdf')?.addEventListener('change', async e => {
       const fPdf = e.target.files?.[0];
       if (!fPdf) return;
-      registrarPdfLocalNoArtigo(art, fPdf);
+      if (!await registrarPdfLocalNoArtigo(art, fPdf)) return;
       salvarArtigosEstudo(this.artigos);
       const statusEl = box.querySelector('#athStatusSyncArtigo');
       if (statusEl) {
         statusEl.style.color = '#15803D';
         statusEl.textContent = `PDF "${fPdf.name}" carregado na folha!`;
-      }
-      const tokenPainel = await obterTokenDrive();
-      if (tokenPainel) {
-        try {
-          const salvo = await salvarArquivoNoGoogleDrive({
-            nomeArquivo: fPdf.name,
-            conteudoBlobOuTexto: fPdf,
-            mimeType: 'application/pdf',
-            accessToken: tokenPainel,
-            pastaId: cfgDrivePainel.pastaId || null,
-            driveFileId: art.driveFileId || null
-          });
-          if (salvo?.id) {
-            art.driveFileId = salvo.id;
-            art.driveFileName = salvo.name || fPdf.name;
-            salvarArtigosEstudo(this.artigos);
-          }
-        } catch (_) {}
       }
       this.renderizar();
     });

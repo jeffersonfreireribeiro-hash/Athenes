@@ -31,6 +31,7 @@ import { mostrarAviso } from './athenes_aviso.js';
 import { ModalCompartilhar } from './athenes_compartilhar_modal.js';
 import { listarCompartilhadosComigo, carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
 import { lerSessaoSupabase } from '../core/athenes_supabase_auth.js';
+import { paginaEditorialDoPdf } from '../core/athenes_pdf_identificadores.js';
 import { removerPdfLocal, PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, obterPdfComoDataUrl, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo, definirArtigoAbertoAtivo, lerSnapshotArtigosIdb, mesclarFichamentoPreservandoDados, compartilharPdfNoDrive } from './athenes_estudo_artigos_dados.js';
 import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
@@ -533,6 +534,7 @@ export class EstudoArtigosView {
       numero: item.numero || '',
       paginas: item.paginas || '',
       doi: item.doi || '',
+      isbn: item.isbn || item.camposZotero?.ISBN || '',
       palavrasChave: item.palavrasChave?.length ? item.palavrasChave : ['Zotero'],
       driveFileId: '',
       driveFileName: '',
@@ -701,7 +703,6 @@ export class EstudoArtigosView {
         <div class="ath-doc-card-header">
           <span class="ath-badge ath-badge-primary">ARTIGO</span>
           ${art.compartilhadoComigo ? '<span class="ath-badge ath-badge-info">COMPARTILHADO COMIGO</span>' : ''}
-          <span class="ath-badge ath-badge-info" title="Chave Zotero">${svgIcone('zotero', 10)} ${escapeHtml(art.chaveZotero || 'ZOTERO')}</span>
           ${artigoTemPdf(art)
             ? `<span class="ath-badge ath-badge-ok" title="PDF Vinculado">${svgIcone('drive', 10)} PDF</span>`
             : (art.anexoPdfZotero?.baixavel ? `<span class="ath-badge ath-badge-info">PDF ZOTERO</span>` : `<span class="ath-badge ath-badge-warn">SEM PDF</span>`)}
@@ -1056,8 +1057,9 @@ export class EstudoArtigosView {
         for (const cand of candidatos) {
           if (/^\d{1,5}$/.test(cand)) {
             const numEditorial = parseInt(cand, 10);
-            if (numEditorial > 0 && numEditorial !== numPag) {
-              folha.dataset.pagEditorial = String(numEditorial);
+            const paginaValida = paginaEditorialDoPdf(this.artigoAberto, numPag, info.n, numEditorial);
+            if (paginaValida && paginaValida !== numPag) {
+              folha.dataset.pagEditorial = String(paginaValida);
             }
             break;
           }
@@ -1084,7 +1086,10 @@ export class EstudoArtigosView {
     if (!root) return;
     const totalPags = this.artigoAberto?.conteudoPaginasPdf?.length || 1;
     const indBarra = root.querySelector('#athIndicadorPagBarra');
-    if (indBarra) indBarra.textContent = `Pág. ${numPag} de ${totalPags}`;
+    if (indBarra) {
+      const numEditorial = paginaEditorialDoPdf(this.artigoAberto, numPag, this._pdfDocs?.get(this.artigoAberto?.pdfBlobUrl)?.n);
+      indBarra.textContent = numEditorial ? `Pág. ${numEditorial} · PDF ${numPag}/${totalPags}` : `Pág. ${numPag} de ${totalPags}`;
+    }
 
     root.querySelectorAll('.ath-pdf-folha-container').forEach(el => {
       el.classList.toggle('pagina-ativa', parseInt(el.dataset.numPagina, 10) === numPag);
@@ -1739,6 +1744,9 @@ export class EstudoArtigosView {
         existente.itemTypeZotero = it.itemTypeZotero || existente.itemTypeZotero || '';
         existente.camposZotero = it.camposZotero || existente.camposZotero || null; // informações do Zotero atualizadas a cada sincronização
         existente.criadores = it.criadores || existente.criadores || null;
+        if (!existente.doi && it.doi) existente.doi = it.doi;
+        if (!existente.isbn && it.isbn) existente.isbn = it.isbn;
+        if (!existente.paginas && it.paginas) existente.paginas = it.paginas;
         if (naRaizOuZotero(existente)) { existente.pastasIds = ids; existente.pastaId = ids[0]; }
         return;
       }

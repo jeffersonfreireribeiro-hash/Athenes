@@ -6,6 +6,7 @@
 
 import { parseBibTeX } from './athenes_bibliografia.js';
 import { organizarFilhosZotero } from './athenes_zotero_anexos_notas.js';
+import { blobEhPdf } from './athenes_pdf_identificadores.js';
 
 const ZOTERO_API_BASE = 'https://api.zotero.org';
 
@@ -291,6 +292,7 @@ export class ZoteroClient {
     if (!res.ok) throw erro('http', `O Zotero respondeu ${res.status} ao baixar o PDF.`);
     const blob = await res.blob();
     if (!blob || !blob.size) throw erro('sem_arquivo', 'O Zotero devolveu um arquivo vazio.');
+    if (!await blobEhPdf(blob)) throw erro('sem_arquivo', 'O Zotero devolveu conteúdo que não é um PDF.');
     return blob;
   }
 
@@ -436,6 +438,7 @@ export class ZoteroClient {
       numero: d.issue || '',
       paginas: d.pages || '',
       doi: d.DOI || '',
+      isbn: d.ISBN || '',
       url: d.url || '',
       resumo: d.abstractNote || '',
       palavrasChave: (d.tags || []).map(t => t.tag).filter(Boolean),

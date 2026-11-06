@@ -168,10 +168,10 @@ export const metodosEstudoModais = {
         window.open(urlFinal, '_blank', 'noopener,noreferrer');
       });
 
-      popDrive.querySelector('#athPopDriveFileInput')?.addEventListener('change', e => {
+      popDrive.querySelector('#athPopDriveFileInput')?.addEventListener('change', async e => {
         const file = e.target.files?.[0];
         if (!file) return;
-        registrarPdfLocalNoArtigo(art, file);
+        if (!await registrarPdfLocalNoArtigo(art, file)) return;
         if (this._pdfFalhou) this._pdfFalhou.clear();
         salvarArtigosEstudo(this.artigos);
         this.renderizar();
@@ -693,20 +693,7 @@ export const metodosEstudoModais = {
       if (driveFileIdSelecionado) {
         novoArt.driveFileId = driveFileIdSelecionado;
       }
-      if (arquivoPdfSelecionado) {
-        registrarPdfLocalNoArtigo(novoArt, arquivoPdfSelecionado);
-        obterTokenDrive().then(tokenNovo => (tokenNovo ? salvarArquivoNoGoogleDrive({
-            nomeArquivo: arquivoPdfSelecionado.name,
-            conteudoBlobOuTexto: arquivoPdfSelecionado,
-            mimeType: 'application/pdf',
-            accessToken: tokenNovo
-          }) : null)).then(salvo => {
-            if (salvo?.id) {
-              novoArt.driveFileId = salvo.id;
-              salvarArtigosEstudo(this.artigos);
-            }
-          }).catch(() => {});
-      }
+      if (arquivoPdfSelecionado && !await registrarPdfLocalNoArtigo(novoArt, arquivoPdfSelecionado)) return;
 
       this.artigos.unshift(novoArt);
       salvarArtigosEstudo(this.artigos);

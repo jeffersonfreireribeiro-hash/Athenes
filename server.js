@@ -7,6 +7,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolverPdfAberto } from './src/server/athenes_pdf_aberto.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +34,18 @@ const MIME_TYPES = {
 
 const server = http.createServer((req, res) => {
   let reqPath = decodeURIComponent(req.url.split('?')[0]);
+
+  if (reqPath === '/api/pdf-aberto') {
+    if (req.method !== 'GET') { res.writeHead(405); res.end(); return; }
+    const consulta = new URL(req.url, 'http://localhost').searchParams;
+    resolverPdfAberto({ doi: consulta.get('doi'), isbn: consulta.get('isbn') }).then(resultado => {
+      res.writeHead(resultado.status, resultado.status === 200
+        ? { 'Content-Type': 'application/pdf', 'X-Athenes-Fonte': resultado.fonte, 'Cache-Control': 'no-store' }
+        : { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(resultado.status === 200 ? resultado.pdf : JSON.stringify({ erro: resultado.mensagem }));
+    }).catch(() => { res.writeHead(502); res.end(JSON.stringify({ erro: 'Falha ao consultar PDF público.' })); });
+    return;
+  }
 
   // Rotas de API para atualização automática do aplicativo Android (padrão Glaux GIS)
   if (reqPath === '/api/v1/app/info') {

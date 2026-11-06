@@ -11,6 +11,7 @@ import { escapeHtml, sanitizarHtmlEditorial } from '../core/athenes_seguranca.js
 import { svgIcone, svgLogo } from './athenes_icones.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import { registrarPdfLocalNoArtigo, salvarArtigosEstudo, definirArtigoAbertoAtivo, formatarCitacaoAbntDoArtigo, artigoTemPdf, ehArtigoExemploFicticio } from './athenes_estudo_artigos_dados.js';
+import { paginaEditorialDoPdf } from '../core/athenes_pdf_identificadores.js';
 
 /**
  * PDF guardado pelo próprio Zotero (arquivo importado): fica na pasta de dados do Zotero, em storage/CHAVE-DO-ANEXO/arquivo.pdf.
@@ -68,8 +69,7 @@ export const metodosEstudoTela = {
     }
 
     // sem PDF vinculado não se inventam páginas: o palco avisa e oferece vincular (o fichamento e o resumo seguem disponíveis)
-    const temPaginasCompartilhadas = Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.some(p => Array.isArray(p.paragrafos) && p.paragrafos.length > 0 && p.paragrafos.some(txt => String(txt || '').trim()));
-    const semPdf = !art.pdfBlobUrl && !ehArtigoExemploFicticio(art) && !temPaginasCompartilhadas;
+    const semPdf = !art.pdfBlobUrl && !ehArtigoExemploFicticio(art);
     const paginasPdf = semPdf ? [] : (Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.length > 0
       ? art.conteudoPaginasPdf
       : [{ numero: 1, cabecalho: art.publicacao || 'Artigo PDF', titulo: art.titulo, autores: '', paragrafos: [art.resumoOriginal || ''] }]);
@@ -96,9 +96,6 @@ export const metodosEstudoTela = {
         </a>
         <input type="text" class="ath-doc-titulo-topo" id="athInputTituloArtigoTopo" value="${escapeHtml(art.titulo || 'Artigo Científico')}" title="Clique para editar o título do artigo">
         <span class="rm-selo">${escapeHtml(formatarCitacaoAbntDoArtigo(art))}</span>
-        <span class="ath-selo-zotero" style="padding:4px 9px; border-radius:999px; font-size:10.5px;">
-          ${svgIcone('zotero', 11)} ${escapeHtml(art.chaveZotero || 'ZOTERO')}
-        </span>
       </div>
 
       <div class="ath-topo-dir">
@@ -260,7 +257,7 @@ export const metodosEstudoTela = {
             <!-- Botão de Adicionar Folha Extra e Indicador de Página à Direita -->
             <div style="margin-left:auto; display:flex; align-items:center; gap:6px;">
               <span id="athIndicadorPagBarra" style="font:800 11.5px var(--glx-font); color:#314F79; background:#EEF4FA; padding:4px 10px; border-radius:999px;">
-                ${semPdf ? 'Sem PDF' : `Pág. ${this.paginaAtual} de ${totalPags}`}
+                ${semPdf ? 'Sem PDF' : (paginaEditorialDoPdf(art, this.paginaAtual, pdfInfo?.n) ? `Pág. ${paginaEditorialDoPdf(art, this.paginaAtual, pdfInfo.n)} · PDF ${this.paginaAtual}/${pdfInfo.n}` : `Pág. ${this.paginaAtual} de ${totalPags}`)}
               </span>
               <button type="button" class="rm-ic-bt" id="athPdfNovaPag" data-tip="Folha Extra" title="Adicionar folha extra de esquemas/notas ao final do PDF" style="width:32px; height:32px;">
                 ${svgIcone('mais', 14)}
@@ -601,10 +598,10 @@ export const metodosEstudoTela = {
       this.adicionarFolhaExtraNoPdf(art, paginasPdf);
     });
 
-    root.querySelector('#athInputCarregarPdfReal').addEventListener('change', e => {
+    root.querySelector('#athInputCarregarPdfReal').addEventListener('change', async e => {
       const file = e.target.files?.[0];
       if (!file) return;
-      registrarPdfLocalNoArtigo(art, file);
+      if (!await registrarPdfLocalNoArtigo(art, file)) return;
       if (this._pdfFalhou) this._pdfFalhou.clear();
       salvarArtigosEstudo(this.artigos, art);
       this.renderizar();
@@ -612,10 +609,10 @@ export const metodosEstudoTela = {
 
     // Vincular PDF via botão do aviso na folha do palco
     root.querySelectorAll('.ath-input-vincular-pdf-palco').forEach(inp => {
-      inp.addEventListener('change', e => {
+      inp.addEventListener('change', async e => {
         const file = e.target.files?.[0];
         if (!file) return;
-        registrarPdfLocalNoArtigo(art, file);
+        if (!await registrarPdfLocalNoArtigo(art, file)) return;
         if (this._pdfFalhou) this._pdfFalhou.clear();
         salvarArtigosEstudo(this.artigos, art);
         this.renderizar();
@@ -676,12 +673,12 @@ export const metodosEstudoTela = {
           palcoEl.classList.remove('ath-palco-dragover');
         });
       });
-      palcoEl.addEventListener('drop', e => {
+      palcoEl.addEventListener('drop', async e => {
         const files = e.dataTransfer?.files;
         if (files && files.length > 0) {
           const pdfFile = Array.from(files).find(f => f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf');
           if (pdfFile) {
-            registrarPdfLocalNoArtigo(art, pdfFile);
+            if (!await registrarPdfLocalNoArtigo(art, pdfFile)) return;
             if (this._pdfFalhou) this._pdfFalhou.clear();
             salvarArtigosEstudo(this.artigos, art);
             this.renderizar();
@@ -721,9 +718,8 @@ export const metodosEstudoTela = {
     const palcoEl = root.querySelector('#athEstudioPalco');
     if (palcoEl) palcoEl.style.setProperty('--ath-zoom', String((this.zoomPct || 100) / 100));
 
-    const temPaginasCompartilhadas = Array.isArray(art.conteudoPaginasPdf) && art.conteudoPaginasPdf.some(p => Array.isArray(p.paragrafos) && p.paragrafos.length > 0 && p.paragrafos.some(txt => String(txt || '').trim()));
     // sem PDF: aviso claro no lugar das páginas (nada de folha inventada)
-    if (!art.pdfBlobUrl && !ehArtigoExemploFicticio(art) && !temPaginasCompartilhadas) {
+    if (!art.pdfBlobUrl && !ehArtigoExemploFicticio(art)) {
       const carregando = this._carregandoPdf === art;
       const aviso = document.createElement('div');
       aviso.className = 'ath-pdf-sem-arquivo';
@@ -735,13 +731,14 @@ export const metodosEstudoTela = {
              : art.anexoPdfZotero ? `<p><b>PDF só no seu computador:</b> no Zotero ele é um arquivo vinculado (não baixável pela web). Selecione o arquivo abaixo.</p>${htmlLocalDoPdf(art.anexoPdfZotero)}` : ''}
            <div class="ath-pdf-sem-arquivo-acoes">
              ${art.anexoPdfZotero?.baixavel ? `<button type="button" class="glx-btn glx-btn-primary glx-btn-sm" data-baixar-pdf-zotero>${svgIcone('drive', 14)} Baixar do Zotero</button>` : ''}
+             ${art.doi || art.isbn || art.camposZotero?.ISBN ? `<button type="button" class="glx-btn glx-btn-soft glx-btn-sm" data-buscar-pdf-identificador>${svgIcone('sincronizar', 14)} Buscar PDF pelo DOI/ISBN</button>` : ''}
              <label class="glx-btn glx-btn-primary glx-btn-sm" style="cursor:pointer;">${svgIcone('upload', 14)} Selecionar PDF no computador<input type="file" accept="application/pdf,.pdf" hidden></label>
              <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" data-sem-pdf-drive>${svgIcone('drive', 14)} Do Google Drive…</button>
            </div>`;
-      aviso.querySelector('input[type=file]')?.addEventListener('change', (e) => {
+      aviso.querySelector('input[type=file]')?.addEventListener('change', async (e) => {
         const arq = e.target.files?.[0];
         if (!arq) return;
-        registrarPdfLocalNoArtigo(art, arq);
+        if (!await registrarPdfLocalNoArtigo(art, arq)) return;
         if (this._pdfFalhou) this._pdfFalhou.clear();
         salvarArtigosEstudo(this.artigos, art);
         this.renderizar();
@@ -752,7 +749,7 @@ export const metodosEstudoTela = {
           this.carregarConfigZotero();
           const blob = await this.zoteroClient.baixarAnexoPdf(art.anexoPdfZotero.chave);
           const nome = String(art.anexoPdfZotero.nomeArquivo || `${art.id}.pdf`).replace(/(\.pdf)?$/i, '.pdf');
-          registrarPdfLocalNoArtigo(art, new File([blob], nome, { type: 'application/pdf' })); // abre e envia ao Drive
+          if (!await registrarPdfLocalNoArtigo(art, new File([blob], nome, { type: 'application/pdf' }))) return; // abre e envia ao Drive
           if (this._pdfFalhou) this._pdfFalhou.clear();
           salvarArtigosEstudo(this.artigos, art);
           this.renderizar();
@@ -760,6 +757,12 @@ export const metodosEstudoTela = {
           btn.disabled = false; btn.textContent = 'Baixar do Zotero';
           mostrarAviso(`${err.message} Selecione o PDF no computador ou no Google Drive.`);
         }
+      });
+      aviso.querySelector('[data-buscar-pdf-identificador]')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Buscando PDF público…';
+        const encontrado = await garantirPdfDoArtigo(art, { forcarBuscaIdentificadores: true });
+        if (encontrado) this.renderizar();
+        else { btn.disabled = false; btn.textContent = 'Buscar PDF pelo DOI/ISBN'; mostrarAviso('Não foi encontrado um PDF público para esta obra. Você ainda pode vinculá-lo pelo Zotero, Drive ou computador.', { tipo: 'info' }); }
       });
       aviso.querySelectorAll('[data-copiar]').forEach(b => b.addEventListener('click', async () => {
         const texto = b.dataset.copiar;
@@ -814,6 +817,7 @@ export const metodosEstudoTela = {
       const tracosDaPagina = art.fichamento.tracosPorPagina?.[numPag] || [];
       const isPagAtiva = numPag === this.paginaAtual;
       const ehPaginaPdfReal = Boolean(pdfInfo && idx < pdfInfo.n && !pagDados.extra);
+      const paginaEditorial = ehPaginaPdfReal ? paginaEditorialDoPdf(art, numPag, pdfInfo.n) : null;
       const dimPag = ehPaginaPdfReal ? pdfInfo.dims[idx] : null;
       const alturaReal = dimPag ? Math.round(794 * dimPag.h / dimPag.w) : 1123;
       const escalaZoom = this.zoomPct / 100;
@@ -826,11 +830,11 @@ export const metodosEstudoTela = {
 
       folhaWrap.innerHTML = `
         <div class="ath-pdf-etiqueta-pagina ${isPagAtiva ? 'ativa' : ''}" data-etiqueta-pag="${numPag}">
-          <span class="ath-pdf-etiqueta-num">Página ${numPag} de ${totalPags} — ${escapeHtml((pagDados.titulo || (ehPaginaPdfReal ? `Folha ${numPag} do PDF` : `Folha Extra ${numPag}`)).slice(0, 62))}</span>
+          <span class="ath-pdf-etiqueta-num">${paginaEditorial ? `Página ${paginaEditorial} · PDF ${numPag}/${pdfInfo.n}` : `Página ${numPag} de ${totalPags}`} — ${escapeHtml((pagDados.titulo || (ehPaginaPdfReal ? `Folha ${numPag} do PDF` : `Folha Extra ${numPag}`)).slice(0, 62))}</span>
           <span class="ath-pdf-etiqueta-stats" data-stats-pag="${numPag}">${tracosDaPagina.length} risco(s) · ${pinsDaPagina.length} nota(s)</span>
         </div>
 
-        <div class="ath-folha-a4 ath-pdf-folha-container ${pagDados.extra ? 'ath-pdf-folha-extra' : ''} ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" data-altura-real="${alturaReal}" style="${ehPaginaPdfReal ? `width:794px; height:${alturaReal}px; min-height:${alturaReal}px; max-height:${alturaReal}px; padding:0; flex-shrink:0; ` : 'width:794px; height:1123px; min-height:1123px; flex-shrink:0; background:#FFFFFF; '}transform: scale(${escalaZoom}); transform-origin: 0 0;">
+        <div class="ath-folha-a4 ath-pdf-folha-container ${pagDados.extra ? 'ath-pdf-folha-extra' : ''} ${isPagAtiva ? 'pagina-ativa' : ''}" data-num-pagina="${numPag}" ${paginaEditorial ? `data-pag-editorial="${paginaEditorial}"` : ''} data-altura-real="${alturaReal}" style="${ehPaginaPdfReal ? `width:794px; height:${alturaReal}px; min-height:${alturaReal}px; max-height:${alturaReal}px; padding:0; flex-shrink:0; ` : 'width:794px; height:1123px; min-height:1123px; flex-shrink:0; background:#FFFFFF; '}transform: scale(${escalaZoom}); transform-origin: 0 0;">
           ${ehPaginaPdfReal ? `
             <canvas class="ath-pdf-render-canvas" style="width:794px; height:${alturaReal}px;"></canvas>
             <div class="ath-pdf-grifos-layer" data-grifos-pag="${numPag}"></div>
@@ -1053,10 +1057,11 @@ export const metodosEstudoTela = {
               const qtdNotas = (artAtivo.fichamento?.notasPagina?.[numPag] || []).length;
               const qtdCitsPag = (artAtivo.fichamento?.citacoesMarcadas || []).filter(c => Number(c.pagina) === Number(numPag)).length;
               const ehExtra = Boolean(pg.extra || (!pg.real && artAtivo.pdfBlobUrl && this._pdfDocs?.has(artAtivo.pdfBlobUrl) && idx >= (this._pdfDocs.get(artAtivo.pdfBlobUrl)?.n || 0)));
+              const paginaEditorial = !ehExtra ? paginaEditorialDoPdf(artAtivo, numPag, this._pdfDocs?.get(artAtivo.pdfBlobUrl)?.n) : null;
               return `
                 <li class="rm-bl ${isPagAtiva ? 'sel' : ''}" data-ir-pagina-esq="${numPag}">
                   <button type="button" class="rm-bl-nome">
-                    <strong>Página ${numPag} — ${escapeHtml((pg.titulo || (ehExtra ? `Folha Extra #${numPag}` : 'Folha do Artigo')).slice(0, 30))}</strong>
+                    <strong>${paginaEditorial ? `Página ${paginaEditorial} (PDF ${numPag})` : `Página ${numPag}`} — ${escapeHtml((pg.titulo || (ehExtra ? `Folha Extra #${numPag}` : 'Folha do Artigo')).slice(0, 30))}</strong>
                     <span>${qtdRiscos} risco(s) · ${qtdNotas} nota(s) · ${qtdCitsPag} citação(ões)</span>
                   </button>
                   ${(ehExtra || !artAtivo.pdfBlobUrl) && paginasPdf.length > 1 ? `
