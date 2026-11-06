@@ -2203,7 +2203,7 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   padding: 24px 32px 64px 32px !important;
   box-sizing: border-box !important;
   margin: 0 auto !important;
-  gap: 4px !important;
+  gap: 10px !important;
 }
 .ath-pdf-pagina-bloco-wrap {
   display: flex !important;
@@ -2212,6 +2212,7 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   margin: 0 auto !important;
   flex-shrink: 0 !important;
   width: max-content !important;
+  gap: 10px !important;
 }
 .ath-pdf-escala {
   position: relative !important;
@@ -2230,7 +2231,7 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   width: max(calc(794px * var(--ath-zoom, 1)), 260px) !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
-  margin: 0 auto 3px auto !important;
+  margin: 0 auto !important;
 }
 .ath-zd-desvincular { width: 100%; justify-content: center; color: #B42318; border-color: #FECACA; background: #FFF; font-size: 11.5px; font-weight: 700; }
 .ath-zd-desvincular:hover { background: #FEF2F2; }
