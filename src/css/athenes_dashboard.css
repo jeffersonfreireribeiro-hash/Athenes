@@ -2148,6 +2148,8 @@ mark.ath-pdf-grifo-texto {
 /* Grades e campos */
 .ath-zd-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ath-zd label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 700; color: #475569; min-width: 0; }
+.ath-zd .ath-zd-acoes-pdf label.ath-zd-btn-pdf { flex-direction: row; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; font-weight: 750; }
+.ath-zd .ath-zd-acoes-pdf .ath-zd-btn-pdf svg { flex: none; }
 .ath-zd .ath-input { height: 32px; padding: 0 9px; font-size: 12px; width: 100%; box-sizing: border-box; font-weight: 500; border-radius: 8px; border: 1px solid #CBD5E1; background: #F8FAFC; }
 .ath-zd .ath-input:focus { outline: none; border-color: var(--ath-primary, #314F79); background: #fff; }
 .ath-zd-segredo { display: flex; gap: 4px; }
