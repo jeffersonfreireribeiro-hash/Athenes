@@ -6,7 +6,7 @@
  * Inclui barra superior de Identificação / Login do Usuário sincronizada com Supabase e Google Drive.
  */
 
-import { lerConta } from '../core/athenes_conta.js';
+import { lerConta, obterContaAtiva } from '../core/athenes_conta.js';
 import { TIPOS_DOCUMENTO } from '../core/athenes_documento.js';
 
 import {
@@ -79,7 +79,7 @@ export class DashboardView {
       // o servidor é a fonte da verdade: ao abrir, ao voltar para esta janela e depois de cada alteração local
       setTimeout(() => this.sincronizarPerfilServidor(), 300);
       let ultimaFoco = 0;
-      this._aoFocar = () => { if (!this.container?.isConnected || Date.now() - ultimaFoco < 15000) return; ultimaFoco = Date.now(); this.sincronizarPerfilServidor(); };
+      this._aoFocar = () => { if (!this.container?.isConnected || Date.now() - ultimaFoco < 15000) return; ultimaFoco = Date.now(); this.sincronizarPerfilServidor(); this.sincronizarCompartilhados(); };
       window.addEventListener('focus', this._aoFocar);
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this._aoFocar?.(); });
       this._aoMudarPastas = () => this.agendarPerfil();
@@ -958,11 +958,14 @@ export class DashboardView {
   /** Documentos que outras pessoas compartilharam com o meu e-mail (o banco só devolve os que posso ver); não depende do Drive. */
   async sincronizarCompartilhados() {
     let novos = 0;
+    const conta = obterContaAtiva();
     try {
       const compartilhados = await listarCompartilhadosComigo();
-      const ids = new Set(compartilhados.map(c => String(c.id)));
+      if (obterContaAtiva() !== conta) return;
+      const documentosRecebidos = compartilhados.filter(c => c.norma !== 'zotero_pdf');
+      const ids = new Set(documentosRecebidos.map(c => String(c.id)));
       const excluidos = idsExcluidos();
-      for (const c of compartilhados) {
+      for (const c of documentosRecebidos) {
         if (excluidos.has(String(c.id))) continue;
         const existente = this.documentos.find(d => String(d.id) === String(c.id));
         const marca = { compartilhadoComigo: true, proprietarioExterno: true, permissao: c.papel, salvoNuvem: true, proprietario: { id: `ext_${c.user_id}`, nome: c.dono || 'Outra pessoa' } };
@@ -979,6 +982,7 @@ export class DashboardView {
       const antes = this.documentos.length;
       this.documentos = this.documentos.filter(d => !d.compartilhadoComigo || (ids.has(String(d.id)) && !excluidos.has(String(d.id))));
       if (this.documentos.length !== antes || novos) { this.salvarDocumentosLocais(); this.atualizarGrid(); this.renderizarPastasLateral(); }
+      if (this.estudoView?.container?.isConnected) await this.estudoView.carregarCompartilhados();
     } catch (e) { console.warn('[Athenes] Compartilhados comigo:', e.message); }
     return novos;
   }

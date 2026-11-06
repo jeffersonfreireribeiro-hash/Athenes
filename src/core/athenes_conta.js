@@ -4,7 +4,7 @@
  * Antes, documentos, pastas, templates, artigos, Zotero e o token do Drive eram globais do navegador, e qualquer conta via os mesmos arquivos.
  *
  * - `contaDoPerfil(perfil)`: identificador estável — e-mail Google, e-mail informado ou, sem e-mail, o nome normalizado.
- * - `lerConta/gravarConta/removerConta(base)`: leem/gravam a chave `base::conta` (sem conta ativa, a chave pura: modo anônimo/testes).
+ * - `lerConta/gravarConta/removerConta(base)`: leem/gravam a chave `base::conta`.
  * - Migração: os dados antigos (sem conta) passam, uma única vez, para a PRIMEIRA conta que entrar depois desta atualização.
  */
 
@@ -56,8 +56,11 @@ export function contaEhPrimeira() {
  * Devolve o identificador (vazio = sem conta identificável: usa o espaço comum).
  */
 export function definirContaAtiva(perfil) {
-  // a conta fica gravada no perfil: editar o nome depois não leva os documentos embora (o login zera `perfil.conta` para recalcular)
-  const nova = perfil?.conta || contaDoPerfil(perfil);
+  // Identificação manual não prova posse do nome/e-mail digitado. Cada entrada sem Google recebe um espaço próprio.
+  const manual = perfil?.conectado && perfil?.autenticadoGoogle !== true;
+  const nova = manual
+    ? (/^anon:/.test(perfil?.conta || '') ? perfil.conta : `anon:${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`)
+    : (perfil?.conta || contaDoPerfil(perfil));
   if (perfil && typeof perfil === 'object') perfil.conta = nova;
   contaAtiva = nova;
   const st = armazenamento();
@@ -67,7 +70,7 @@ export function definirContaAtiva(perfil) {
       st.setItem(CHAVE_CONTA_ATIVA, nova);
       const lista = lerLista(st);
       if (!lista.includes(nova)) st.setItem(CHAVE_CONTAS, JSON.stringify([...lista, nova]));
-      reivindicarLegado(st, nova);
+      if (!manual) reivindicarLegado(st, nova);
     } else st.removeItem(CHAVE_CONTA_ATIVA);
   } catch { /* cota cheia ou armazenamento bloqueado: segue sem registrar */ }
   return nova;

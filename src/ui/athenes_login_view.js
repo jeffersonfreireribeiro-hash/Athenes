@@ -8,6 +8,7 @@
 import {
   obterPerfilColaborador,
   salvarPerfilColaborador,
+  encerrarSessao,
   ativarSessao,
   autenticarGoogleDrive,
   obterInfoUsuarioGoogle,
@@ -230,16 +231,13 @@ export class TelaLoginView {
     const instituicao = instInp?.value.trim() || '';
     const continuarConectado = chkLembrar ? chkLembrar.checked : true;
 
-    const p = this.perfil;
-    p.nome = nome;
-    p.email = email;
-    p.papel = papel;
-    p.instituicao = instituicao;
-    p.autenticadoGoogle = false; // identificação acadêmica não é conta Google
-    delete p.foto;
-    p.conta = ''; // recalcula pelo e-mail informado (ou pelo nome)
-    p.conectado = true;
-    p.continuarConectado = continuarConectado;
+    // Uma tela de login manual aberta sobre uma sessão Google não pode herdar tokens nem o perfil anterior.
+    encerrarSessao();
+    const p = {
+      id: 'usr_' + Math.random().toString(36).slice(2, 10),
+      nome, email, papel, instituicao, cor: this.perfil?.cor || '#314F79',
+      autenticadoGoogle: false, conta: '', conectado: true, continuarConectado
+    };
     salvarPerfilColaborador(p);
 
     ativarSessao(continuarConectado);

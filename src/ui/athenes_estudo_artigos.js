@@ -18,7 +18,7 @@
 
 import * as bib from '../core/athenes_biblioteca_artigos.js';
 import { gravarConfigZotero } from '../core/athenes_zotero_config.js';
-import { lerConta, gravarConta } from '../core/athenes_conta.js';
+import { lerConta, gravarConta, obterContaAtiva } from '../core/athenes_conta.js';
 import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive } from '../core/athenes_drive_sync.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import { obterPerfilColaborador, obterConfigGoogleDrive, salvarArquivoNoGoogleDrive, autenticarGoogleDrive, listarPdfsDoGoogleDrive, salvarDocumentoNoSupabase, obterPastasDriveLocais, salvarPastasDriveLocais, buscarPastaNaArvore } from '../core/athenes_colaboracao.js';
@@ -29,6 +29,7 @@ import { aplicarFilhosZoteroAoArtigo } from '../core/athenes_zotero_anexos_notas
 import { tokenPodeLerTodoODrive, listarConteudoDoDrive, copiarPdfDoDriveParaAthenes, ESCOPOS_COM_LEITURA } from '../core/athenes_drive_navegar.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import { ModalCompartilhar } from './athenes_compartilhar_modal.js';
+import { listarCompartilhadosComigo, carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
 import { lerSessaoSupabase } from '../core/athenes_supabase_auth.js';
 import { removerPdfLocal, PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, obterPdfComoDataUrl, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo, definirArtigoAbertoAtivo, lerSnapshotArtigosIdb, mesclarFichamentoPreservandoDados, compartilharPdfNoDrive } from './athenes_estudo_artigos_dados.js';
 import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
@@ -44,6 +45,7 @@ export class EstudoArtigosView {
     this.opcoes = opcoes;
     this.onModoFullScreenChange = opcoes.onModoFullScreenChange || (() => {});
     this.artigos = carregarArtigosEstudo();
+    this.artigosCompartilhados = [];
     // a biblioteca vem do servidor: chegou algo de outro computador → atualiza a tela (sem interromper quem está lendo um artigo)
     this._cancelarBib = bib.aoMudarBiblioteca(() => {
       this.artigos = carregarArtigosEstudo();
@@ -91,6 +93,34 @@ export class EstudoArtigosView {
     this.hidratarSnapshotIndexedDb();
     this.restaurarArtigoAbertoSessao();
     if (!this.artigoAberto) this.renderizar();
+    this.carregarCompartilhados();
+  }
+
+  artigosCatalogo() {
+    const proprios = this.artigos.filter(a => !a.compartilhadoComigo);
+    return [...proprios, ...this.artigosCompartilhados];
+  }
+
+  async carregarCompartilhados() {
+    const conta = obterContaAtiva();
+    if (!lerSessaoSupabase()?.email) {
+      this.artigosCompartilhados = [];
+      if (!this.artigoAberto && this.container?.isConnected) this.atualizarGridCatalogo();
+      this.aoMudarPastas?.();
+      return;
+    }
+    try {
+      const lista = (await listarCompartilhadosComigo()).filter(x => x.norma === 'zotero_pdf');
+      const resultados = await Promise.allSettled(lista.map(x => carregarDocumentoCompartilhado(x.id)));
+      if (obterContaAtiva() !== conta || !this.container?.isConnected) return;
+      this.artigosCompartilhados = resultados.flatMap(r => {
+        const doc = r.status === 'fulfilled' ? r.value?.doc : null;
+        const art = doc?.artigoEstudo;
+        return art ? [{ ...art, compartilhadoComigo: true, proprietarioExterno: true, docCompartilhadoId: doc.id, permissao: doc.permissao, proprietario: doc.proprietario }] : [];
+      });
+      if (!this.artigoAberto) this.atualizarGridCatalogo();
+      this.aoMudarPastas?.();
+    } catch (e) { console.warn('[Athenes] Artigos compartilhados:', e.message); }
   }
 
   salvarCacheArtigoAbertoSessao(art) {
@@ -596,9 +626,11 @@ export class EstudoArtigosView {
     if (!grid) return;
     grid.innerHTML = '';
 
-    const filtrados = this.ordenarArtigos(this.artigos).filter(art => {
+    const filtrados = this.ordenarArtigos(this.artigosCatalogo()).filter(art => {
       if (this.pastaFiltroId && this.pastaFiltroId !== 'todas') {
-        if (!artigoEstaNaPasta(art, this.pastaFiltroId)) return false;
+        if (this.pastaFiltroId === 'compartilhados_comigo') {
+          if (!art.compartilhadoComigo) return false;
+        } else if (!artigoEstaNaPasta(art, this.pastaFiltroId)) return false;
       }
       if (this.filtroStatus && this.filtroStatus !== 'todos') {
         if (this.filtroStatus === 'com_pdf' && !artigoTemPdf(art)) return false;
@@ -641,10 +673,8 @@ export class EstudoArtigosView {
       grid.innerHTML = `
         <div style="grid-column:1/-1; padding:42px; text-align:center; background:#fff; border-radius:16px; border:1px solid #E2E8F0;">
           <p style="font-size:15px; font-weight:800; color:#1F2733; margin:0 0 6px 0;">Nenhum artigo encontrado ${escapeHtml(rotuloLocal)}</p>
-          <p style="font-size:12.5px; color:#64748B; margin:0 0 14px 0;">Sincronize sua biblioteca Zotero ou vincule um novo PDF para esta pasta de bibliografia.</p>
-          <button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnVincularArtigoVazio">
-            ${svgIcone('mais', 13)} Vincular Artigo & PDF
-          </button>
+          <p style="font-size:12.5px; color:#64748B; margin:0 0 14px 0;">${this.pastaFiltroId === 'compartilhados_comigo' ? 'Os artigos compartilhados com seu e-mail Google aparecerão aqui.' : 'Sincronize sua biblioteca Zotero ou vincule um novo PDF para esta pasta de bibliografia.'}</p>
+          ${this.pastaFiltroId === 'compartilhados_comigo' ? '' : `<button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnVincularArtigoVazio">${svgIcone('mais', 13)} Vincular Artigo & PDF</button>`}
         </div>
       `;
       grid.querySelector('#athBtnVincularArtigoVazio')?.addEventListener('click', () => {
@@ -670,6 +700,7 @@ export class EstudoArtigosView {
 
         <div class="ath-doc-card-header">
           <span class="ath-badge ath-badge-primary">ARTIGO</span>
+          ${art.compartilhadoComigo ? '<span class="ath-badge ath-badge-info">COMPARTILHADO COMIGO</span>' : ''}
           <span class="ath-badge ath-badge-info" title="Chave Zotero">${svgIcone('zotero', 10)} ${escapeHtml(art.chaveZotero || 'ZOTERO')}</span>
           ${artigoTemPdf(art)
             ? `<span class="ath-badge ath-badge-ok" title="PDF Vinculado">${svgIcone('drive', 10)} PDF</span>`
@@ -686,9 +717,9 @@ export class EstudoArtigosView {
         <div class="ath-doc-card-meta">
           <span>${qtdCitacoes} citação(ões) · ${qtdTracos + qtdPins} marcação(ões)</span>
           <div class="ath-doc-card-actions">
-            <button type="button" class="ath-btn ath-btn-sm ath-btn-compartilhar-artigo" title="Compartilhar documento com outras pessoas" aria-label="Compartilhar">${svgIcone('usuarios', 12)}</button>
+            ${art.compartilhadoComigo ? '' : `<button type="button" class="ath-btn ath-btn-sm ath-btn-compartilhar-artigo" title="Compartilhar documento com outras pessoas" aria-label="Compartilhar">${svgIcone('usuarios', 12)}</button>`}
             <button type="button" class="ath-btn ath-btn-sm ath-btn-primary ath-btn-abrir-estudio">Abrir</button>
-            <button type="button" class="ath-btn ath-btn-sm ath-btn-excluir-artigo" title="Remover artigo da lista" aria-label="Remover">${svgIcone('lixeira', 12)}</button>
+            ${art.compartilhadoComigo ? '' : `<button type="button" class="ath-btn ath-btn-sm ath-btn-excluir-artigo" title="Remover artigo da lista" aria-label="Remover">${svgIcone('lixeira', 12)}</button>`}
           </div>
         </div>
       `;
@@ -706,14 +737,15 @@ export class EstudoArtigosView {
           this.atualizarGridCatalogo();
           return;
         }
-        this.abrirArtigoNoEstudio(art);
+        if (art.compartilhadoComigo && !this.artigos.includes(art)) this.abrirArtigoCompartilhadoRecebido(art);
+        else this.abrirArtigoNoEstudio(art);
       });
       card.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         document.querySelector('.ath-artigo-menu-contexto')?.remove();
         const menu = document.createElement('div');
         menu.className = 'ath-artigo-menu-contexto'; menu.setAttribute('role', 'menu');
-        menu.innerHTML = `<button type="button" role="menuitem" data-acao="abrir">Abrir artigo</button><button type="button" role="menuitem" data-acao="compartilhar">Compartilhar</button><hr><button type="button" role="menuitem" data-acao="referencia">Copiar referência</button><button type="button" role="menuitem" data-acao="chave" ${art.chaveZotero ? '' : 'disabled'}>Copiar chave Zotero</button><hr><button type="button" role="menuitem" data-acao="remover">Remover da lista</button>`;
+        menu.innerHTML = `<button type="button" role="menuitem" data-acao="abrir">Abrir artigo</button>${art.compartilhadoComigo ? '' : '<button type="button" role="menuitem" data-acao="compartilhar">Compartilhar</button>'}<hr><button type="button" role="menuitem" data-acao="referencia">Copiar referência</button><button type="button" role="menuitem" data-acao="chave" ${art.chaveZotero ? '' : 'disabled'}>Copiar chave Zotero</button>${art.compartilhadoComigo ? '' : '<hr><button type="button" role="menuitem" data-acao="remover">Remover da lista</button>'}`;
         document.body.appendChild(menu);
         const r = menu.getBoundingClientRect();
         menu.style.left = `${Math.max(8, Math.min(e.clientX, innerWidth - r.width - 8))}px`;
@@ -725,7 +757,10 @@ export class EstudoArtigosView {
           const acao = ev.target.closest('[data-acao]')?.dataset.acao;
           if (!acao) return;
           fechar();
-          if (acao === 'abrir') this.abrirArtigoNoEstudio(art);
+          if (acao === 'abrir') {
+            if (art.compartilhadoComigo && !this.artigos.includes(art)) this.abrirArtigoCompartilhadoRecebido(art);
+            else this.abrirArtigoNoEstudio(art);
+          }
           else if (acao === 'compartilhar') this.abrirModalCompartilharArtigo(art);
           else if (acao === 'remover') card.querySelector('.ath-btn-excluir-artigo')?.click();
           else if (acao === 'chave' || acao === 'referencia') {

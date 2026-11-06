@@ -54,20 +54,32 @@ test('migração: os arquivos antigos (sem conta) vão para a PRIMEIRA conta que
   assert.match(lerConta('athenes_docs_indice'), /antigo/, 'a dona continua com os dela');
 });
 
-test('a conta fica gravada no perfil: renomear não leva os documentos embora; o login recalcula', () => {
+test('identificação manual usa espaço anônimo estável durante a sessão, sem herdar dados por nome ou e-mail', () => {
   novoArmazenamento();
   const perfil = { nome: 'Carla', conectado: true };
   salvarPerfilColaborador(perfil);
-  assert.equal(obterContaAtiva(), 'n:carla');
+  assert.match(obterContaAtiva(), /^anon:/);
+  const primeira = obterContaAtiva();
   gravarConta('athenes_docs_indice', '["c"]');
   perfil.nome = 'Carla Souza'; // edição do perfil
   salvarPerfilColaborador(perfil);
-  assert.equal(obterContaAtiva(), 'n:carla');
+  assert.equal(obterContaAtiva(), primeira);
   assert.equal(lerConta('athenes_docs_indice'), '["c"]');
   perfil.conta = ''; perfil.email = 'carla@uni.br'; // novo login
   salvarPerfilColaborador(perfil);
-  assert.equal(obterContaAtiva(), 'e:carla@uni.br');
+  assert.match(obterContaAtiva(), /^anon:/);
+  assert.notEqual(obterContaAtiva(), primeira);
   assert.equal(lerConta('athenes_docs_indice'), null);
+});
+
+test('entrada manual não reivindica Zotero nem documentos antigos sem conta', () => {
+  const m = novoArmazenamento();
+  m.set('athenes_zotero_cfg', JSON.stringify({ apiKey: 'chave-privada' }));
+  m.set('athenes_docs_indice', JSON.stringify([{ id: 'particular' }]));
+  definirContaAtiva({ nome: 'serro', email: '', conectado: true, autenticadoGoogle: false });
+  assert.equal(lerConta('athenes_zotero_cfg'), null);
+  assert.equal(lerConta('athenes_docs_indice'), null);
+  assert.equal(m.get('athenes_zotero_cfg') !== undefined, true, 'dados antigos são preservados para a conta Google');
 });
 
 test('sair: volta ao espaço comum, apaga o token da conta e não mistura com a próxima', () => {
@@ -104,5 +116,5 @@ test('nuvem: o documento sai marcado com a conta e a listagem filtra pelo dono',
   assert.ok(urlLista.includes(encodeURIComponent('conteudo_json->proprietario->>conta') + '=eq.' + encodeURIComponent('g:gil@uni.br')), urlLista);
   limparContaAtiva();
   await listarDocumentosDoSupabase(fetchLista);
-  assert.ok(!urlLista.includes('proprietario'), 'sem conta identificada, sem filtro (testes e uso anônimo)');
+  assert.equal(urlLista.includes('proprietario'), true, 'a chamada anterior foi a última; sem conta não consulta a lista');
 });

@@ -723,7 +723,7 @@ export const metodosEstudoModais = {
       <div class="ath-modal" style="max-width:500px;">
         <div class="ath-modal-head">
           <h2>Conectar Biblioteca Zotero (API Key)</h2>
-          <button type="button" class="ath-btn ath-btn-icon" id="athModalZotCredFechar">${svgIcone('fechar', 16)}</button>
+          <button type="button" class="ath-btn ath-btn-icon" id="athModalZotCredFechar" aria-label="Fechar">${svgIcone('fechar', 16)}</button>
         </div>
         <div class="ath-modal-corpo">
           <p style="font-size:12.5px; color:#475569; margin:0;">

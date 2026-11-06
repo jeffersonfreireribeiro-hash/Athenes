@@ -3,7 +3,7 @@
  * Athenes — Dashboard: sincronização com o servidor (perfil, documentos) e o Drive.
  * Métodos da classe DashboardView (usam `this`); são acrescentados ao prototype em athenes_dashboard.js.
  */
-import { lerConta, gravarConta } from '../core/athenes_conta.js';
+import { lerConta, gravarConta, obterContaAtiva } from '../core/athenes_conta.js';
 import { obterConfigGoogleDrive, salvarConfigGoogleDrive, nuvemAutenticada, obterOuCriarEstruturaPastasAthenes, obterPastasDriveLocais, salvarPastasDriveLocais } from '../core/athenes_colaboracao.js';
 import { sincronizarBiblioteca } from '../core/athenes_biblioteca_artigos.js';
 import { sincronizarTemplatesUsuario } from '../core/athenes_templates.js';
@@ -97,10 +97,12 @@ export const metodosDashboardSincronia = {
    */
   async sincronizarPerfilServidor() {
     if (!nuvemAutenticada() || this._perfilEmCurso) return null;
+    const conta = obterContaAtiva();
     this._perfilEmCurso = true;
     try {
       const pastasAntes = obterPastasDriveLocais();
       const r = await sincronizarPerfil(montarEstadoLocal(this.documentos));
+      if (obterContaAtiva() !== conta) return null;
       sincronizarTemplatesUsuario().catch(e => console.warn('[Athenes] Modelos no servidor:', e.message));
       sincronizarBiblioteca().then(res => { if (res?.mudou) { this.renderizarPastasLateral(); this.renderizarBannerPasta(); } }).catch(e => console.warn('[Athenes] Biblioteca no servidor:', e.message));
       this._aplicandoPerfil = true;

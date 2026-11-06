@@ -5,7 +5,9 @@
  */
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { PAPEIS, emailValido, normalizarEmail, lerCompartilhamento, salvarCompartilhamento, linkDoDocumento } from '../core/athenes_compartilhamento.js';
-import { salvarDocumentoNoSupabase, nuvemAutenticada, entrarNaNuvemComGoogle } from '../core/athenes_colaboracao.js';
+import { salvarDocumentoNoSupabase, nuvemAutenticada, entrarNaNuvemComGoogle, autenticarGoogleDrive, obterConfigGoogleDrive, GOOGLE_AUTH_ESCOPOS } from '../core/athenes_colaboracao.js';
+import { conviteDocumento, enviarConviteGmail, ESCOPO_GMAIL_ENVIO } from '../core/athenes_convites_email.js';
+import { svgIcone } from './athenes_icones.js';
 
 // campos de formulário da janela: altura única, texto sem corte e sem a aparência de pílula do tema
 const CAMPO = 'height:34px; box-sizing:border-box; padding:0 12px; border:1px solid #CBD5E1; border-radius:8px; background:#fff; font:500 13px var(--glx-font, system-ui); color:#1F2733; line-height:normal;';
@@ -17,6 +19,8 @@ export class ModalCompartilhar {
     this.perfil = perfil;
     this.aoSalvar = opcoes.aoSalvar || (() => {});
     this.pessoas = {};
+    this.pessoasOriginais = {};
+    this.notificarEmail = true;
     this.publico = false;
     this.dono = true;
     this.abrir();
@@ -29,7 +33,7 @@ export class ModalCompartilhar {
       <div class="ath-modal" style="max-width:460px;" role="dialog" aria-modal="true" aria-label="Compartilhar documento">
         <div class="ath-modal-head">
           <h2>Compartilhar “${escapeHtml(this.doc.titulo || 'Documento')}”</h2>
-          <button type="button" class="ath-btn ath-btn-icon" data-fechar aria-label="Fechar">✕</button>
+          <button type="button" class="ath-btn ath-btn-icon" data-fechar aria-label="Fechar">${svgIcone('fechar', 16)}</button>
         </div>
         <div class="ath-modal-corpo" id="athCompBody" style="display:flex; flex-direction:column; gap:10px;">
           <p style="margin:0; font-size:12px; color:var(--ath-text-secondary);">Preparando o documento na nuvem…</p>
@@ -65,6 +69,7 @@ export class ModalCompartilhar {
       this.dono = info.papel === 'dono';
       this.pessoas = { ...info.permissoes };
       for (const e of info.compartilhado_com) if (!this.pessoas[e]) this.pessoas[e] = 'leitura';
+      this.pessoasOriginais = { ...this.pessoas };
       this.publico = Boolean(info.publico_leitura);
       this.desenhar();
     } catch (err) {
@@ -114,6 +119,7 @@ export class ModalCompartilhar {
         <button type="button" class="ath-btn" id="athCompCopiar" style="height:34px; padding:0 14px; white-space:nowrap; flex:none;">Copiar link</button>
       </div>
       <small style="color:#64748B;">O link só abre para quem você adicionou acima${this.publico ? ' (ou para qualquer pessoa, com a leitura pública ligada)' : ''}.</small>`;
+    if (!somenteLeitura) this.corpo.insertAdjacentHTML('beforeend', `<label style="display:flex;align-items:center;gap:8px;font-size:12px;"><input type="checkbox" id="athCompNotificar" ${this.notificarEmail ? 'checked' : ''}> Avisar novas pessoas por e-mail</label>`);
     this.btnSalvar.disabled = somenteLeitura;
     this.ligar();
   }
@@ -135,6 +141,7 @@ export class ModalCompartilhar {
     c.querySelector('#athCompAdd')?.addEventListener('click', adicionar);
     c.querySelector('#athCompEmail')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); adicionar(); } });
     c.querySelector('#athCompPublico')?.addEventListener('change', (e) => { this.publico = e.target.checked; });
+    c.querySelector('#athCompNotificar')?.addEventListener('change', (e) => { this.notificarEmail = e.target.checked; });
     c.querySelector('#athCompCopiar')?.addEventListener('click', async (e) => {
       const link = c.querySelector('#athCompLink').value;
       try { await navigator.clipboard.writeText(link); e.currentTarget.textContent = 'Copiado ✓'; } catch (_) { window.prompt('Copie o link:', link); }
@@ -142,8 +149,45 @@ export class ModalCompartilhar {
     this.btnSalvar.onclick = async () => {
       this.btnSalvar.disabled = true; this.btnSalvar.textContent = 'Salvando…';
       try {
+        c.querySelector('[data-email-convite-fallback]')?.remove();
+        const novos = Object.keys(this.pessoas).filter(email => !Object.hasOwn(this.pessoasOriginais, email));
+        let tokenEmail = null;
+        if (novos.length && this.notificarEmail && this.perfil.autenticadoGoogle) {
+          try {
+            tokenEmail = await autenticarGoogleDrive(obterConfigGoogleDrive().clientId, `${GOOGLE_AUTH_ESCOPOS} ${ESCOPO_GMAIL_ENVIO}`);
+            const conta = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${tokenEmail}` } });
+            const info = conta.ok ? await conta.json() : null;
+            if (normalizarEmail(info?.email) !== normalizarEmail(this.perfil.email)) throw new Error('A conta Google autorizada é diferente da conta que compartilhou.');
+          }
+          catch (e) { tokenEmail = null; console.warn('[Athenes] Autorização de convite por e-mail:', e.message); }
+        }
         await salvarCompartilhamento(this.doc.id, { pessoas: this.pessoas, publico: this.publico });
-        this.aoSalvar({ pessoas: { ...this.pessoas }, publico: this.publico });
+        await this.aoSalvar({ pessoas: { ...this.pessoas }, publico: this.publico });
+        this.pessoasOriginais = { ...this.pessoas };
+        const pendentes = [];
+        if (novos.length && this.notificarEmail) {
+          for (const email of novos) {
+            const convite = conviteDocumento({ email, titulo: this.doc.titulo, docId: this.doc.id, dono: this.perfil.nome });
+            if (tokenEmail) {
+              try { await enviarConviteGmail(convite, tokenEmail); continue; }
+              catch (e) { console.warn('[Athenes] Envio do convite:', e.message); }
+            }
+            pendentes.push(convite);
+          }
+        }
+        const msg = c.querySelector('#athCompMsg');
+        if (msg) {
+          msg.textContent = pendentes.length ? `Acesso salvo. ${pendentes.length} convite(s) aguardando envio pelo seu aplicativo de e-mail.` : (novos.length && this.notificarEmail ? 'Acesso salvo e convite(s) enviado(s) por e-mail.' : 'Acesso salvo.');
+          for (const convite of pendentes) {
+            const botao = document.createElement('button');
+            botao.type = 'button'; botao.className = 'ath-btn ath-btn-sm'; botao.dataset.emailConviteFallback = '';
+            botao.textContent = `Abrir convite para ${convite.destinatario}`;
+            botao.addEventListener('click', () => {
+              window.location.href = `mailto:${convite.destinatario}?subject=${encodeURIComponent(convite.assunto)}&body=${encodeURIComponent(convite.corpo)}`;
+            });
+            msg.after(botao);
+          }
+        }
         this.btnSalvar.textContent = 'Salvo ✓';
         setTimeout(() => { this.btnSalvar.textContent = 'Salvar acesso'; this.btnSalvar.disabled = false; }, 1200);
       } catch (err) {

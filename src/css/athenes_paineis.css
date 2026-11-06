@@ -147,9 +147,21 @@ body:has(.ath-modal-backdrop) .ath-barra-contextual {
 
 .ath-modal-head h2 {
   margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 17px;
   font-weight: 800;
   color: var(--ath-text);
+}
+
+.ath-modal-head > .ath-btn-icon {
+  display: inline-flex;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  margin-left: 12px;
 }
 
 .ath-modal-corpo {

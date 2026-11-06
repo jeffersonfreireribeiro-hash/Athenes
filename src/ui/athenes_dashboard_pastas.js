@@ -42,7 +42,7 @@ export const metodosDashboardPastas = {
 
     // 1. Item Todas as Pastas (Visão Geral da Aba Ativa)
     const totalItens = ehAbaBib
-      ? (this.estudoView?.artigos || carregarArtigosEstudo()).length
+      ? (this.estudoView?.artigosCatalogo?.() || carregarArtigosEstudo()).length
       : this.documentos.length;
     const rotuloTodas = ehAbaBib
       ? 'Todas as Bibliografias'
@@ -104,11 +104,13 @@ export const metodosDashboardPastas = {
     tituloComp.textContent = 'Compartilhadas Comigo';
     listaEl.appendChild(tituloComp);
 
-    if (!ehAbaBib) {
-      const qtd = this.documentos.filter(d => d.compartilhadoComigo).length;
+    {
+      const qtd = ehAbaBib
+        ? (this.estudoView?.artigosCompartilhados || []).length
+        : this.documentos.filter(d => d.compartilhadoComigo).length;
       const itemComigo = document.createElement('div');
       itemComigo.className = `ath-pasta-item ${this.pastaAtivaId === 'compartilhados_comigo' ? 'active' : ''}`;
-      itemComigo.innerHTML = `<div style="display:flex; align-items:center; gap:7px;">${svgIcone('usuarios', 15)}<span>Documentos de outras pessoas</span></div><span class="ath-pasta-badge">${qtd}</span>`;
+      itemComigo.innerHTML = `<div style="display:flex; align-items:center; gap:7px;">${svgIcone('usuarios', 15)}<span>${ehAbaBib ? 'Artigos de outras pessoas' : 'Documentos de outras pessoas'}</span></div><span class="ath-pasta-badge">${qtd}</span>`;
       itemComigo.addEventListener('click', () => this.selecionarPasta('compartilhados_comigo'));
       listaEl.appendChild(itemComigo);
     }
@@ -245,7 +247,7 @@ export const metodosDashboardPastas = {
           </div>
         `;
       } else {
-        const totalArtigos = (this.estudoView?.artigos || carregarArtigosEstudo()).length;
+        const totalArtigos = (this.estudoView?.artigosCatalogo?.() || carregarArtigosEstudo()).length;
         bannerEl.innerHTML = `
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
             ${botaoDrawerHtml}
@@ -260,7 +262,7 @@ export const metodosDashboardPastas = {
       }
     } else {
       const pastaInfo = buscarPastaNaArvore(this.pastasDrive, this.pastaAtivaId) || {
-        nome: 'Pasta Selecionada',
+        nome: this.pastaAtivaId === 'compartilhados_comigo' ? 'Compartilhados comigo' : 'Pasta Selecionada',
         tipo: ehAbaBib ? 'bibliografia' : 'relatorios'
       };
 
@@ -288,8 +290,8 @@ export const metodosDashboardPastas = {
           </div>
         `;
       } else {
-        const artigos = this.estudoView?.artigos || carregarArtigosEstudo();
-        const artigosNaPasta = artigos.filter(a => artigoEstaNaPasta(a, this.pastaAtivaId));
+        const artigos = this.estudoView?.artigosCatalogo?.() || carregarArtigosEstudo();
+        const artigosNaPasta = artigos.filter(a => this.pastaAtivaId === 'compartilhados_comigo' ? a.compartilhadoComigo : artigoEstaNaPasta(a, this.pastaAtivaId));
 
         bannerEl.innerHTML = `
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">

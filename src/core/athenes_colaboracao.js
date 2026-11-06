@@ -74,8 +74,6 @@ export function estaSessaoAtiva() {
   try {
     if (typeof localStorage !== 'undefined') {
       if (localStorage.getItem('athenes_sessao_ativa') === 'conectado') return true;
-      const s = localStorage.getItem('athenes_sb_sessao');
-      if (s && s !== 'null') return true;
     }
     if (typeof sessionStorage !== 'undefined') {
       if (sessionStorage.getItem('athenes_sessao_ativa') === 'conectado') return true;
@@ -488,9 +486,9 @@ export async function excluirDocumentoDoSupabase(docId, fetchImpl = globalThis.f
  * Lista os documentos salvos na nuvem Supabase.
  */
 export async function listarDocumentosDoSupabase(fetchImpl = globalThis.fetch, { conta = obterContaAtiva() } = {}) {
-  if (typeof fetchImpl !== 'function') return [];
+  if (typeof fetchImpl !== 'function' || !conta || String(conta).startsWith('anon:')) return [];
   const cfg = obterConfigSupabase();
-  // só os documentos da conta conectada (antes vinham os 50 mais recentes de TODOS); sem conta identificada, sem filtro (testes/anônimo)
+  // Sem conta Google confirmada, a lista não pode consultar documentos de outras pessoas.
   const filtroDono = conta ? `&${encodeURIComponent('conteudo_json->proprietario->>conta')}=eq.${encodeURIComponent(conta)}` : '';
   const endpoint = `${cfg.url}/rest/v1/${cfg.tabela}?select=id,titulo,autor,norma,atualizado_em,atualizado_por${filtroDono}&order=atualizado_em.desc&limit=50`;
 

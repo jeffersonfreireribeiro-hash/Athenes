@@ -54,11 +54,15 @@ export async function gravarDado(chave, valor, versaoLinha, fetchImpl = globalTh
  * (repete no conflito) e devolve { valor, gravou, criado }.
  */
 export async function sincronizarDado(chave, local, mesclar, { fetchImpl = globalThis.fetch, tentativas = 3 } = {}) {
+  const usuario = lerSessaoSupabase()?.user_id;
+  const conferirSessao = () => { if (!usuario || lerSessaoSupabase()?.user_id !== usuario) throw new Error('A conta mudou durante a sincronização.'); };
   for (let i = 0; i < tentativas; i++) {
+    conferirSessao();
     const atual = await lerDado(chave, fetchImpl);
+    conferirSessao();
     const r = mesclar(atual?.valor ?? null, local);
     if (!r.mudouServidor) return { valor: r.valor, gravou: false, criado: !atual };
-    if (await gravarDado(chave, r.valor, atual?.versaoLinha || '', fetchImpl)) return { valor: r.valor, gravou: true, criado: !atual };
+    if (await gravarDado(chave, r.valor, atual?.versaoLinha || '', fetchImpl)) { conferirSessao(); return { valor: r.valor, gravou: true, criado: !atual }; }
   }
   throw new Error(`"${chave}" mudou em outro computador durante a sincronização. Tente de novo.`);
 }

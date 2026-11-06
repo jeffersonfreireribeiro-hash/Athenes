@@ -118,7 +118,7 @@ describe('Athenes — Colaboração, Modos Google Docs, Supabase e Google Drive'
     assert.equal(salvo.atualizado_por, 'Prof. Orientador');
     assert.ok(chamadas[0].url.startsWith(SUPABASE_CONFIG_PADRAO.url));
 
-    const lista = await listarDocumentosDoSupabase(mockFetch);
+    const lista = await listarDocumentosDoSupabase(mockFetch, { conta: 'g:orientador@exemplo.com' });
     assert.equal(lista.length, 1);
     assert.equal(lista[0].titulo, 'Paper Colaborativo Supabase');
 

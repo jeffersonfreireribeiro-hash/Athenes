@@ -190,11 +190,15 @@ export async function gravarPerfilNoServidor(indice, versaoLinha, fetchImpl = gl
  * computador precisa aplicar. `local` = { pastas, documentos, excluidos }. Lança se não houver sessão/erro de rede.
  */
 export async function sincronizarPerfil(local, { fetchImpl = globalThis.fetch, tentativas = 3 } = {}) {
+  const usuario = lerSessaoSupabase()?.user_id;
+  const conferirSessao = () => { if (!usuario || lerSessaoSupabase()?.user_id !== usuario) throw new Error('A conta mudou durante a sincronização.'); };
   for (let i = 0; i < tentativas; i++) {
+    conferirSessao();
     const atual = await lerPerfilDoServidor(fetchImpl);
+    conferirSessao();
     const r = mesclarPerfil(atual?.indice || null, local);
     if (!r.mudouServidor) return { ...r, criado: !atual, gravou: false };
-    if (await gravarPerfilNoServidor(r.indice, atual?.versaoLinha || '', fetchImpl)) return { ...r, criado: !atual, gravou: true };
+    if (await gravarPerfilNoServidor(r.indice, atual?.versaoLinha || '', fetchImpl)) { conferirSessao(); return { ...r, criado: !atual, gravou: true }; }
   }
   throw new Error('O índice do perfil mudou em outro computador durante a sincronização. Tente de novo.');
 }
