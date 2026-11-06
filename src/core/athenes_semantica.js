@@ -298,31 +298,6 @@ export function criarEstadoSemanticoDocumento(opcoes = {}) {
 
 
 /**
- * Retorna todas as tags semânticas disponíveis no documento (presets + customizadas).
- * @param {object} docOuEstado
- * @returns {Array}
- */
-export function obterTagsSemanticas(docOuEstado) {
-  const estado = garantirEstadoSemantico(docOuEstado);
-  return estado?.availableTags || criarTagsSemanticasPadrao();
-}
-
-export const obterTodasTagsSemanticas = obterTagsSemanticas;
-
-/**
- * Busca uma tag semântica por ID no documento ou presets.
- * @param {object|Array} docOuTags
- * @param {string} id
- * @returns {object|null}
- */
-export function obterTagSemanticaPorId(docOuTags, id) {
-  if (!id) return null;
-  const lista = Array.isArray(docOuTags) ? docOuTags : obterTagsSemanticas(docOuTags);
-  return lista.find(t => t && t.id === id) || null;
-}
-
-
-/**
  * Aplica tag semântica em nível de bloco.
  * @param {object} bloco
  * @param {string|null} tagId

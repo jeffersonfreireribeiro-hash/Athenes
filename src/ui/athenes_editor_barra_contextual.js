@@ -1,3 +1,4 @@
+import { obterTagsSemanticas } from '../core/athenes_semantica.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Athenes — Editor: barra flutuante do texto (estilo, lista, alinhamento, dividir/unir, citar) e aplicação de estilo ao trecho.
@@ -167,6 +168,57 @@ export const metodosBarraContextual = {
     const fecharDropdownsCtx = () => {
       if (menuEstilo) menuEstilo.hidden = true;
     };
+
+    const renderizarListaSemanticaContextual = () => {
+      if (!listaSemanticaEl) return;
+      listaSemanticaEl.innerHTML = '';
+
+      // Opção de Desmarcar
+      const btnLimpar = document.createElement('button');
+      btnLimpar.type = 'button';
+      btnLimpar.style.cssText = 'display:flex; align-items:center; gap:6px; width:100%; border:none; background:#FFF5F5; color:#DC2626; padding:5px 8px; border-radius:6px; font:700 11px var(--glx-font); cursor:pointer; text-align:left; margin-bottom:4px;';
+      btnLimpar.innerHTML = '<span>✕</span> <span>Remover Marcação Retórica</span>';
+      btnLimpar.addEventListener('click', (e) => {
+        e.preventDefault();
+        fecharDropdownsCtx();
+        this.aplicarMarcadorSemanticoAoTrecho(null, barra);
+      });
+      listaSemanticaEl.appendChild(btnLimpar);
+
+      const tags = obterTagsSemanticas(this.doc);
+      tags.forEach(t => {
+        const itemBtn = document.createElement('button');
+        itemBtn.type = 'button';
+        itemBtn.className = 'ath-ctx-estilo-opcao';
+        itemBtn.style.cssText = 'display:flex; align-items:center; gap:8px; width:100%; border:none; background:#F8FAFC; padding:5px 8px; border-radius:6px; font:600 11.5px var(--glx-font); cursor:pointer; text-align:left; box-sizing:border-box; margin-bottom:2px;';
+        const bg = t.backgroundColor || 'transparent';
+        const txt = t.textColor || '#1F2733';
+        itemBtn.innerHTML = `
+          <span style="width:16px; height:16px; border-radius:3px; background:${bg}; color:${txt}; border:1px solid rgba(0,0,0,0.1); font-size:9px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex:none;">Aa</span>
+          <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#1F2733;">${t.label}</span>
+        `;
+        itemBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          fecharDropdownsCtx();
+          this.aplicarMarcadorSemanticoAoTrecho(t.id, barra);
+        });
+        listaSemanticaEl.appendChild(itemBtn);
+      });
+    };
+
+    menuSemantica?.addEventListener('mousedown', e => e.stopPropagation());
+    menuSemantica?.addEventListener('click', e => e.stopPropagation());
+
+    btnSemanticaMenu?.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const abrir = menuSemantica.hidden;
+      fecharDropdownsCtx();
+      if (abrir) {
+        renderizarListaSemanticaContextual();
+      }
+      menuSemantica.hidden = !abrir;
+    });
 
     const renderizarListaEstilosContextuais = () => {
       const containerItens = barra.querySelector('#athListaItensCtxEstilos');

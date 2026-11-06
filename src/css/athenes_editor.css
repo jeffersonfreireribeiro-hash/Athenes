@@ -3088,3 +3088,286 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
   color: #FFFFFF !important;
   border-color: #314F79 !important;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Camada Visual de Marcação Retórica e Estrutura Científica (Editor-Only)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Botão no topo do editor */
+.ath-btn-semantica-topo.on {
+  background: #EEF4FA !important;
+  color: #314F79 !important;
+  border-color: #314F79 !important;
+}
+.ath-btn-semantica-topo.on svg {
+  color: #314F79 !important;
+}
+
+/* Popover de Estrutura Científica */
+.ath-popover-semantica {
+  width: 340px;
+  max-width: 95vw;
+  padding: 12px;
+  background: #FFFFFF;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
+  border: 1px solid #C8D7E6;
+  font: 600 12px var(--glx-font, system-ui);
+}
+
+.ath-sem-pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #EEF2F6;
+  margin-bottom: 8px;
+}
+.ath-sem-pop-titulo {
+  font-size: 13px;
+  font-weight: 800;
+  color: #314F79;
+}
+.ath-sem-pop-sub {
+  font-size: 10.5px;
+  color: #64748B;
+  margin-top: 1px;
+}
+
+/* Switch Toggle Global */
+.ath-switch-label {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex: none;
+  cursor: pointer;
+}
+.ath-switch-label input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.ath-switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #CBD5E1;
+  transition: .2s;
+  border-radius: 20px;
+}
+.ath-switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .2s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.ath-switch-label input:checked + .ath-switch-slider {
+  background-color: #314F79;
+}
+.ath-switch-label input:checked + .ath-switch-slider:before {
+  transform: translateX(16px);
+}
+
+.ath-sem-pop-botoes-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ath-sem-lista-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.ath-sem-item-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  transition: background .12s ease;
+}
+.ath-sem-item-tag:hover {
+  background: #F1F5F9;
+}
+.ath-sem-item-tag.pincel-on {
+  border-color: #314F79;
+  background: #EEF4FA;
+}
+
+.ath-sem-amostra-cor {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  flex: none;
+}
+
+.ath-sem-info-tag {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ath-sem-tag-nome {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #1F2733;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ath-sem-tag-sub {
+  font-size: 10px;
+  color: #64748B;
+}
+
+.ath-sem-acoes-tag {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+.ath-btn-acao-pincel {
+  background: none;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
+  color: #475569;
+}
+.ath-btn-acao-pincel.ativo {
+  background: #314F79;
+  color: #FFF;
+  border-color: #314F79;
+}
+.ath-btn-acao-remover {
+  background: none;
+  border: none;
+  color: #DC2626;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.ath-sem-pop-footer {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #EEF2F6;
+  font-size: 10px;
+  color: #64748B;
+  text-align: center;
+}
+
+/* Indicador de Modo Pincel Ativo */
+.ath-indicador-pincel {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: #1E293B;
+  color: #FFFFFF;
+  padding: 8px 16px;
+  border-radius: 999px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  font: 700 12px var(--glx-font);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ath-cursor-pincel-ativo [contenteditable="true"] {
+  cursor: crosshair !important;
+}
+
+/* Badge Flutuante (Tooltip) ao passar o mouse */
+.ath-badge-semantica-hover {
+  position: fixed;
+  z-index: 10000;
+  background: rgba(15, 23, 42, 0.92);
+  color: #FFFFFF;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font: 700 11px var(--glx-font, system-ui);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+.ath-badge-semantica-hover .ath-badge-remover {
+  background: none;
+  border: none;
+  color: #F87171;
+  font-weight: 800;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+.ath-badge-semantica-hover .ath-badge-remover:hover {
+  color: #EF4444;
+}
+
+/* Modal Criar Marcador */
+.ath-modal-criar-semantico {
+  width: 420px;
+}
+.ath-form-cores-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 6px;
+}
+.ath-previa-marcador-wrap {
+  margin-top: 12px;
+  padding: 10px;
+  background: #F8FAFC;
+  border: 1px dashed #CBD5E1;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ath-previa-marcador-lbl {
+  font-size: 10.5px;
+  color: #64748B;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Regra estrita de impressão */
+@media print {
+  .ath-badge-semantica-hover,
+  .ath-indicador-pincel,
+  .ath-popover-semantica {
+    display: none !important;
+  }
+}

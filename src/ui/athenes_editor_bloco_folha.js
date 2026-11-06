@@ -107,6 +107,7 @@ export const metodosBlocoNaFolha = {
       const heading = document.createElement(tag);
       heading.contentEditable = ehSomenteLeitura ? 'false' : 'true';
       heading.className = 'ath-titulo-editable';
+      if (b.semanticTagId) heading.dataset.semanticTag = b.semanticTagId;
       const numSecao = b.tipo === 'titulo' ? this.mapaNumSecoes?.get(b.id) : null;
       if (numSecao) { heading.dataset.prefixo = numSecao.prefixo; heading.classList.add('ath-titulo-numerado'); } // o número é CSS: não entra no texto editado
       if (b.tipo === 'titulo' && nivelDe(b) > 6) { heading.setAttribute('role', 'heading'); heading.setAttribute('aria-level', String(nivelDe(b))); }
@@ -142,6 +143,7 @@ export const metodosBlocoNaFolha = {
       const p = document.createElement('div');
       p.contentEditable = ehSomenteLeitura ? 'false' : 'true';
       p.className = 'ath-texto-editable';
+      if (b.semanticTagId) p.dataset.semanticTag = b.semanticTagId;
       const classesAv = classesAvancadasDoBloco(estiloMesclado, b._frag);
       if (classesAv) p.className += ` ${classesAv}`;
       p.setAttribute('lang', 'pt-BR');

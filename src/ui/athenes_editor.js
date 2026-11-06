@@ -1,3 +1,4 @@
+import { CamadaSemanticaEditorUI } from './athenes_semantica_ui.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Athenes — Editor WYSIWYG de Documentos em Blocos na Folha.
@@ -196,6 +197,7 @@ export class EditorView {
     this.renderizar();
     this.inicializarBarraContextualTexto();
     this.iniciarSessaoColaborativa();
+    this.semanticaUI = new CamadaSemanticaEditorUI(this);
     this.iniciarAtalhos();
   }
 
@@ -531,6 +533,17 @@ export class EditorView {
             <div class="rm-topo-popover rm-topo-popover-estilos" id="athPopoverEstilos" role="dialog" aria-label="Estilos de Texto" hidden></div>
           </div>
 
+          <div class="rm-menu-topo-item ath-menu-semantica" data-menu="semantica">
+            <button type="button" class="rm-btn-menu-topo ath-btn-semantica-topo" id="athBtnMenuSemantica" aria-haspopup="dialog" aria-expanded="false" title="Estrutura Científica & Movimentos Retóricos (Alt+Shift+S)">
+              ${svgIcone('olho', 14)}
+              <span>Estrutura do Artigo</span>
+              <svg class="rm-seta-dropdown-icone" viewBox="0 0 6 4" width="6" height="4" aria-hidden="true">
+                <path d="M1 1L3 3L5 1" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="rm-topo-popover ath-popover-semantica" id="athPopoverSemantica" role="dialog" aria-label="Estrutura Científica" hidden></div>
+          </div>
+
           <div class="rm-menu-topo-item" data-menu="config">
             <button type="button" class="rm-btn-menu-topo" id="athBtnMenuConfig" aria-haspopup="menu" aria-expanded="false" aria-label="Configurações" title="Configurações: tema e estilos, nuvem e Drive">
               ${svgIcone('config', 15)}
@@ -661,6 +674,7 @@ export class EditorView {
           <div class="ath-palco-reguas ${reguasVisiveis() ? '' : 'sem-reguas'}" id="athPalcoReguas">
             <canvas class="ath-regua-h" aria-hidden="true"></canvas><canvas class="ath-regua-v" aria-hidden="true"></canvas><div class="ath-regua-canto" aria-hidden="true"></div>
             <div class="rm-prev rm-prev-palco" id="rmPrevPalco"></div>
+          <div id="athIndicadorPincelAtivo" class="ath-indicador-pincel" style="display:none;"></div>
           </div>
           <button type="button" class="ath-zoom-indicador" id="athZoomIndicador" title="Ctrl + roda do mouse para zoom · clique para 100%">100%</button>
         </section>
@@ -921,6 +935,14 @@ export class EditorView {
       if (e.ctrlKey && e.altKey && !e.shiftKey && (e.code === 'KeyF' || e.key.toLowerCase() === 'f')) {
         e.preventDefault();
         this.inserirNotaRodapeNoCursor();
+      }
+      if (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && (e.code === 'KeyS' || e.key.toLowerCase() === 's')) {
+        e.preventDefault();
+        this.semanticaUI?.alternarVisibilidade();
+      }
+      if (e.key === 'Escape' && this.semanticaUI?.estado?.brushActiveTagId) {
+        e.preventDefault();
+        this.semanticaUI.definirModoPincel(null);
       }
     }, true);
     // clique no marcador abre o editor da nota inteira (também para notas divididas entre páginas)
@@ -2209,6 +2231,8 @@ export class EditorView {
     });
     if (scrollTopSalvo > 0) palco.scrollTop = scrollTopSalvo;
     if (scrollLeftSalvo > 0) palco.scrollLeft = scrollLeftSalvo;
+    this.semanticaUI?.sincronizarOverlayCss();
+    this.semanticaUI?.instalarHoverBadge(palco);
   }
 
   construirBarraRapidaDoBloco(b, pag) {
