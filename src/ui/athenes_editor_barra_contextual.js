@@ -45,6 +45,11 @@ export function clampPosicaoPilula(pos, rectBloco, areaVisivel, dimPill, margem 
 }
 
 export const metodosBarraContextual = {
+  aplicarMarcadorSemanticoAoTrecho(tagId, barraEl = null) {
+    const selecionado = this.semanticaUI?.aplicarNoTextoSelecionado(tagId);
+    if (!selecionado) return;
+    if (barraEl) barraEl.style.display = 'none';
+  },
   inicializarBarraContextualTexto() {
     if (document.getElementById('athBarraContextualTexto')) return;
 
@@ -89,9 +94,17 @@ export const metodosBarraContextual = {
         </div>
       </div>
       <span class="ath-pill-sep"></span>
-      <button type="button" class="ath-pill-bt" id="athBtnContextDividir" title="Dividir este bloco de texto em dois no cursor">${svgIcone('divisor', 13)} <span>Dividir Bloco Aqui</span></button>
+      <div class="ath-ctx-dropdown-wrap" id="athWrapCtxSemantica">
+        <button type="button" class="ath-pill-btn-circulo" id="athBtnContextSemanticaMenu" title="Estrutura de texto" aria-label="Estrutura de texto">${svgIcone('olho', 15)}</button>
+        <div class="ath-ctx-dropdown-menu" id="athMenuContextSemantica" hidden style="width:250px; overflow:hidden; padding:4px;">
+          <div style="font:800 10.5px var(--glx-font); color:var(--ath-primary, #314F79); padding:4px 8px; border-bottom:1px solid #EEF2F6;">Estrutura de texto</div>
+          <div id="athListaItensCtxSemantica" class="ath-rolagem-interna" style="max-height:236px; overflow-y:auto;"></div>
+        </div>
+      </div>
       <span class="ath-pill-sep"></span>
-      <button type="button" class="ath-pill-bt ath-pill-bt-zotero" id="athBtnContextCitar" title="Inserir citação bibliográfica do Zotero">${svgIcone('zotero', 14)} <span>Citar Zotero</span></button>
+      <button type="button" class="ath-pill-btn-circulo" id="athBtnContextDividir" title="Dividir este bloco de texto em dois no cursor" aria-label="Dividir bloco aqui">${svgIcone('tesoura', 15)}</button>
+      <span class="ath-pill-sep"></span>
+      <button type="button" class="ath-pill-btn-circulo" id="athBtnContextCitar" title="Inserir citação bibliográfica do Zotero" aria-label="Citar Zotero"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" stroke="none" aria-hidden="true"><path d="M4.583 17.321C3.553 16.227 3 15 3 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179zm10 0C13.553 16.227 13 15 13 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179z"/></svg></button>
     `;
 
     // Pill flutuante para quando o cursor está posicionado no texto (sem seleção prévia)
@@ -156,11 +169,46 @@ export const metodosBarraContextual = {
       const ids = this._idsParaUnir || [];
       pillUnir.style.display = 'none';
       const r = unirBlocosTexto(this.doc, ids, modo);
+      this._idsParaUnir = [];
+      this.container?.querySelectorAll('.ath-bloco-uniao-selecionado').forEach(el => el.classList.remove('ath-bloco-uniao-selecionado'));
       if (r) this.aposEstrutura(r.bloco);
       else alert('Só dá para unir parágrafos em sequência, na mesma seção.');
     };
     pillUnir.querySelector('#athBtnUnirContinuo').addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); unir('continuo'); });
     pillUnir.querySelector('#athBtnUnirLinhas').addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); unir('linhas'); });
+
+    this.limparSelecaoUniao = () => {
+      this._idsParaUnir = [];
+      this._ultimoBlocoUniaoId = null;
+      pillUnir.style.display = 'none';
+      this.container?.querySelectorAll('.ath-bloco-uniao-selecionado').forEach(el => el.classList.remove('ath-bloco-uniao-selecionado'));
+    };
+
+    this.alternarBlocoParaUniao = (bloco, elemento, evento) => {
+      const secao = (this.doc.secoes || []).find(s => s.blocos?.some(b => b.id === bloco.id));
+      if (!secao || modoSomenteLeitura(this.modoTrabalho)) return false;
+      evento.preventDefault();
+      const ids = new Set(this._idsParaUnir || []);
+      if (evento.shiftKey && this._ultimoBlocoUniaoId) {
+        const todos = secao.blocos.filter(b => b.tipo === 'paragrafo').map(b => b.id);
+        const a = todos.indexOf(this._ultimoBlocoUniaoId);
+        const b = todos.indexOf(bloco.id);
+        if (a >= 0 && b >= 0) todos.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(id => ids.add(id));
+      } else if (ids.has(bloco.id)) ids.delete(bloco.id);
+      else ids.add(bloco.id);
+      this._ultimoBlocoUniaoId = bloco.id;
+      this._idsParaUnir = secao.blocos.map(b => b.id).filter(id => ids.has(id));
+      this.container?.querySelectorAll('.ath-bloco-uniao-selecionado').forEach(el => el.classList.remove('ath-bloco-uniao-selecionado'));
+      this._idsParaUnir.forEach(id => this.container?.querySelectorAll(`[data-bloco-id="${id}"]`).forEach(el => el.classList.add('ath-bloco-uniao-selecionado')));
+      if (this._idsParaUnir.length >= 2) {
+        pillUnir.querySelector('#athRotuloUnir').textContent = `Unir ${this._idsParaUnir.length} blocos`;
+        pillUnir.style.display = 'flex';
+        pillUnir.style.left = `${evento.clientX}px`;
+        pillUnir.style.top = `${evento.clientY - 12}px`;
+        pillUnir.style.transform = 'translate(-50%, -100%)';
+      } else pillUnir.style.display = 'none';
+      return true;
+    };
 
     const menuEstilo = barra.querySelector('#athMenuContextEstilo');
     const btnEstiloMenu = barra.querySelector('#athBtnContextEstiloMenu');
@@ -199,7 +247,7 @@ export const metodosBarraContextual = {
         const txt = t.textColor || '#1F2733';
         itemBtn.innerHTML = `
           <span style="width:16px; height:16px; border-radius:3px; background:${bg}; color:${txt}; border:1px solid rgba(0,0,0,0.1); font-size:9px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex:none;">Aa</span>
-          <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#1F2733;">${t.label}</span>
+          <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#1F2733;">${t.label.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
         `;
         itemBtn.addEventListener('click', (e) => {
           e.preventDefault();
@@ -455,6 +503,7 @@ export const metodosBarraContextual = {
 
     // Monitora seleção de texto e posição do cursor
     const atualizarPosicaoBarra = () => {
+      if (this._idsParaUnir?.length >= 2 && pillUnir.style.display !== 'none') return;
       // Se houver qualquer modal aberto na tela, oculta barra contextual e pill flutuante
       if (document.querySelector('.ath-modal-backdrop') || document.querySelector('.ath-modal')) {
         barra.style.display = 'none';
@@ -463,7 +512,7 @@ export const metodosBarraContextual = {
         return;
       }
       // Com um menu da barra aberto ela não some, mas continua junto do texto (rolagem, redimensionamento, repaginação)
-      if (menuEstilo && !menuEstilo.hidden) {
+      if ((menuEstilo && !menuEstilo.hidden) || (menuSemantica && !menuSemantica.hidden)) {
         const r = this._ultimaSelecaoAtiva?.range;
         const rectSel = r && r.commonAncestorContainer?.isConnected ? r.getBoundingClientRect() : null;
         if (rectSel && rectSel.height > 0 && !posicionarBarra(rectSel, this._ultimaSelecaoAtiva?.editable?.closest('[data-bloco-id]'))) fecharDropdownsCtx(); // saiu da área visível: fecha o menu junto

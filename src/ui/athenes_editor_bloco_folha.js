@@ -47,6 +47,8 @@ export const metodosBlocoNaFolha = {
     // Seleção dinâmica bidirecional ao clicar no bloco na página
     el.addEventListener('click', e => {
       e.stopPropagation();
+      if ((e.ctrlKey || e.metaKey || e.shiftKey) && b.tipo === 'paragrafo' && this.alternarBlocoParaUniao?.(b, el, e)) return;
+      if (this._idsParaUnir?.length) this.limparSelecaoUniao?.();
       this.selecionarBloco(b, pag);
     });
 

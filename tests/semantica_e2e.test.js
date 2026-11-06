@@ -686,6 +686,17 @@ describe('Tier 1 — Feature Coverage: Presets, Schemas, CRUD, Atalhos e CSS', (
       assert.equal(tagAtualizada.backgroundColor, '#FEF3C7');
     });
 
+    it('presets existentes aceitam cores e modo de exibição sem perder o ID', () => {
+      const doc = criarDocumento();
+      const tag = semantica.atualizarMarcadorCustomizado(doc, 'objetivos', {
+        displayMode: 'text_color_only', textColor: '#314F79'
+      });
+      assert.equal(tag.id, 'objetivos');
+      assert.equal(tag.isDefaultPreset, true);
+      assert.equal(tag.textColor, '#314F79');
+      assert.match(semantica.gerarCssOverlaySemantico(semantica.obterTagsSemanticas(doc)), /color: #314F79 !important/);
+    });
+
     it('F3.5: removerMarcadorCustomizado impede a exclusão de presets nativos', () => {
       const doc = criarDocumento();
       assert.throws(() => {

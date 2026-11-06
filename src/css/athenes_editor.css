@@ -3245,6 +3245,19 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
   border-color: #314F79;
   background: #EEF4FA;
 }
+.ath-bloco-uniao-selecionado {
+  outline: 2px solid #314F79;
+  outline-offset: 2px;
+  background: #EEF4FA;
+}
+.ath-bloco-uniao-selecionado .ath-bloco-barra-rapida { pointer-events: none; }
+.ath-cor-cromatica { display: grid; justify-items: center; gap: 10px; margin-top: 12px; padding: 12px; border: 1px solid #DCE6F0; border-radius: 12px; background: #F8FAFC; }
+.ath-cor-cromatica-abas { display: flex; gap: 6px; }
+.ath-cor-cromatica-abas button { border: 1px solid #C8D7E6; border-radius: 999px; background: #fff; color: #314F79; padding: 5px 14px; cursor: pointer; font: 700 11px var(--glx-font); }
+.ath-cor-cromatica-abas button.ativo { color: #fff; background: #314F79; }
+.ath-circulo-cromatico { position: relative; width: 156px; height: 156px; border-radius: 50%; cursor: crosshair; touch-action: none; background: radial-gradient(circle, #fff 0%, rgba(255,255,255,0) 75%), conic-gradient(red, #ff0, lime, cyan, blue, magenta, red); border: 2px solid #fff; box-shadow: 0 0 0 1px #C8D7E6, 0 4px 12px rgba(49,79,121,.16); }
+.ath-circulo-indicador { position: absolute; width: 13px; height: 13px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 2px #314F79; transform: translate(-50%, -50%); pointer-events: none; }
+.ath-cor-cromatica input[type="range"] { display: block; width: 170px; accent-color: #314F79; }
 
 .ath-sem-amostra-cor {
   width: 22px;

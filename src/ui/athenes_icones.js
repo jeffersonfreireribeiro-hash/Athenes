@@ -45,6 +45,7 @@ export const ICONES = Object.freeze({
   fluxograma: '<rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/>',
   divisor: '<line x1="5" y1="12" x2="19" y2="12"/>',
   tesoura: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>',
+  pincel: '<path d="M14 4l6 6-9.5 9.5a3 3 0 0 1-4.2-4.2L16 5.5A2.1 2.1 0 0 1 19 4.8l.2.2"/><path d="M5 19c-.3 1.2-1.4 2-3 2 0-1.7.8-2.8 2-3"/>',
   espacamento: '<polyline points="8 18 12 22 16 18"/><polyline points="8 6 12 2 16 6"/><line x1="12" y1="2" x2="12" y2="22"/>',
   anexo: '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
   sumario: '<path d="M4 6h16M4 12h16M4 18h16M8 6h.01M8 12h.01M8 18h.01"/>',

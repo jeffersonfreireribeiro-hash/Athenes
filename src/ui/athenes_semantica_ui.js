@@ -12,14 +12,12 @@
  */
 
 import {
-  PRESETS_NATIVOS,
   inicializarEstadoSemantico,
   obterTagsSemanticas,
   adicionarMarcadorCustomizado,
+  atualizarMarcadorCustomizado,
   removerMarcadorCustomizado,
-  aplicarMarcadorEmBloco,
   removerMarcadorDeBloco,
-  aplicarMarcadorEmTrecho,
   removerMarcadorDeTrecho,
   toggleOverlaySemantico,
   gerarCssOverlaySemantico,
@@ -46,10 +44,7 @@ export class CamadaSemanticaEditorUI {
 
   get estado() {
     if (!this.doc) return { showSemanticOverlay: true, availableTags: [] };
-    if (!this.doc.semanticOverlay) {
-      this.doc.semanticOverlay = inicializarEstadoSemantico(this.doc);
-    }
-    return this.doc.semanticOverlay;
+    return inicializarEstadoSemantico(this.doc);
   }
 
   /**
@@ -112,8 +107,8 @@ export class CamadaSemanticaEditorUI {
       if (boxPincel) {
         boxPincel.style.display = 'flex';
         boxPincel.innerHTML = `
-          <span>🖌️ Modo Pincel Ativo: <strong>${escapeHtml(tag?.label || this.estado.brushActiveTagId)}</strong></span>
-          <button type="button" id="athBtnEncerrarPincel" title="Encerrar pincel (Esc)" style="background:none; border:none; color:inherit; font-weight:800; cursor:pointer; padding:0 4px;">✕</button>
+          ${svgIcone('pincel', 16)} <span>Modo Pincel Ativo: <strong>${escapeHtml(tag?.label || this.estado.brushActiveTagId)}</strong></span>
+          <button type="button" id="athBtnEncerrarPincel" title="Encerrar pincel (Esc)" style="background:none; border:none; color:inherit; font-weight:800; cursor:pointer; padding:0 4px;">${svgIcone('fechar', 14)}</button>
         `;
         boxPincel.querySelector('#athBtnEncerrarPincel')?.addEventListener('click', () => {
           this.definirModoPincel(null);
@@ -124,6 +119,63 @@ export class CamadaSemanticaEditorUI {
       if (boxPincel) boxPincel.style.display = 'none';
       if (palco) palco.classList.remove('ath-cursor-pincel-ativo');
     }
+  }
+
+  aplicarNoTextoSelecionado(tagId = this.estado.brushActiveTagId) {
+    const selecao = window.getSelection?.();
+    if (!selecao?.rangeCount || selecao.isCollapsed) return false;
+    const range = selecao.getRangeAt(0);
+    const inicio = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+    const fim = range.endContainer.nodeType === Node.ELEMENT_NODE ? range.endContainer : range.endContainer.parentElement;
+    const editavel = inicio?.closest?.('.ath-texto-editable, .ath-titulo-editable');
+    if (!editavel || editavel !== fim?.closest?.('.ath-texto-editable, .ath-titulo-editable')) return false;
+    if (!this.editor.container?.contains(editavel) || !range.toString().trim()) return false;
+    const blocoId = editavel.closest('[data-bloco-id]')?.dataset.blocoId;
+    const bloco = this.editor.buscarBlocoPorId?.(blocoId);
+    if (!bloco) return false;
+    if (!tagId) {
+      const marcado = inicio.closest?.('.ath-semantic-span');
+      if (!marcado || !editavel.contains(marcado) || marcado !== fim.closest?.('.ath-semantic-span')) return false;
+      const antes = document.createRange();
+      antes.selectNodeContents(marcado);
+      antes.setEnd(range.startContainer, range.startOffset);
+      const depois = document.createRange();
+      depois.selectNodeContents(marcado);
+      depois.setStart(range.endContainer, range.endOffset);
+      const partes = document.createDocumentFragment();
+      const inicioFragmento = antes.cloneContents();
+      const selecionado = range.cloneContents();
+      const fimFragmento = depois.cloneContents();
+      if (inicioFragmento.textContent) { const copia = marcado.cloneNode(false); copia.appendChild(inicioFragmento); partes.appendChild(copia); }
+      partes.appendChild(selecionado);
+      if (fimFragmento.textContent) { const copia = marcado.cloneNode(false); copia.appendChild(fimFragmento); partes.appendChild(copia); }
+      marcado.replaceWith(partes);
+      selecao.removeAllRanges();
+      editavel.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    }
+    if (!obterTagsSemanticas(this.doc).some(t => t.id === tagId)) return false;
+    if (bloco.semanticTagId) {
+      removerMarcadorDeBloco(bloco);
+      delete editavel.dataset.semanticTag;
+    }
+    const span = document.createElement('span');
+    span.className = 'ath-semantic-span';
+    span.dataset.semanticTag = tagId;
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+    selecao.removeAllRanges();
+    editavel.dispatchEvent(new Event('input', { bubbles: true }));
+    this.sincronizarOverlayCss();
+    return true;
+  }
+
+  instalarPincelNoPalco(palco) {
+    if (!palco) return;
+    palco.addEventListener('mouseup', (evento) => {
+      if (!this.estado.brushActiveTagId || evento.button !== 0) return;
+      if (window.getSelection?.()?.isCollapsed === false) this.aplicarNoTextoSelecionado();
+    });
   }
 
   /**
@@ -233,11 +285,12 @@ export class CamadaSemanticaEditorUI {
               </div>
               <div class="ath-sem-acoes-tag">
                 <button type="button" class="ath-btn-acao-pincel ${ehPincel ? 'ativo' : ''}" data-acao="pincel" title="${ehPincel ? 'Desativar pincel' : 'Ativar pincel de escrita rápida'}">
-                  🖌️
+                  ${svgIcone('pincel', 14)}
                 </button>
+                <button type="button" class="ath-btn-acao-pincel" data-acao="editar" title="Editar nome e cores de exibição" aria-label="Editar ${escapeHtml(t.label)}">${svgIcone('config', 13)}</button>
                 ${!t.isDefaultPreset ? `
                   <button type="button" class="ath-btn-acao-remover" data-acao="remover" title="Excluir marcador customizado (preserva o texto)">
-                    ✕
+                    ${svgIcone('fechar', 13)}
                   </button>
                 ` : ''}
               </div>
@@ -281,20 +334,25 @@ export class CamadaSemanticaEditorUI {
         e.stopPropagation();
         this.confirmarExclusaoMarcador(tagId);
       });
+      item.querySelector('[data-acao="editar"]')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.abrirModalCriarMarcador(tagId);
+      });
     });
   }
 
   /**
    * Modal para criar marcador personalizado (+ Adicionar Novo).
    */
-  abrirModalCriarMarcador() {
+  abrirModalCriarMarcador(tagId = null) {
+    const existente = tagId ? obterTagsSemanticas(this.doc).find(t => t.id === tagId) : null;
     const overlay = document.createElement('div');
     overlay.className = 'ath-modal-overlay';
     overlay.innerHTML = `
       <div class="ath-modal-caixa ath-modal-criar-semantico" role="dialog" aria-label="Novo Marcador de Estrutura Científica">
         <div class="ath-modal-topo">
-          <div class="ath-modal-titulo">Novo Marcador Semântico</div>
-          <button type="button" class="ath-modal-fechar" id="athBtnFecharModalSem">✕</button>
+        <div class="ath-modal-titulo">${existente ? 'Editar Estrutura Científica' : 'Novo Marcador Semântico'}</div>
+          <button type="button" class="ath-modal-fechar" id="athBtnFecharModalSem">${svgIcone('fechar', 15)}</button>
         </div>
         <div class="ath-modal-corpo">
           <label class="ath-form-label">
@@ -329,6 +387,19 @@ export class CamadaSemanticaEditorUI {
             </label>
           </div>
 
+          <div class="ath-cor-cromatica">
+            <div class="ath-cor-cromatica-abas" role="group" aria-label="Cor a ajustar">
+              <button type="button" class="ativo" data-cor-alvo="fundo">Fundo</button>
+              <button type="button" data-cor-alvo="texto">Letra</button>
+            </div>
+            <div id="athCirculoCromatico" class="ath-circulo-cromatico" role="slider" tabindex="0" aria-label="Círculo cromático" aria-valuemin="0" aria-valuemax="360">
+              <span id="athIndicadorCirculo" class="ath-circulo-indicador"></span>
+            </div>
+            <label class="ath-form-label" for="athBrilhoCor">Luminosidade
+              <input type="range" id="athBrilhoCor" min="0" max="100" value="100">
+            </label>
+          </div>
+
           <div class="ath-previa-marcador-wrap">
             <span class="ath-previa-marcador-lbl">Prévia em tela:</span>
             <span id="athPreviaMarcadorAmostra" style="background:#FEF3C7; color:#92400E; padding:4px 10px; border-radius:4px; font-weight:600;">
@@ -338,7 +409,7 @@ export class CamadaSemanticaEditorUI {
         </div>
         <div class="ath-modal-rodape">
           <button type="button" class="glx-btn glx-btn-soft" id="athBtnCancelarModalSem">Cancelar</button>
-          <button type="button" class="glx-btn glx-btn-primary" id="athBtnSalvarModalSem">Criar Marcador</button>
+          <button type="button" class="glx-btn glx-btn-primary" id="athBtnSalvarModalSem">${existente ? 'Salvar Alterações' : 'Criar Marcador'}</button>
         </div>
       </div>
     `;
@@ -352,6 +423,57 @@ export class CamadaSemanticaEditorUI {
     const colorTxt = overlay.querySelector('#athColorTxt');
     const inputTxtHex = overlay.querySelector('#athInputTxtHex');
     const previa = overlay.querySelector('#athPreviaMarcadorAmostra');
+    const circulo = overlay.querySelector('#athCirculoCromatico');
+    const indicador = overlay.querySelector('#athIndicadorCirculo');
+    const brilho = overlay.querySelector('#athBrilhoCor');
+    let alvoCor = 'fundo';
+    let matiz = 0;
+    let saturacao = 1;
+    const hsvParaHex = (h, s, v) => {
+      const f = n => {
+        const k = (n + h / 60) % 6;
+        return Math.round((v - v * s * Math.max(0, Math.min(k, 4 - k, 1))) * 255);
+      };
+      return `#${[f(5), f(3), f(1)].map(n => n.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+    };
+    const atualizarIndicador = () => {
+      const raio = circulo.clientWidth / 2 - 12;
+      const angulo = (matiz - 90) * Math.PI / 180;
+      indicador.style.left = `${circulo.clientWidth / 2 + Math.cos(angulo) * saturacao * raio}px`;
+      indicador.style.top = `${circulo.clientHeight / 2 + Math.sin(angulo) * saturacao * raio}px`;
+      circulo.setAttribute('aria-valuenow', String(Math.round(matiz)));
+    };
+    const aplicarCorDoCirculo = () => {
+      const hex = hsvParaHex(matiz, saturacao, Number(brilho.value) / 100);
+      const amostra = alvoCor === 'fundo' ? colorBg : colorTxt;
+      const campo = alvoCor === 'fundo' ? inputBgHex : inputTxtHex;
+      amostra.value = hex;
+      campo.value = hex;
+      atualizarIndicador();
+      atualizarPrevia();
+    };
+    const sincronizarCirculo = () => {
+      const hex = (alvoCor === 'fundo' ? inputBgHex : inputTxtHex).value.trim();
+      if (!validarHexCor(hex)) return;
+      const normalizado = hex.length === 4 ? '#' + [...hex.slice(1)].map(c => c + c).join('') : hex;
+      const rgb = [1, 3, 5].map(i => parseInt(normalizado.slice(i, i + 2), 16) / 255);
+      const max = Math.max(...rgb), min = Math.min(...rgb), delta = max - min;
+      saturacao = max ? delta / max : 0;
+      if (delta) {
+        const i = rgb.indexOf(max);
+        matiz = ((i === 0 ? (rgb[1] - rgb[2]) / delta : i === 1 ? (rgb[2] - rgb[0]) / delta + 2 : (rgb[0] - rgb[1]) / delta + 4) * 60 + 360) % 360;
+      }
+      brilho.value = String(Math.round(max * 100));
+      atualizarIndicador();
+    };
+    if (existente) {
+      inputNome.value = existente.label;
+      selModo.value = existente.displayMode;
+      colorBg.value = existente.backgroundColor || '#FEF3C7';
+      inputBgHex.value = colorBg.value.toUpperCase();
+      colorTxt.value = existente.textColor || '#92400E';
+      inputTxtHex.value = colorTxt.value.toUpperCase();
+    }
 
     const atualizarPrevia = () => {
       const modo = selModo.value;
@@ -370,11 +492,37 @@ export class CamadaSemanticaEditorUI {
       }
     };
 
-    colorBg.addEventListener('input', () => { inputBgHex.value = colorBg.value.toUpperCase(); atualizarPrevia(); });
-    inputBgHex.addEventListener('input', () => { if (validarHexCor(inputBgHex.value)) { colorBg.value = inputBgHex.value; } atualizarPrevia(); });
-    colorTxt.addEventListener('input', () => { inputTxtHex.value = colorTxt.value.toUpperCase(); atualizarPrevia(); });
-    inputTxtHex.addEventListener('input', () => { if (validarHexCor(inputTxtHex.value)) { colorTxt.value = inputTxtHex.value; } atualizarPrevia(); });
+    colorBg.addEventListener('input', () => { inputBgHex.value = colorBg.value.toUpperCase(); sincronizarCirculo(); atualizarPrevia(); });
+    inputBgHex.addEventListener('input', () => { if (validarHexCor(inputBgHex.value)) { colorBg.value = inputBgHex.value; sincronizarCirculo(); } atualizarPrevia(); });
+    colorTxt.addEventListener('input', () => { inputTxtHex.value = colorTxt.value.toUpperCase(); sincronizarCirculo(); atualizarPrevia(); });
+    inputTxtHex.addEventListener('input', () => { if (validarHexCor(inputTxtHex.value)) { colorTxt.value = inputTxtHex.value; sincronizarCirculo(); } atualizarPrevia(); });
     selModo.addEventListener('change', atualizarPrevia);
+    atualizarPrevia();
+    sincronizarCirculo();
+    overlay.querySelectorAll('[data-cor-alvo]').forEach(botao => botao.addEventListener('click', () => {
+      alvoCor = botao.dataset.corAlvo;
+      overlay.querySelectorAll('[data-cor-alvo]').forEach(b => b.classList.toggle('ativo', b === botao));
+      sincronizarCirculo();
+    }));
+    const selecionarCorNoCirculo = evento => {
+      const rect = circulo.getBoundingClientRect();
+      const x = evento.clientX - rect.left - rect.width / 2;
+      const y = evento.clientY - rect.top - rect.height / 2;
+      matiz = (Math.atan2(y, x) * 180 / Math.PI + 90 + 360) % 360;
+      saturacao = Math.min(1, Math.hypot(x, y) / (rect.width / 2 - 12));
+      aplicarCorDoCirculo();
+    };
+    circulo.addEventListener('pointerdown', evento => { circulo.setPointerCapture(evento.pointerId); selecionarCorNoCirculo(evento); });
+    circulo.addEventListener('pointermove', evento => { if (circulo.hasPointerCapture(evento.pointerId)) selecionarCorNoCirculo(evento); });
+    circulo.addEventListener('keydown', evento => {
+      const passo = evento.shiftKey ? 10 : 1;
+      if (evento.key === 'ArrowRight' || evento.key === 'ArrowUp') matiz = (matiz + passo) % 360;
+      else if (evento.key === 'ArrowLeft' || evento.key === 'ArrowDown') matiz = (matiz - passo + 360) % 360;
+      else return;
+      evento.preventDefault();
+      aplicarCorDoCirculo();
+    });
+    brilho.addEventListener('input', aplicarCorDoCirculo);
 
     const fechar = () => overlay.remove();
     overlay.querySelector('#athBtnFecharModalSem').addEventListener('click', fechar);
@@ -389,12 +537,14 @@ export class CamadaSemanticaEditorUI {
       }
 
       try {
-        adicionarMarcadorCustomizado(this.doc, {
+        const dados = {
           label,
           displayMode: selModo.value,
           backgroundColor: inputBgHex.value.trim().toUpperCase(),
           textColor: inputTxtHex.value.trim().toUpperCase()
-        });
+        };
+        if (existente) atualizarMarcadorCustomizado(this.doc, existente.id, dados);
+        else adicionarMarcadorCustomizado(this.doc, dados);
         this.sincronizarOverlayCss();
         this.editor.notificarMudanca?.();
         fechar();
@@ -451,7 +601,7 @@ export class CamadaSemanticaEditorUI {
 
       const rect = alvo.getBoundingClientRect();
       this.badgeFlutuanteEl.innerHTML = `
-        <span class="ath-badge-icone">🏷️</span>
+        <span class="ath-badge-icone">${svgIcone('pincel', 13)}</span>
         <span class="ath-badge-texto">${escapeHtml(tag.label)}</span>
         <button type="button" class="ath-badge-remover" title="Desmarcar função retórica">✕</button>
       `;

@@ -560,8 +560,7 @@ export function atualizarMarcadorCustomizado(doc, id, dados = {}) {
   const estado = inicializarEstadoSemantico(doc);
   const tag = estado.availableTags.find(t => t && t.id === id);
   if (!tag) throw new Error('Tag não encontrada: ' + id);
-  if (tag.isDefaultPreset) throw new Error('Não é permitido alterar um preset nativo');
-  const novo = { ...tag, ...dados, id: tag.id, isDefaultPreset: false };
+  const novo = { ...tag, ...dados, id: tag.id, isDefaultPreset: !!tag.isDefaultPreset };
   const v = validarSemanticTag(novo);
   if (!v.valido) throw new Error('Tag inválida: ' + v.erros.join(', '));
   Object.assign(tag, novo);

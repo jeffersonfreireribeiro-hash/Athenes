@@ -193,11 +193,11 @@ export class EditorView {
       const secIni = this.obterSecaoAtiva();
       this.blocoSelecionado = secIni?.blocos?.[0] || null;
     }
+    this.semanticaUI = new CamadaSemanticaEditorUI(this);
     this.salvarSnapshot();
     this.renderizar();
     this.inicializarBarraContextualTexto();
     this.iniciarSessaoColaborativa();
-    this.semanticaUI = new CamadaSemanticaEditorUI(this);
     this.iniciarAtalhos();
   }
 
@@ -2232,6 +2232,7 @@ export class EditorView {
     if (scrollTopSalvo > 0) palco.scrollTop = scrollTopSalvo;
     if (scrollLeftSalvo > 0) palco.scrollLeft = scrollLeftSalvo;
     this.semanticaUI?.sincronizarOverlayCss();
+    this.semanticaUI?.instalarPincelNoPalco(palco);
     this.semanticaUI?.instalarHoverBadge(palco);
   }
 
