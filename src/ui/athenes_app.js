@@ -82,7 +82,7 @@ export class AthenesApp {
         this.carregarUltimoDocENavegarEditor();
         return;
       }
-      const ehEstudio = params.get('tela') === 'estudio' || telaSalva === 'estudio' || abaSalva === 'artigos_zotero' || Boolean(idSalvo);
+      const ehEstudio = params.get('tela') === 'estudio' || telaSalva === 'estudio' || (telaSalva !== 'dashboard' && (abaSalva === 'artigos_zotero' || Boolean(idSalvo)));
       if (ehEstudio) {
         this.navegarParaDashboard({
           abaInicial: 'artigos_zotero',

@@ -174,7 +174,7 @@ export class DashboardView {
     this.perfilUsuario = obterPerfilColaborador();
     const driveCfg = obterConfigGoogleDrive();
 
-    let estudioFullInicial = Boolean(this.diretoEstudio);
+    let estudioFullInicial = this.abaAtiva === 'artigos_zotero' && Boolean(this.diretoEstudio);
     try {
       if (!estudioFullInicial) {
         estudioFullInicial = this.abaAtiva === 'artigos_zotero' && typeof sessionStorage !== 'undefined' && Boolean(sessionStorage.getItem('athenes_estudio_artigo_id'));
@@ -381,6 +381,18 @@ export class DashboardView {
       btn.addEventListener('click', () => {
         const novaAba = btn.dataset.abaDash;
         if (this.abaAtiva !== novaAba) {
+          if (novaAba === 'escrita') {
+            this.diretoEstudio = false;
+            this.artigoInicialId = null;
+            try {
+              sessionStorage.setItem('athenes_nav_tela', 'dashboard');
+              sessionStorage.removeItem('athenes_estudio_artigo_id');
+              const url = new URL(window.location.href);
+              if (url.searchParams.get('tela') === 'estudio') url.searchParams.delete('tela');
+              url.searchParams.delete('artigo');
+              window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+            } catch (_) {}
+          }
           this.abaAtiva = novaAba; try { if (typeof sessionStorage !== 'undefined') { sessionStorage.setItem('athenes_dash_aba', novaAba); sessionStorage.setItem('athenes_dash_pasta', 'todas'); } } catch (_) {}
           this.pastaAtivaId = 'todas';
           this.renderizar();
