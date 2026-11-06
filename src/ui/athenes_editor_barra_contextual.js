@@ -47,6 +47,12 @@ export function clampPosicaoPilula(pos, rectBloco, areaVisivel, dimPill, margem 
 
 export const metodosBarraContextual = {
   aplicarMarcadorSemanticoAoTrecho(tagId, barraEl = null) {
+    const anterior = this._ultimaSelecaoAtiva;
+    if (anterior?.range && !anterior.range.collapsed && anterior.editable?.isConnected) {
+      const selecao = window.getSelection();
+      selecao.removeAllRanges();
+      selecao.addRange(anterior.range.cloneRange());
+    }
     const selecionado = this.semanticaUI?.aplicarNoTextoSelecionado(tagId);
     if (!selecionado) return;
     if (barraEl) barraEl.style.display = 'none';
@@ -231,8 +237,9 @@ export const metodosBarraContextual = {
       btnLimpar.type = 'button';
       btnLimpar.style.cssText = 'display:flex; align-items:center; gap:6px; width:100%; border:none; background:#FFF5F5; color:#DC2626; padding:5px 8px; border-radius:6px; font:700 11px var(--glx-font); cursor:pointer; text-align:left; margin-bottom:4px;';
       btnLimpar.innerHTML = '<span>✕</span> <span>Remover Marcação Retórica</span>';
-      btnLimpar.addEventListener('click', (e) => {
+      btnLimpar.addEventListener('mousedown', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         fecharDropdownsCtx();
         this.aplicarMarcadorSemanticoAoTrecho(null, barra);
       });
@@ -250,8 +257,9 @@ export const metodosBarraContextual = {
           <span style="width:16px; height:16px; border-radius:3px; background:${bg}; color:${txt}; border:1px solid rgba(0,0,0,0.1); font-size:9px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; flex:none;">Aa</span>
           <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#1F2733;">${t.label.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
         `;
-        itemBtn.addEventListener('click', (e) => {
+        itemBtn.addEventListener('mousedown', (e) => {
           e.preventDefault();
+          e.stopPropagation();
           fecharDropdownsCtx();
           this.aplicarMarcadorSemanticoAoTrecho(t.id, barra);
         });

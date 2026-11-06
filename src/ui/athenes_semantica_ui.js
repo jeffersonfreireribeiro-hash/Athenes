@@ -26,6 +26,7 @@ import {
 } from '../core/athenes_semantica.js';
 import { svgIcone } from './athenes_icones.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
+import { removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
 
 export class CamadaSemanticaEditorUI {
   constructor(editor) {
@@ -133,6 +134,20 @@ export class CamadaSemanticaEditorUI {
     const blocoId = editavel.closest('[data-bloco-id]')?.dataset.blocoId;
     const bloco = this.editor.buscarBlocoPorId?.(blocoId);
     if (!bloco) return false;
+    const htmlOriginal = editavel.innerHTML;
+    const textoOriginal = removerHifensCondicionais(editavel.textContent);
+    const confirmar = () => {
+      if (removerHifensCondicionais(editavel.textContent) !== textoOriginal) {
+        editavel.innerHTML = htmlOriginal;
+        return false;
+      }
+      selecao.removeAllRanges();
+      editavel.dataset.alteracaoSemanticaPendente = '1';
+      try { editavel.dispatchEvent(new Event('input', { bubbles: true })); }
+      finally { delete editavel.dataset.alteracaoSemanticaPendente; }
+      this.sincronizarOverlayCss();
+      return true;
+    };
     if (!tagId) {
       const marcado = inicio.closest?.('.ath-semantic-span');
       if (!marcado || !editavel.contains(marcado) || marcado !== fim.closest?.('.ath-semantic-span')) return false;
@@ -150,9 +165,7 @@ export class CamadaSemanticaEditorUI {
       partes.appendChild(selecionado);
       if (fimFragmento.textContent) { const copia = marcado.cloneNode(false); copia.appendChild(fimFragmento); partes.appendChild(copia); }
       marcado.replaceWith(partes);
-      selecao.removeAllRanges();
-      editavel.dispatchEvent(new Event('input', { bubbles: true }));
-      return true;
+      return confirmar();
     }
     if (!obterTagsSemanticas(this.doc).some(t => t.id === tagId)) return false;
     if (bloco.semanticTagId) {
@@ -164,10 +177,7 @@ export class CamadaSemanticaEditorUI {
     span.dataset.semanticTag = tagId;
     span.appendChild(range.extractContents());
     range.insertNode(span);
-    selecao.removeAllRanges();
-    editavel.dispatchEvent(new Event('input', { bubbles: true }));
-    this.sincronizarOverlayCss();
-    return true;
+    return confirmar();
   }
 
   instalarPincelNoPalco(palco) {

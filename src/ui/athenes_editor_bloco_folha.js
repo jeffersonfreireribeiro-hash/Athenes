@@ -131,10 +131,11 @@ export const metodosBlocoNaFolha = {
       }
 
       heading.addEventListener('input', () => {
+        const apenasMarcacao = heading.dataset.alteracaoSemanticaPendente === '1';
         b.texto = sanearHtmlTexto(removerHifensCondicionais(heading.innerHTML));
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida();
-        this.agendarRepaginacao();
+        if (!apenasMarcacao) this.agendarRepaginacao();
       });
       this.instalarSugestaoNoBloco(heading, b);
       el.appendChild(heading);
@@ -179,10 +180,11 @@ export const metodosBlocoNaFolha = {
       this.instalarSugestaoNoBloco(p, b);
 
       p.addEventListener('input', () => {
+        const apenasMarcacao = p.dataset.alteracaoSemanticaPendente === '1';
         b.texto = sanearHtmlTexto(removerPalavrasIniciais(removerHifensCondicionais(p.innerHTML)).replace(/<span class="ath-citacao-ref"[^>]*>.*?<\/span>/g, '')); // destaque de palavras iniciais e referência da citação são só de exibição
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida(); // agenda gravação/histórico (adiados): fechar a aba com o cursor no campo não perde mais o texto
-        this.agendarRepaginacao(); // o texto que cresce passa para a página seguinte na hora, sem precisar reabrir o arquivo
+        if (!apenasMarcacao) this.agendarRepaginacao(); // o texto que cresce passa para a página seguinte na hora, sem precisar reabrir o arquivo
       });
 
       p.addEventListener('keydown', e => {

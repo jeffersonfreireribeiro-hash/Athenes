@@ -113,10 +113,35 @@ export function hifenizarTexto(texto) {
  */
 export function hifenizarHtml(html) {
   if (!html || typeof html !== 'string') return html;
-  return html.replace(/(<[^>]+>)|([^<]+)/g, (match, tag, texto) => {
-    if (tag) return tag;
-    return hifenizarTexto(texto);
+  const partes = html.match(/<[^>]+>|[^<]+/g) || [];
+  const pontos = partes.map(() => new Set());
+  const palavra = [];
+  const letra = /[a-zA-ZáàãâéêíóõôúüçÁÀÃÂÉÊÍÓÕÔÚÜÇ]/;
+  const finalizar = () => {
+    if (palavra.length >= 5) {
+      const silabas = silabarPalavraPt(palavra.map(x => x.caractere).join(''));
+      let pos = 0;
+      for (const silaba of silabas.slice(0, -1)) {
+        pos += silaba.length;
+        const anterior = palavra[pos - 1];
+        pontos[anterior.parte].add(anterior.posicao);
+      }
+    }
+    palavra.length = 0;
+  };
+  partes.forEach((parte, indice) => {
+    if (parte.startsWith('<')) {
+      // Spans de estrutura/estilo não interrompem uma palavra nem mudam sua hifenização.
+      if (!/^<\/?(?:span|a|b|strong|i|em|u|ins|del)\b/i.test(parte)) finalizar();
+      return;
+    }
+    for (let i = 0; i < parte.length; i++) {
+      if (letra.test(parte[i])) palavra.push({ caractere: parte[i], parte: indice, posicao: i });
+      else finalizar();
+    }
   });
+  finalizar();
+  return partes.map((parte, indice) => [...parte].map((c, i) => c + (pontos[indice].has(i) ? SOFT_HYPHEN : '')).join('')).join('');
 }
 
 /**

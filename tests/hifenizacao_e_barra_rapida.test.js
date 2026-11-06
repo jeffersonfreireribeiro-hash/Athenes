@@ -60,6 +60,13 @@ test('Athenes — Hifenização Fonológica e Editorial em Língua Portuguesa (p
     assert.equal(htmlSaida.includes(SOFT_HYPHEN), true);
     assert.equal(removerHifensCondicionais(htmlSaida), htmlEntrada);
   });
+
+  await t.test('marcação visual no meio da palavra mantém os mesmos pontos de hifenização', () => {
+    const simples = hifenizarHtml('contextualização metodológica');
+    const marcado = hifenizarHtml('con<span class="ath-semantic-span" data-semantic-tag="objetivos">textual</span>ização metodológica');
+    assert.equal(marcado.replace(/<[^>]+>/g, ''), simples);
+    assert.equal(removerHifensCondicionais(marcado), 'con<span class="ath-semantic-span" data-semantic-tag="objetivos">textual</span>ização metodológica');
+  });
 });
 
 test('Athenes — Barra Rápida do Bloco ocupa a largura do bloco, abaixo dele, sem cortar controles', async t => {
