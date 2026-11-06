@@ -4,6 +4,7 @@
  * Métodos da classe DashboardView (usam `this`); são acrescentados ao prototype em athenes_dashboard.js.
  */
 import { obterPastasDriveLocais, removerPastaDriveLocal, buscarPastaNaArvore } from '../core/athenes_colaboracao.js';
+import { registrarPastasExcluidas } from '../core/athenes_drive_sync.js';
 import { artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { carregarArtigosEstudo } from './athenes_estudo_artigos.js';
@@ -174,13 +175,34 @@ export const metodosDashboardPastas = {
       if (ev.target.closest('.ath-btn-remover-comp')) {
         ev.stopPropagation();
         if (confirm(`Deseja desvincular a pasta compartilhada "${pasta.nome}"?`)) {
+          const todas = [];
+          const coletar = (p) => {
+            todas.push({ id: p.id, driveId: p.driveId || p.id, nome: p.nome, lixeira: true });
+            (p.subpastas || []).forEach(coletar);
+          };
+          coletar(pasta);
+
+          const ids = new Set(todas.map(p => p.id));
+          let mudouDocs = false;
+          for (const d of (this.documentos || [])) {
+            if (ids.has(d.pastaId)) {
+              d.pastaId = undefined;
+              mudouDocs = true;
+            }
+          }
+          if (mudouDocs) {
+            this.salvarDocumentosLocais?.();
+          }
+
+          registrarPastasExcluidas(todas);
           removerPastaDriveLocal(pasta.id);
           this.pastasDrive = obterPastasDriveLocais();
-          if (this.pastaAtivaId === pasta.id) this.pastaAtivaId = 'todas';
+          if (ids.has(this.pastaAtivaId)) this.pastaAtivaId = 'todas';
           this.renderizarPastasLateral();
           this.renderizarBannerPasta();
           if (this.abaAtiva === 'escrita') this.atualizarGrid();
           else this.estudoView?.filtrarPorPasta?.(this.pastaAtivaId);
+          this.agendarPerfil?.(200);
         }
         return;
       }

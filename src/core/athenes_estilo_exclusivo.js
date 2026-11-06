@@ -23,7 +23,7 @@ export const CAMPOS_FORMATACAO_DIRETA = Object.freeze([
 export const ehBlocoDeTexto = (b) => !!b && TIPOS_BLOCO_TEXTO.includes(b.tipo);
 
 const TAGS_FORMATACAO = 'b|strong|i|em|u|s|strike|del|ins|font|mark|big|small|center|span';
-const RE_ABRE_SPAN_ESTILO = /^<span\b[^>]*\bath-estilo-span\b[^>]*>$/i;
+const RE_ABRE_SPAN_ESTILO = /^<span\b[^>]*\b(?:ath-estilo-span|ath-semantic-span)\b[^>]*>$/i;
 
 /**
  * Reescreve a abertura de um <ins>/<del> de sugestão só com os atributos que a revisão usa (id, autor, data, cor). O resto,
@@ -45,7 +45,7 @@ function tagSugestaoSegura(t, attrs) {
  */
 export function sanearHtmlTexto(html) {
   if (typeof html !== 'string' || !html.includes('<')) return html;
-  let h = html;
+  let h = html.replace(/<(script|style|iframe|object|embed)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '').replace(/<(script|style|iframe|object|embed)\b[^>]*\/?>/gi, '');
   // listas HTML antigas (<ul>/<ol>/<li>) viram linhas; o marcador passa a ser do estilo
   h = h.replace(/<\/li>\s*<li\b[^>]*>/gi, '<br>').replace(/<\/?(ul|ol|li)\b[^>]*>/gi, '');
   const marcasSugestao = []; // <ins>/<del> de sugestões pendentes (data-sugestao-id) são revisão, não formatação: ficam
@@ -60,6 +60,10 @@ export function sanearHtmlTexto(html) {
     }
     if (t === 'span') {
       if (fecha) return '</span>';
+      if (/\bath-semantic-span\b/i.test(attrs)) {
+        const sid = /data-semantic-tag\s*=\s*["']([\w-]{1,64})["']/i.exec(attrs)?.[1];
+        return sid ? `<span class="ath-semantic-span" data-semantic-tag="${sid}">` : '<span>';
+      }
       if (/\bath-estilo-span\b/i.test(attrs)) {
         const id = /data-estilo-id\s*=\s*["']([\w-]{1,64})["']/i.exec(attrs)?.[1];
         return id ? `<span class="ath-estilo-span" data-estilo-id="${id}">` : '<span>';

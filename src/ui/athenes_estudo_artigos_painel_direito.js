@@ -73,11 +73,11 @@ export const metodosEstudoPainelDireito = {
 
     return `
       <section class="ath-zd-sec ath-zd-colab-sec" style="border-top:1px solid #E2E8F0; padding-top:14px; margin-top:14px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
           <h4 style="margin:0; font-size:12.5px; font-weight:800; color:#314F79; display:flex; align-items:center; gap:6px;">
             ${svgIcone('usuarios', 13)} Quem tem acesso ao documento
           </h4>
-          <button type="button" class="ath-btn ath-btn-sm" id="athBtnCompartilharPainelZd" title="Gerenciar permissões ou convidar pessoas" style="height:26px; padding:0 8px; font-size:11px; display:inline-flex; align-items:center; gap:4px;">
+          <button type="button" class="ath-btn ath-btn-sm" id="athBtnCompartilharPainelZd" title="Gerenciar permissões ou convidar pessoas" style="height:30px; padding:0 10px; font-size:11.5px; border-radius:8px; border:1px solid #CBD5E1; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; flex-shrink:0;">
             ${svgIcone('usuarios', 11)} Compartilhar...
           </button>
         </div>
@@ -505,7 +505,7 @@ export const metodosEstudoPainelDireito = {
             <label>Chave de API
               <span class="ath-zd-segredo">
                 <input type="password" class="ath-input" id="athDirZoteroApiKey" value="${escapeHtml(this.zoteroClient.apiKey || '')}" placeholder="Cole a chave" autocomplete="off" spellcheck="false">
-                <button type="button" class="ath-btn ath-btn-sm" id="athBtnVerChaveZotero" aria-label="Mostrar ou ocultar a chave" aria-pressed="false">Mostrar</button>
+                <button type="button" class="ath-btn ath-btn-sm" id="athBtnVerChaveZotero" aria-label="Mostrar ou ocultar a chave" aria-pressed="false" style="height:32px; padding:0 10px; border-radius:8px; border:1px solid #CBD5E1;">Mostrar</button>
               </span>
             </label>
             <label>User ID

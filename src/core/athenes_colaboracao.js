@@ -1291,6 +1291,20 @@ export function adicionarPastaCompartilhadaDriveLocal({ id, nome, url, dono = 'C
   const pastaId = id || extrairIdPastaDrive(url);
   if (!pastaId) throw new Error('ID ou link da pasta inválido.');
 
+  // Se o pastaId existia em athenes_pastas_excluidas, removê-lo para permitir re-vinculação limpa
+  try {
+    const raw = lerConta('athenes_pastas_excluidas');
+    if (raw) {
+      const excluidas = JSON.parse(raw);
+      if (Array.isArray(excluidas)) {
+        const filtradas = excluidas.filter(x => x && x.id !== pastaId && x.driveId !== pastaId);
+        if (filtradas.length !== excluidas.length) {
+          gravarConta('athenes_pastas_excluidas', JSON.stringify(filtradas));
+        }
+      }
+    }
+  } catch (_) {}
+
   const existente = buscarPastaNaArvore(pastas, pastaId);
   if (existente) return existente;
 

@@ -63,7 +63,9 @@ export class DashboardView {
     this.filtroBusca = '';
     this.filtroTipo = 'todos';
     this.ordemDocumentos = 'recente_desc';
-    this.abaAtiva = opcoes.abaInicial || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('athenes_dash_aba')) || 'escrita'; // 'escrita' | 'artigos_zotero'
+    this.diretoEstudio = Boolean(opcoes.diretoEstudio);
+    this.artigoInicialId = opcoes.artigoInicialId || null;
+    this.abaAtiva = opcoes.abaInicial || (this.diretoEstudio ? 'artigos_zotero' : ((typeof sessionStorage !== 'undefined' && sessionStorage.getItem('athenes_dash_aba')) || 'escrita')); // 'escrita' | 'artigos_zotero'
     this.pastaAtivaId = opcoes.pastaInicialId || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('athenes_dash_pasta')) || 'todas';
     this.pastasDrive = obterPastasDriveLocais();
     this.perfilUsuario = obterPerfilColaborador();
@@ -172,8 +174,15 @@ export class DashboardView {
     this.perfilUsuario = obterPerfilColaborador();
     const driveCfg = obterConfigGoogleDrive();
 
+    let estudioFullInicial = Boolean(this.diretoEstudio);
+    try {
+      if (!estudioFullInicial) {
+        estudioFullInicial = this.abaAtiva === 'artigos_zotero' && typeof sessionStorage !== 'undefined' && Boolean(sessionStorage.getItem('athenes_estudio_artigo_id'));
+      }
+    } catch (_) {}
+
     const root = document.createElement('div');
-    root.className = 'ath-dashboard';
+    root.className = estudioFullInicial ? 'ath-dashboard ath-dashboard-estudio-full' : 'ath-dashboard';
 
     const iniciais = this.obterIniciais(this.perfilUsuario.nome);
     const papelTxt = this.rotuloPapel(this.perfilUsuario.papel);
@@ -528,11 +537,24 @@ export class DashboardView {
       this.abrirModalBackupEspaco();
     });
 
+    if (estudioFullInicial) {
+      const sb = root.querySelector('#athDashSidebar');
+      const bn = root.querySelector('#athDashPastaBanner');
+      if (sb) sb.style.display = 'none';
+      if (bn) bn.style.display = 'none';
+      root.querySelectorAll('.ath-dash-head, .ath-dash-topbar, .ath-dash-alca-pastas').forEach(el => {
+        el.style.display = 'none';
+      });
+      const secaoEscrita = root.querySelector('#athSecaoDashEscrita');
+      if (secaoEscrita) secaoEscrita.style.display = 'none';
+    }
     this.container.appendChild(root);
 
     // Inicialização da barra lateral de pastas do Google Drive
-    this.renderizarPastasLateral();
-    this.renderizarBannerPasta();
+    if (!estudioFullInicial) {
+      this.renderizarPastasLateral();
+      this.renderizarBannerPasta();
+    }
 
     root.querySelector('#athDashScrim')?.addEventListener('click', () => this.fecharDrawerPastas());
     root.querySelector('#athBtnFecharPastasDrawer')?.addEventListener('click', () => this.fecharDrawerPastas());
@@ -560,12 +582,14 @@ export class DashboardView {
       this.atualizarGrid();
     });
 
-    if (this.abaAtiva === 'escrita') {
+    if (this.abaAtiva === 'escrita' && !estudioFullInicial) {
       this.atualizarGrid();
     } else {
       const boxEstudo = root.querySelector('#athContainerEstudoArtigos');
+      if (boxEstudo) boxEstudo.style.display = 'block';
       this.estudoView = new EstudoArtigosView(boxEstudo, {
         pastaFiltroId: this.pastaAtivaId,
+        artigoInicialId: this.artigoInicialId,
         // coleções do Zotero chegaram como pastas: atualiza a lateral e espelha a estrutura no Drive
         aoMudarPastas: ({ pastasNovas = 0 } = {}) => {
           this.pastasDrive = obterPastasDriveLocais();

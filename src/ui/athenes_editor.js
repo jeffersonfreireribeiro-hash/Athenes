@@ -454,7 +454,11 @@ export class EditorView {
     if (!this.container) return;
     const rolagem = {
       palco: this.container.querySelector('#rmPrevPalco')?.scrollTop || 0,
-      esq: this.container.querySelector('#rmColEsq')?.scrollTop || 0
+      palcoLeft: this.container.querySelector('#rmPrevPalco')?.scrollLeft || 0,
+      esq: this.container.querySelector('#rmColEsq')?.scrollTop || 0,
+      cardsEsq: Array.from(this.container.querySelectorAll('#rmColEsq .rm-card-meio-a-meio-corpo')).map(el => el.scrollTop),
+      dir: this.container.querySelector('#athInspectorContainer')?.scrollTop || 0,
+      props: this.container.querySelector('#athInspectorContainer .rm-props')?.scrollTop || 0
     };
     this._visaoRevisao?.destruir();
     this._visaoRevisao = null;
@@ -486,10 +490,10 @@ export class EditorView {
     topoShell.className = 'ath-topo-shell' + (modoSomenteLeitura(this.modoTrabalho) ? ' ath-modo-revisao' : '');
     topoShell.innerHTML = `
       <div class="ath-topo-esq">
-        <a class="ath-marca-link" id="athBrandVoltar" title="Voltar para a Visão Geral">
+        <button type="button" class="ath-marca-link" id="athBrandVoltar" title="Voltar para a Visão Geral" style="background:none; border:none; padding:0; font:inherit; cursor:pointer;">
           ${svgLogo(26)}
           <span>ATHENES</span>
-        </a>
+        </button>
         <input type="text" class="ath-doc-titulo-topo" id="athInputTituloDoc" value="${this.doc.titulo || 'Sem título'}" title="Clique para renomear">
         <span class="rm-selo">${(this.doc.perfil || 'abnt').toUpperCase()}</span>
       </div>
@@ -746,9 +750,24 @@ export class EditorView {
       });
     }
     const esqNovo = root.querySelector('#rmColEsq');
-    if (palcoNovo) palcoNovo.scrollTop = rolagem.palco;
-    if (esqNovo) esqNovo.scrollTop = rolagem.esq;
-    this.onRenderizado(root.querySelector('#athInspectorContainer'));
+    if (palcoNovo) {
+      palcoNovo.scrollTop = rolagem.palco;
+      palcoNovo.scrollLeft = rolagem.palcoLeft;
+    }
+    if (esqNovo) {
+      esqNovo.scrollTop = rolagem.esq;
+      const novosCardsEsq = esqNovo.querySelectorAll('.rm-card-meio-a-meio-corpo');
+      rolagem.cardsEsq.forEach((st, idx) => {
+        if (novosCardsEsq[idx]) novosCardsEsq[idx].scrollTop = st;
+      });
+    }
+    const dirNovo = root.querySelector('#athInspectorContainer');
+    this.onRenderizado(dirNovo);
+    if (dirNovo) {
+      if (rolagem.dir > 0) dirNovo.scrollTop = rolagem.dir;
+      const propsNovo = dirNovo.querySelector('.rm-props');
+      if (propsNovo && rolagem.props > 0) propsNovo.scrollTop = rolagem.props;
+    }
   }
 
   ligarEventosGerais(root) {
@@ -920,7 +939,11 @@ export class EditorView {
     root.querySelector('#rmAddSumario').addEventListener('click', () => adicionar('sumario', {}));
     root.querySelector('#rmAddReferencias').addEventListener('click', () => {
       const ja = (this.doc.secoes || []).flatMap(sec => sec.blocos || []).find(x => x.tipo === 'referencias');
-      if (ja) { document.querySelector(`.ath-bloco-folha[data-bloco-id="${ja.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; } // a lista é uma só: leva até ela
+      if (ja) {
+        const el = this.container?.querySelector(`.ath-bloco-folha[data-bloco-id="${ja.id}"]`) || document.querySelector(`.ath-bloco-folha[data-bloco-id="${ja.id}"]`);
+        if (el) this.rolarNoPalco(el, 'center', true);
+        return;
+      } // a lista é uma só: leva até ela
       adicionar('referencias', { titulo: 'Referências' });
     });
     root.querySelector('#rmAddQuebra').addEventListener('click', () => adicionar('quebra_pagina', {}));
@@ -1635,7 +1658,7 @@ export class EditorView {
     this.renderizarFolhasPaginas();
     requestAnimationFrame(() => {
       const campo = this.container?.querySelector(`.ath-nota[data-nota-id="${nota.id}"] .ath-nota-txt`);
-      if (campo) { campo.scrollIntoView({ block: 'nearest' }); campo.focus(); }
+      if (campo) { this.rolarNoPalco(campo, 'nearest', false); campo.focus(); }
     });
   }
 
@@ -1890,6 +1913,8 @@ export class EditorView {
     const palco = this.container.querySelector('#rmPrevPalco');
     if (!palco) return;
     if (modoSomenteLeitura(this.modoTrabalho)) { this.renderizarVisaoRevisao(palco); return; }
+    const scrollTopSalvo = palco.scrollTop || 0;
+    const scrollLeftSalvo = palco.scrollLeft || 0;
     palco.classList.remove('ath-palco-revisao');
     palco.innerHTML = '';
     // regras de pseudo-elementos dos estilos avançados (capitular, 1ª linha, ornamento de fim)
@@ -2170,6 +2195,10 @@ export class EditorView {
       }
 
       folha.appendChild(areaUtil);
+      if (this.zoomCanvas && this.zoomCanvas !== 1) {
+        folha.style.zoom = String(this.zoomCanvas);
+        folha.style.transformOrigin = 'top center';
+      }
       palco.appendChild(folha);
       } catch (erro) {
         const aviso = document.createElement('div');
@@ -2178,6 +2207,8 @@ export class EditorView {
         palco.appendChild(aviso);
       }
     });
+    if (scrollTopSalvo > 0) palco.scrollTop = scrollTopSalvo;
+    if (scrollLeftSalvo > 0) palco.scrollLeft = scrollLeftSalvo;
   }
 
   construirBarraRapidaDoBloco(b, pag) {
@@ -2708,12 +2739,22 @@ export class EditorView {
     this._tSnap = setTimeout(() => this.salvarSnapshot(), 700);
   }
 
-  /** Chamado pelo inspetor: estrutural = mudou linha/posição (redesenha tudo). */
+  /** Chamado pelo inspetor: estrutural = mudou linha/posição (atualiza páginas e coluna esquerda preservando o inspetor e a rolagem). */
   aposAlteracaoExterna(estrutural) {
     repaginarDocumento(this.doc);
     if (estrutural) {
       this.salvarSnapshot();
-      this.renderizar();
+      const esq = this.container?.querySelector('#rmColEsq');
+      if (esq) {
+        const stEsq = esq.scrollTop;
+        const stCards = Array.from(esq.querySelectorAll('.rm-card-meio-a-meio-corpo')).map(el => el.scrollTop);
+        this.renderizarColunaEsquerda(esq);
+        esq.scrollTop = stEsq;
+        const novosCards = esq.querySelectorAll('.rm-card-meio-a-meio-corpo');
+        stCards.forEach((st, i) => { if (novosCards[i]) novosCards[i].scrollTop = st; });
+      }
+      this.renderizarFolhasPaginas();
+      this.pintarDiagramaMargens();
     } else {
       this.renderizarFolhasPaginas();
       this.agendarSnapshot();

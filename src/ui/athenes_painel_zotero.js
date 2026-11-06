@@ -448,8 +448,18 @@ export class PainelZotero {
         if (ev.target.closest('.ath-cit-pag')) { ev.stopPropagation(); return; }
         if (ev.target.closest('.ath-btn-longa')) {
           ev.stopPropagation();
+          ev.preventDefault();
           this.selecionarItem(ref);
-          this.container.querySelector('#athZoteroLongaBox')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          const longaBox = this.container.querySelector('#athZoteroLongaBox');
+          if (longaBox) {
+            const scroller = this.container.closest?.('.rm-col-dir') || this.container;
+            if (scroller) {
+              const sRect = scroller.getBoundingClientRect();
+              const bRect = longaBox.getBoundingClientRect();
+              const delta = bRect.top - sRect.top - 12;
+              if (Math.abs(delta) > 1) scroller.scrollBy({ top: delta, behavior: 'smooth' });
+            }
+          }
           return;
         }
         const btnCitar = ev.target.closest('.ath-btn-citar');

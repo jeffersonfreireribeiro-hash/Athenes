@@ -352,8 +352,19 @@ export const metodosEstudoTela = {
         if (typeof sessionStorage !== 'undefined') {
           sessionStorage.removeItem('athenes_estudio_artigo_id');
           sessionStorage.removeItem('athenes_estudio_pag');
+          sessionStorage.setItem('athenes_nav_tela', 'dashboard');
         }
       } catch (_) {}
+      if (typeof window !== 'undefined' && window.history) {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('artigo');
+          if (url.searchParams.get('tela') === 'estudio') {
+            url.searchParams.set('tela', 'dashboard');
+          }
+          window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+        } catch (_) {}
+      }
       salvarArtigosEstudo(this.artigos, art);
       definirArtigoAbertoAtivo(null);
       this.artigoAberto = null;

@@ -47,7 +47,15 @@ export class EstudoArtigosView {
     // a biblioteca vem do servidor: chegou algo de outro computador → atualiza a tela (sem interromper quem está lendo um artigo)
     this._cancelarBib = bib.aoMudarBiblioteca(() => {
       this.artigos = carregarArtigosEstudo();
-      if (!this.artigoAberto) {
+      if (this.artigoAberto) {
+        const atualizado = (this.artigos || []).find(a => String(a.id) === String(this.artigoAberto.id) || (this.artigoAberto.chaveZotero && a.chaveZotero === this.artigoAberto.chaveZotero));
+        if (atualizado && atualizado !== this.artigoAberto) {
+          mesclarFichamentoPreservandoDados(this.artigoAberto, atualizado);
+          this.salvarCacheArtigoAbertoSessao(this.artigoAberto);
+        }
+        const colEsq = this.container?.querySelector('#athEstudioColEsq');
+        if (colEsq) this.renderizarColunaEsquerdaEstudio(colEsq, this.artigoAberto, this.artigoAberto.conteudoPaginasPdf || []);
+      } else {
         this.restaurarArtigoAbertoSessao();
         if (!this.artigoAberto && typeof this.renderizar === 'function') this.renderizar();
       }
@@ -84,12 +92,34 @@ export class EstudoArtigosView {
     if (!this.artigoAberto) this.renderizar();
   }
 
+  salvarCacheArtigoAbertoSessao(art) {
+    try {
+      if (typeof sessionStorage === 'undefined' || !art?.id) return;
+      const copia = { ...art };
+      delete copia.pdfBlobUrl;
+      delete copia.pdfDataUrl;
+      delete copia.pdfBlob;
+      sessionStorage.setItem('athenes_estudio_artigo_cache', JSON.stringify(copia));
+    } catch (_) {}
+  }
+
   restaurarArtigoAbertoSessao() {
     try {
       if (typeof sessionStorage === 'undefined' || this.artigoAberto) return false;
-      const idSalvo = sessionStorage.getItem('athenes_estudio_artigo_id');
+      const idSalvo = this.opcoes?.artigoInicialId || sessionStorage.getItem('athenes_estudio_artigo_id');
       if (!idSalvo) return false;
-      const achado = (this.artigos || []).find(a => String(a.id) === String(idSalvo) || (a.chaveZotero && String(a.chaveZotero) === String(idSalvo)));
+      let achado = (this.artigos || []).find(a => String(a.id) === String(idSalvo) || (a.chaveZotero && String(a.chaveZotero) === String(idSalvo)));
+      if (!achado) {
+        const rawCache = sessionStorage.getItem('athenes_estudio_artigo_cache');
+        if (rawCache) {
+          const objCache = JSON.parse(rawCache);
+          if (objCache && (String(objCache.id) === String(idSalvo) || (objCache.chaveZotero && String(objCache.chaveZotero) === String(idSalvo)))) {
+            achado = objCache;
+            if (!Array.isArray(this.artigos)) this.artigos = [];
+            this.artigos.unshift(achado);
+          }
+        }
+      }
       if (!achado) return false;
       const pagSalva = parseInt(sessionStorage.getItem('athenes_estudio_pag') || '1', 10) || 1;
       this.abrirArtigoNoEstudio(achado, pagSalva);
@@ -109,6 +139,14 @@ export class EstudoArtigosView {
             mesclarFichamentoPreservandoDados(a, dados);
             mudou = true;
           }
+        }
+        if (this.artigoAberto) {
+          const dadosAberto = snapshot.porChave[String(this.artigoAberto.id)] || (this.artigoAberto.chaveZotero && snapshot.porChave[`zot:${this.artigoAberto.chaveZotero}`]);
+          if (dadosAberto) {
+            mesclarFichamentoPreservandoDados(this.artigoAberto, dadosAberto);
+            this.salvarCacheArtigoAbertoSessao(this.artigoAberto);
+          }
+          return;
         }
         if (!this.artigoAberto && this.restaurarArtigoAbertoSessao()) return;
         if (mudou && !this.artigoAberto) {
@@ -711,20 +749,38 @@ export class EstudoArtigosView {
   }
 
   abrirArtigoNoEstudio(art, paginaInicial = 1) {
+    const trocouArtigo = this.artigoAberto && String(this.artigoAberto.id) !== String(art?.id);
     definirArtigoAbertoAtivo(art);
     this.artigoAberto = art;
     this.paginaAtual = Math.max(1, parseInt(paginaInicial, 10) || 1);
     this.pinEditandoId = null;
     try {
       if (typeof sessionStorage !== 'undefined' && art?.id) {
+        const idAnterior = sessionStorage.getItem('athenes_estudio_artigo_id');
+        if (trocouArtigo || (idAnterior && String(idAnterior) !== String(art.id))) {
+          sessionStorage.removeItem('athenes_estudio_scroll');
+        }
         sessionStorage.setItem('athenes_estudio_artigo_id', String(art.id));
         sessionStorage.setItem('athenes_estudio_pag', String(this.paginaAtual));
+        sessionStorage.setItem('athenes_nav_tela', 'estudio');
+        sessionStorage.setItem('athenes_dash_aba', 'artigos_zotero');
+        this.salvarCacheArtigoAbertoSessao(art);
       }
     } catch (_) {}
+    if (typeof window !== 'undefined' && window.history && art?.id) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('tela', 'estudio');
+        url.searchParams.set('artigo', String(art.id));
+        window.history.replaceState(null, '', url.pathname + url.search);
+      } catch (_) {}
+    }
     if (typeof window !== 'undefined') {
-      if (window.scrollY > 0) window.scrollTo(0, 0);
-      if (document.documentElement?.scrollTop > 0) document.documentElement.scrollTop = 0;
-      if (document.body?.scrollTop > 0) document.body.scrollTop = 0;
+      if (window.scrollY > 0) window.scrollTo?.(0, 0);
+      if (typeof document !== 'undefined') {
+        if (document.documentElement?.scrollTop > 0) document.documentElement.scrollTop = 0;
+        if (document.body?.scrollTop > 0) document.body.scrollTop = 0;
+      }
     }
     this._carregandoPdf = !art.pdfBlobUrl && artigoTemPdf(art) ? art : null; // PDF no Drive: "Carregando…" em vez de aviso de "sem PDF"
     if (!art.pdfBlobUrl) {

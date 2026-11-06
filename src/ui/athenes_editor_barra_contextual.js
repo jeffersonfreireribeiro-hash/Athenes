@@ -10,9 +10,47 @@ import { modoSomenteLeitura } from '../core/athenes_colaboracao.js';
 import { removerPalavrasIniciais } from '../core/athenes_estilo_avancado.js';
 import { sanearHtmlTexto } from '../core/athenes_estilo_exclusivo.js';
 
+/**
+ * Delimita geometricamente as coordenadas (left, top) da pílula ao redor do retângulo do bloco
+ * e dentro dos limites da área visível (viewport/palco), respeitando a margem máxima razoável.
+ */
+export function clampPosicaoPilula(pos, rectBloco, areaVisivel, dimPill, margem = 80) {
+  if (!rectBloco || !pos) return pos || { left: 0, top: 0 };
+  const w = Number(dimPill?.width) || 220;
+  const h = Number(dimPill?.height) || 36;
+  const m = Math.max(0, Number(margem) >= 0 ? Number(margem) : 80);
+
+  const bMinX = rectBloco.left - m;
+  const bMaxX = rectBloco.right + m - w;
+  const bMinY = rectBloco.top - m;
+  const bMaxY = rectBloco.bottom + m - h;
+
+  const vMinX = (areaVisivel?.left !== undefined ? areaVisivel.left : 0) + 8;
+  const vMaxX = (areaVisivel?.right !== undefined ? areaVisivel.right : (typeof window !== 'undefined' ? window.innerWidth : 1200)) - w - 8;
+  const vMinY = (areaVisivel?.top !== undefined ? areaVisivel.top : 0) + 8;
+  const vMaxY = (areaVisivel?.bottom !== undefined ? areaVisivel.bottom : (typeof window !== 'undefined' ? window.innerHeight : 800)) - h - 8;
+
+  const minX = Math.max(bMinX, vMinX);
+  const maxX = Math.min(bMaxX, vMaxX);
+  const minY = Math.max(bMinY, vMinY);
+  const maxY = Math.min(bMaxY, vMaxY);
+
+  const clamp = (val, min, max) => (min <= max ? Math.min(Math.max(val, min), max) : min);
+
+  return {
+    left: Math.round(clamp(pos.left, minX, Math.max(minX, maxX))),
+    top: Math.round(clamp(pos.top, minY, Math.max(minY, maxY)))
+  };
+}
+
 export const metodosBarraContextual = {
   inicializarBarraContextualTexto() {
     if (document.getElementById('athBarraContextualTexto')) return;
+
+    this._pillOffsetPorBloco = this._pillOffsetPorBloco || {};
+    this._ultimoBlocoPillId = this._ultimoBlocoPillId || null;
+    let ultimoBlocoSel = null;
+    let ultimoBlocoCaret = null;
 
     const barra = document.createElement('div');
     barra.id = 'athBarraContextualTexto';
@@ -32,6 +70,10 @@ export const metodosBarraContextual = {
     barra.style.userSelect = 'none';
 
     barra.innerHTML = `
+      <div class="ath-pill-drag-handle" title="Arrastar controle de ações" aria-label="Arrastar">
+        ${svgIcone('alca', 12)}
+      </div>
+      <span class="ath-pill-sep"></span>
       <!-- Dropdown de Estilo de Texto na Barra Flutuante -->
       <div class="ath-ctx-dropdown-wrap" id="athWrapCtxEstilo">
         <button type="button" class="ath-ctx-dropdown-btn" id="athBtnContextEstiloMenu" title="Aplicar Estilo de Texto ao Bloco" style="height:26px; padding:0 10px; font-weight:700;">
@@ -61,6 +103,10 @@ export const metodosBarraContextual = {
       pillCaret.style.position = 'fixed';
       pillCaret.style.zIndex = '9100';
       pillCaret.innerHTML = `
+        <div class="ath-pill-drag-handle" title="Arrastar controle de ações" aria-label="Arrastar">
+          ${svgIcone('alca', 12)}
+        </div>
+        <span class="ath-pill-sep"></span>
         <button type="button" class="ath-pill-bt" id="athBtnPillDividir" title="Dividir este bloco de texto em dois no cursor">
           ${svgIcone('divisor', 13)} <span>Dividir Bloco Aqui</span>
         </button>
@@ -232,11 +278,110 @@ export const metodosBarraContextual = {
     };
     const estaVisivel = (rect) => { const a = areaVisivel(); return rect.bottom > a.top + 4 && rect.top < a.bottom - 4; };
 
+    // Arraste livre via Pointer Events na alça da pílula/barra com clamp ao bloco ativo
+    const habilitarArrastePill = (el, obterBlocoAtivo) => {
+      const handle = el.querySelector('.ath-pill-drag-handle');
+      if (!handle) return;
+      let arrastando = false;
+      let startX = 0, startY = 0;
+      let initLeft = 0, initTop = 0;
+      let blocoElAtual = null;
+      let blocoIdAtual = null;
+
+      const aoPointerDown = (e) => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        blocoElAtual = obterBlocoAtivo?.();
+        blocoIdAtual = blocoElAtual?.dataset?.blocoId || this.blocoSelecionado?.id;
+        if (!blocoElAtual) return;
+
+        arrastando = true;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        const rectEl = el.getBoundingClientRect();
+        initLeft = rectEl.left;
+        initTop = rectEl.top;
+
+        el.style.transform = 'none';
+        el.style.marginTop = '0';
+        el.style.left = `${initLeft}px`;
+        el.style.top = `${initTop}px`;
+
+        try {
+          handle.setPointerCapture(e.pointerId);
+        } catch (_) {}
+
+        e.preventDefault();
+        e.stopPropagation();
+      };
+
+      const aoPointerMove = (e) => {
+        if (!arrastando || !blocoElAtual) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        const targetPos = { left: initLeft + dx, top: initTop + dy };
+        const rectBloco = blocoElAtual.getBoundingClientRect();
+        const dim = { width: el.offsetWidth || 220, height: el.offsetHeight || 36 };
+        const area = areaVisivel();
+
+        const clamped = clampPosicaoPilula(targetPos, rectBloco, area, dim, 80);
+        el.style.left = `${clamped.left}px`;
+        el.style.top = `${clamped.top}px`;
+
+        if (blocoIdAtual) {
+          this._pillOffsetPorBloco = this._pillOffsetPorBloco || {};
+          this._pillOffsetPorBloco[blocoIdAtual] = {
+            relX: clamped.left - rectBloco.left,
+            relY: clamped.top - rectBloco.top
+          };
+          this._ultimoBlocoPillId = blocoIdAtual;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+      };
+
+      const aoPointerUp = (e) => {
+        if (!arrastando) return;
+        arrastando = false;
+        try {
+          handle.releasePointerCapture(e.pointerId);
+        } catch (_) {}
+        e.preventDefault();
+        e.stopPropagation();
+      };
+
+      handle.addEventListener('pointerdown', aoPointerDown);
+      handle.addEventListener('pointermove', aoPointerMove);
+      handle.addEventListener('pointerup', aoPointerUp);
+      handle.addEventListener('pointercancel', aoPointerUp);
+    };
+
+    habilitarArrastePill(barra, () => ultimoBlocoSel);
+    habilitarArrastePill(pillCaret, () => ultimoBlocoCaret);
+
     // Posiciona a barra junto da seleção: acima dela; sem espaço em cima (início da área), abaixo. Devolve false se a seleção saiu da área visível.
-    const posicionarBarra = (rect) => {
+    const posicionarBarra = (rect, blocoEl = null) => {
       if (!estaVisivel(rect)) { barra.style.display = 'none'; return false; }
       const area = areaVisivel();
       barra.style.display = 'flex';
+
+      const bId = blocoEl?.dataset?.blocoId || this.blocoSelecionado?.id;
+      const off = bId && this._pillOffsetPorBloco ? this._pillOffsetPorBloco[bId] : null;
+      const rectBloco = blocoEl?.getBoundingClientRect();
+
+      if (off && rectBloco) {
+        const dim = { width: barra.offsetWidth || 420, height: barra.offsetHeight || 36 };
+        const targetPos = { left: rectBloco.left + off.relX, top: rectBloco.top + off.relY };
+        const clamped = clampPosicaoPilula(targetPos, rectBloco, area, dim, 80);
+        barra.style.left = `${clamped.left}px`;
+        barra.style.top = `${clamped.top}px`;
+        barra.style.transform = 'none';
+        barra.style.marginTop = '0';
+        return true;
+      }
+
       const larg = barra.offsetWidth || 420;
       const centro = rect.left + rect.width / 2;
       barra.style.left = `${Math.max(area.left + larg / 2 + 8, Math.min(area.right - larg / 2 - 8, centro))}px`;
@@ -265,7 +410,7 @@ export const metodosBarraContextual = {
       if (menuEstilo && !menuEstilo.hidden) {
         const r = this._ultimaSelecaoAtiva?.range;
         const rectSel = r && r.commonAncestorContainer?.isConnected ? r.getBoundingClientRect() : null;
-        if (rectSel && rectSel.height > 0 && !posicionarBarra(rectSel)) fecharDropdownsCtx(); // saiu da área visível: fecha o menu junto
+        if (rectSel && rectSel.height > 0 && !posicionarBarra(rectSel, this._ultimaSelecaoAtiva?.editable?.closest('[data-bloco-id]'))) fecharDropdownsCtx(); // saiu da área visível: fecha o menu junto
         return;
       }
 
@@ -319,11 +464,17 @@ export const metodosBarraContextual = {
         if (pillCaret) pillCaret.style.display = 'none';
         const rect = range.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
-          if (!posicionarBarra(rect)) return; // seleção rolada para fora da área do texto
-
-          // Salva última seleção ativa para aplicar estilos pontuais mesmo com perda temporária de foco
           const blocoEl = editable?.closest('[data-bloco-id]');
           const blocoId = blocoEl?.dataset?.blocoId || this.blocoSelecionado?.id;
+          ultimoBlocoSel = blocoEl;
+          if (blocoId && this._ultimoBlocoPillId && this._ultimoBlocoPillId !== blocoId) {
+            this._pillOffsetPorBloco = {};
+          }
+          if (blocoId) this._ultimoBlocoPillId = blocoId;
+
+          if (!posicionarBarra(rect, blocoEl)) return; // seleção rolada para fora da área do texto
+
+          // Salva última seleção ativa para aplicar estilos pontuais mesmo com perda temporária de foco
           this._ultimaSelecaoAtiva = {
             range: range.cloneRange(),
             texto: sel.toString(),
@@ -357,20 +508,41 @@ export const metodosBarraContextual = {
         } else {
           r = editable.getBoundingClientRect();
         }
+        const blocoEl = editable?.closest('[data-bloco-id]');
+        const blocoId = blocoEl?.dataset?.blocoId || this.blocoSelecionado?.id;
+        ultimoBlocoCaret = blocoEl;
+        if (blocoId && this._ultimoBlocoPillId && this._ultimoBlocoPillId !== blocoId) {
+          this._pillOffsetPorBloco = {};
+        }
+        if (blocoId) this._ultimoBlocoPillId = blocoId;
+
         if (r && !estaVisivel(r)) { if (pillCaret) pillCaret.style.display = 'none'; return; }
         if (r && pillCaret) {
           pillCaret.style.display = 'flex';
           const area = areaVisivel();
-          const left = Math.max(area.left + 140, Math.min(area.right - 140, r.left + (r.width || 0) / 2));
-          pillCaret.style.left = `${left}px`;
-          if (r.top - 50 < area.top) {
-            pillCaret.style.top = `${r.bottom}px`;
-            pillCaret.style.transform = 'translate(-50%, 0)';
-            pillCaret.style.marginTop = '8px';
+          const off = blocoId && this._pillOffsetPorBloco ? this._pillOffsetPorBloco[blocoId] : null;
+          const rectBloco = blocoEl?.getBoundingClientRect();
+
+          if (off && rectBloco) {
+            const dim = { width: pillCaret.offsetWidth || 220, height: pillCaret.offsetHeight || 36 };
+            const targetPos = { left: rectBloco.left + off.relX, top: rectBloco.top + off.relY };
+            const clamped = clampPosicaoPilula(targetPos, rectBloco, area, dim, 80);
+            pillCaret.style.left = `${clamped.left}px`;
+            pillCaret.style.top = `${clamped.top}px`;
+            pillCaret.style.transform = 'none';
+            pillCaret.style.marginTop = '0';
           } else {
-            pillCaret.style.top = `${r.top}px`;
-            pillCaret.style.transform = 'translate(-50%, -100%)';
-            pillCaret.style.marginTop = '-10px';
+            const left = Math.max(area.left + 140, Math.min(area.right - 140, r.left + (r.width || 0) / 2));
+            pillCaret.style.left = `${left}px`;
+            if (r.top - 50 < area.top) {
+              pillCaret.style.top = `${r.bottom}px`;
+              pillCaret.style.transform = 'translate(-50%, 0)';
+              pillCaret.style.marginTop = '8px';
+            } else {
+              pillCaret.style.top = `${r.top}px`;
+              pillCaret.style.transform = 'translate(-50%, -100%)';
+              pillCaret.style.marginTop = '-10px';
+            }
           }
         }
       } else if (pillCaret) {

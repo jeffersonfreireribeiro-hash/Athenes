@@ -58,7 +58,13 @@ export const metodosDashboardSincronia = {
       const r = mesclarBibliotecaDrive(this.documentos, arquivos, pastasNovas.mapa, obterPastasDriveLocais(), undefined, permitidos);
       const religados = repararPastaDosDocumentos(this.documentos, obterPastasDriveLocais()); // documentos trazidos de outro PC voltam para a pasta certa
       if (religados) r.atualizados += religados;
-      if (pastasNovas.importadas || religados) { this.pastasDrive = obterPastasDriveLocais(); this.salvarDocumentosLocais(); this.renderizar(); }
+      if (pastasNovas.importadas || religados) {
+        this.pastasDrive = obterPastasDriveLocais();
+        this.salvarDocumentosLocais();
+        this.renderizarPastasLateral();
+        this.renderizarBannerPasta();
+        if (this.abaAtiva === 'escrita') this.atualizarGrid();
+      }
       else if (r.novos || r.atualizados) {
         this.salvarDocumentosLocais();
         this.atualizarGrid();

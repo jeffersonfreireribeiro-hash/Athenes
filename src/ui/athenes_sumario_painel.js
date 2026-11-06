@@ -39,19 +39,20 @@ const CSS = `
 .ath-sum .corpo { display: flex; flex-direction: column; gap: 10px; }
 
 /* Campos e formulários */
-.ath-sum label.campo { display: flex; flex-direction: column; gap: 4px; font: 700 11px var(--glx-font, inherit); color: #475569; min-width: 0; }
 .ath-sum .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ath-sum .grade-fonte { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.8fr); gap: 8px; }
+.ath-sum .campo-full { grid-column: 1 / -1; width: 100%; }
 .ath-sum .grade3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .ath-sum .grade4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 
 .ath-sum input[type=text], .ath-sum input[type=number], .ath-sum select {
-  width: 100%; height: 32px; padding: 0 9px; border: 1px solid #D5DEE9; border-radius: 8px; background: #F8FAFC; font: 500 12px var(--glx-font, inherit); color: #1F2733;
+  width: 100%; height: 32px !important; padding: 0 9px !important; border: 1px solid #CBD5E1; border-radius: 8px !important; background: #F8FAFC; font: 600 12px var(--glx-font, inherit); color: #1F2733;
 }
 .ath-sum input:focus, .ath-sum select:focus { outline: none; border-color: var(--ath-primary, #314F79); box-shadow: 0 0 0 2px rgba(49, 79, 121, 0.15); background: #fff; }
 
-.ath-sum input[type=color] { appearance: none; -webkit-appearance: none; width: 100%; height: 32px; padding: 2px; border: 1px solid #D5DEE9; border-radius: 8px; background: #fff; cursor: pointer; }
+.ath-sum input[type=color] { appearance: none; -webkit-appearance: none; width: 100%; height: 32px !important; padding: 3px !important; border: 1px solid #CBD5E1; border-radius: 8px !important; background: #fff; cursor: pointer; }
 .ath-sum input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
-.ath-sum input[type=color]::-webkit-color-swatch { border: 0; border-radius: 6px; }
+.ath-sum input[type=color]::-webkit-color-swatch { border: 0; border-radius: 5px; }
 
 /* Barra de níveis 1 a 9 */
 .ath-sum-niveis-wrap { display: flex; flex-direction: column; gap: 6px; }
@@ -65,28 +66,38 @@ const CSS = `
 .ath-sum-niveis-barra button.fora { opacity: .4; }
 .ath-sum-niveis-barra button.on { background: var(--ath-primary, #314F79); color: #fff; box-shadow: 0 1px 3px rgba(49, 79, 121, 0.3); }
 
-/* Switch de linha limpo */
+/* Botão interruptor booleano de linha */
 .ath-sum-switch-linha {
-  display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 9px; font-size: 11.5px; font-weight: 700; color: #334155;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 11px; background: #FFFFFF; border: 1.5px solid #CBD5E1; border-radius: 10px; font-size: 11.5px; font-weight: 700; color: #334155; cursor: pointer; user-select: none; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); transition: all .15s ease;
 }
-.ath-sum .interruptor { display: flex; align-items: center; cursor: pointer; margin: 0; }
+.ath-sum-switch-linha:hover { border-color: #94A3B8; background: #F8FAFC; }
+.ath-sum-switch-linha.on, .ath-sum-switch-linha:has(input:checked) {
+  background: #EFF6FF; border-color: var(--ath-primary, #314F79); color: #1E3A8A; box-shadow: 0 1px 3px rgba(49, 79, 121, 0.14);
+}
+.ath-sum .interruptor { display: inline-flex; align-items: center; cursor: pointer; margin: 0; flex-shrink: 0; }
 .ath-sum .interruptor input {
-  appearance: none; -webkit-appearance: none; width: 34px; height: 19px; margin: 0; border-radius: 999px; background: #CBD5E1; position: relative; cursor: pointer; transition: background .15s;
+  appearance: none; -webkit-appearance: none; width: 38px !important; height: 22px !important; margin: 0; border-radius: 999px !important; border: 1.5px solid #94A3B8 !important; background: #CBD5E1 !important; position: relative; cursor: pointer; transition: background .15s, border-color .15s; flex-shrink: 0;
 }
 .ath-sum .interruptor input::after {
-  content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(15,23,42,.25); transition: transform .15s;
+  content: '' !important; position: absolute; top: 2px; left: 2px; width: 15px !important; height: 15px !important; border: 0 !important; border-radius: 50% !important; background: #fff !important; box-shadow: 0 1px 2px rgba(15,23,42,.3); transform: none !important; transition: transform .15s;
 }
-.ath-sum .interruptor input:checked { background: var(--ath-primary, #314F79); }
-.ath-sum .interruptor input:checked::after { transform: translateX(15px); }
+.ath-sum .interruptor input:checked { background: var(--ath-primary, #314F79) !important; border-color: var(--ath-primary, #314F79) !important; }
+.ath-sum .interruptor input:checked::after { transform: translateX(16px) !important; }
 
-/* Estilos tipográficos (Segmented Control N / I / S) */
+/* Botões booleanos tipográficos (N / I / S) */
 .ath-sum-estilos-grupo { display: flex; align-items: center; gap: 8px; }
-.ath-sum-estilos-segmented { display: inline-flex; border: 1px solid #D5DEE9; border-radius: 8px; background: #F8FAFC; padding: 2px; gap: 2px; }
+.ath-sum-estilos-segmented { display: flex; align-items: center; gap: 6px; width: 100%; }
 .ath-sum-estilos-segmented label {
-  display: flex; align-items: center; justify-content: center; width: 30px; height: 28px; border-radius: 6px; cursor: pointer; user-select: none; font-size: 12.5px; color: #64748B; font-weight: 700; transition: all .15s;
+  display: inline-flex; align-items: center; justify-content: center; flex: 1; min-width: 34px; height: 32px; border-radius: 8px; border: 1.5px solid #CBD5E1; background: #FFFFFF; cursor: pointer; user-select: none; font-size: 13px; color: #334155; font-weight: 700; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); transition: all .15s ease;
 }
-.ath-sum-estilos-segmented input { position: absolute; opacity: 0; pointer-events: none; }
-.ath-sum-estilos-segmented label:has(input:checked) { background: #FFFFFF; color: var(--ath-primary, #314F79); box-shadow: 0 1px 2px rgba(0,0,0,0.08); font-weight: 900; }
+.ath-sum-estilos-segmented label:hover:not(.on) { background: #F1F5F9; border-color: #94A3B8; color: #0F172A; }
+.ath-sum-estilos-segmented input { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+.ath-sum-estilos-segmented label.on, .ath-sum-estilos-segmented label:has(input:checked) {
+  background: var(--ath-primary, #314F79) !important; border-color: var(--ath-primary, #314F79) !important; color: #FFFFFF !important; box-shadow: 0 2px 5px rgba(49, 79, 121, 0.28); font-weight: 900;
+}
+.ath-sum-estilos-segmented label.on span, .ath-sum-estilos-segmented label:has(input:checked) span {
+  color: #FFFFFF !important;
+}
 .ath-sum-estilos-segmented .b { font-weight: 900; }
 .ath-sum-estilos-segmented .i { font-style: italic; font-family: Georgia, serif; }
 .ath-sum-estilos-segmented .u { text-decoration: underline; }
@@ -134,9 +145,14 @@ export function montarPainelSumario(doc, bloco, aoMudar) {
   const num = (id, v, min, max, passo = 1) => `<input type="number" data-k="${id}" value="${v}" min="${min}" max="${max}" step="${passo}">`;
   const sel = (id, opcoes, atual) => `<select data-k="${id}">${opcoes.map(([v, r]) => `<option value="${v}" ${String(v) === String(atual) ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>`;
   const cor = (id, v) => `<input type="color" data-k="${id}" value="${v || '#000000'}">`;
-  const estilo = (id, rot, classe, on, dica) => `<label title="${dica}"><input type="checkbox" data-k="${id}" ${on ? 'checked' : ''}><span class="${classe}">${rot}</span></label>`;
+  const estilo = (id, rot, classe, on, dica) => `<label class="${on ? 'on' : ''}" title="${dica}" role="checkbox" aria-checked="${on ? 'true' : 'false'}"><input type="checkbox" data-k="${id}" ${on ? 'checked' : ''}><span class="${classe}">${rot}</span></label>`;
 
   function desenhar() {
+    const colDir = raiz.closest?.('.rm-col-dir');
+    const propsEl = raiz.closest?.('.rm-props');
+    const stColDir = colDir ? colDir.scrollTop : 0;
+    const stProps = propsEl ? propsEl.scrollTop : 0;
+
     const c = normalizarConfigSumario(bloco.sumario_config || doc.sumario_config_padrao);
     const numeracao = normalizarNumeracaoSecoes(doc.numeracao_secoes);
     const usandoPadrao = !bloco.sumario_config;
@@ -203,14 +219,14 @@ export function montarPainelSumario(doc, bloco, aoMudar) {
           </div>
         </div>
 
-        <div class="ath-sum-switch-linha">
+        <label class="ath-sum-switch-linha ${nv.mostrar_pagina ? 'on' : ''}">
           <span>Mostrar número da página no nível ${nivelAtivo}</span>
-          <label class="interruptor">
+          <span class="interruptor">
             <input type="checkbox" data-k="n_mostrar_pagina" ${nv.mostrar_pagina ? 'checked' : ''}>
-          </label>
-        </div>
+          </span>
+        </label>
 
-        <div class="grade2">
+        <div class="grade-fonte">
           ${campo('Família da fonte', sel('n_familia', fontes, f.familia))}
           ${campo('Tamanho (pt)', num('n_tam', f.tamanho_pt, 6, 36, 0.5))}
         </div>
@@ -254,18 +270,27 @@ export function montarPainelSumario(doc, bloco, aoMudar) {
 
       // Seção 4: Numeração das seções
       secao('numeracao', 'Numeração das seções', `
-        <div class="ath-sum-switch-linha">
+        <label class="ath-sum-switch-linha ${numeracao.ativa ? 'on' : ''}">
           <span>Numerar títulos do documento (1, 1.1, 1.1.1…)</span>
-          <label class="interruptor">
+          <span class="interruptor">
             <input type="checkbox" data-k="num_ativa" ${numeracao.ativa ? 'checked' : ''}>
-          </label>
-        </div>
+          </span>
+        </label>
         ${campo('Numerar até o nível', sel('num_ate', Array.from({ length: NIVEL_MAX }, (_, i) => [i + 1, `Nível ${i + 1}`]), numeracao.ate_nivel))}
         <p style="margin:2px 0 0; font-size:11px; color:#64748B; line-height:1.4;">
           Configuração global do documento. Se ativa, números digitados manualmente no início de títulos são tratados de forma limpa pelo gerador editorial.
         </p>
       `)
     ].join('');
+
+    const restaurarScroll = () => {
+      if (colDir && stColDir > 0) colDir.scrollTop = stColDir;
+      if (propsEl && stProps > 0) propsEl.scrollTop = stProps;
+    };
+    restaurarScroll();
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(restaurarScroll);
+    }
   }
 
   const lerCor = (v) => (/^#[0-9a-f]{6}$/i.test(v) ? v : '');
@@ -315,31 +340,47 @@ export function montarPainelSumario(doc, bloco, aoMudar) {
   raiz.addEventListener('change', (e) => {
     if (!e.target.dataset?.k) return;
     const redesenha = ['profundidade_max', 'pre_tipo', 'n_mostrar_pagina'].includes(e.target.dataset.k) || e.target.tagName === 'SELECT' || e.target.type === 'checkbox';
+    if (e.target.type === 'checkbox') {
+      const lbl = e.target.closest('label');
+      if (lbl) {
+        lbl.classList.toggle('on', e.target.checked);
+        lbl.setAttribute('aria-checked', e.target.checked ? 'true' : 'false');
+      }
+    }
     aplicar(e.target);
     if (redesenha && !e.target.dataset.k.startsWith('num_')) desenhar();
   });
   raiz.addEventListener('click', (e) => {
     const aba = e.target.closest('[data-nivel]');
-    if (aba) { nivelAtivo = parseInt(aba.dataset.nivel, 10); NIVEL_ATIVO_POR_BLOCO.set(bloco.id, nivelAtivo); desenhar(); return; }
-    const a = e.target.closest('[data-acao]')?.dataset.acao;
-    if (a === 'padrao-doc') { doc.sumario_config_padrao = JSON.parse(JSON.stringify(configEfetivaSumario(doc, bloco))); aoMudar(); desenhar(); }
-    if (a === 'usar-padrao') { delete bloco.sumario_config; aoMudar(); desenhar(); }
-    if (a === 'nivel-todos') {
-      const origem = JSON.parse(JSON.stringify(nivelCfg(nivelAtivo)));
-      for (let i = 1; i <= NIVEL_MAX; i++) {
-        if (i === nivelAtivo) continue;
-        const alvo = nivelCfg(i);
-        alvo.fonte = { ...JSON.parse(JSON.stringify(origem.fonte)) };
-        alvo.espacamento = { ...origem.espacamento };
-        alvo.transformacao = origem.transformacao;
-        alvo.mostrar_pagina = origem.mostrar_pagina; // o recuo continua de cada nível
-      }
-      mudou(); desenhar();
+    if (aba) {
+      e.preventDefault();
+      nivelAtivo = parseInt(aba.dataset.nivel, 10);
+      NIVEL_ATIVO_POR_BLOCO.set(bloco.id, nivelAtivo);
+      desenhar();
+      return;
     }
-    if (a === 'nivel-restaurar') {
-      const c = cfg(); c.niveis = c.niveis || {};
-      c.niveis[nivelAtivo] = nivelPadrao(nivelAtivo);
-      mudou(); desenhar();
+    const a = e.target.closest('[data-acao]')?.dataset.acao;
+    if (a) {
+      e.preventDefault();
+      if (a === 'padrao-doc') { doc.sumario_config_padrao = JSON.parse(JSON.stringify(configEfetivaSumario(doc, bloco))); aoMudar(); desenhar(); return; }
+      if (a === 'usar-padrao') { delete bloco.sumario_config; aoMudar(); desenhar(); return; }
+      if (a === 'nivel-todos') {
+        const origem = JSON.parse(JSON.stringify(nivelCfg(nivelAtivo)));
+        for (let i = 1; i <= NIVEL_MAX; i++) {
+          if (i === nivelAtivo) continue;
+          const alvo = nivelCfg(i);
+          alvo.fonte = { ...JSON.parse(JSON.stringify(origem.fonte)) };
+          alvo.espacamento = { ...origem.espacamento };
+          alvo.transformacao = origem.transformacao;
+          alvo.mostrar_pagina = origem.mostrar_pagina; // o recuo continua de cada nível
+        }
+        mudou(); desenhar(); return;
+      }
+      if (a === 'nivel-restaurar') {
+        const c = cfg(); c.niveis = c.niveis || {};
+        c.niveis[nivelAtivo] = nivelPadrao(nivelAtivo);
+        mudou(); desenhar(); return;
+      }
     }
   });
 

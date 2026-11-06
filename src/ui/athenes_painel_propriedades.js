@@ -111,8 +111,22 @@ export class PainelPropriedades {
    */
   renderizar() {
     if (!this.container) return;
+    const colDir = this.container.closest?.('.rm-col-dir') || this.container;
+    const scrollDirSalvo = colDir ? colDir.scrollTop : 0;
+    const scrollContSalvo = this.container.scrollTop || 0;
+    const scrollPropsSalvo = this.container.querySelector?.('.rm-props')?.scrollTop || 0;
     try {
       this.montarConteudo();
+      const restaurar = () => {
+        if (colDir && scrollDirSalvo > 0) colDir.scrollTop = scrollDirSalvo;
+        if (scrollContSalvo > 0) this.container.scrollTop = scrollContSalvo;
+        const novoProps = this.container.querySelector?.('.rm-props');
+        if (novoProps && scrollPropsSalvo > 0) novoProps.scrollTop = scrollPropsSalvo;
+      };
+      restaurar();
+      if (typeof requestAnimationFrame !== 'undefined') {
+        requestAnimationFrame(restaurar);
+      }
     } catch (erro) {
       console.error('[Athenes] Painel de propriedades:', erro);
       this.container.innerHTML = '';
@@ -268,7 +282,8 @@ export class PainelPropriedades {
       const cheia = linhas[i - 1].length >= LIMITE_BLOCOS_POR_LINHA && i !== info.numero;
       btn.disabled = cheia;
       btn.title = cheia ? 'Esta linha já está cheia' : `Colocar na linha ${i}`;
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
         if (moverParaLinha(this.doc, b.id, i)) this.notificarMudanca(true);
       });
       lns.appendChild(btn);
@@ -280,7 +295,8 @@ export class PainelPropriedades {
     nova.textContent = '+';
     nova.title = 'Mover para uma linha nova ao final';
     nova.disabled = info.quantidade === 1;
-    nova.addEventListener('click', () => {
+    nova.addEventListener('click', (e) => {
+      e.preventDefault();
       if (moverParaLinha(this.doc, b.id, info.total + 1)) this.notificarMudanca(true);
     });
     lns.appendChild(nova);
@@ -315,7 +331,8 @@ export class PainelPropriedades {
       igual.className = 'glx-btn glx-btn-soft glx-btn-sm';
       igual.textContent = 'Igualar larguras';
       igual.title = 'Divide as 12 colunas igualmente entre os blocos desta linha';
-      igual.addEventListener('click', () => {
+      igual.addEventListener('click', (e) => {
+        e.preventDefault();
         igualarLinha(linhas[info.numero - 1]);
         this.notificarMudanca(true);
       });
@@ -366,7 +383,8 @@ export class PainelPropriedades {
         <small>${p.nome}</small>
       `;
 
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
         b.col = p.col;
         b.span = p.span;
         this.notificarMudanca(true);
@@ -402,7 +420,8 @@ export class PainelPropriedades {
       pt.innerHTML = '<i></i>';
       pt.title = `Coluna ${c}`;
 
-      pt.addEventListener('click', () => {
+      pt.addEventListener('click', (e) => {
+        e.preventDefault();
         const ini = b.col;
         const fim = b.col + b.span - 1;
         if (c < ini) {
@@ -507,19 +526,22 @@ export class PainelPropriedades {
         this.notificarMudanca(true); this.renderizar?.();
       });
       box.querySelector('#rmCampoForaSumario')?.addEventListener('change', e => { if (e.target.checked) b.ocultar_no_sumario = true; else delete b.ocultar_no_sumario; this.notificarMudanca(true); });
-      box.querySelector('#rmBtnTirarNumeroManual')?.addEventListener('click', () => {
+      box.querySelector('#rmBtnTirarNumeroManual')?.addEventListener('click', (e) => {
+        e.preventDefault();
         b.texto = String(b.texto || '').replace(REGEX_NUMERO_MANUAL, '');
         this.notificarMudanca(true); this.renderizar?.();
       });
       box.querySelector('#rmCampoEstilo').addEventListener('change', e => { b.estiloId = e.target.value; this.notificarMudanca(); });
       box.querySelector('#rmCampoManter').addEventListener('change', e => { b.manterComProximo = e.target.checked; this.notificarMudanca(); });
 
-      box.querySelector('#athBtnEditarEstiloDoBloco')?.addEventListener('click', () => {
+      box.querySelector('#athBtnEditarEstiloDoBloco')?.addEventListener('click', (e) => {
+        e.preventDefault();
         const est = (this.doc.estilos || []).find(e => e.id === b.estiloId) || this.doc.estilos?.[0];
         if (est) this.setEstilo(est);
       });
 
-      box.querySelectorAll('[data-estilo-no-texto]').forEach(btn => btn.addEventListener('click', () => {
+      box.querySelectorAll('[data-estilo-no-texto]').forEach(btn => btn.addEventListener('click', (e) => {
+        e.preventDefault();
         const est = (this.doc.estilos || []).find(e => e.id === btn.dataset.estiloNoTexto);
         if (est) this.setEstilo(est);
       }));
@@ -577,14 +599,16 @@ export class PainelPropriedades {
         this.renderizar();
       });
 
-      box.querySelector('#athBtnAplicarEstiloBloco')?.addEventListener('click', () => {
+      box.querySelector('#athBtnAplicarEstiloBloco')?.addEventListener('click', (e) => {
+        e.preventDefault();
         const selId = box.querySelector('#rmCampoEstilo')?.value;
         if (selId) b.estiloId = selId;
         this.notificarMudanca(true);
         this.renderizar();
       });
 
-      box.querySelector('#athBtnAplicarEstiloTrecho')?.addEventListener('click', () => {
+      box.querySelector('#athBtnAplicarEstiloTrecho')?.addEventListener('click', (e) => {
+        e.preventDefault();
         const selId = box.querySelector('#rmCampoEstilo')?.value || b.estiloId;
         const est = estilos.find(e => e.id === selId) || estiloAtivo;
         const selInfo = obterOuRestaurarSelecaoDoBloco(b.id);
@@ -602,13 +626,15 @@ export class PainelPropriedades {
         }
       });
 
-      box.querySelector('#athBtnEditarEstiloDoBloco')?.addEventListener('click', () => {
+      box.querySelector('#athBtnEditarEstiloDoBloco')?.addEventListener('click', (e) => {
+        e.preventDefault();
         const est = (this.doc.estilos || []).find(e => e.id === b.estiloId) || this.doc.estilos?.[0];
         if (est) this.setEstilo(est);
       });
 
       // (marcadores, numeração, alinhamento, fonte, cor, fundo, borda, espaços e recuos pertencem ao Estilo de Texto)
-      box.querySelector('#athBtnDividirBlocoProps')?.addEventListener('click', () => {
+      box.querySelector('#athBtnDividirBlocoProps')?.addEventListener('click', (e) => {
+        e.preventDefault();
         this.onDividirBloco(b);
       });
 
@@ -1427,13 +1453,15 @@ export class PainelPropriedades {
     alternarFormato('#athEstiloItalico', 'italico');
     alternarFormato('#athEstiloCaixaAlta', 'caixa_alta');
 
-    box.querySelector('#athBtnSalvarEstilo').addEventListener('click', () => {
+    box.querySelector('#athBtnSalvarEstilo').addEventListener('click', (e) => {
+      e.preventDefault();
       gravarRascunhoNoEstilo(est, rasc);
       this.notificarMudanca(true);
       this.renderizar();
     });
 
-    box.querySelector('#athBtnDuplicarEstilo').addEventListener('click', () => {
+    box.querySelector('#athBtnDuplicarEstilo').addEventListener('click', (e) => {
+      e.preventDefault();
       const novoId = 'est_' + Date.now().toString(36);
       const novoEst = {
         ...rasc,
@@ -1447,7 +1475,8 @@ export class PainelPropriedades {
       this.renderizar();
     });
 
-    box.querySelector('#athBtnExcluirEstilo')?.addEventListener('click', () => {
+    box.querySelector('#athBtnExcluirEstilo')?.addEventListener('click', (e) => {
+      e.preventDefault();
       const uso = contarUsoDoEstilo(this.doc, est.id);
       const aviso = uso
         ? `O estilo "${est.nome}" é usado em ${uso} bloco(s). Eles passarão para o título do mesmo nível ou para o Corpo do Texto. Excluir mesmo assim?`
@@ -1489,7 +1518,8 @@ export class PainelPropriedades {
       this.notificarMudanca(true);
       this.renderizar?.();
     });
-    wrap.querySelector('[data-sep-todos]').addEventListener('click', () => {
+    wrap.querySelector('[data-sep-todos]').addEventListener('click', (e) => {
+      e.preventDefault();
       this.doc.separador_legenda = idSeparadorLegenda(this.doc, b);
       for (const sec of this.doc.secoes || []) for (const x of sec.blocos || []) delete x.separador_legenda;
       this.notificarMudanca(true);

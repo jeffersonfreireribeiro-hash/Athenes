@@ -71,9 +71,22 @@ export class AthenesApp {
         return;
       }
       let telaSalva = null;
-      try { telaSalva = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('athenes_nav_tela') : null; } catch (_) {}
+      let idSalvo = null;
+      try {
+        telaSalva = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('athenes_nav_tela') : null;
+        idSalvo = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('athenes_estudio_artigo_id') : null;
+      } catch (_) {}
       if (params.get('tela') === 'editor' || params.get('editor') === '1' || telaSalva === 'editor') {
         this.carregarUltimoDocENavegarEditor();
+        return;
+      }
+      const ehEstudio = params.get('tela') === 'estudio' || telaSalva === 'estudio';
+      if (ehEstudio) {
+        this.navegarParaDashboard({
+          abaInicial: 'artigos_zotero',
+          artigoInicialId: params.get('artigo') || idSalvo,
+          diretoEstudio: true
+        });
         return;
       }
       this.navegarParaDashboard();
@@ -184,13 +197,13 @@ export class AthenesApp {
     this.navegarParaLogin();
   }
 
-  navegarParaDashboard({ limparSessaoEditor = false } = {}) {
+  navegarParaDashboard({ limparSessaoEditor = false, abaInicial, artigoInicialId, diretoEstudio = false } = {}) {
     this.descarregarSalvamento(); // o painel lê os documentos do armazenamento: grava antes o que ainda estava pendente
     this.editorView?.desmontarAtalhos?.(); // remove os listeners globais do editor que está saindo
-    this.tela = 'dashboard';
+    this.tela = diretoEstudio ? 'estudio' : 'dashboard';
     try {
       if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem('athenes_nav_tela', 'dashboard');
+        sessionStorage.setItem('athenes_nav_tela', diretoEstudio ? 'estudio' : 'dashboard');
         if (limparSessaoEditor) {
           sessionStorage.removeItem('athenes_nav_doc_id');
           sessionStorage.removeItem('athenes_nav_doc_cache');
@@ -201,6 +214,9 @@ export class AthenesApp {
     const dashBox = this.container.querySelector('#athAppDashboard');
 
     this.dashboardView = new DashboardView(dashBox, {
+      abaInicial: abaInicial || (diretoEstudio ? 'artigos_zotero' : undefined),
+      artigoInicialId,
+      diretoEstudio,
       onAbrirDocumento: (doc) => {
         if (doc?.norma === 'zotero_pdf' || doc?.artigoEstudo || String(doc?.id || '').startsWith('artigo_')) {
           const art = doc.artigoEstudo ? { ...doc.artigoEstudo } : { ...doc };

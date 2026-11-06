@@ -1317,6 +1317,26 @@ html, body, button, input, select, textarea, option, summary, label, table,
   color: #FFFFFF;
 }
 
+/* Alça de arraste da pílula móvel e barra contextual */
+.ath-pill-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  padding: 2px 4px;
+  color: #94A3B8;
+  border-radius: 999px;
+  transition: color .12s, transform .12s;
+}
+.ath-pill-drag-handle:hover {
+  color: var(--ath-primary, #314F79);
+}
+.ath-pill-drag-handle:active {
+  cursor: grabbing;
+}
+
 /* Forçar azul da marca em botões selecionados/ativos */
 .rm-ic-bt.on, .rm-ic-bt[aria-pressed="true"], .rm-ic-bt.ativo {
   background: var(--ath-primary, #314F79) !important;

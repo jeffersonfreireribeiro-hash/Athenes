@@ -494,16 +494,27 @@ const lerPastasExcluidas = () => { try { const v = JSON.parse(lerConta(CHAVE_PAS
 /** { idDaPasta: quando } das pastas excluídas neste computador (vai para o servidor, para valer em todos). */
 export const pastasExcluidasRegistradas = () => Object.fromEntries(lerPastasExcluidas().filter(x => x && x.id).map(x => [x.id, x.em || new Date().toISOString()]));
 
-/** Registra a exclusão de pastas (a do Drive vai para a lixeira quando estiver vazia). */
+/** Registra a exclusão de pastas (a do Drive vai para a lixeira quando estiver vazia; pastas compartilhadas têm lixeira: true e não tocam no Drive). */
 export function registrarPastasExcluidas(pastas) {
   const lista = lerPastasExcluidas();
   for (const p of pastas || []) {
     if (!p) continue;
     if (!lista.some(x => (p.id && x.id === p.id) || (p.driveId && x.driveId && x.driveId === p.driveId))) {
-      lista.push({ id: p.id || '', driveId: p.driveId || '', nome: p.nome || '', lixeira: !p.driveId, em: new Date().toISOString() });
+      const lixeiraVal = p.lixeira !== undefined ? Boolean(p.lixeira) : !p.driveId;
+      lista.push({ id: p.id || '', driveId: p.driveId || '', nome: p.nome || '', lixeira: lixeiraVal, em: new Date().toISOString() });
     }
   }
   gravarConta(CHAVE_PASTAS_EXCLUIDAS, JSON.stringify(lista.slice(-300)));
+}
+
+/** Remove uma pasta da lista de excluídas (ex: ao revincular uma pasta compartilhada previamente removida). */
+export function removerPastaExcluida(idOuDriveId) {
+  if (!idOuDriveId) return;
+  const lista = lerPastasExcluidas();
+  const filtrada = lista.filter(x => x && x.id !== idOuDriveId && x.driveId !== idOuDriveId);
+  if (filtrada.length !== lista.length) {
+    gravarConta(CHAVE_PASTAS_EXCLUIDAS, JSON.stringify(filtrada));
+  }
 }
 
 /**

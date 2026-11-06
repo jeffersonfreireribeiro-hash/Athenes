@@ -2130,16 +2130,17 @@ mark.ath-pdf-grifo-texto {
 .ath-zd-arquivo-status { font-size: 10.5px; color: #64748B; display: flex; align-items: center; gap: 4px; margin-top: 1px; }
 
 /* Botões do PDF */
-.ath-zd-acoes-pdf { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.ath-zd-btn-pdf { height: 32px; padding: 0 10px; font-size: 11.5px; font-weight: 750; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+.ath-zd-acoes-pdf { display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 6px; }
+.ath-zd-btn-pdf { height: 32px; padding: 0 8px; font-size: 11px; font-weight: 750; border-radius: 8px; border: 1px solid #CBD5E1; display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; min-width: 0; }
+.ath-zd-btn-pdf span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .ath-zd-btn-pdf.principal { background: #EEF4FA; border: 1px solid #C8D7E6; color: #314F79; }
 .ath-zd-btn-pdf.principal:hover { background: #E2ECF6; color: #1B2D47; }
 .ath-zd-btn-pdf.drive { background: #FFFFFF; border: 1px solid #CBD5E1; color: #334155; }
 .ath-zd-btn-pdf.drive:hover { background: #F8FAFC; border-color: #94A3B8; }
 
 .ath-zd-acoes-secundarias { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-.ath-zd-btn-sub { height: 26px; padding: 0 8px; font-size: 11px; font-weight: 700; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; border: none; background: transparent; cursor: pointer; }
-.ath-zd-btn-sub.desvincular { color: #DC2626; }
+.ath-zd-btn-sub { height: 30px; padding: 0 8px; font-size: 11px; font-weight: 700; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid transparent; background: transparent; cursor: pointer; }
+.ath-zd-btn-sub.desvincular { color: #DC2626; border-color: #FECACA; }
 .ath-zd-btn-sub.desvincular:hover { background: #FEF2F2; }
 .ath-zd-btn-sub.guardar { color: #15803D; background: #F0FDF4; border: 1px solid #BBF7D0; }
 .ath-zd-btn-sub.guardar:hover { background: #DCFCE7; }
@@ -2147,10 +2148,10 @@ mark.ath-pdf-grifo-texto {
 /* Grades e campos */
 .ath-zd-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ath-zd label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 700; color: #475569; min-width: 0; }
-.ath-zd .ath-input { height: 30px; font-size: 12px; width: 100%; box-sizing: border-box; font-weight: 500; border-radius: 7px; border: 1px solid #D5DEE9; background: #F8FAFC; }
+.ath-zd .ath-input { height: 32px; padding: 0 9px; font-size: 12px; width: 100%; box-sizing: border-box; font-weight: 500; border-radius: 8px; border: 1px solid #CBD5E1; background: #F8FAFC; }
 .ath-zd .ath-input:focus { outline: none; border-color: var(--ath-primary, #314F79); background: #fff; }
 .ath-zd-segredo { display: flex; gap: 4px; }
-.ath-zd-segredo .ath-btn { flex: none; font-size: 11px; padding: 0 8px; }
+.ath-zd-segredo .ath-btn { flex: none; font-size: 11px; height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid #CBD5E1; }
 
 .ath-zd-det summary { cursor: pointer; font-size: 11px; font-weight: 700; color: #64748B; padding: 2px 0; }
 .ath-zd-det label { margin-top: 6px; }
