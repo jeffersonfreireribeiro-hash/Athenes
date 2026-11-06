@@ -1840,12 +1840,20 @@ export class EditorView {
 
   
   dividirBlocoAtual(blocoId = null, corte = null) {
-    const id = blocoId || this.blocoSelecionado?.id;
+    const idDom = blocoId || this.blocoSelecionado?.id;
+    const frag = (this.doc.paginas || []).flatMap(p => p.blocos || []).find(b => b.id === idDom);
+    const id = frag?._frag?.origemId || idDom;
     if (!id) return;
+    const ativo = document.activeElement;
+    const ativoIdDom = ativo?.closest?.('[data-bloco-id]')?.dataset.blocoId;
+    const ativoFrag = (this.doc.paginas || []).flatMap(p => p.blocos || []).find(b => b.id === ativoIdDom);
+    const ativoId = ativoFrag?._frag?.origemId || ativoIdDom;
+    const campoAtivo = ativo?.isContentEditable && this.container?.contains(ativo) && ativoId === id ? ativo : null;
+    if (campoAtivo) campoAtivo.dataset.ignorarBlurAposDivisao = '1';
     const res = dividirBlocoTexto(this.doc, id, corte);
     if (res) {
       this.aposEstrutura(res.novoBloco);
-    }
+    } else if (campoAtivo) delete campoAtivo.dataset.ignorarBlurAposDivisao;
   }
 
   aposEstrutura(selecionado) {

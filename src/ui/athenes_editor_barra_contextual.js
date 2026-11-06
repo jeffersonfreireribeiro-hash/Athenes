@@ -10,6 +10,7 @@ import { unirBlocosTexto } from '../core/athenes_documento.js';
 import { modoSomenteLeitura } from '../core/athenes_colaboracao.js';
 import { removerPalavrasIniciais } from '../core/athenes_estilo_avancado.js';
 import { sanearHtmlTexto } from '../core/athenes_estilo_exclusivo.js';
+import { removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
 
 /**
  * Delimita geometricamente as coordenadas (left, top) da pílula ao redor do retângulo do bloco
@@ -328,14 +329,14 @@ export const metodosBarraContextual = {
 
       const rangeDepois = range.cloneRange();
       rangeDepois.selectNodeContents(editable);
-      rangeDepois.setStart(range.endContainer, range.endOffset);
+      rangeDepois.setStart(range.startContainer, range.startOffset);
       const divDepois = document.createElement('div');
       divDepois.appendChild(rangeDepois.cloneContents());
 
       // o bloco a dividir é o que contém o cursor (o selecionado no painel pode ser outro, se o foco veio por teclado ou por outro caminho)
       const bId = editable.closest('[data-bloco-id]')?.dataset.blocoId || this.blocoSelecionado?.id;
       if (bId) {
-        this.dividirBlocoAtual(bId, { textoAntes: removerPalavrasIniciais(divAntes.innerHTML), textoDepois: removerPalavrasIniciais(divDepois.innerHTML) });
+        this.dividirBlocoAtual(bId, { textoAntes: removerPalavrasIniciais(removerHifensCondicionais(divAntes.innerHTML)), textoDepois: removerPalavrasIniciais(removerHifensCondicionais(divDepois.innerHTML)) });
       }
     };
 

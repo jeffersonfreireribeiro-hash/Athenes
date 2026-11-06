@@ -179,7 +179,7 @@ export const metodosBlocoNaFolha = {
       this.instalarSugestaoNoBloco(p, b);
 
       p.addEventListener('input', () => {
-        b.texto = sanearHtmlTexto(removerPalavrasIniciais(p.innerHTML).replace(/<span class="ath-citacao-ref"[^>]*>.*?<\/span>/g, '')); // destaque de palavras iniciais e referência da citação são só de exibição
+        b.texto = sanearHtmlTexto(removerPalavrasIniciais(removerHifensCondicionais(p.innerHTML)).replace(/<span class="ath-citacao-ref"[^>]*>.*?<\/span>/g, '')); // destaque de palavras iniciais e referência da citação são só de exibição
         this.sessaoRealtime?.transmitirAtualizacaoBloco(b);
         this.notificarMudancaRapida(); // agenda gravação/histórico (adiados): fechar a aba com o cursor no campo não perde mais o texto
         this.agendarRepaginacao(); // o texto que cresce passa para a página seguinte na hora, sem precisar reabrir o arquivo
@@ -200,11 +200,11 @@ export const metodosBlocoNaFolha = {
 
               const rangeDepois = range.cloneRange();
               rangeDepois.selectNodeContents(p);
-              rangeDepois.setStart(range.endContainer, range.endOffset);
+              rangeDepois.setStart(range.startContainer, range.startOffset);
               const divDepois = document.createElement('div');
               divDepois.appendChild(rangeDepois.cloneContents());
 
-              this.dividirBlocoAtual(b.id, { textoAntes: removerPalavrasIniciais(divAntes.innerHTML), textoDepois: removerPalavrasIniciais(divDepois.innerHTML) });
+              this.dividirBlocoAtual(b.id, { textoAntes: removerPalavrasIniciais(removerHifensCondicionais(divAntes.innerHTML)), textoDepois: removerPalavrasIniciais(removerHifensCondicionais(divDepois.innerHTML)) });
             } else {
               this.dividirBlocoAtual(b.id);
             }
@@ -235,7 +235,8 @@ export const metodosBlocoNaFolha = {
         }
       });
       p.addEventListener('blur', () => {
-        b.texto = sanearHtmlTexto(removerPalavrasIniciais(p.innerHTML));
+        if (p.dataset.ignorarBlurAposDivisao === '1') return;
+        b.texto = sanearHtmlTexto(removerPalavrasIniciais(removerHifensCondicionais(p.innerHTML)));
         this.notificarMudancaRapida();
       });
       el.appendChild(p);
