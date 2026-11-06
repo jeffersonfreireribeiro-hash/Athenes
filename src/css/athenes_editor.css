@@ -2775,9 +2775,6 @@ ins.ath-sug-ins:hover, del.ath-sug-del:hover { outline: 1.5px solid var(--ath-su
 .rm-config-item strong { display: block; font: 700 12.5px var(--glx-font, inherit); }
 .rm-config-item small { display: block; font-size: 11px; color: #64748B; }
 
-/* caixas de marcar do painel de estilo: tamanho nativo, discreto */
-#athEstiloItalico, #athEstiloCaixaAlta, #athEstiloHifenizacao { appearance: auto; -webkit-appearance: checkbox; width: 14px; height: 14px; min-height: 0; padding: 0; border-radius: 3px; accent-color: #314F79; }
-
 /* Fidelidade com o PDF/DOCX: o bloco na folha não ganha preenchimento nem borda que estreitem o texto ou aumentem a distância
    entre blocos; o destaque de passar o mouse/selecionar é desenhado por fora (sombra), sem ocupar espaço. */
 .ath-folha-area-util .ath-bloco-folha { padding: 0; border: 0; }
@@ -3049,6 +3046,8 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
 .ath-mk-campo .ath-input, .ath-mk-campo .ath-select { height: 34px; width: 100%; box-sizing: border-box; }
 .ath-mk-dica { color: #64748B; font-size: 11px; line-height: 1.4; }
 .ath-fmt-icones .ath-fmt-txt { font: 800 12px var(--glx-font, sans-serif); letter-spacing: .02em; }
+.ath-fmt-icones { display: inline-flex; flex-wrap: nowrap; gap: 4px; width: max-content; max-width: 100%; padding: 3px; }
+.ath-fmt-icones .rm-ic-bt { flex: 0 0 34px; width: 34px; height: 34px; min-height: 34px; padding: 0; appearance: none; -webkit-appearance: none; }
 /* modo de trabalho, réguas e grade ficam juntos, encostados à direita da barra (só o primeiro leva a margem automática) */
 .rm-barra-blocos .ath-modo-wrap ~ .rm-ic-bt,
 .rm-barra-blocos .ath-modo-wrap ~ .rm-ic-guia,

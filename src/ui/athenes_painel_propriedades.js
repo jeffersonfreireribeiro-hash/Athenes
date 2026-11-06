@@ -1320,9 +1320,9 @@ export class PainelPropriedades {
       <div>
         <span style="display:block; font:800 11px var(--glx-font); text-transform:uppercase; letter-spacing:.05em; color:var(--glx-muted, #6B7585); margin-bottom:6px;">Formato</span>
         <div class="rm-icg ath-fmt-icones" role="group" aria-label="Formato do texto do estilo">
-          <button type="button" class="rm-ic-bt ${rasc.italico ? 'on' : ''}" id="athEstiloItalico" aria-pressed="${Boolean(rasc.italico)}" title="Itálico">${svgIcone('italico', 16)}</button>
-          <button type="button" class="rm-ic-bt ath-fmt-txt ${rasc.caixa_alta ? 'on' : ''}" id="athEstiloCaixaAlta" aria-pressed="${Boolean(rasc.caixa_alta)}" title="Caixa alta: todo o texto em letras maiúsculas">AA</button>
-          <button type="button" class="rm-ic-bt ath-fmt-txt ${rasc.hifenizacao ? 'on' : ''}" id="athEstiloHifenizacao" aria-pressed="${Boolean(rasc.hifenizacao)}" title="Hifenização: divide palavras no fim da linha (exem-plo)">a-b</button>
+          <button type="button" class="rm-ic-bt ${rasc.italico ? 'on' : ''}" id="athEstiloItalico" aria-label="Itálico" aria-pressed="${Boolean(rasc.italico)}" title="Itálico">${svgIcone('italico', 16)}</button>
+          <button type="button" class="rm-ic-bt ath-fmt-txt ${rasc.caixa_alta ? 'on' : ''}" id="athEstiloCaixaAlta" aria-label="Caixa alta" aria-pressed="${Boolean(rasc.caixa_alta)}" title="Caixa alta: todo o texto em letras maiúsculas">AA</button>
+          <button type="button" class="rm-ic-bt ath-fmt-txt ${rasc.hifenizacao ? 'on' : ''}" id="athEstiloHifenizacao" aria-label="Hifenização" aria-pressed="${Boolean(rasc.hifenizacao)}" title="Hifenização: divide palavras no fim da linha (exem-plo)">a-b</button>
         </div>
       </div>
 
