@@ -144,7 +144,7 @@ test('formatação direta: Ctrl/Cmd+B, I, U e Ctrl/Cmd+Shift+L/E/R/J são bloque
 test('atalhos de bloco: duplicar, excluir e mover existem, sem conflito com os outros', () => {
   for (const id of ['bloco_duplicar', 'bloco_excluir', 'bloco_subir', 'bloco_descer']) assert.ok(acaoPorId(id), id);
   assert.deepEqual(acaoPorId('bloco_duplicar').atalhos, ['Mod+Shift+D']);
-  assert.deepEqual(acaoPorId('bloco_excluir').atalhos, ['Mod+Shift+Backspace']);
+  assert.deepEqual(acaoPorId('bloco_excluir').atalhos, ['Mod+Shift+X']);
   assert.deepEqual(conflitos(false), []);
   assert.deepEqual(conflitos(true), []);
 });

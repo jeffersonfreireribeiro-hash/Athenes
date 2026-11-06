@@ -36,6 +36,11 @@ const CSS = `
 .ath-at-lin kbd{font:700 11px ui-monospace,Consolas,monospace;background:#F1F5F9;border:1px solid #D5DEE9;border-bottom-width:2px;border-radius:6px;padding:2px 7px;white-space:nowrap}
 .ath-at-cmd{width:260px;padding:6px}.ath-at-cmd button{display:block;width:100%;text-align:left;border:0;height:30px;border-radius:7px}
 .ath-at-cmd button.sel{background:#EAF1FA}
+.ath-at-contexto{position:fixed;z-index:100003;min-width:230px;max-width:min(300px,90vw);padding:5px;background:#fff;border:1px solid #C8D7E6;border-radius:11px;box-shadow:0 12px 32px rgba(15,23,42,.22);font:500 12.5px var(--glx-font,system-ui);color:#1F2733}
+.ath-at-contexto button{width:100%;height:32px;display:flex;align-items:center;gap:8px;padding:0 9px;border:0;border-radius:7px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.ath-at-contexto button:hover{background:#EEF4FA}.ath-at-contexto button:disabled{opacity:.42;cursor:default}
+.ath-at-contexto button span{margin-left:auto;color:#64748B;font-size:11px}
+.ath-at-contexto hr{border:0;border-top:1px solid #E3EAF2;margin:4px 2px}
 ::highlight(ath-busca){background:#FFE08A}::highlight(ath-busca-atual){background:#FF9F43;color:#000}
 `;
 
@@ -50,6 +55,7 @@ export class AtalhosDoEditor {
     this.injetarCss();
     this.registrar();
     this.ligarColagem();
+    this.ligarMenuContexto();
     this.aoInput = (e) => { if (e.target?.isContentEditable && this.ed.container.contains(e.target)) this.ed._edicaoNativa = true; };
     document.addEventListener('input', this.aoInput, true);
     this.gerenciador.anexar();
@@ -60,6 +66,7 @@ export class AtalhosDoEditor {
     this.fecharTudo();
     this.gerenciador.destruir();
     this.removerColagem?.();
+    this.removerMenuContexto?.();
     document.removeEventListener('input', this.aoInput, true);
     document.removeEventListener('keydown', this.aoEsc, true);
     this.limparDestaques();
@@ -195,6 +202,65 @@ export class AtalhosDoEditor {
     document.addEventListener('paste', h, true);
     document.addEventListener('keydown', bloqueio, true);
     this.removerColagem = () => { document.removeEventListener('paste', h, true); document.removeEventListener('keydown', bloqueio, true); };
+  }
+
+  ligarMenuContexto() {
+    const fechar = () => { this.menuContexto?.remove(); this.menuContexto = null; };
+    const aoContexto = (e) => {
+      const alvo = e.target instanceof Element ? e.target : e.target?.parentElement;
+      const editavel = alvo?.closest?.('[contenteditable="true"]');
+      if (!editavel || !this.ed.container.contains(editavel)) return;
+      e.preventDefault();
+      fechar();
+      const selecao = getSelection();
+      const range = selecao?.rangeCount && editavel.contains(selecao.anchorNode) ? selecao.getRangeAt(0).cloneRange() : null;
+      const temTrecho = Boolean(range && !range.collapsed);
+      const leitura = this.somenteLeitura();
+      const menu = document.createElement('div');
+      menu.className = 'ath-at-contexto'; menu.setAttribute('role', 'menu');
+      menu.innerHTML = `
+        <button type="button" role="menuitem" data-cm="recortar" ${!temTrecho || leitura ? 'disabled' : ''}>Recortar <span>Ctrl+X</span></button>
+        <button type="button" role="menuitem" data-cm="copiar" ${!temTrecho ? 'disabled' : ''}>Copiar <span>Ctrl+C</span></button>
+        <button type="button" role="menuitem" data-cm="colar" ${leitura ? 'disabled' : ''}>Colar texto <span>Ctrl+V</span></button>
+        <hr>
+        <button type="button" role="menuitem" data-cm="link" ${leitura ? 'disabled' : ''}>Inserir link <span>Ctrl+K</span></button>
+        <button type="button" role="menuitem" data-cm="limpar" ${!temTrecho || leitura ? 'disabled' : ''}>Limpar formatação</button>
+        <hr>
+        <button type="button" role="menuitem" data-cm="zotero">Citar obra do Zotero</button>
+        <button type="button" role="menuitem" data-cm="nota" ${leitura ? 'disabled' : ''}>Inserir nota de rodapé</button>
+        <hr>
+        <button type="button" role="menuitem" data-cm="duplicar" ${leitura ? 'disabled' : ''}>Duplicar bloco</button>
+        <button type="button" role="menuitem" data-cm="excluir" ${leitura ? 'disabled' : ''}>Excluir bloco <span>Ctrl+Shift+X</span></button>
+        <button type="button" role="menuitem" data-cm="atalhos">Ver atalhos de teclado</button>`;
+      document.body.appendChild(menu);
+      const rect = menu.getBoundingClientRect();
+      menu.style.left = `${Math.max(8, Math.min(e.clientX, innerWidth - rect.width - 8))}px`;
+      menu.style.top = `${Math.max(8, Math.min(e.clientY, innerHeight - rect.height - 8))}px`;
+      menu.addEventListener('mousedown', ev => ev.preventDefault());
+      menu.addEventListener('click', async ev => {
+        const acao = ev.target.closest('[data-cm]')?.dataset.cm;
+        if (!acao) return;
+        fechar();
+        editavel.focus({ preventScroll: true });
+        if (range && ['recortar', 'copiar', 'colar', 'link', 'limpar', 'nota'].includes(acao)) { selecao.removeAllRanges(); selecao.addRange(range); }
+        if (acao === 'recortar' || acao === 'copiar') { document.execCommand(acao === 'recortar' ? 'cut' : 'copy'); if (acao === 'recortar') this.sinalizarEdicao(); }
+        else if (acao === 'colar') { try { const texto = await navigator.clipboard.readText(); document.execCommand('insertText', false, texto); this.sinalizarEdicao(); } catch (_) { this.ed.toast?.('Use Ctrl+V para colar neste navegador.'); } }
+        else if (acao === 'link') this.abrirLink();
+        else if (acao === 'limpar') { document.execCommand('removeFormat'); document.execCommand('unlink'); this.sinalizarEdicao(); }
+        else if (acao === 'zotero') this.ed.abrirPainelZotero();
+        else if (acao === 'nota') this.ed.inserirNotaRodapeNoCursor();
+        else if (acao === 'duplicar') this.duplicarBlocoSelecionado();
+        else if (acao === 'excluir') this.excluirBlocoSelecionado();
+        else if (acao === 'atalhos') this.abrirAjuda();
+      });
+      this.menuContexto = menu;
+    };
+    const aoClique = e => { if (!this.menuContexto?.contains(e.target)) fechar(); };
+    const aoTeclar = e => { if (e.key === 'Escape') fechar(); };
+    this.ed.container.addEventListener('contextmenu', aoContexto);
+    document.addEventListener('pointerdown', aoClique);
+    document.addEventListener('keydown', aoTeclar);
+    this.removerMenuContexto = () => { fechar(); this.ed.container.removeEventListener('contextmenu', aoContexto); document.removeEventListener('pointerdown', aoClique); document.removeEventListener('keydown', aoTeclar); };
   }
 
   // ───────────── recuo ─────────────

@@ -82,6 +82,7 @@ export class EstudoArtigosView {
     this.pinEditandoId = null; // ID da nota adesiva atualmente aberta para edição na folha
     this.filtroBusca = '';
     this.filtroStatus = 'todos';
+    this.filtrosObra = { anoDe: '', anoAte: '', autor: '', editora: '', palavra: '' };
     this.filtroLateralEsq = '';
     this.pastaFiltroId = opcoes.pastaFiltroId || 'todas';
     this.aoMudarPastas = opcoes.aoMudarPastas || null; // a página inicial refaz a lista de pastas quando as coleções do Zotero chegam
@@ -325,6 +326,14 @@ export class EstudoArtigosView {
                 <li><button type="button" role="menuitem" data-filtro-bib="com_citacoes" class="${this.filtroStatus === 'com_citacoes' ? 'sel' : ''}"><span>Com citações marcadas</span>${this.filtroStatus === 'com_citacoes' ? svgIcone('check', 13) : ''}</button></li>
                 <li><button type="button" role="menuitem" data-filtro-bib="compartilhados" class="${this.filtroStatus === 'compartilhados' ? 'sel' : ''}"><span>Compartilhados comigo</span>${this.filtroStatus === 'compartilhados' ? svgIcone('check', 13) : ''}</button></li>
               </ul>
+              <div class="ath-filtros-obra" aria-label="Filtros da obra">
+                <strong>Dados da obra</strong>
+                <div class="ath-filtros-anos"><label>Ano de <input type="number" inputmode="numeric" min="1000" max="9999" data-filtro-obra="anoDe" value="${escapeHtml(this.filtrosObra.anoDe)}"></label><label>Até <input type="number" inputmode="numeric" min="1000" max="9999" data-filtro-obra="anoAte" value="${escapeHtml(this.filtrosObra.anoAte)}"></label></div>
+                <label>Autor <input type="search" data-filtro-obra="autor" value="${escapeHtml(this.filtrosObra.autor)}" placeholder="Nome ou sobrenome"></label>
+                <label>Editora ou periódico <input type="search" data-filtro-obra="editora" value="${escapeHtml(this.filtrosObra.editora)}" placeholder="Nome da publicação"></label>
+                <label>Palavra-chave <input type="search" data-filtro-obra="palavra" value="${escapeHtml(this.filtrosObra.palavra)}" placeholder="Tag do Zotero"></label>
+                <button type="button" class="ath-filtros-limpar" data-limpar-filtros-obra>Limpar dados da obra</button>
+              </div>
             </div>
           </div>
         </div>
@@ -396,6 +405,19 @@ export class EstudoArtigosView {
         this.atualizarGridCatalogo();
       });
     });
+    const marcarFiltroAtivo = () => btnFiltroBib?.classList.toggle('ath-btn-filtro-ativo', this.filtroStatus !== 'todos' || Object.values(this.filtrosObra).some(Boolean));
+    popFiltroBib?.querySelectorAll('[data-filtro-obra]').forEach(input => input.addEventListener('input', () => {
+      this.filtrosObra[input.dataset.filtroObra] = input.value.trim();
+      marcarFiltroAtivo();
+      this.atualizarGridCatalogo();
+    }));
+    popFiltroBib?.querySelector('[data-limpar-filtros-obra]')?.addEventListener('click', () => {
+      Object.keys(this.filtrosObra).forEach(chave => { this.filtrosObra[chave] = ''; });
+      popFiltroBib.querySelectorAll('[data-filtro-obra]').forEach(input => { input.value = ''; });
+      marcarFiltroAtivo();
+      this.atualizarGridCatalogo();
+    });
+    marcarFiltroAtivo();
 
     if (this._fecharMenuOrdemBib) document.removeEventListener('click', this._fecharMenuOrdemBib);
     this._fecharMenuOrdemBib = (ev) => {
@@ -476,6 +498,7 @@ export class EstudoArtigosView {
       autores: item.autores?.length ? item.autores : [{ sobrenome: 'Autor', prenome: '' }],
       ano: item.ano || String(new Date().getFullYear()),
       publicacao: item.publicacao || item.editora || 'Periódico Acadêmico',
+      editora: item.editora || '',
       volume: item.volume || '',
       numero: item.numero || '',
       paginas: item.paginas || '',
@@ -597,6 +620,13 @@ export class EstudoArtigosView {
           if (!ehComp) return false;
         }
       }
+      const f = this.filtrosObra;
+      const ano = Number(String(art.ano || '').match(/\d{4}/)?.[0] || 0);
+      if (f.anoDe && (!ano || ano < Number(f.anoDe))) return false;
+      if (f.anoAte && (!ano || ano > Number(f.anoAte))) return false;
+      if (f.autor && !(art.autores || []).some(a => `${a.prenome || ''} ${a.sobrenome || ''}`.toLocaleLowerCase('pt-BR').includes(f.autor.toLocaleLowerCase('pt-BR')))) return false;
+      if (f.editora && !`${art.editora || art.camposZotero?.publisher || ''} ${art.publicacao || ''}`.toLocaleLowerCase('pt-BR').includes(f.editora.toLocaleLowerCase('pt-BR'))) return false;
+      if (f.palavra && !(art.palavrasChave || []).some(tag => String(tag).toLocaleLowerCase('pt-BR').includes(f.palavra.toLocaleLowerCase('pt-BR')))) return false;
       if (!this.filtroBusca) return true;
       const autoresStr = (art.autores || []).map(a => `${a.prenome} ${a.sobrenome}`).join(' ');
       const tagsStr = (art.palavrasChave || []).join(' ');
@@ -677,6 +707,35 @@ export class EstudoArtigosView {
           return;
         }
         this.abrirArtigoNoEstudio(art);
+      });
+      card.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        document.querySelector('.ath-artigo-menu-contexto')?.remove();
+        const menu = document.createElement('div');
+        menu.className = 'ath-artigo-menu-contexto'; menu.setAttribute('role', 'menu');
+        menu.innerHTML = `<button type="button" role="menuitem" data-acao="abrir">Abrir artigo</button><button type="button" role="menuitem" data-acao="compartilhar">Compartilhar</button><hr><button type="button" role="menuitem" data-acao="referencia">Copiar referência</button><button type="button" role="menuitem" data-acao="chave" ${art.chaveZotero ? '' : 'disabled'}>Copiar chave Zotero</button><hr><button type="button" role="menuitem" data-acao="remover">Remover da lista</button>`;
+        document.body.appendChild(menu);
+        const r = menu.getBoundingClientRect();
+        menu.style.left = `${Math.max(8, Math.min(e.clientX, innerWidth - r.width - 8))}px`;
+        menu.style.top = `${Math.max(8, Math.min(e.clientY, innerHeight - r.height - 8))}px`;
+        const fechar = () => { menu.remove(); document.removeEventListener('pointerdown', fora); document.removeEventListener('keydown', esc); };
+        const fora = ev => { if (!menu.contains(ev.target)) fechar(); };
+        const esc = ev => { if (ev.key === 'Escape') fechar(); };
+        menu.addEventListener('click', async ev => {
+          const acao = ev.target.closest('[data-acao]')?.dataset.acao;
+          if (!acao) return;
+          fechar();
+          if (acao === 'abrir') this.abrirArtigoNoEstudio(art);
+          else if (acao === 'compartilhar') this.abrirModalCompartilharArtigo(art);
+          else if (acao === 'remover') card.querySelector('.ath-btn-excluir-artigo')?.click();
+          else if (acao === 'chave' || acao === 'referencia') {
+            const autores = (art.autores || []).map(a => `${a.sobrenome || ''}, ${a.prenome || ''}`.trim()).filter(Boolean).join('; ');
+            const texto = acao === 'chave' ? art.chaveZotero : `${autores}. ${art.titulo || ''}. ${art.publicacao || art.editora || ''}, ${art.ano || 's.d.'}.`;
+            try { await navigator.clipboard.writeText(texto); } catch (_) { /* A cópia exige permissão do navegador. */ }
+          }
+        });
+        document.addEventListener('pointerdown', fora);
+        document.addEventListener('keydown', esc);
       });
 
       grid.appendChild(card);

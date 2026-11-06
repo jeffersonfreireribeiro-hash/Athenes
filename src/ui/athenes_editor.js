@@ -571,6 +571,7 @@ export class EditorView {
         <button type="button" class="glx-btn glx-btn-primary glx-btn-sm" id="athBtnExportarModal">
           ${svgIcone('exportar', 14)} <span>Exportar</span>
         </button>
+        <button type="button" class="glx-btn glx-btn-soft glx-btn-sm" id="athBtnGuiaAtalhos" title="Ver atalhos de teclado (Ctrl+/)" aria-label="Ver atalhos de teclado">?</button>
       </div>
     `;
     root.appendChild(topoShell);
@@ -806,6 +807,7 @@ export class EditorView {
 
     root.querySelector('#athBtnAbaZotero').addEventListener('click', () => this.onAbrirZotero());
     root.querySelector('#athBtnExportarModal').addEventListener('click', () => this.onAbrirExportar());
+    root.querySelector('#athBtnGuiaAtalhos').addEventListener('click', () => this.atalhos?.abrirAjuda());
 
     // Card de decisão: clique em uma marca de sugestão (ou cursor posicionado sobre ela) abre Aceitar/Rejeitar
     const abrirCardDaMarca = (marca) => abrirCardSugestao({

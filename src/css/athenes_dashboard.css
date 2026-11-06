@@ -2390,6 +2390,19 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   color: #2563EB !important;
 }
 
+#athMenuFiltrarBibPopover { width: min(320px, calc(100vw - 24px)); max-height: min(78vh, 700px); overflow-y: auto; }
+.ath-filtros-obra { display: grid; gap:7px; border-top:1px solid #E3EAF2; padding:11px 10px 7px; font-size:11px; color:#334155; }
+.ath-filtros-obra > strong { color:#314F79; text-transform:uppercase; letter-spacing:.04em; }
+.ath-filtros-obra label { display:grid; gap:3px; font-weight:600; }
+.ath-filtros-anos { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.ath-filtros-obra input { width:100%; box-sizing:border-box; min-width:0; border:1px solid #CBD5E1; border-radius:7px; padding:6px 7px; font:inherit; font-size:12px; }
+.ath-filtros-obra input:focus { outline:2px solid #93B5DC; border-color:#314F79; }
+.ath-filtros-limpar { justify-self:start; border:0; background:transparent; color:#314F79; padding:3px 0; cursor:pointer; font-family:inherit; font-size:11px; font-weight:700; }
+.ath-artigo-menu-contexto { position:fixed; z-index:100003; min-width:205px; padding:5px; background:#fff; border:1px solid #C8D7E6; border-radius:11px; box-shadow:0 12px 32px rgba(15,23,42,.2); font:500 12.5px var(--glx-font,system-ui); color:#1F2733; }
+.ath-artigo-menu-contexto button { display:block; width:100%; padding:8px 10px; border:0; border-radius:7px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.ath-artigo-menu-contexto button:hover { background:#EEF4FA; }.ath-artigo-menu-contexto button:disabled { opacity:.45; cursor:default; }
+.ath-artigo-menu-contexto hr { border:0; border-top:1px solid #E3EAF2; margin:4px 2px; }
+
 .ath-btn-filtro-ativo svg {
   stroke: #2563EB !important;
   color: #2563EB !important;
