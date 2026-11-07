@@ -1065,9 +1065,11 @@
   right: 0 !important;
   bottom: 0 !important;
   width: 100% !important;
-  height: 100% !important;
+  height: 100vh !important;
+  height: 100dvh !important;
   max-width: 100% !important;
-  max-height: 100% !important;
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
   margin: 0 !important;
   padding: 0 !important;
   z-index: 100 !important;
@@ -1130,12 +1132,17 @@
 
 .ath-estudio-full-shell,
 .ath-estudio-full-shell.rm-conteudo {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 101 !important;
   display: flex !important;
   flex-direction: column !important;
   width: 100% !important;
-  height: 100% !important;
-  min-height: 100% !important;
-  max-height: 100% !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
   flex: 1 1 auto !important;
   overflow: hidden !important;
   box-sizing: border-box !important;
@@ -1147,8 +1154,8 @@
   flex-direction: column !important;
   padding: 10px 12px !important;
   flex: 1 1 auto !important;
-  height: calc(100vh - 52px) !important;
-  max-height: calc(100vh - 52px) !important;
+  height: auto !important;
+  max-height: none !important;
   min-height: 0 !important;
   overflow: hidden !important;
   box-sizing: border-box !important;
