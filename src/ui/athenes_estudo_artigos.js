@@ -37,6 +37,8 @@ import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
 import { metodosEstudoAnotacoes } from './athenes_estudo_artigos_anotacoes.js';
 import { metodosEstudoModais } from './athenes_estudo_artigos_modais.js';
+import { metodosEstudoPastas, restaurarPastaAtiva, coletarPastasBibliografia, CORES_PASTAS_CRONOS } from './athenes_estudo_artigos_pastas.js';
+import { renderizarEstante3D, fecharTodosLivros3D, tratarTecladoLivro3D, moverLivroParaPasta } from './athenes_estudo_artigos_estante.js';
 
 export { ehArtigoExemploFicticio, criarArtigosEstudoExemplo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, gerarHtmlNotaZoteroDoArtigo, calcularPontoFinalLinhaReta } from './athenes_estudo_artigos_dados.js';
 
@@ -87,7 +89,10 @@ export class EstudoArtigosView {
     this.filtroStatus = 'todos';
     this.filtrosObra = { anoDe: '', anoAte: '', autor: '', editora: '', palavra: '' };
     this.filtroLateralEsq = '';
-    this.pastaFiltroId = opcoes.pastaFiltroId || 'todas';
+    this.pastaFiltroId = opcoes.pastaFiltroId || restaurarPastaAtiva({
+      pastas: coletarPastasBibliografia(),
+      storage: typeof sessionStorage !== 'undefined' ? sessionStorage : null
+    }) || 'todas';
     this.aoMudarPastas = opcoes.aoMudarPastas || null; // a página inicial refaz a lista de pastas quando as coleções do Zotero chegam
     this.zoteroClient = new ZoteroClient();
     this.carregarConfigZotero();
@@ -215,11 +220,14 @@ export class EstudoArtigosView {
 
   filtrarPorPasta(pastaId) {
     this.pastaFiltroId = pastaId || 'todas';
-    if (!this.artigoAberto) {
+    if (typeof this.selecionarPastaBib === 'function') {
+      this.selecionarPastaBib(this.pastaFiltroId);
+    } else if (!this.artigoAberto) {
       this.atualizarGridCatalogo();
-    } else {
-      const colEsq = this.container.querySelector('#athEstudioColEsq');
-      if (colEsq && this.artigoAberto) {
+    }
+    if (this.artigoAberto) {
+      const colEsq = this.container?.querySelector('#athEstudioColEsq');
+      if (colEsq) {
         this.renderizarColunaEsquerdaEstudio(colEsq, this.artigoAberto, this.artigoAberto.conteudoPaginasPdf);
       }
     }
@@ -311,6 +319,8 @@ export class EstudoArtigosView {
     }
 
     wrap.innerHTML = `
+      <div id="athBibTopoPastasWrapper"></div>
+
       <div class="ath-estudo-barra-topo">
         <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:620px;">
           <div class="ath-busca-box" style="flex:1;">
@@ -373,9 +383,34 @@ export class EstudoArtigosView {
       </div>
 
       <div class="ath-artigos-zotero-grid" id="athArtigosZoteroGrid"></div>
+      <div class="ath-estante-scrim" id="athEstanteScrim"></div>
     `;
 
     this.container.appendChild(wrap);
+
+    wrap.querySelector('#athEstanteScrim')?.addEventListener('click', () => {
+      fecharTodosLivros3D(this.container);
+    });
+
+    if (!this._fecharEstanteGlobalConfigurado) {
+      this._fecharEstanteGlobalConfigurado = true;
+      this.container.addEventListener('click', (ev) => {
+        if (!ev.target?.closest?.('.ath-livro-3d')) {
+          fecharTodosLivros3D(this.container);
+        }
+      });
+      document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape' || ev.keyCode === 27) {
+          const aberto = this.container?.querySelector?.('.ath-livro-3d.aberto');
+          if (aberto) tratarTecladoLivro3D(ev, aberto);
+        }
+      });
+    }
+
+    const topoPastasWrap = wrap.querySelector('#athBibTopoPastasWrapper');
+    if (topoPastasWrap && typeof this.renderizarBarraPastasTopo === 'function') {
+      this.renderizarBarraPastasTopo(topoPastasWrap);
+    }
 
     const inputBusca = wrap.querySelector('#athEstudoBuscaInput');
     inputBusca?.addEventListener('input', () => {
@@ -672,109 +707,167 @@ export class EstudoArtigosView {
     if (filtrados.length === 0) {
       const pastaInfo = buscarPastaNaArvore(obterPastasDriveLocais(), this.pastaFiltroId);
       const rotuloLocal = pastaInfo?.nome ? `na pasta "${pastaInfo.nome}"` : 'para este filtro';
-      grid.innerHTML = `
-        <div style="grid-column:1/-1; padding:42px; text-align:center; background:#fff; border-radius:16px; border:1px solid #E2E8F0;">
-          <p style="font-size:15px; font-weight:800; color:#1F2733; margin:0 0 6px 0;">Nenhum artigo encontrado ${escapeHtml(rotuloLocal)}</p>
+      const estanteVazia = renderizarEstante3D([], { maxPorPrateleira: 6 });
+      const cardVazio = estanteVazia.querySelector('.ath-estante-vazia-card');
+      if (cardVazio) {
+        cardVazio.innerHTML = `
+          <p style="font-size:15px; font-weight:800; color:#1F2733; margin:0 0 6px 0;">Nenhuma obra encontrada ${escapeHtml(rotuloLocal)}</p>
           <p style="font-size:12.5px; color:#64748B; margin:0 0 14px 0;">${this.pastaFiltroId === 'compartilhados_comigo' ? 'Os artigos compartilhados com seu e-mail Google aparecerão aqui.' : 'Sincronize sua biblioteca Zotero ou vincule um novo PDF para esta pasta de bibliografia.'}</p>
           ${this.pastaFiltroId === 'compartilhados_comigo' ? '' : `<button type="button" class="ath-btn ath-btn-primary ath-btn-sm" id="athBtnVincularArtigoVazio">${svgIcone('mais', 13)} Vincular Artigo & PDF</button>`}
-        </div>
-      `;
-      grid.querySelector('#athBtnVincularArtigoVazio')?.addEventListener('click', () => {
-        this.abrirModalVincularArtigo({ pastaId: this.pastaFiltroId });
-      });
+        `;
+        cardVazio.querySelector('#athBtnVincularArtigoVazio')?.addEventListener('click', () => {
+          this.abrirModalVincularArtigo({ pastaId: this.pastaFiltroId });
+        });
+      }
+      grid.appendChild(estanteVazia);
       return;
     }
 
-    filtrados.forEach(art => {
-      const card = document.createElement('article');
-      card.className = 'ath-doc-card ath-artigo-zotero-card';
-
-      const autoresFmt = (art.autores || []).map(a => `${a.sobrenome}, ${a.prenome?.[0] || ''}.`).join('; ');
-      const qtdCitacoes = art.fichamento?.citacoesMarcadas?.length || 0;
-      const qtdTracos = Object.values(art.fichamento?.tracosPorPagina || {}).reduce((acc, l) => acc + (Array.isArray(l) ? l.length : 0), 0);
-      const qtdPins = Object.values(art.fichamento?.notasPagina || {}).reduce((acc, l) => acc + (Array.isArray(l) ? l.length : 0), 0);
-
-      card.innerHTML = `
-        <div class="ath-doc-card-capa-preview" style="border-left: 4px solid ${escapeHtml(art.corCapa || '#314F79')};">
-          <div class="ath-doc-card-capa-titulo">${escapeHtml(art.titulo)}</div>
-          <div class="ath-doc-card-capa-autor">${escapeHtml(autoresFmt)} · ${escapeHtml(art.ano)}</div>
-        </div>
-
-        <div class="ath-doc-card-header">
-          <span class="ath-badge ath-badge-primary">ARTIGO</span>
-          ${art.compartilhadoComigo ? '<span class="ath-badge ath-badge-info">COMPARTILHADO COMIGO</span>' : ''}
-          ${artigoTemPdf(art)
-            ? `<span class="ath-badge ath-badge-ok" title="PDF Vinculado">${svgIcone('drive', 10)} PDF</span>`
-            : (art.anexoPdfZotero?.baixavel ? `<span class="ath-badge ath-badge-info">PDF ZOTERO</span>` : `<span class="ath-badge ath-badge-warn">SEM PDF</span>`)}
-        </div>
-
-        <h3 class="ath-doc-card-titulo">${escapeHtml(art.titulo)}</h3>
-        ${(() => {
-          const resRaw = (art.fichamento?.resumoPessoal || art.resumoOriginal || 'Sem anotações').replace(/\s+/g, ' ').trim();
-          const resCurto = resRaw.length > 115 ? `${resRaw.slice(0, 112)}…` : resRaw;
-          return `<p class="ath-doc-card-subtitulo" title="${escapeHtml(resRaw)}">${escapeHtml(resCurto)}</p>`;
-        })()}
-
-        <div class="ath-doc-card-meta">
-          <span>${qtdCitacoes} citação(ões) · ${qtdTracos + qtdPins} marcação(ões)</span>
-          <div class="ath-doc-card-actions">
-            ${art.compartilhadoComigo ? '' : `<button type="button" class="ath-btn ath-btn-sm ath-btn-compartilhar-artigo" title="Compartilhar documento com outras pessoas" aria-label="Compartilhar">${svgIcone('usuarios', 12)}</button>`}
-            <button type="button" class="ath-btn ath-btn-sm ath-btn-primary ath-btn-abrir-estudio">Abrir</button>
-            ${art.compartilhadoComigo ? '' : `<button type="button" class="ath-btn ath-btn-sm ath-btn-excluir-artigo" title="Remover artigo da lista" aria-label="Remover">${svgIcone('lixeira', 12)}</button>`}
-          </div>
-        </div>
-      `;
-
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.ath-btn-compartilhar-artigo')) {
-          e.stopPropagation();
-          this.abrirModalCompartilharArtigo(art);
-          return;
-        }
-        if (e.target.closest('.ath-btn-excluir-artigo')) {
-          e.stopPropagation();
-          this.artigos = this.artigos.filter(x => x.id !== art.id);
+    const estanteEl = renderizarEstante3D(filtrados, {
+      maxPorPrateleira: 6,
+      callbacks: {
+        onAbrirLeitor: (art) => {
+          if (art.compartilhadoComigo && !this.artigos.includes(art)) {
+            this.abrirArtigoCompartilhadoRecebido(art);
+          } else {
+            this.abrirArtigoNoEstudio(art, 1);
+          }
+        },
+        onStatusChange: (status) => {
           salvarArtigosEstudo(this.artigos);
-          this.atualizarGridCatalogo();
-          return;
+        },
+        onSalvarNota: (nota) => {
+          salvarArtigosEstudo(this.artigos);
+          mostrarAviso('Anotação de fichamento salva com sucesso!', { tipo: 'ok' });
+        },
+        onEditarMeta: (art) => {
+          this.abrirModalVincularArtigo(art);
+        },
+        onEditarMetadados: (art) => {
+          this.abrirModalVincularArtigo(art);
+        },
+        onMoverPasta: (art) => {
+          this.abrirModalMoverArtigo(art);
+        },
+        onMudarCor: (art, cor) => {
+          if (cor) {
+            art.corCapa = cor;
+            salvarArtigosEstudo(this.artigos);
+            this.atualizarGridCatalogo();
+          } else {
+            this.abrirModalCorCapa(art);
+          }
+        },
+        onAlterarCorCapa: (art, cor) => {
+          if (cor) {
+            art.corCapa = cor;
+            salvarArtigosEstudo(this.artigos);
+            this.atualizarGridCatalogo();
+          } else {
+            this.abrirModalCorCapa(art);
+          }
         }
-        if (art.compartilhadoComigo && !this.artigos.includes(art)) this.abrirArtigoCompartilhadoRecebido(art);
-        else this.abrirArtigoNoEstudio(art);
-      });
-      card.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        document.querySelector('.ath-artigo-menu-contexto')?.remove();
-        const menu = document.createElement('div');
-        menu.className = 'ath-artigo-menu-contexto'; menu.setAttribute('role', 'menu');
-        menu.innerHTML = `<button type="button" role="menuitem" data-acao="abrir">Abrir artigo</button>${art.compartilhadoComigo ? '' : '<button type="button" role="menuitem" data-acao="compartilhar">Compartilhar</button>'}<hr><button type="button" role="menuitem" data-acao="referencia">Copiar referência</button><button type="button" role="menuitem" data-acao="chave" ${art.chaveZotero ? '' : 'disabled'}>Copiar chave Zotero</button>${art.compartilhadoComigo ? '' : '<hr><button type="button" role="menuitem" data-acao="remover">Remover da lista</button>'}`;
-        document.body.appendChild(menu);
-        const r = menu.getBoundingClientRect();
-        menu.style.left = `${Math.max(8, Math.min(e.clientX, innerWidth - r.width - 8))}px`;
-        menu.style.top = `${Math.max(8, Math.min(e.clientY, innerHeight - r.height - 8))}px`;
-        const fechar = () => { menu.remove(); document.removeEventListener('pointerdown', fora); document.removeEventListener('keydown', esc); };
-        const fora = ev => { if (!menu.contains(ev.target)) fechar(); };
-        const esc = ev => { if (ev.key === 'Escape') fechar(); };
-        menu.addEventListener('click', async ev => {
-          const acao = ev.target.closest('[data-acao]')?.dataset.acao;
-          if (!acao) return;
-          fechar();
-          if (acao === 'abrir') {
-            if (art.compartilhadoComigo && !this.artigos.includes(art)) this.abrirArtigoCompartilhadoRecebido(art);
-            else this.abrirArtigoNoEstudio(art);
-          }
-          else if (acao === 'compartilhar') this.abrirModalCompartilharArtigo(art);
-          else if (acao === 'remover') card.querySelector('.ath-btn-excluir-artigo')?.click();
-          else if (acao === 'chave' || acao === 'referencia') {
-            const autores = (art.autores || []).map(a => `${a.sobrenome || ''}, ${a.prenome || ''}`.trim()).filter(Boolean).join('; ');
-            const texto = acao === 'chave' ? art.chaveZotero : `${autores}. ${art.titulo || ''}. ${art.publicacao || art.editora || ''}, ${art.ano || 's.d.'}.`;
-            try { await navigator.clipboard.writeText(texto); } catch (_) { /* A cópia exige permissão do navegador. */ }
-          }
-        });
-        document.addEventListener('pointerdown', fora);
-        document.addEventListener('keydown', esc);
-      });
+      }
+    });
 
-      grid.appendChild(card);
+    grid.appendChild(estanteEl);
+  }
+
+  abrirModalMoverArtigo(art) {
+    if (!art) return;
+    const pastas = coletarPastasBibliografia();
+    const modalExistente = document.getElementById('athModalMoverArtigo');
+    if (modalExistente) modalExistente.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'athModalMoverArtigo';
+    overlay.className = 'ath-modal-overlay ath-modal-overlay-visivel';
+    overlay.style.zIndex = '120';
+
+    const card = document.createElement('div');
+    card.className = 'ath-modal-card';
+    card.style.maxWidth = '420px';
+    card.style.padding = '24px';
+
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h3 style="margin:0; font-size:16px; font-weight:800; color:#1E293B;">📁 Mover para Pasta</h3>
+        <button type="button" class="ath-btn ath-btn-sm ath-btn-fechar" id="athBtnFecharMover" style="border:none; background:transparent; font-size:18px; cursor:pointer;">&times;</button>
+      </div>
+      <p style="font-size:12.5px; color:#64748B; margin:0 0 16px 0;">Selecione o destino para <strong>${escapeHtml(art.titulo || 'esta obra')}</strong>:</p>
+      <div id="athListaPastasDestino" style="display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; margin-bottom:18px;">
+        <button type="button" class="ath-btn ath-btn-soft" data-pasta-dest="todas" style="text-align:left; padding:8px 12px; font-size:12.5px; font-weight:700;">
+          📚 Estante Geral (Raiz)
+        </button>
+        ${pastas.map(p => `
+          <button type="button" class="ath-btn ath-btn-soft" data-pasta-dest="${escapeHtml(p.id)}" style="text-align:left; padding:8px 12px; font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:8px;">
+            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${escapeHtml(p.cor || '#314F79')};"></span>
+            ${escapeHtml(p.nome)}
+          </button>
+        `).join('')}
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const fechar = () => overlay.remove();
+    card.querySelector('#athBtnFecharMover')?.addEventListener('click', fechar);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(); });
+
+    card.querySelectorAll('[data-pasta-dest]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pId = btn.dataset.pastaDest;
+        moverLivroParaPasta(art.id, pId, this.artigos, pastas);
+        salvarArtigosEstudo(this.artigos);
+        fechar();
+        this.atualizarGridCatalogo();
+        mostrarAviso('Obra movida com sucesso!', { tipo: 'ok' });
+      });
+    });
+  }
+
+  abrirModalCorCapa(art) {
+    if (!art) return;
+    const modalExistente = document.getElementById('athModalCorCapa');
+    if (modalExistente) modalExistente.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'athModalCorCapa';
+    overlay.className = 'ath-modal-overlay ath-modal-overlay-visivel';
+    overlay.style.zIndex = '120';
+
+    const card = document.createElement('div');
+    card.className = 'ath-modal-card';
+    card.style.maxWidth = '360px';
+    card.style.padding = '20px';
+
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="margin:0; font-size:15px; font-weight:800; color:#1E293B;">🎨 Escolher Cor da Capa</h3>
+        <button type="button" class="ath-btn ath-btn-sm" id="athBtnFecharCorCapa" style="border:none; background:transparent; font-size:18px; cursor:pointer;">&times;</button>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px;">
+        ${CORES_PASTAS_CRONOS.map(c => `
+          <button type="button" data-cor="${c}" style="height:36px; border-radius:6px; border:2px solid ${art.corCapa === c ? '#0F172A' : 'transparent'}; background:${c}; cursor:pointer; transition:transform 0.15s ease;" title="${c}"></button>
+        `).join('')}
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const fechar = () => overlay.remove();
+    card.querySelector('#athBtnFecharCorCapa')?.addEventListener('click', fechar);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(); });
+
+    card.querySelectorAll('[data-cor]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        art.corCapa = btn.dataset.cor;
+        salvarArtigosEstudo(this.artigos);
+        fechar();
+        this.atualizarGridCatalogo();
+      });
     });
   }
 
@@ -1607,100 +1700,186 @@ export class EstudoArtigosView {
      MODAL DE CONFIGURAÇÃO RÁPIDA DE CREDENCIAIS DO ZOTERO (API KEY + USER ID)
      ========================================================================== */
   async sincronizarArtigoComDriveEZotero(art, btnEl = null, statusEl = null) {
+    if (this._sincronizandoArtigo) return;
+    this._sincronizandoArtigo = true;
+
     definirArtigoAbertoAtivo(art);
     salvarArtigosEstudo(this.artigos, art);
+
+    const ehBotaoIcone = Boolean(btnEl && (btnEl.classList.contains('rm-ic-bt') || !btnEl.querySelector('span')));
     const txtOriginal = btnEl ? btnEl.innerHTML : '';
-    if (btnEl) btnEl.textContent = 'Salvando...';
+    const tituloOriginal = btnEl ? (btnEl.getAttribute('title') || '') : '';
+    const ariaLabelOriginal = btnEl ? (btnEl.getAttribute('aria-label') || '') : '';
+
+    if (btnEl) {
+      if (ehBotaoIcone) {
+        btnEl.classList.add('ath-salvando');
+        btnEl.classList.remove('ath-salvo', 'ath-salvar-erro');
+        btnEl.setAttribute('aria-busy', 'true');
+        btnEl.setAttribute('title', 'Salvando alterações...');
+        btnEl.setAttribute('aria-label', 'Salvando alterações...');
+      } else {
+        btnEl.disabled = true;
+        const span = btnEl.querySelector('span');
+        if (span) span.textContent = 'Salvando...';
+        else btnEl.textContent = 'Salvando...';
+      }
+    }
 
     const resultados = [];
 
     try {
-      await bib.sincronizarBiblioteca();
-      resultados.push('Biblioteca sincronizada ✓');
-    } catch (_) {}
-
-    const htmlNotaZotero = gerarHtmlNotaZoteroDoArtigo(art);
-    if (this.temZoteroConectado() && art.chaveZotero) {
       try {
-        const resZot = await this.zoteroClient.sincronizarNotaFilhaNoZotero({
-          parentItemKey: art.chaveZotero,
-          noteKey: art.notaZoteroKey || null,
-          htmlNota: htmlNotaZotero,
-          tags: ['Athenes', 'Fichamento PDF', ...(art.palavrasChave || []).slice(0, 3)],
-          artigoMetadados: art
-        });
-        if (resZot.parentKey) art.chaveZotero = resZot.parentKey;
-        if (resZot.noteKey) art.notaZoteroKey = resZot.noteKey;
-        if (this.zoteroClient.userId) {
-          this.salvarConfigZotero({ userId: this.zoteroClient.userId });
+        await bib.sincronizarBiblioteca();
+        resultados.push('Biblioteca sincronizada ✓');
+      } catch (_) {}
+
+      const htmlNotaZotero = gerarHtmlNotaZoteroDoArtigo(art);
+      if (this.temZoteroConectado() && art.chaveZotero) {
+        try {
+          const resZot = await this.zoteroClient.sincronizarNotaFilhaNoZotero({
+            parentItemKey: art.chaveZotero,
+            noteKey: art.notaZoteroKey || null,
+            htmlNota: htmlNotaZotero,
+            tags: ['Athenes', 'Fichamento PDF', ...(art.palavrasChave || []).slice(0, 3)],
+            artigoMetadados: art
+          });
+          if (resZot.parentKey) art.chaveZotero = resZot.parentKey;
+          if (resZot.noteKey) art.notaZoteroKey = resZot.noteKey;
+          if (this.zoteroClient.userId) {
+            this.salvarConfigZotero({ userId: this.zoteroClient.userId });
+          }
+          if (resZot.ok) resultados.push('Zotero ✓');
+        } catch (e) {
+          console.warn('[Athenes] Zotero sync nota:', e.message);
         }
-        if (resZot.ok) resultados.push('Zotero ✓');
-      } catch (e) {
-        console.warn('[Athenes] Zotero sync nota:', e.message);
       }
-    }
 
-    try {
-      const sessaoSync = lerSessaoSupabase();
-      const idSufixoSync = sessaoSync?.user_id ? `_${sessaoSync.user_id.slice(0, 8)}` : '';
-      const idDocSync = art.docCompartilhadoId || `artigo_${art.id || 'ref'}${idSufixoSync}`;
-      art.docCompartilhadoId = idDocSync;
-      await salvarDocumentoNoSupabase({
-        id: idDocSync,
-        titulo: `[Fichamento PDF] ${art.titulo}`,
-        autor: (art.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome || ''}`.trim()).filter(Boolean).join(', ') || 'Autor',
-        norma: 'zotero_pdf',
-        secoes: [],
-        artigoEstudo: art
-      });
-      resultados.push('Nuvem Supabase ✓');
-    } catch (_) {}
-
-    const driveCfg = obterConfigGoogleDrive();
-    if (driveCfg.accessToken || driveCfg.clientId) {
       try {
-        const token = await obterTokenOuConectar(driveCfg);
-        const salvoDrive = await salvarArquivoNoGoogleDrive({
-          nomeArquivo: `${(art.driveFileName || 'Artigo').replace(/\.pdf$/i, '')}.athenes-pdf.json`,
-          conteudoBlobOuTexto: art,
-          accessToken: token,
-          pastaId: driveCfg.pastaId || null,
-          driveFileId: art.driveAnnotationFileId || null
+        const sessaoSync = lerSessaoSupabase();
+        const idSufixoSync = sessaoSync?.user_id ? `_${sessaoSync.user_id.slice(0, 8)}` : '';
+        const idDocSync = art.docCompartilhadoId || `artigo_${art.id || 'ref'}${idSufixoSync}`;
+        art.docCompartilhadoId = idDocSync;
+        await salvarDocumentoNoSupabase({
+          id: idDocSync,
+          titulo: `[Fichamento PDF] ${art.titulo}`,
+          autor: (art.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome || ''}`.trim()).filter(Boolean).join(', ') || 'Autor',
+          norma: 'zotero_pdf',
+          secoes: [],
+          artigoEstudo: art
         });
-        if (salvoDrive?.id) art.driveAnnotationFileId = salvoDrive.id;
+        resultados.push('Nuvem Supabase ✓');
+      } catch (_) {}
 
-        // Se o PDF ainda não está salvo no Google Drive, faz o upload para a pasta indicada
-        if (!art.driveFileId) {
-          const pdfBlob = await obterPdfLocal(art.id) || art.pdfBlob;
-          if (pdfBlob) {
-            const nomePdf = art.driveFileName || `${(art.titulo || 'artigo').slice(0, 40).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
-            const salvoPdf = await salvarArquivoNoGoogleDrive({
-              nomeArquivo: nomePdf,
-              conteudoBlobOuTexto: pdfBlob,
-              mimeType: 'application/pdf',
-              accessToken: token,
-              pastaId: driveCfg.pastaId || null
-            });
-            if (salvoPdf?.id) {
-              art.driveFileId = salvoPdf.id;
-              art.driveFileName = salvoPdf.name || nomePdf;
-              art.driveStatus = 'PDF no Google Drive';
+      const driveCfg = obterConfigGoogleDrive();
+      if (driveCfg.accessToken || driveCfg.clientId) {
+        try {
+          const token = await obterTokenOuConectar(driveCfg);
+          const salvoDrive = await salvarArquivoNoGoogleDrive({
+            nomeArquivo: `${(art.driveFileName || 'Artigo').replace(/\.pdf$/i, '')}.athenes-pdf.json`,
+            conteudoBlobOuTexto: art,
+            accessToken: token,
+            pastaId: driveCfg.pastaId || null,
+            driveFileId: art.driveAnnotationFileId || null
+          });
+          if (salvoDrive?.id) art.driveAnnotationFileId = salvoDrive.id;
+
+          // Se o PDF ainda não está salvo no Google Drive, faz o upload para a pasta indicada
+          if (!art.driveFileId) {
+            const pdfBlob = await obterPdfLocal(art.id) || art.pdfBlob;
+            if (pdfBlob) {
+              const nomePdf = art.driveFileName || `${(art.titulo || 'artigo').slice(0, 40).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+              const salvoPdf = await salvarArquivoNoGoogleDrive({
+                nomeArquivo: nomePdf,
+                conteudoBlobOuTexto: pdfBlob,
+                mimeType: 'application/pdf',
+                accessToken: token,
+                pastaId: driveCfg.pastaId || null
+              });
+              if (salvoPdf?.id) {
+                art.driveFileId = salvoPdf.id;
+                art.driveFileName = salvoPdf.name || nomePdf;
+                art.driveStatus = 'PDF no Google Drive';
+              }
             }
           }
-        }
-        resultados.push('Google Drive ✓');
-      } catch (_) {}
-    }
+          resultados.push('Google Drive ✓');
+        } catch (_) {}
+      }
 
-    salvarArtigosEstudo(this.artigos, art);
-    if (btnEl) {
-      btnEl.textContent = 'Salvo ✓';
-      setTimeout(() => { btnEl.innerHTML = txtOriginal; }, 1800);
+      salvarArtigosEstudo(this.artigos, art);
+
+      if (btnEl) {
+        if (ehBotaoIcone) {
+          btnEl.classList.remove('ath-salvando');
+          btnEl.classList.add('ath-salvo');
+          btnEl.removeAttribute('aria-busy');
+          btnEl.setAttribute('title', 'Salvo com sucesso!');
+          btnEl.setAttribute('aria-label', 'Salvo com sucesso!');
+
+          if (this._timerFeedbackSalvar) clearTimeout(this._timerFeedbackSalvar);
+          this._timerFeedbackSalvar = setTimeout(() => {
+            btnEl.classList.remove('ath-salvo');
+            btnEl.setAttribute('title', tituloOriginal || 'Salvar alterações');
+            btnEl.setAttribute('aria-label', ariaLabelOriginal || 'Salvar');
+            this._timerFeedbackSalvar = null;
+          }, 1800);
+        } else {
+          btnEl.disabled = false;
+          const span = btnEl.querySelector('span');
+          if (span) span.textContent = 'Salvo ✓';
+          else btnEl.textContent = 'Salvo ✓';
+          setTimeout(() => {
+            if (span) span.textContent = 'Sincronizar agora';
+            else btnEl.innerHTML = txtOriginal;
+          }, 1800);
+        }
+      }
+
+      if (statusEl) {
+        statusEl.textContent = resultados.join(' · ');
+      }
+      mostrarAviso('Alterações, riscos e citações salvos com sucesso!', { tipo: 'ok' });
+
+    } catch (err) {
+      console.error('[Athenes] Falha ao sincronizar artigo:', err);
+
+      if (btnEl) {
+        if (ehBotaoIcone) {
+          btnEl.classList.remove('ath-salvando', 'ath-salvo');
+          btnEl.classList.add('ath-salvar-erro');
+          btnEl.removeAttribute('aria-busy');
+          btnEl.setAttribute('title', 'Erro ao salvar. Clique para tentar novamente.');
+          btnEl.setAttribute('aria-label', 'Erro ao salvar. Tentar novamente.');
+
+          if (this._timerFeedbackSalvar) clearTimeout(this._timerFeedbackSalvar);
+          this._timerFeedbackSalvar = setTimeout(() => {
+            btnEl.classList.remove('ath-salvar-erro');
+            btnEl.setAttribute('title', tituloOriginal || 'Salvar alterações');
+            btnEl.setAttribute('aria-label', ariaLabelOriginal || 'Salvar');
+            this._timerFeedbackSalvar = null;
+          }, 3000);
+        } else {
+          btnEl.disabled = false;
+          const span = btnEl.querySelector('span');
+          if (span) span.textContent = 'Erro ao salvar';
+          else btnEl.textContent = 'Erro ao salvar';
+          setTimeout(() => {
+            if (span) span.textContent = 'Sincronizar agora';
+            else btnEl.innerHTML = txtOriginal;
+          }, 3000);
+        }
+      }
+
+      if (statusEl) {
+        statusEl.style.color = '#B91C1C';
+        statusEl.textContent = `Atenção: ${err.message || 'Falha na sincronização'}`;
+      }
+      mostrarAviso(`Erro ao salvar: ${err.message || 'verifique sua conexão.'}`, { tipo: 'erro' });
+
+    } finally {
+      this._sincronizandoArtigo = false;
     }
-    if (statusEl) {
-      statusEl.textContent = resultados.join(' · ');
-    }
-    mostrarAviso('Alterações, riscos e citações salvos com sucesso!', { tipo: 'ok' });
   }
 
   async sincronizarComZoteroApi({ silencioso = false } = {}) {
@@ -1955,4 +2134,4 @@ export class EstudoArtigosView {
 
 }
 
-Object.assign(EstudoArtigosView.prototype, metodosEstudoTela, metodosEstudoPainelDireito, metodosEstudoAnotacoes, metodosEstudoModais);
+Object.assign(EstudoArtigosView.prototype, metodosEstudoTela, metodosEstudoPainelDireito, metodosEstudoAnotacoes, metodosEstudoModais, metodosEstudoPastas);

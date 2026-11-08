@@ -24,3 +24,13 @@ android/.kotlin/
 android/*.iml
 android/*/*.iml
 *.salive
+
+# Ephemeral agent & test artifacts
+.claude/
+.agents/teamwork/
+.agents/rules/
+.playwright-mcp/
+TEST_INFRA.md
+TEST_READY.md
+cronos-*.png
+abrir_emulador.bat

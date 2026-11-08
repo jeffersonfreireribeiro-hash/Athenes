@@ -408,6 +408,77 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 .rm-ic-primario:hover { background: #1B2D47; border-color: #1B2D47; color: #fff; }
 .rm-ic-primario:disabled { opacity: .5; cursor: progress; }
 
+/* ==========================================================================
+   ATHENES — INDICADOR VISUAL CIRCULAR DE SALVAMENTO (R1)
+   Substitui injeção de texto por spinner concêntrico elegante sobre o botão circular
+   ========================================================================== */
+
+/* 1. Estado Ativo de Salvamento */
+.rm-ic-bt.rm-ic-primario.ath-salvando,
+.rm-ic-bt.ath-salvando {
+  position: relative !important;
+  cursor: wait !important;
+  opacity: 1 !important;
+  pointer-events: none !important;
+}
+
+/* 2. Spinner de linha branca circular concêntrico */
+.rm-ic-bt.rm-ic-primario.ath-salvando::before,
+.rm-ic-bt.ath-salvando::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  border-top-color: #ffffff;
+  animation: ath-spinner-salvar 0.8s linear infinite;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 3. Ícone central preservado com leve redução de escala para respiro */
+.rm-ic-bt.ath-salvando svg {
+  opacity: 0.85;
+  transform: scale(0.88);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+@keyframes ath-spinner-salvar {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 4. Estado de Confirmação de Sucesso (após salvar) */
+.rm-ic-bt.rm-ic-primario.ath-salvo,
+.rm-ic-bt.ath-salvo {
+  background: #15803D !important;
+  border-color: #15803D !important;
+  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.25) !important;
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.rm-ic-bt.ath-salvo svg {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+}
+
+/* 5. Estado de Erro no Salvamento */
+.rm-ic-bt.rm-ic-primario.ath-salvar-erro,
+.rm-ic-bt.ath-salvar-erro {
+  background: #B91C1C !important;
+  border-color: #B91C1C !important;
+  box-shadow: 0 4px 12px rgba(185, 28, 28, 0.25) !important;
+  animation: ath-shake-salvar 0.35s ease;
+}
+
+@keyframes ath-shake-salvar {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2.5px); }
+  75% { transform: translateX(2.5px); }
+}
+
+
 /* ---- Cartões com borda de acento (laranja + tons complementares) ---- */
 .rm-cartao { --ac: var(--glx-acento-1); position: relative; padding-top: 22px; border: 1.5px solid color-mix(in srgb, var(--ac) 45%, #fff); box-shadow: 0 10px 26px -14px color-mix(in srgb, var(--ac) 55%, transparent); transition: box-shadow .18s, border-color .18s; }
 .rm-cartao:nth-child(5n+2) { --ac: var(--glx-acento-2); }

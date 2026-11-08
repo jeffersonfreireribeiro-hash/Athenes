@@ -1,0 +1,834 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Athenes — Estante e Livros Esquemáticos em CSS 3D & Folha de Fichamento (Requisitos R3 e R4) */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   1. Scrim / Backdrop de Foco da Estante
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-estante-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 90;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.ath-estante-scrim.ativo {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   2. Container Geral da Estante e Viewport 3D
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-estante-3d,
+.ath-estante-container {
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+  padding: 32px 16px 64px 16px;
+  max-width: 1320px;
+  margin: 0 auto;
+  perspective: 1000px;
+  perspective-origin: 50% 35%;
+  overflow: visible;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   3. Prateleira Horizontal
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-estante-prateleira {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  transform-style: preserve-3d;
+  box-sizing: border-box;
+}
+
+/* Área de repouso dos livros na prateleira */
+.ath-prateleira-livros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 36px 32px;
+  padding: 0 24px;
+  min-height: 240px;
+  z-index: 2;
+  box-sizing: border-box;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   4. Base Chanfrada da Prateleira (Wood/Metal Editorial)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-prateleira-base {
+  position: relative;
+  width: 100%;
+  height: 16px;
+  margin-top: -2px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* Superfície plana superior com sutil brilho iluminado */
+.ath-prateleira-superficie {
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(90deg, #CBD5E1 0%, #E2E8F0 50%, #CBD5E1 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.6);
+  box-sizing: border-box;
+}
+
+/* Chanfro biselado frontal em tom metal/madeira editorial */
+.ath-prateleira-chanfro {
+  width: 100%;
+  height: 10px;
+  background: linear-gradient(180deg, #94A3B8 0%, #64748B 60%, #475569 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom: 1px solid #1E293B;
+  box-sizing: border-box;
+}
+
+/* Sombra projetada profunda sob a prateleira */
+.ath-prateleira-sombra,
+.ath-prateleira-sombra-inferior {
+  position: absolute;
+  top: 100%;
+  left: 2%;
+  right: 2%;
+  height: 20px;
+  background: radial-gradient(ellipse at 50% 0%, rgba(15, 23, 42, 0.28) 0%, rgba(15, 23, 42, 0.08) 50%, transparent 80%);
+  pointer-events: none;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   5. Wrapper de Perspectiva e Caixa Delimitadora do Livro
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-livro-3d-wrap {
+  position: relative;
+  width: 154px;
+  height: 226px; /* Proporção áurea vertical 1:1.47 */
+  perspective: 1000px;
+  perspective-origin: 50% 40%;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  box-sizing: border-box;
+  margin-bottom: 2px;
+}
+
+/* Foco acessível no livro */
+.ath-livro-3d:focus-visible,
+.ath-livro-3d-wrap:focus-visible.ath-livro-3d,
+.ath-livro-3d-wrap:focus-visible .ath-livro-3d {
+  outline: 2px solid #FACC15;
+  outline-offset: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   6. Elemento Tridimensional do Livro
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-livro-3d {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateY(-18deg) rotateX(4deg) translateZ(0);
+  transform-origin: 50% 100%;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.45s ease;
+  box-sizing: border-box;
+}
+
+/* Hover na prateleira (destaque sutil do exemplar quando fechado) */
+.ath-livro-3d:not(.aberto):hover,
+.ath-livro-3d-wrap:hover.ath-livro-3d:not(.aberto),
+.ath-livro-3d-wrap:hover .ath-livro-3d:not(.aberto) {
+  transform: translateY(-8px) rotateY(-8deg) rotateX(2deg) translateZ(16px) !important;
+}
+
+/* Sombra de contato basal do livro pousado na prateleira */
+.ath-livro-sombra-base {
+  position: absolute;
+  bottom: -6px;
+  left: -10px;
+  right: -6px;
+  height: 14px;
+  background: radial-gradient(ellipse at 40% 50%, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.12) 50%, transparent 75%);
+  transform: rotateX(90deg) translateZ(-6px);
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   7. Anatomia 3D: Lombada Lateral Esquerda (Spine)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-livro-lombada {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 100%;
+  transform-origin: left center;
+  transform: rotateY(-90deg);
+  background: linear-gradient(90deg, 
+    rgba(0, 0, 0, 0.48) 0%, 
+    rgba(255, 255, 255, 0.18) 28%, 
+    rgba(0, 0, 0, 0.22) 75%, 
+    rgba(0, 0, 0, 0.52) 100%
+  ), var(--ath-livro-cor, #314F79);
+  border-radius: 3px 0 0 3px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.ath-livro-lombada-texto {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-height: 180px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   8. Anatomia 3D: Bloco de Páginas da Lateral Direita e Borda Inferior
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-livro-paginas,
+.ath-livro-paginas-dir {
+  position: absolute;
+  top: 3px;
+  right: 0;
+  bottom: 3px;
+  width: 22px;
+  transform-origin: right center;
+  transform: rotateY(90deg);
+  background: repeating-linear-gradient(
+    to right,
+    #FAF9F5 0px,
+    #F1EFEA 1px,
+    #E5E2DB 2px,
+    #D4D0C7 3px
+  );
+  box-shadow: inset 2px 0 4px rgba(0, 0, 0, 0.14);
+  box-sizing: border-box;
+}
+
+.ath-livro-paginas-baixo {
+  position: absolute;
+  bottom: 0;
+  left: 3px;
+  right: 3px;
+  height: 22px;
+  transform-origin: bottom center;
+  transform: rotateX(-90deg);
+  background: repeating-linear-gradient(
+    to bottom,
+    #FAF9F5 0px,
+    #F1EFEA 1px,
+    #E5E2DB 2px,
+    #D4D0C7 3px
+  );
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
+  box-sizing: border-box;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   9. Anatomia 3D: Capa Traseira
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-livro-capa-tras {
+  position: absolute;
+  inset: 0;
+  transform: translateZ(-22px);
+  background: var(--ath-livro-cor, #314F79);
+  border-radius: 2px 4px 4px 2px;
+  box-shadow: -8px 12px 20px rgba(15, 23, 42, 0.28);
+  box-sizing: border-box;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   10. Anatomia 3D: Capa Frontal Áurea
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-livro-capa,
+.ath-livro-capa-frente {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: translateZ(0);
+  transform-style: preserve-3d;
+  background: linear-gradient(135deg, 
+    var(--ath-livro-cor, #314F79) 0%, 
+    color-mix(in srgb, var(--ath-livro-cor, #314F79) 82%, #000000) 100%
+  );
+  border-radius: 2px 6px 6px 2px;
+  padding: 12px 10px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 
+    inset 5px 0 10px rgba(0, 0, 0, 0.32), 
+    inset -1px 0 2px rgba(255, 255, 255, 0.22), 
+    2px 4px 12px rgba(0, 0, 0, 0.18);
+  backface-visibility: visible;
+  transition: transform 0.65s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.65s ease;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+/* Face interna da capa (verso visível quando aberto a -140deg) */
+.ath-livro-capa-verso,
+.ath-livro-capa-interna {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg) translateZ(1px);
+  backface-visibility: hidden;
+  background: linear-gradient(135deg, 
+    color-mix(in srgb, var(--ath-livro-cor, #314F79) 75%, #1e293b) 0%, 
+    color-mix(in srgb, var(--ath-livro-cor, #314F79) 50%, #0f172a) 100%
+  );
+  border-radius: 6px 2px 2px 6px;
+  box-shadow: inset 4px 0 12px rgba(0, 0, 0, 0.45);
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+/* Vinco de articulação da encadernação */
+.ath-livro-capa-vinco-esq {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 6px;
+  width: 2px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.35) 0%, rgba(255, 255, 255, 0.2) 100%);
+  pointer-events: none;
+}
+
+/* Cabeçalho da capa: Badge e Contador de Citações */
+.ath-livro-capa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ath-livro-badge-tipo {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.ath-livro-citacoes,
+.ath-livro-badge-citacoes {
+  font-size: 10px;
+  font-weight: 800;
+  color: #FDE047;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(253, 224, 71, 0.4);
+  white-space: nowrap;
+}
+
+/* Título com truncamento em até 3 linhas */
+.ath-livro-titulo {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #FFFFFF;
+  line-height: 1.3;
+  margin: 0 0 6px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  word-break: break-word;
+}
+
+/* Autores contidos */
+.ath-livro-autores {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: auto;
+  margin-top: 0;
+}
+
+/* Rodapé da capa: Indicador de PDF */
+.ath-livro-capa-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.ath-livro-pdf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.3);
+  color: #A7F3D0;
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  white-space: nowrap;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   11. Estado Aberto (Cinemática 3D de Rotação da Capa)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-livro-3d.aberto {
+  z-index: 100;
+  transform: translateZ(60px);
+  transition: transform 0.55s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.ath-livro-3d.aberto .ath-livro-capa,
+.ath-livro-3d.aberto .ath-livro-capa-frente {
+  transform: rotateY(-140deg);
+  box-shadow: -6px 8px 18px rgba(0, 0, 0, 0.28);
+  backface-visibility: visible;
+}
+
+/* Oculta textos da face frontal da capa quando aberta a -140deg */
+.ath-livro-3d.aberto .ath-livro-capa .ath-livro-capa-header,
+.ath-livro-3d.aberto .ath-livro-capa .ath-livro-titulo,
+.ath-livro-3d.aberto .ath-livro-capa .ath-livro-autores,
+.ath-livro-3d.aberto .ath-livro-capa .ath-livro-capa-footer,
+.ath-livro-3d.aberto .ath-livro-capa .ath-livro-capa-vinco-esq {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   12. Folha Interna de Fichamento (.ath-livro-folha-interna)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-livro-folha-interna {
+  position: absolute;
+  top: -8px;
+  left: 0;
+  width: 290px;
+  min-height: 100%;
+  max-height: 420px;
+  background: #FFFFFF;
+  border-radius: 4px 8px 8px 4px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.28), 0 2px 8px rgba(15, 23, 42, 0.12);
+  border: 1px solid #E2E8F0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  z-index: 10;
+  transform: rotateY(-4deg) translateZ(6px);
+  transition: transform 0.5s 0.08s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
+}
+
+/* Ocultação total e estrita da folha interna quando o livro estiver fechado */
+.ath-livro-3d:not(.aberto) .ath-livro-folha-interna {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.ath-livro-3d.aberto .ath-livro-folha-interna {
+  display: flex;
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Cabeçalho da folha */
+.ath-folha-cabecalho,
+.ath-folha-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #E2E8F0;
+  padding-bottom: 12px;
+}
+
+.ath-folha-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ath-folha-tipo-badge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #314F79;
+  background: #EEF2F6;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Seletor de status toggle */
+.ath-status-toggle,
+.ath-folha-status-selector {
+  display: inline-flex;
+  background: #F1F5F9;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.ath-status-btn,
+.ath-status-opt {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.ath-status-btn:hover {
+  color: #1E293B;
+}
+
+.ath-status-btn.ativo {
+  background: #FFFFFF;
+  color: #0F172A;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.ath-folha-titulo {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1.35;
+  margin: 0;
+  word-break: break-word;
+}
+
+.ath-folha-meta,
+.ath-folha-autores-completos {
+  font-size: 11.5px;
+  color: #475569;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Citation Tracker */
+.ath-citation-tracker,
+.ath-folha-citation-tracker {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ath-citation-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ath-citacoes-total,
+.ath-citation-metric-num {
+  font-size: 12px;
+  font-weight: 800;
+  color: #1E293B;
+}
+
+.ath-btn-copiar-citacao,
+.ath-btn-copiar-chave {
+  font-size: 10px;
+  font-weight: 700;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ath-btn-copiar-citacao:hover {
+  background: #F1F5F9;
+  border-color: #94A3B8;
+}
+
+.ath-btn-copiar-citacao.copiado {
+  background: #DCFCE7;
+  color: #166534;
+  border-color: #86EFAC;
+}
+
+.ath-citation-secoes-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ath-citation-secao-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  background: #E2E8F0;
+  color: #334155;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.ath-citation-vazio-aviso {
+  font-size: 11px;
+  color: #94A3B8;
+  font-style: italic;
+}
+
+/* Preview de Fichamento */
+.ath-fichamento-preview,
+.ath-folha-fichamento {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.ath-folha-subtit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 800;
+  color: #475569;
+}
+
+.ath-grifos-contador,
+.ath-folha-grifos-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #0369A1;
+  background: #E0F2FE;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin: 0;
+}
+
+.ath-folha-trecho-destaque {
+  font-size: 11px;
+  line-height: 1.45;
+  color: #854D0E;
+  background: #FEF9C3;
+  border-left: 3px solid #EAB308;
+  padding: 6px 8px;
+  border-radius: 0 4px 4px 0;
+  margin: 0;
+  font-style: italic;
+}
+
+.ath-anotacao-rapida-input,
+.ath-folha-textarea {
+  width: 100%;
+  min-height: 60px;
+  font-family: inherit;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #1E293B;
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  padding: 8px;
+  box-sizing: border-box;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.ath-anotacao-rapida-input:focus {
+  background: #FFFFFF;
+  border-color: #314F79;
+}
+
+.ath-btn-salvar-anotacao {
+  align-self: flex-end;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: #314F79;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.ath-btn-salvar-anotacao:hover {
+  background: #253D5F;
+}
+
+/* Ações da Folha */
+.ath-folha-acoes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  border-top: 1px solid #E2E8F0;
+  padding-top: 12px;
+}
+
+.ath-btn-abrir-leitor {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 12px;
+  background: #314F79;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.ath-btn-abrir-leitor:hover {
+  background: #253D5F;
+  transform: translateY(-1px);
+}
+
+.ath-folha-acoes-secundarias {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.ath-folha-acoes-secundarias .ath-btn-soft {
+  flex: 1;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 5px 6px;
+  background: #F1F5F9;
+  color: #334155;
+  border: 1px solid #E2E8F0;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.ath-folha-acoes-secundarias .ath-btn-soft:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   13. Estante Vazia (Empty State)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.ath-estante-vazia-card {
+  width: 100%;
+  padding: 48px 24px;
+  text-align: center;
+  background: #FFFFFF;
+  border: 1px dashed #CBD5E1;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  color: #64748B;
+  font-size: 14px;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   14. Adaptação Responsiva
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .ath-prateleira-livros {
+    gap: 24px 18px;
+    padding: 0 12px;
+  }
+  .ath-livro-3d-wrap {
+    width: 135px;
+    height: 198px;
+  }
+  .ath-livro-folha-interna {
+    width: calc(100vw - 32px);
+    max-width: 320px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   15. Acessibilidade: Suporte a Redução de Movimento (WCAG 2.3.3)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .ath-livro-3d,
+  .ath-livro-3d.aberto,
+  .ath-livro-capa,
+  .ath-livro-capa-frente,
+  .ath-livro-folha-interna,
+  .ath-estante-scrim,
+  .ath-livro-sombra-base,
+  .ath-btn-abrir-leitor,
+  .ath-status-btn,
+  .ath-btn-copiar-citacao,
+  .ath-btn-soft,
+  .ath-livro-3d:not(.aberto):hover,
+  .ath-livro-3d-wrap:hover.ath-livro-3d:not(.aberto),
+  .ath-livro-3d-wrap:hover .ath-livro-3d:not(.aberto) {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    animation-delay: 0s !important;
+  }
+}

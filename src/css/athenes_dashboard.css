@@ -2416,3 +2416,475 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   stroke: #2563EB !important;
   color: #2563EB !important;
 }
+
+/* ==========================================================================
+   ATHENES BIBLIOGRAFIA — NAVEGAÇÃO, BREADCRUMBS E PASTAS ESTILO CRONOS (R2)
+   ========================================================================== */
+
+/* Barra de Navegação Superior (Breadcrumbs + Botão Estante Geral + Ações) */
+.ath-bib-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 4px 10px 4px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  box-sizing: border-box;
+}
+
+.ath-bib-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #64748B;
+  min-width: 0;
+}
+
+.ath-bib-breadcrumb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #314F79;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ath-bib-breadcrumb-btn:hover {
+  background: #EEF4FA;
+  color: #1E3A8A;
+}
+
+.ath-bib-breadcrumb-btn--active {
+  font-weight: 800;
+  color: #1E293B;
+}
+
+.ath-bib-breadcrumb-btn:focus-visible {
+  outline: 2px solid #314F79;
+  outline-offset: 1px;
+}
+
+.ath-bib-breadcrumb-sep {
+  color: #94A3B8;
+  font-weight: 400;
+  user-select: none;
+}
+
+.ath-bib-breadcrumb-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #0F172A;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.ath-bib-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Botão Especial "Estante Geral" */
+.ath-btn-estante-geral {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid #CBD5E1;
+  background: #FFFFFF;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.ath-btn-estante-geral:hover {
+  background: #F8FAFC;
+  border-color: #94A3B8;
+  color: #0F172A;
+  transform: translateY(-1px);
+}
+
+.ath-btn-estante-geral--on,
+.ath-btn-estante-geral--active {
+  background: #314F79 !important;
+  border-color: #314F79 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 3px 8px rgba(49, 79, 121, 0.28) !important;
+}
+
+.ath-btn-estante-geral .ath-bib-count-pill {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #EEF2F6;
+  color: #475569;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.ath-btn-estante-geral--on .ath-bib-count-pill,
+.ath-btn-estante-geral--active .ath-bib-count-pill {
+  background: rgba(255, 255, 255, 0.24) !important;
+  color: #FFFFFF !important;
+}
+
+.ath-btn-nova-pasta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  color: #314F79;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ath-btn-nova-pasta:hover {
+  background: #F8FAFC;
+  border-color: #314F79;
+}
+
+.ath-bib-count-pill {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #E2E8F0;
+  color: #334155;
+}
+
+/* Faixa Horizontal de Pastas Estilo Cronos */
+.ath-bib-folders-track-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.ath-bib-pastas-strip,
+.ath-bib-folders-grid,
+.ath-bib-pastas-faixa {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 4px 16px 4px;
+  margin-bottom: 12px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+  box-sizing: border-box;
+}
+
+.ath-bib-pastas-strip::-webkit-scrollbar,
+.ath-bib-folders-grid::-webkit-scrollbar,
+.ath-bib-pastas-faixa::-webkit-scrollbar {
+  height: 6px;
+}
+
+.ath-bib-pastas-strip::-webkit-scrollbar-thumb,
+.ath-bib-folders-grid::-webkit-scrollbar-thumb,
+.ath-bib-pastas-faixa::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+
+.ath-bib-pastas-strip::-webkit-scrollbar-thumb:hover,
+.ath-bib-folders-grid::-webkit-scrollbar-thumb:hover,
+.ath-bib-pastas-faixa::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Card no Formato de Pasta com Aba Superior Esquerda */
+.ath-bib-folder-card {
+  position: relative;
+  min-width: 190px;
+  max-width: 240px;
+  flex: 0 0 210px;
+  height: 132px;
+  padding-top: 20px; /* Reserva espaço para a aba saliente */
+  color: var(--ath-folder-fg, #1E293B);
+  cursor: pointer;
+  user-select: none;
+  box-sizing: border-box;
+  outline: none;
+  border: none;
+  background: transparent;
+  text-align: left;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
+}
+
+.ath-bib-folder-card:hover {
+  transform: translateY(-2px);
+}
+
+.ath-bib-folder-card:focus-visible {
+  outline: none;
+}
+
+.ath-bib-folder-card:focus-visible .ath-bib-folder-body {
+  box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px #314F79;
+}
+
+/* Aba Superior Esquerda (Folder Tab) */
+.ath-bib-folder-tab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 48%;
+  min-width: 80px;
+  max-width: 110px;
+  height: 24px;
+  background: var(--ath-folder-bg, #EDF2FA);
+  border: 1.5px solid var(--ath-folder-border, #CBD5E1);
+  border-bottom: 2px solid var(--ath-folder-bg, #EDF2FA); /* Elimina a costura com o corpo */
+  border-radius: 11px 13px 0 0;
+  z-index: 2;
+  box-sizing: border-box;
+  font-size: 11px;
+  font-weight: 750;
+  padding: 2px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+/* Corpo Principal da Pasta */
+.ath-bib-folder-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 112px;
+  min-height: 112px;
+  padding: 12px 14px 10px 14px;
+  background: var(--ath-folder-bg, #EDF2FA);
+  border: 1.5px solid var(--ath-folder-border, #CBD5E1);
+  border-radius: 0 14px 14px 14px; /* Canto superior esquerdo reto em 0 */
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  box-sizing: border-box;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+
+.ath-bib-folder-card:hover .ath-bib-folder-body {
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
+}
+
+/* Estado Ativo (.ath-bib-folder-card--active) */
+.ath-bib-folder-card--active {
+  transform: translateY(-3px);
+}
+
+.ath-bib-folder-card--active .ath-bib-folder-tab {
+  border-color: #314F79;
+}
+
+.ath-bib-folder-card--active .ath-bib-folder-body {
+  border-color: #314F79;
+  box-shadow: 0 8px 24px rgba(49, 79, 121, 0.18), 0 0 0 2.5px #314F79;
+}
+
+/* Marcador visual luminoso na aba ativa */
+.ath-bib-folder-card--active .ath-bib-folder-tab::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  right: 6px;
+  height: 3px;
+  background: #314F79;
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(49, 79, 121, 0.4);
+}
+
+/* Elementos Internos do Card */
+.ath-bib-folder-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ath-bib-folder-icon-wrap,
+.ath-bib-folder-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--ath-folder-badge-bg, rgba(255, 255, 255, 0.5));
+  color: currentColor;
+  flex-shrink: 0;
+}
+
+.ath-bib-folder-top-actions,
+.ath-bib-folder-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Badge de Contagem de Obras */
+.ath-bib-folder-count,
+.ath-bib-folder-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ath-folder-badge-bg, rgba(255, 255, 255, 0.65));
+  color: currentColor;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Botão de Opções da Pasta (⋯) */
+.ath-bib-folder-opt-btn {
+  background: transparent;
+  border: none;
+  color: currentColor;
+  opacity: 0.6;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 5px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.ath-bib-folder-opt-btn:hover {
+  opacity: 1;
+  background: var(--ath-folder-badge-bg, rgba(255, 255, 255, 0.4));
+}
+
+.ath-bib-folder-opt-btn:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+
+/* Bloco Informativo de Texto */
+.ath-bib-folder-info {
+  margin: 6px 0 auto 0;
+  min-width: 0;
+}
+
+.ath-bib-folder-title,
+.ath-bib-folder-name {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: currentColor;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ath-bib-folder-sub,
+.ath-bib-folder-desc {
+  display: block;
+  font-size: 10px;
+  opacity: 0.75;
+  font-weight: 600;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Rodapé do Card */
+.ath-bib-folder-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid var(--ath-folder-divider, rgba(0, 0, 0, 0.06));
+  font-size: 10px;
+}
+
+.ath-bib-folder-color-indicator,
+.ath-bib-folder-color-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.ath-bib-folder-tag-comp,
+.ath-bib-tag-comp {
+  font-size: 9.5px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+/* Estado Drag & Drop Target (Arrastar Livro para Pasta) */
+.ath-bib-folder-card.ath-drop-target-over,
+.ath-drop-target-over {
+  transform: translateY(-4px) scale(1.02);
+}
+
+.ath-bib-folder-card.ath-drop-target-over .ath-bib-folder-tab,
+.ath-bib-folder-card.ath-drop-target-over .ath-bib-folder-body,
+.ath-drop-target-over .ath-bib-folder-tab,
+.ath-drop-target-over .ath-bib-folder-body {
+  background: #DCEBFA !important;
+  border-color: #2F7BD0 !important;
+  color: #1E3A8A !important;
+  outline: 2px dashed #2F7BD0;
+  outline-offset: -2px;
+}
+
+.ath-bib-folder-card.ath-drop-target-over .ath-bib-folder-body,
+.ath-drop-target-over .ath-bib-folder-body {
+  box-shadow: 0 12px 28px rgba(47, 123, 208, 0.28) !important;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .ath-bib-pastas-strip,
+  .ath-bib-folders-grid,
+  .ath-bib-pastas-faixa {
+    gap: 12px;
+    padding-bottom: 12px;
+  }
+  .ath-bib-folder-card {
+    min-width: 175px;
+    flex: 0 0 185px;
+  }
+  .ath-bib-nav-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .ath-bib-nav-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
