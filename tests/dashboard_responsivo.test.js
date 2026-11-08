@@ -23,7 +23,7 @@ test('Dashboard responsivo para tablets: CSS impede empilhamento vertical sobre 
   assert.equal(cssEditor.includes('.ath-dash-sidebar.ath-aberto'), true, 'deve ter classe de abertura da gaveta');
   assert.equal(cssEditor.includes('.ath-dash-scrim'), true, 'deve ter backdrop scrim para fechar ao tocar fora');
   assert.equal(cssEditor.includes('.ath-dash-alca-pastas'), true, 'deve ter alça/atalho para abrir gaveta');
-  assert.equal(cssEditor.includes('.ath-dash-btn-toggle-pastas'), true, 'deve ter botão no banner para abrir pastas');
+  assert.equal(cssEditor.includes('.ath-dash-btn-toggle-pastas'), false, 'não deve duplicar o acesso às pastas no banner');
 
   // 4. Grade de artigos zotero responsiva no tablet
   assert.equal(cssDash.includes('minmax(280px, 1fr)'), true, 'grade de artigos deve adaptar minmax para caber em 2 colunas no tablet');

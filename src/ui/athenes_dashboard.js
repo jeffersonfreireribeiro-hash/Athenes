@@ -52,6 +52,7 @@ import { driveConectado, tokenDriveValido, obterTokenDrive, sincronizarPastasCom
 import { metodosDashboardModais } from './athenes_dashboard_modais.js';
 import { metodosDashboardPastas } from './athenes_dashboard_pastas.js';
 import { metodosDashboardSincronia } from './athenes_dashboard_sincronia.js';
+import { mostrarCadernoDocumento } from './athenes_dashboard_caderno.js';
 
 export class DashboardView {
   constructor(containerEl, opcoes = {}) {
@@ -113,11 +114,12 @@ export class DashboardView {
     }
   }
 
-  /** Abre um documento (baixando da nuvem antes, se preciso). */
-  async abrirDocumento(doc, card = null) {
+  /** Obtém o conteúdo completo para o editor e para a prévia do caderno. */
+  async carregarDocumentoCompleto(doc, card = null) {
     let docParaAbrir = doc;
     if (doc.precisaCarregarConteudo) {
       const btnAbrir = card?.querySelector('.ath-btn-abrir');
+      const rotuloAnterior = btnAbrir?.textContent;
       if (btnAbrir) btnAbrir.textContent = 'Baixando...';
       try {
         let remoto = null;
@@ -139,17 +141,38 @@ export class DashboardView {
           if (idx >= 0) this.documentos[idx] = docParaAbrir;
           this.salvarDocumentosLocais();
         }
+        if (btnAbrir) btnAbrir.textContent = rotuloAnterior;
       } catch (e) {
         alert(`Falha ao abrir documento da nuvem: ${e.message}`);
-        if (btnAbrir) btnAbrir.textContent = 'Abrir';
-        return;
+        if (btnAbrir) btnAbrir.textContent = rotuloAnterior;
+        return null;
       }
     }
+    return docParaAbrir;
+  }
+
+  /** Abre um documento (baixando da nuvem antes, se preciso). */
+  async abrirDocumento(doc, card = null) {
+    const docParaAbrir = await this.carregarDocumentoCompleto(doc, card);
+    if (!docParaAbrir) return;
     this.onAbrirDocumento(docParaAbrir);
   }
 
   abrirDocumentoDoCard(doc) {
     return this.abrirDocumento(doc, this.container.querySelector(`[data-doc-id="${doc.id}"]`));
+  }
+
+  async abrirCadernoDocumento(doc, card) {
+    const completo = await this.carregarDocumentoCompleto(doc, card);
+    if (!completo || this.abaAtiva !== 'escrita') return;
+    const cardAtual = card?.isConnected ? card : [...this.container.querySelectorAll('[data-doc-id]')]
+      .find(el => el.dataset.docId === String(doc.id));
+    this._fecharCaderno?.();
+    this._fecharCaderno = mostrarCadernoDocumento(completo, {
+      retornoFoco: cardAtual,
+      onFechar: () => { this._fecharCaderno = null; },
+      onAbrir: documento => this.abrirDocumento(documento, cardAtual)
+    });
   }
 
   obterIniciais(nome) {
@@ -169,6 +192,7 @@ export class DashboardView {
   }
 
   renderizar() {
+    this._fecharCaderno?.();
     if (!this.container) return;
     this.container.innerHTML = '';
     this.perfilUsuario = obterPerfilColaborador();
@@ -281,7 +305,7 @@ export class DashboardView {
         <div class="ath-dash-main-area">
           <!-- Banner / Breadcrumbs da Pasta Selecionada -->
           <div class="ath-dash-pasta-banner" id="athDashPastaBanner">
-            <!-- Preenchido por this.renderizarBannerPasta() -->
+            <div class="ath-dash-pasta-banner-info" id="athDashPastaBannerInfo"></div>
           </div>
 
           <!-- Conteúdo da Aba 1: Escrita & Documentos -->
@@ -562,6 +586,15 @@ export class DashboardView {
     }
     this.container.appendChild(root);
 
+    // O banner da pasta é o cabeçalho único das duas bibliotecas.
+    const cabecalhoAtivo = root.querySelector(this.abaAtiva === 'escrita'
+      ? '#athSecaoDashEscrita > .ath-dash-head'
+      : '#athSecaoDashArtigosZotero > .ath-dash-head');
+    const acoesAtivas = cabecalhoAtivo?.querySelector('.ath-dash-head-acoes');
+    if (acoesAtivas) root.querySelector('#athDashPastaBanner')?.appendChild(acoesAtivas);
+    root.querySelectorAll('#athSecaoDashEscrita > .ath-dash-head, #athSecaoDashArtigosZotero > .ath-dash-head')
+      .forEach(cabecalho => cabecalho.remove());
+
     // Inicialização da barra lateral de pastas do Google Drive
     if (!estudioFullInicial) {
       this.renderizarPastasLateral();
@@ -816,6 +849,9 @@ export class DashboardView {
     for (const doc of filtrados) {
       const card = document.createElement('div');
       card.className = 'ath-doc-card';
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', `Ver caderno de ${doc.titulo || 'documento'}`);
 
       const dataFormatada = new Date(doc.dataModificacao || doc.dataCriacao || Date.now()).toLocaleDateString('pt-BR');
       const autorPrincipal = doc.metadados?.autores?.[0]?.nome || this.perfilUsuario?.nome || 'Autor Principal';
@@ -828,24 +864,22 @@ export class DashboardView {
       const st = statusMap[doc.estado] || statusMap.rascunho;
 
       card.innerHTML = `
-        <div class="ath-doc-card-capa-preview">
-          <div class="ath-doc-card-capa-titulo">${doc.titulo}</div>
-          <div class="ath-doc-card-capa-autor">${autorPrincipal} · ${doc.metadados?.ano || '2026'}</div>
-        </div>
-
         <div class="ath-doc-card-header">
-          <span class="ath-badge ath-badge-primary">${doc.tipoDoc?.toUpperCase() || 'DOCUMENTO'}</span>
+          <span class="ath-badge ath-badge-primary">${escapeHtml(doc.tipoDoc?.toUpperCase() || 'DOCUMENTO')}</span>
           <span class="ath-badge ${st.classe}">${st.rotulo}</span>
           ${doc.salvoNuvem ? `<span class="ath-badge" style="background:#EEF4FA; color:#314F79; font-weight:700; border:1px solid #C8D7E6; display:inline-flex; align-items:center; gap:4px;">${svgIcone('nuvem_ok', 11)} NUVEM</span>` : ''}
         </div>
 
-        <h3 class="ath-doc-card-titulo">${doc.titulo}</h3>
-        <p class="ath-doc-card-subtitulo">${doc.subtitulo || 'Sem subtítulo'}</p>
+        <div class="ath-doc-card-capa-preview">
+          <span class="ath-doc-card-capa-marca">ATHENES · ${escapeHtml(doc.metadados?.ano || '')}</span>
+          <h3 class="ath-doc-card-titulo">${escapeHtml(doc.titulo || 'Documento sem título')}</h3>
+          ${doc.subtitulo ? `<p class="ath-doc-card-subtitulo">${escapeHtml(doc.subtitulo)}</p>` : ''}
+          <span class="ath-doc-card-capa-autor">${escapeHtml(autorPrincipal)}</span>
+        </div>
 
         <div class="ath-doc-card-meta">
           <span>Modificado em ${dataFormatada}</span>
           <div class="ath-doc-card-actions">
-            <button type="button" class="ath-btn ath-btn-sm ath-btn-primary ath-btn-abrir">Abrir</button>
             <button type="button" class="ath-btn ath-btn-sm ath-btn-excluir" title="Excluir">${svgIcone('lixeira', 12)}</button>
           </div>
         </div>
@@ -858,7 +892,13 @@ export class DashboardView {
           await this.arquivos.excluir([doc]); // mesmo caminho do menu: confirma, remove, e o documento não volta ao sincronizar
           return;
         }
-        await this.abrirDocumento(doc, card);
+        await this.abrirCadernoDocumento(doc, card);
+      });
+
+      card.addEventListener('keydown', ev => {
+        if (ev.target !== card || (ev.key !== 'Enter' && ev.key !== ' ')) return;
+        ev.preventDefault();
+        this.abrirCadernoDocumento(doc, card);
       });
 
       this.arquivos.decorarCard(card, doc, ordemIds);

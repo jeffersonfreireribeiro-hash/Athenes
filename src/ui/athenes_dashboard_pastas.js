@@ -222,22 +222,15 @@ export const metodosDashboardPastas = {
   },
 
   renderizarBannerPasta() {
-    const bannerEl = this.container.querySelector('#athDashPastaBanner');
+    const bannerEl = this.container.querySelector('#athDashPastaBannerInfo');
     if (!bannerEl) return;
 
     const ehAbaBib = this.abaAtiva === 'artigos_zotero';
-    const botaoDrawerHtml = `
-      <button type="button" class="ath-btn ath-btn-sm ath-dash-btn-toggle-pastas" id="athBtnTogglePastasBanner" title="Ver pastas e coleções do Google Drive" aria-label="Abrir pastas">
-        ${svgIcone('pasta', 14)}
-        <span class="ath-dash-btn-toggle-txt">Pastas</span>
-      </button>
-    `;
 
     if (this.pastaAtivaId === 'todas') {
       if (!ehAbaBib) {
         bannerEl.innerHTML = `
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-            ${botaoDrawerHtml}
             <div style="display:flex; align-items:center; gap:8px; min-width:0;">
               ${svgIcone('pasta', 18)}
               <div style="min-width:0;">
@@ -250,7 +243,6 @@ export const metodosDashboardPastas = {
         const totalArtigos = (this.estudoView?.artigosCatalogo?.() || carregarArtigosEstudo()).length;
         bannerEl.innerHTML = `
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-            ${botaoDrawerHtml}
             <div style="display:flex; align-items:center; gap:8px; min-width:0;">
               ${svgIcone('livro', 18)}
               <div style="min-width:0;">
@@ -274,7 +266,6 @@ export const metodosDashboardPastas = {
 
         bannerEl.innerHTML = `
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-            ${botaoDrawerHtml}
             <div style="display:flex; align-items:center; gap:8px; min-width:0;">
               ${svgIcone('pasta', 20)}
             <div style="min-width:0;">
@@ -295,7 +286,6 @@ export const metodosDashboardPastas = {
 
         bannerEl.innerHTML = `
           <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-            ${botaoDrawerHtml}
             <div style="display:flex; align-items:center; gap:8px; min-width:0;">
               ${svgIcone('livro', 20)}
             <div style="min-width:0;">
@@ -313,9 +303,5 @@ export const metodosDashboardPastas = {
       }
     }
 
-    bannerEl.querySelector('#athBtnTogglePastasBanner')?.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      this.alternarDrawerPastas();
-    });
   }
 };

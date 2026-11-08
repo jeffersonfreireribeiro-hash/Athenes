@@ -32,9 +32,9 @@
   display: flex;
   flex-direction: column;
   gap: 36px;
-  padding: 20px 16px 56px;
-  max-width: 1320px;
-  margin: 0 auto;
+  padding: 20px 4px 56px;
+  max-width: none;
+  margin: 0;
   perspective: 1000px;
   perspective-origin: 50% 35%;
   overflow: visible;
@@ -67,11 +67,11 @@
 /* Área de repouso dos livros na prateleira */
 .ath-prateleira-livros {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: flex-end;
   justify-content: flex-start;
   gap: 24px;
-  padding: 0 18px;
+  padding: 0;
   min-height: 240px;
   z-index: 2;
   box-sizing: border-box;
@@ -534,10 +534,32 @@
   flex-direction: column;
   padding: 16px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #AAB6C5 transparent;
+  scrollbar-gutter: stable;
   box-sizing: border-box;
   z-index: 10;
   transform: translateZ(6px);
   transition: transform 0.5s 0.08s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
+}
+
+.ath-livro-folha-interna::-webkit-scrollbar {
+  width: 7px;
+}
+
+.ath-livro-folha-interna::-webkit-scrollbar-button {
+  display: none;
+}
+
+.ath-livro-folha-interna::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 7px 3px;
+}
+
+.ath-livro-folha-interna::-webkit-scrollbar-thumb {
+  background: #AAB6C5;
+  border: 1px solid #FFFFFF;
+  border-radius: 10px;
 }
 
 /* Ocultação total e estrita da folha interna quando o livro estiver fechado */
@@ -911,12 +933,8 @@
 
 @media (max-width: 768px) {
   .ath-prateleira-livros {
-    gap: 24px 18px;
-    padding: 0 12px;
-  }
-  .ath-livro-3d-wrap {
-    width: 135px;
-    height: 198px;
+    gap: 24px;
+    padding: 0;
   }
   .ath-livro-folha-interna {
     width: calc(100vw - 32px);

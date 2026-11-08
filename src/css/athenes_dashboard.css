@@ -265,6 +265,27 @@
   height: 38px;
 }
 
+.ath-dash-pasta-banner-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ath-dash-pasta-banner .ath-dash-head-acoes {
+  margin-left: 12px;
+}
+
+@media (max-width: 640px) {
+  .ath-dash-pasta-banner {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .ath-dash-pasta-banner .ath-dash-head-acoes {
+    width: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+}
+
 .ath-dash-filtros-linha, .ath-dash-filtros, .ath-estudo-barra-topo {
   display: flex;
   align-items: center;
@@ -299,42 +320,62 @@
 
 .ath-docs-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(218px, 260px));
+  gap: 20px;
 }
 
-/* Card do Documento */
+/* Capa de caderno dos documentos. */
 .ath-doc-card {
-  background: var(--ath-surface);
-  border: 1px solid var(--ath-line);
-  border-radius: var(--ath-radius);
-  padding: 12px;
-  box-shadow: var(--ath-shadow-sm);
+  background: #F4F0E6;
+  border: 2px solid #BDAF9E;
+  border-radius: 8px 12px 12px 8px;
+  padding: 12px 12px 10px 20px;
+  box-shadow: 4px 8px 18px rgba(29, 42, 57, .15), inset 5px 0 0 #6A4B38;
   display: flex;
   flex-direction: column;
   transition: all 0.2s ease;
   position: relative;
   cursor: pointer;
+  min-height: 292px;
+  box-sizing: border-box;
+}
+
+.ath-doc-card::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  bottom: 16px;
+  left: -11px;
+  width: 19px;
+  background: radial-gradient(ellipse at center, transparent 35%, #48515B 40% 54%, #A7ADB1 59%, transparent 64%) left top / 19px 23px repeat-y;
+  pointer-events: none;
 }
 
 .ath-doc-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--ath-shadow);
-  border-color: #CBD5E1;
+  transform: translateY(-4px);
+  box-shadow: 5px 12px 22px rgba(29, 42, 57, .2), inset 5px 0 0 #6A4B38;
+  border-color: #8F7B67;
+}
+
+.ath-doc-card:focus-visible {
+  outline: 3px solid #314F79;
+  outline-offset: 5px;
 }
 
 .ath-doc-card-capa-preview {
-  height: 96px;
-  background: var(--ath-bg);
-  border: 1px solid var(--ath-line-soft);
-  border-radius: var(--ath-radius-sm);
-  padding: 8px;
-  margin-bottom: 10px;
+  flex: 1 1 auto;
+  min-height: 177px;
+  background: repeating-linear-gradient(to bottom, #FFFEF9 0 25px, #DCE8E9 26px, #FFFEF9 27px);
+  border: 1px solid #D5CDC0;
+  border-radius: 3px 6px 6px 3px;
+  padding: 14px 12px 12px 18px;
+  margin-bottom: 8px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
+  justify-content: flex-start;
+  align-items: stretch;
+  text-align: left;
   overflow: hidden;
   position: relative;
 }
@@ -344,26 +385,26 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 4px;
+  width: 5px;
   height: 100%;
-  background: var(--ath-primary);
+  background: #D3AC87;
 }
 
-.ath-doc-card-capa-titulo {
-  font-size: 12px;
+.ath-doc-card-capa-marca {
+  color: #746655;
+  font-size: 9px;
   font-weight: 800;
-  color: var(--ath-text);
-  line-height: 1.25;
-  margin-bottom: 4px;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  letter-spacing: .12em;
+  line-height: 27px;
+  margin-bottom: 0;
 }
 
 .ath-doc-card-capa-autor {
-  font-size: 10.5px;
-  color: var(--ath-muted);
+  font-size: 10px;
+  font-weight: 650;
+  color: #586679;
+  margin-top: auto;
+  line-height: 27px;
 }
 
 .ath-doc-card-header {
@@ -386,37 +427,35 @@
 
 .ath-doc-card-titulo {
   margin: 0;
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   color: var(--ath-text);
-  line-height: 1.3;
+  line-height: 27px;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-height: 35px;
 }
 
 .ath-doc-card-subtitulo {
-  margin: 2px 0 8px 0;
-  font-size: 11.5px;
+  margin: 0 0 12px 0;
+  font-size: 11px;
   color: var(--ath-text-secondary);
-  line-height: 1.35;
+  line-height: 27px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
   max-height: 32px;
-  min-height: 32px;
 }
 
 .ath-doc-card-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 8px;
+  padding-top: 7px;
   border-top: 1px solid var(--ath-line-soft);
   font-size: 11px;
   color: var(--ath-muted);
@@ -436,6 +475,199 @@
   gap: 6px;
 }
 
+.ath-caderno-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(20, 32, 49, .58);
+  box-sizing: border-box;
+}
+
+.ath-caderno-aberto {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  width: min(900px, 100%);
+  height: min(560px, calc(100vh - 48px));
+  min-height: 360px;
+  border: 9px solid #70513A;
+  border-radius: 16px;
+  background: #70513A;
+  box-shadow: 0 24px 60px rgba(6, 17, 34, .4);
+}
+
+.ath-caderno-capa-interna,
+.ath-caderno-pagina {
+  min-width: 0;
+  overflow: hidden;
+  background: repeating-linear-gradient(to bottom, #FFFEF9 0 29px, #DAE7E9 30px, #FFFEF9 31px);
+}
+
+.ath-caderno-capa-interna {
+  display: flex;
+  flex-direction: column;
+  padding: 42px 38px 30px 44px;
+  border-radius: 8px 2px 2px 8px;
+  box-shadow: inset -8px 0 18px rgba(62, 49, 37, .09);
+}
+
+.ath-caderno-sobretitulo {
+  color: #856548;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.ath-caderno-capa-interna h2 {
+  margin: 34px 0 0;
+  color: #213954;
+  font-size: clamp(20px, 2.2vw, 29px);
+  line-height: 31px;
+  overflow-wrap: anywhere;
+}
+
+.ath-caderno-subtitulo {
+  margin: 0;
+  color: #566475;
+  font-size: 13px;
+  line-height: 31px;
+}
+
+.ath-caderno-resumo {
+  margin-top: 31px;
+  overflow-y: auto;
+  color: #3C4C5F;
+  line-height: 31px;
+}
+
+.ath-caderno-resumo strong {
+  color: #314F79;
+  font-size: 12px;
+  text-transform: uppercase;
+  line-height: 31px;
+}
+
+.ath-caderno-resumo p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 31px;
+  white-space: pre-line;
+}
+
+.ath-caderno-autor {
+  margin-top: auto;
+  padding-top: 18px;
+  color: #526175;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 31px;
+}
+
+.ath-caderno-espiral {
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  margin: 7px -7px;
+}
+
+.ath-caderno-espiral span {
+  width: 32px;
+  height: 12px;
+  border: 4px solid #56616B;
+  border-radius: 50%;
+  background: linear-gradient(#C8CED0, #7F898E);
+  box-shadow: 0 2px 2px rgba(0,0,0,.2);
+}
+
+.ath-caderno-pagina {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 36px 30px 24px 36px;
+  border-radius: 2px 8px 8px 2px;
+  box-shadow: inset 8px 0 18px rgba(62, 49, 37, .1);
+}
+
+.ath-caderno-fechar {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: #EEF1F2;
+  color: #314F79;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.ath-caderno-pagina-conteudo {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #B8C6CB transparent;
+}
+
+.ath-caderno-pagina h3 {
+  margin: 13px 0 18px;
+  color: #213954;
+  font-size: 18px;
+  line-height: 31px;
+}
+
+.ath-caderno-dados {
+  display: grid;
+  gap: 0;
+  margin: 0 0 31px;
+}
+
+.ath-caderno-dados div {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 8px;
+  font-size: 12px;
+  min-height: 31px;
+  line-height: 31px;
+}
+
+.ath-caderno-dados dt { color: #69788A; font-weight: 700; }
+.ath-caderno-dados dd { margin: 0; color: #2E3F54; overflow-wrap: anywhere; }
+.ath-caderno-referencias h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.ath-caderno-referencias h3 span { padding: 2px 7px; border-radius: 12px; background: #E7EEF5; font-size: 12px; }
+.ath-caderno-referencias ol { margin: 0; padding-left: 22px; }
+.ath-caderno-referencias li { padding: 0; color: #34465B; font-size: 12px; line-height: 31px; }
+.ath-caderno-referencias li strong { display: block; font-weight: 700; line-height: 31px; }
+.ath-caderno-referencias li small { display: block; color: #66788B; line-height: 31px; }
+.ath-caderno-sem-refs, .ath-caderno-mais-refs { color: #66788B; font-size: 12px; }
+.ath-caderno-abrir-editor { flex: 0 0 auto; margin-top: 14px; padding: 10px 14px; }
+
+@media (max-width: 700px) {
+  .ath-caderno-overlay { padding: 12px; }
+  .ath-caderno-aberto {
+    display: block;
+    height: auto;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .ath-caderno-capa-interna { max-height: none; overflow: visible; padding: 20px 24px 24px; }
+  .ath-caderno-capa-interna h2 { margin: 15px 0 0; font-size: 18px; }
+  .ath-caderno-resumo { margin-top: 15px; overflow: visible; }
+  .ath-caderno-autor, .ath-caderno-espiral { display: none; }
+  .ath-caderno-pagina { min-height: 0; overflow: visible; padding: 18px 20px 20px; }
+  .ath-caderno-pagina-conteudo { overflow: visible; }
+  .ath-caderno-fechar { top: 8px; right: 8px; }
+}
+
 /* ==========================================================================
    PÁGINA 2: ESTÚDIO DE ARTIGOS ZOTERO + LEITOR/RISCADOR DE PDF (SAMSUNG NOTES)
    ========================================================================== */
@@ -447,6 +679,32 @@
   gap: 14px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 1100px) {
+  .ath-dash-filtros-linha,
+  .ath-estudo-barra-topo {
+    max-width: none;
+    width: 100%;
+  }
+
+  .ath-estudo-barra-topo > div:first-child {
+    flex: 1 1 auto !important;
+    max-width: none !important;
+    min-width: 0;
+  }
+
+  .ath-dash-filtros-linha .ath-busca-box,
+  .ath-estudo-barra-topo .ath-busca-box {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .ath-dash-filtros-linha .ath-menu-popover-wrap,
+  .ath-estudo-barra-topo .ath-menu-popover-wrap,
+  .ath-estudo-barra-topo .ath-menu-ordenar-bib {
+    flex: 0 0 auto;
+  }
 }
 
 .ath-estudo-aviso-arquitetura {
@@ -2607,6 +2865,10 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   box-sizing: border-box;
 }
 
+.ath-bib-pastas-faixa {
+  gap: 24px;
+}
+
 .ath-bib-pastas-strip::-webkit-scrollbar,
 .ath-bib-folders-grid::-webkit-scrollbar,
 .ath-bib-pastas-faixa::-webkit-scrollbar {
@@ -2629,9 +2891,9 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
 /* Fichários de registro em pé: lombada, etiqueta e argola. */
 .ath-bib-folder-card {
   position: relative;
-  min-width: 148px;
-  max-width: 148px;
-  flex: 0 0 148px;
+  min-width: 164px;
+  max-width: 164px;
+  flex: 0 0 164px;
   height: 204px;
   padding: 0 0 5px 6px;
   color: #FFFFFF;
@@ -2897,12 +3159,12 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   .ath-bib-pastas-strip,
   .ath-bib-folders-grid,
   .ath-bib-pastas-faixa {
-    gap: 12px;
+    gap: 24px;
     padding-bottom: 12px;
   }
   .ath-bib-folder-card {
-    min-width: 148px;
-    flex: 0 0 148px;
+    min-width: 164px;
+    flex: 0 0 164px;
   }
   .ath-bib-nav-bar {
     flex-direction: column;

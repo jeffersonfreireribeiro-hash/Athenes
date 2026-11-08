@@ -38,7 +38,7 @@ import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_dire
 import { metodosEstudoAnotacoes } from './athenes_estudo_artigos_anotacoes.js';
 import { metodosEstudoModais } from './athenes_estudo_artigos_modais.js';
 import { metodosEstudoPastas, restaurarPastaAtiva, coletarPastasBibliografia, CORES_PASTAS_CRONOS } from './athenes_estudo_artigos_pastas.js';
-import { renderizarEstante3D, fecharTodosLivros3D, tratarTecladoLivro3D, moverLivroParaPasta, CORES_CAPA_SELECAO } from './athenes_estudo_artigos_estante.js';
+import { renderizarEstante3D, fecharTodosLivros3D, tratarTecladoLivro3D, moverLivroParaPasta, calcularLivrosPorPrateleira } from './athenes_estudo_artigos_estante.js';
 
 export { ehArtigoExemploFicticio, criarArtigosEstudoExemplo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, gerarHtmlNotaZoteroDoArtigo, calcularPontoFinalLinhaReta } from './athenes_estudo_artigos_dados.js';
 
@@ -250,6 +250,8 @@ export class EstudoArtigosView {
 
   renderizar() {
     if (!this.container) return;
+    this._observadorEstante?.disconnect();
+    this._observadorEstante = null;
     const palcoAntigo = this.container.querySelector('#athEstudioPalco');
     const scrollSalvo = palcoAntigo ? palcoAntigo.scrollTop : 0;
 
@@ -661,6 +663,17 @@ export class EstudoArtigosView {
   atualizarGridCatalogo() {
     const grid = this.container.querySelector('#athArtigosZoteroGrid');
     if (!grid) return;
+    const maxPorPrateleira = calcularLivrosPorPrateleira(grid.getBoundingClientRect?.().width || grid.clientWidth);
+    this._livrosPorPrateleira = maxPorPrateleira;
+    if (typeof ResizeObserver !== 'undefined' && !this._observadorEstante) {
+      this._observadorEstante = new ResizeObserver(entradas => {
+        const largura = entradas[0]?.contentRect?.width;
+        if (!this.artigoAberto && calcularLivrosPorPrateleira(largura) !== this._livrosPorPrateleira) {
+          this.atualizarGridCatalogo();
+        }
+      });
+      this._observadorEstante.observe(grid);
+    }
     grid.innerHTML = '';
 
     const filtrados = this.ordenarArtigos(this.artigosCatalogo()).filter(art => {
@@ -707,7 +720,7 @@ export class EstudoArtigosView {
     if (filtrados.length === 0) {
       const pastaInfo = buscarPastaNaArvore(obterPastasDriveLocais(), this.pastaFiltroId);
       const rotuloLocal = pastaInfo?.nome ? `na pasta "${pastaInfo.nome}"` : 'para este filtro';
-      const estanteVazia = renderizarEstante3D([], { maxPorPrateleira: 6 });
+      const estanteVazia = renderizarEstante3D([], { maxPorPrateleira });
       const cardVazio = estanteVazia.querySelector('.ath-estante-vazia-card');
       if (cardVazio) {
         cardVazio.innerHTML = `
@@ -724,7 +737,7 @@ export class EstudoArtigosView {
     }
 
     const estanteEl = renderizarEstante3D(filtrados, {
-      maxPorPrateleira: 6,
+      maxPorPrateleira,
       callbacks: {
         onAbrirLeitor: (art) => {
           if (art.compartilhadoComigo && !this.artigos.includes(art)) {
@@ -753,16 +766,12 @@ export class EstudoArtigosView {
           if (cor) {
             art.corCapa = cor;
             salvarArtigosEstudo(this.artigos, art);
-          } else {
-            this.abrirModalCorCapa(art);
           }
         },
         onAlterarCorCapa: (art, cor) => {
           if (cor) {
             art.corCapa = cor;
             salvarArtigosEstudo(this.artigos, art);
-          } else {
-            this.abrirModalCorCapa(art);
           }
         }
       }
@@ -821,50 +830,6 @@ export class EstudoArtigosView {
         fechar();
         this.atualizarGridCatalogo();
         mostrarAviso('Obra movida com sucesso!', { tipo: 'ok' });
-      });
-    });
-  }
-
-  abrirModalCorCapa(art) {
-    if (!art) return;
-    const modalExistente = document.getElementById('athModalCorCapa');
-    if (modalExistente) modalExistente.remove();
-
-    const overlay = document.createElement('div');
-    overlay.id = 'athModalCorCapa';
-    overlay.className = 'ath-modal-overlay ath-modal-overlay-visivel';
-    overlay.style.zIndex = '120';
-
-    const card = document.createElement('div');
-    card.className = 'ath-modal-card';
-    card.style.maxWidth = '360px';
-    card.style.padding = '20px';
-
-    card.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-        <h3 style="margin:0; font-size:15px; font-weight:800; color:#1E293B;">Escolher cor da capa</h3>
-        <button type="button" class="ath-btn ath-btn-sm" id="athBtnFecharCorCapa" style="border:none; background:transparent; font-size:18px; cursor:pointer;">&times;</button>
-      </div>
-      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:16px;">
-        ${CORES_CAPA_SELECAO.map(({ cor, nome }) => `
-          <button type="button" data-cor="${cor}" aria-label="${nome}" aria-pressed="${String(art.corCapa === cor)}" style="height:36px; border-radius:6px; border:2px solid ${art.corCapa === cor ? '#0F172A' : 'transparent'}; background:${cor}; cursor:pointer; transition:transform 0.15s ease;" title="${nome}"></button>
-        `).join('')}
-      </div>
-    `;
-
-    overlay.appendChild(card);
-    document.body.appendChild(overlay);
-
-    const fechar = () => overlay.remove();
-    card.querySelector('#athBtnFecharCorCapa')?.addEventListener('click', fechar);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(); });
-
-    card.querySelectorAll('[data-cor]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        art.corCapa = btn.dataset.cor;
-        salvarArtigosEstudo(this.artigos, art);
-        fechar();
-        this.atualizarGridCatalogo();
       });
     });
   }

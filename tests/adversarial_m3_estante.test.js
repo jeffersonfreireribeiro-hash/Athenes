@@ -1020,7 +1020,7 @@ describe('Cenário 7: Folha Interna, Citation Tracker e Interações', () => {
     assert.ok(secBox, 'Box de ações secundárias deve existir');
 
     const botoesSec = secBox.querySelectorAll('button');
-    assert.equal(botoesSec.length, 3, 'Deve conter 3 botões secundários');
+    assert.equal(botoesSec.length, 2, 'Deve conter 2 botões secundários');
 
     const btnEdit = botoesSec.find(b => b.getAttribute('title') === 'Editar metadados da obra');
     assert.ok(btnEdit, 'Botão Editar metadados deve existir');
@@ -1032,8 +1032,8 @@ describe('Cenário 7: Folha Interna, Citation Tracker e Interações', () => {
     btnMover.dispatchEvent({ type: 'click' });
     assert.ok(moverPastaChamado, 'onMoverPasta acionado');
 
-    const btnCor = botoesSec.find(b => b.getAttribute('title') === 'Alterar cor da capa');
-    assert.ok(btnCor, 'Botão Alterar cor da capa deve existir');
+    const btnCor = folha.querySelectorAll('.ath-folha-cor-amostra')[1];
+    assert.ok(btnCor, 'A escolha de cor deve ficar no topo da ficha');
     btnCor.dispatchEvent({ type: 'click' });
     assert.ok(mudarCorChamado, 'onAlterarCorCapa acionado');
   });

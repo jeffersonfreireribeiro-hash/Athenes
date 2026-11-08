@@ -45,6 +45,15 @@ export const CORES_CAPA_SELECAO = Object.freeze([
   { cor: CORES_CAPA_PADRAO[6], nome: 'Grafite' }
 ]);
 
+export function calcularLivrosPorPrateleira(larguraDisponivel) {
+  const largura = Number(larguraDisponivel);
+  if (!Number.isFinite(largura) || largura <= 0) return 6;
+  const larguraLivro = 164;
+  const espaco = 24;
+  const recuo = 8;
+  return Math.max(1, Math.floor((Math.max(0, largura - recuo) + espaco) / (larguraLivro + espaco)));
+}
+
 export {
   renderizarPastasCronos,
   renderizarFaixaDePastas,
@@ -1061,18 +1070,6 @@ export function renderizarFolhaInterna(ref = {}, {
       onMoverPasta(ref);
     });
     secBox.appendChild(btnMover);
-  }
-
-  if (fnMudarCor) {
-    const btnCor = criarElemento('button', 'ath-btn ath-btn-sm ath-btn-soft');
-    btnCor.setAttribute('type', 'button');
-    btnCor.textContent = '🎨 Cor';
-    btnCor.setAttribute('title', 'Alterar cor da capa');
-    btnCor.addEventListener('click', (ev) => {
-      if (ev?.stopPropagation) ev.stopPropagation();
-      fnMudarCor(ref);
-    });
-    secBox.appendChild(btnCor);
   }
 
   if (secBox.children && secBox.children.length > 0) {

@@ -19,7 +19,8 @@ import {
   tratarTecladoLivro3D,
   renderizarFolhaInterna,
   moverLivroParaPasta,
-  CORES_CAPA_SELECAO
+  CORES_CAPA_SELECAO,
+  calcularLivrosPorPrateleira
 } from '../src/ui/athenes_estudo_artigos_estante.js';
 
 import {
@@ -221,6 +222,11 @@ globalThis.document = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('Grupo 1: Prateleiras e Estrutura Horizontal da Estante 3D (R3 / F5)', () => {
+  it('1.0: quantidade por prateleira acompanha a largura de tablet e desktop', () => {
+    assert.equal(calcularLivrosPorPrateleira(650), 3);
+    assert.equal(calcularLivrosPorPrateleira(1024), 5);
+    assert.equal(calcularLivrosPorPrateleira(1920), 10);
+  });
   it('1.1: Container da estante .ath-estante-3d possui perspectiva tridimensional de 1000px', () => {
     const estante = renderizarEstante3D([]);
     assert.ok(estante.classList.contains('ath-estante-3d'), 'Deve ter classe .ath-estante-3d');
@@ -695,28 +701,25 @@ describe('Grupo 6: Ações da Folha, Leitor e Movimentação entre Pastas (R4)',
     assert.equal(chamado, true);
   });
 
-  it('6.4: Botões secundários acionam callbacks de metadados, mover pasta e cor', () => {
+  it('6.4: Botões secundários acionam callbacks de metadados e mover pasta', () => {
     const ref = criarBookReferenceItem({ id: 'sec_1' });
     let metaChamado = false;
     let moverChamado = false;
-    let corChamado = false;
 
     const folha = renderizarFolhaInterna(ref, {
       onEditarMeta: () => { metaChamado = true; },
       onMoverPasta: () => { moverChamado = true; },
-      onMudarCor: () => { corChamado = true; }
+      onMudarCor: () => {}
     });
 
     const botoesSec = folha.querySelectorAll('.ath-folha-acoes-secundarias button');
-    assert.equal(botoesSec.length, 3);
+    assert.equal(botoesSec.length, 2);
 
     botoesSec[0].dispatchEvent({ type: 'click' });
     botoesSec[1].dispatchEvent({ type: 'click' });
-    botoesSec[2].dispatchEvent({ type: 'click' });
 
     assert.equal(metaChamado, true);
     assert.equal(moverChamado, true);
-    assert.equal(corChamado, true);
   });
 
   it('6.4a: seis cores alteram a capa aberta e entregam a cor para persistência', () => {
