@@ -162,17 +162,30 @@ export class DashboardView {
     return this.abrirDocumento(doc, this.container.querySelector(`[data-doc-id="${doc.id}"]`));
   }
 
-  async abrirCadernoDocumento(doc, card) {
-    const completo = await this.carregarDocumentoCompleto(doc, card);
-    if (!completo || this.abaAtiva !== 'escrita') return;
+  abrirCadernoDocumento(doc, card) {
+    if (this.abaAtiva !== 'escrita') return;
     const cardAtual = card?.isConnected ? card : [...this.container.querySelectorAll('[data-doc-id]')]
       .find(el => el.dataset.docId === String(doc.id));
     this._fecharCaderno?.();
-    this._fecharCaderno = mostrarCadernoDocumento(completo, {
+    let carregamento;
+    const fechar = mostrarCadernoDocumento(doc, {
       retornoFoco: cardAtual,
       onFechar: () => { this._fecharCaderno = null; },
-      onAbrir: documento => this.abrirDocumento(documento, cardAtual)
+      onAbrir: async () => {
+        const completo = await carregamento;
+        if (completo) this.onAbrirDocumento(completo);
+      }
     });
+    this._fecharCaderno = fechar;
+    carregamento = doc.precisaCarregarConteudo
+      ? this.carregarDocumentoCompleto(doc, cardAtual)
+      : Promise.resolve(doc);
+    if (doc.precisaCarregarConteudo) {
+      carregamento.then(completo => {
+        if (this._fecharCaderno !== fechar) return;
+        fechar.atualizar(completo || doc, { falha: !completo });
+      });
+    }
   }
 
   obterIniciais(nome) {

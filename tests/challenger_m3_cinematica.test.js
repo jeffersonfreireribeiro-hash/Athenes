@@ -725,7 +725,7 @@ describe('Desafio 4: Integração com Leitor e Propagação de Estado em session
 
     const btnLeitor = folha.querySelector('.ath-btn-abrir-leitor');
     assert.ok(btnLeitor, 'Botão primário deve existir');
-    assert.ok(btnLeitor.textContent.includes('📖 Abrir Arquivo / Ler Referência'));
+    assert.equal(btnLeitor.textContent, 'Abrir Arquivo / Ler Referência');
 
     btnLeitor.dispatchEvent({ type: 'click' });
     assert.equal(obraRecebida.id, 'leitor_btn_1');

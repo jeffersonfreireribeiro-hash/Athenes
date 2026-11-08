@@ -479,6 +479,21 @@ describe('Grupo 3: Cinemática 3D de Abertura, Fechamento e Teclado (R4 / F7)', 
     assert.ok(!prateleira.classList.contains('ath-prateleira-com-livro-aberto'));
   });
 
+  it('3.7b: Estado de leitura aparece na capa e acompanha a alteração na folha', () => {
+    const ref = criarBookReferenceItem({ id: 'liv_status', statusLeitura: 'nao_lido' });
+    const estante = renderizarEstante3D([ref]);
+    const livro = estante.querySelector('.ath-livro-3d');
+    const statusCapa = livro.querySelector('.ath-livro-status-pill');
+    assert.equal(statusCapa.textContent, 'Não lido');
+
+    abrirLivro3D(livro, ref);
+    livro.querySelectorAll('.ath-status-btn')
+      .find(btn => btn.getAttribute('data-status') === 'lendo')
+      .dispatchEvent({ type: 'click' });
+    assert.equal(statusCapa.textContent, 'Lendo');
+    assert.equal(statusCapa.getAttribute('data-status'), 'lendo');
+  });
+
   it('3.8: Disparos de fechar/abrir/teclado com entradas nulas não geram exceções', () => {
     assert.doesNotThrow(() => fecharLivro3D(null));
     assert.doesNotThrow(() => abrirLivro3D(null, {}));
@@ -688,12 +703,12 @@ describe('Grupo 5: Fichamento, Status de Leitura e Persistência de Anotações 
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('Grupo 6: Ações da Folha, Leitor e Movimentação entre Pastas (R4)', () => {
-  it('6.1: Botão primário exibe texto "📖 Abrir Arquivo / Ler Referência"', () => {
+  it('6.1: Botão primário exibe texto sem emoji', () => {
     const ref = criarBookReferenceItem({ id: 'acao_1' });
     const folha = renderizarFolhaInterna(ref);
     const btn = folha.querySelector('.ath-btn-abrir-leitor');
     assert.ok(btn);
-    assert.ok(btn.textContent.includes('📖 Abrir Arquivo / Ler Referência'));
+    assert.equal(btn.textContent, 'Abrir Arquivo / Ler Referência');
   });
 
   it('6.2: Clique no botão primário dispara callback canônico onAbrirLeitor', () => {
@@ -775,6 +790,7 @@ describe('Grupo 6: Ações da Folha, Leitor e Movimentação entre Pastas (R4)',
     assert.doesNotThrow(() => {
       const folha = renderizarFolhaInterna(ref);
       assert.ok(folha.querySelector('.ath-folha-titulo'));
+      assert.equal(folha.querySelectorAll('.ath-folha-cor-amostra').length, 6);
     });
   });
 });

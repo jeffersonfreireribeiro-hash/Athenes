@@ -35,6 +35,7 @@ import {
 } from '../core/athenes_referencias.js';
 
 import { artigoTemPdf } from './athenes_estudo_artigos_dados.js';
+import { svgIcone } from './athenes_icones.js';
 
 export const CORES_CAPA_SELECAO = Object.freeze([
   { cor: CORES_CAPA_PADRAO[0], nome: 'Azul' },
@@ -330,6 +331,7 @@ export function renderizarEstante3D(livros = [], { maxPorPrateleira = 6, callbac
 
   // Distribuição em Prateleiras Horizontais (lotes de maxPorPrateleira)
   const limite = (!maxPorPrateleira || maxPorPrateleira <= 0) ? 6 : Math.max(1, Math.floor(maxPorPrateleira));
+  estanteEl.style?.setProperty?.('--ath-livros-por-prateleira', String(limite));
   const totalPrateleiras = Math.ceil(listaLivros.length / limite);
 
   for (let i = 0; i < totalPrateleiras; i++) {
@@ -381,6 +383,7 @@ export function renderizarLivro3D(ref = {}, { callbacks = {} } = {}) {
   livroEl.setAttribute('aria-label', `Livro: ${ref?.titulo || 'Sem Título'}`);
 
   const corLivro = ref?.corCapa || '#314F79';
+  livroEl.style.setProperty?.('--ath-livro-cor', corLivro);
 
   // 1. Lombada Lateral Esquerda
   const lombada = criarElemento('div', 'ath-livro-lombada');
@@ -469,6 +472,12 @@ export function renderizarLivro3D(ref = {}, { callbacks = {} } = {}) {
   capa.appendChild(autores);
 
   const footerCapa = criarElemento('div', 'ath-livro-capa-footer');
+  const rotulosStatus = { nao_lido: 'Não lido', lendo: 'Lendo', fichado: 'Fichado' };
+  const statusAtual = rotulosStatus[ref?.statusLeitura] ? ref.statusLeitura : 'nao_lido';
+  const statusCapa = criarElemento('span', 'ath-livro-status-pill');
+  statusCapa.setAttribute('data-status', statusAtual);
+  statusCapa.textContent = rotulosStatus[statusAtual];
+  footerCapa.appendChild(statusCapa);
   if (ref?.pdfUrl || ref?.pdfCaminho || (typeof artigoTemPdf === 'function' && artigoTemPdf(ref))) {
     const pdfPill = criarElemento('span', 'ath-livro-pdf-pill');
     pdfPill.textContent = 'PDF';
@@ -836,6 +845,11 @@ export function renderizarFolhaInterna(ref = {}, {
     btnSt.addEventListener('click', (ev) => {
       if (ev?.stopPropagation) ev.stopPropagation();
       if (ref) ref.statusLeitura = st.id;
+      const statusCapa = folha.closest?.('.ath-livro-3d')?.querySelector?.('.ath-livro-status-pill');
+      if (statusCapa) {
+        statusCapa.setAttribute('data-status', st.id);
+        statusCapa.textContent = st.label;
+      }
       const todos = statusBox.querySelectorAll('.ath-status-btn');
       for (const b of todos) {
         const ativo = b.getAttribute('data-status') === st.id;
@@ -868,7 +882,7 @@ export function renderizarFolhaInterna(ref = {}, {
   cabecalho.appendChild(meta);
   folha.appendChild(cabecalho);
 
-  if (fnMudarCor) {
+  {
     const seletorCor = criarElemento('div', 'ath-folha-cores-capa');
     seletorCor.setAttribute('role', 'group');
     seletorCor.setAttribute('aria-label', 'Cor da capa');
@@ -892,6 +906,7 @@ export function renderizarFolhaInterna(ref = {}, {
         }
         const livro = folha.closest?.('.ath-livro-3d') || folha.parentNode;
         if (livro?.querySelector) {
+          livro.style?.setProperty?.('--ath-livro-cor', opcao.cor);
           for (const seletor of ['.ath-livro-lombada', '.ath-livro-capa-tras', '.ath-livro-capa-frente', '.ath-livro-capa-verso']) {
             const parte = livro.querySelector(seletor);
             if (parte?.style) parte.style.backgroundColor = opcao.cor;
@@ -899,7 +914,7 @@ export function renderizarFolhaInterna(ref = {}, {
           const capa = livro.querySelector('.ath-livro-capa-frente');
           if (capa?.style) capa.style.color = obterCorTextoAcessivel(opcao.cor);
         }
-        fnMudarCor(ref, opcao.cor);
+        if (fnMudarCor) fnMudarCor(ref, opcao.cor);
       });
       amostras.appendChild(amostra);
     }
@@ -1037,7 +1052,8 @@ export function renderizarFolhaInterna(ref = {}, {
   // Botão Primário: Estúdio de Leitura
   const btnAbrir = criarElemento('button', 'ath-btn ath-btn-primary ath-btn-abrir-leitor');
   btnAbrir.setAttribute('type', 'button');
-  btnAbrir.textContent = '📖 Abrir Arquivo / Ler Referência';
+  btnAbrir.textContent = 'Abrir Arquivo / Ler Referência';
+  btnAbrir.insertAdjacentHTML?.('afterbegin', svgIcone('livro', 14));
   btnAbrir.addEventListener('click', (ev) => {
     if (ev?.stopPropagation) ev.stopPropagation();
     if (typeof onAbrirLeitor === 'function') {
@@ -1052,7 +1068,8 @@ export function renderizarFolhaInterna(ref = {}, {
   if (fnEditarMeta) {
     const btnEditMeta = criarElemento('button', 'ath-btn ath-btn-sm ath-btn-soft');
     btnEditMeta.setAttribute('type', 'button');
-    btnEditMeta.textContent = '✏️ Metadados';
+    btnEditMeta.textContent = 'Metadados';
+    btnEditMeta.insertAdjacentHTML?.('afterbegin', svgIcone('lapis', 12));
     btnEditMeta.setAttribute('title', 'Editar metadados da obra');
     btnEditMeta.addEventListener('click', (ev) => {
       if (ev?.stopPropagation) ev.stopPropagation();

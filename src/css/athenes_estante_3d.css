@@ -126,9 +126,10 @@
 
 .ath-livro-3d-wrap {
   position: relative;
-  width: 164px;
-  height: 226px;
-  flex: 0 0 164px;
+  width: calc((100% + 24px) / var(--ath-livros-por-prateleira, 6) - 24px);
+  height: auto;
+  aspect-ratio: 164 / 226;
+  flex: 0 0 calc((100% + 24px) / var(--ath-livros-por-prateleira, 6) - 24px);
   perspective: 1000px;
   perspective-origin: 50% 40%;
   cursor: pointer;
@@ -152,8 +153,9 @@
 
 .ath-livro-3d {
   position: relative;
-  width: 164px;
-  height: 226px;
+  width: calc((100% + 24px) / var(--ath-livros-por-prateleira, 6) - 24px);
+  height: auto;
+  aspect-ratio: 164 / 226;
   transform-style: flat;
   transform: rotateY(0deg) translateZ(0);
   transform-origin: 50% 100%;
@@ -460,8 +462,24 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 6px;
   margin-top: 6px;
 }
+
+.ath-livro-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .17);
+  color: #FFFFFF;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ath-livro-status-pill[data-status="lendo"] { background: #E9EFFB; color: #264A80; }
+.ath-livro-status-pill[data-status="fichado"] { background: #DCFCE7; color: #166534; }
 
 .ath-livro-pdf-pill {
   display: inline-flex;
@@ -860,6 +878,10 @@
 }
 
 .ath-btn-abrir-leitor {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
   font-size: 12px;
   font-weight: 800;
@@ -886,6 +908,10 @@
 }
 
 .ath-folha-acoes-secundarias .ath-btn-soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   flex: 1;
   font-size: 10px;
   font-weight: 700;
@@ -935,6 +961,21 @@
   .ath-livro-folha-interna {
     width: calc(100vw - 32px);
     max-width: 320px;
+  }
+}
+
+@media (max-width: 600px) {
+  .ath-livro-3d.aberto {
+    width: min(100%, 320px);
+    flex-basis: min(100%, 320px);
+    translate: 0 0;
+  }
+  .ath-livro-3d.aberto .ath-livro-capa,
+  .ath-livro-3d.aberto .ath-livro-capa-tras {
+    display: none;
+  }
+  .ath-livro-3d.aberto .ath-livro-folha-interna {
+    width: 100%;
   }
 }
 

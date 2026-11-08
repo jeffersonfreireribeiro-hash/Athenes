@@ -31,7 +31,16 @@ export function obterDadosCaderno(doc = {}) {
   };
 }
 
+function htmlReferenciasCaderno(dados, carregando = false, falha = false) {
+  if (carregando) return '<p class="ath-caderno-sem-refs">Carregando referências...</p>';
+  if (falha) return '<p class="ath-caderno-sem-refs">Não foi possível carregar as referências.</p>';
+  if (!dados.referencias.length) return '<p class="ath-caderno-sem-refs">Ainda não há referências vinculadas a este documento.</p>';
+  return `<ol>${dados.referencias.slice(0, 12).map(ref => `<li><strong>${escapeHtml(ref.titulo)}</strong>${ref.detalhe ? `<small>${escapeHtml(ref.detalhe)}</small>` : ''}</li>`).join('')}</ol>
+    ${dados.referencias.length > 12 ? `<p class="ath-caderno-mais-refs">E mais ${dados.referencias.length - 12} referências no editor.</p>` : ''}`;
+}
+
 export function mostrarCadernoDocumento(doc, { onAbrir, onFechar, retornoFoco } = {}) {
+  let documentoAtual = doc;
   const dados = obterDadosCaderno(doc);
   const overlay = document.createElement('div');
   overlay.className = 'ath-caderno-overlay';
@@ -61,10 +70,7 @@ export function mostrarCadernoDocumento(doc, { onAbrir, onFechar, retornoFoco } 
           </dl>
           <div class="ath-caderno-referencias">
             <h3>Referências <span>${dados.referencias.length}</span></h3>
-            ${dados.referencias.length
-              ? `<ol>${dados.referencias.slice(0, 12).map(ref => `<li><strong>${escapeHtml(ref.titulo)}</strong>${ref.detalhe ? `<small>${escapeHtml(ref.detalhe)}</small>` : ''}</li>`).join('')}</ol>
-                ${dados.referencias.length > 12 ? `<p class="ath-caderno-mais-refs">E mais ${dados.referencias.length - 12} referências no editor.</p>` : ''}`
-              : '<p class="ath-caderno-sem-refs">Ainda não há referências vinculadas a este documento.</p>'}
+            ${htmlReferenciasCaderno(dados, Boolean(doc.precisaCarregarConteudo))}
           </div>
         </div>
         <button type="button" class="ath-btn ath-btn-primary ath-btn-abrir ath-caderno-abrir-editor">Abrir no editor</button>
@@ -94,10 +100,40 @@ export function mostrarCadernoDocumento(doc, { onAbrir, onFechar, retornoFoco } 
   overlay.querySelector('.ath-caderno-fechar').addEventListener('click', fechar);
   overlay.querySelector('.ath-caderno-abrir-editor').addEventListener('click', () => {
     fechar();
-    if (typeof onAbrir === 'function') onAbrir(doc);
+    if (typeof onAbrir === 'function') onAbrir(documentoAtual);
   });
   document.body.appendChild(overlay);
   document.addEventListener('keydown', aoTeclado, true);
   overlay.querySelector('.ath-caderno-fechar').focus({ preventScroll: true });
+  fechar.atualizar = (novoDocumento, { falha = false } = {}) => {
+    if (!overlay.isConnected) return;
+    documentoAtual = novoDocumento;
+    const novosDados = obterDadosCaderno(novoDocumento);
+    const dialogo = overlay.querySelector('.ath-caderno-aberto');
+    dialogo.setAttribute('aria-label', `Caderno de ${novosDados.titulo}`);
+    overlay.querySelector('.ath-caderno-capa-interna .ath-caderno-sobretitulo').textContent = `${novosDados.tipo} · ${novosDados.estado}`;
+    const titulo = overlay.querySelector('.ath-caderno-capa-interna h2');
+    titulo.textContent = novosDados.titulo;
+    let subtitulo = overlay.querySelector('.ath-caderno-subtitulo');
+    if (novosDados.subtitulo && !subtitulo) {
+      subtitulo = document.createElement('p');
+      subtitulo.className = 'ath-caderno-subtitulo';
+      titulo.insertAdjacentElement('afterend', subtitulo);
+    }
+    if (subtitulo) {
+      if (novosDados.subtitulo) subtitulo.textContent = novosDados.subtitulo;
+      else subtitulo.remove();
+    }
+    overlay.querySelector('.ath-caderno-resumo p').textContent = novosDados.resumo || 'Este documento ainda não tem resumo cadastrado.';
+    overlay.querySelector('.ath-caderno-autor').textContent = `${novosDados.autor} · ${novosDados.ano}`;
+    const detalhes = overlay.querySelectorAll('.ath-caderno-dados dd');
+    [novosDados.autor, novosDados.instituicao || 'Não informada', novosDados.modificado,
+      `${novosDados.secoes} seções · ${novosDados.paginas} páginas`]
+      .forEach((valor, indice) => { detalhes[indice].textContent = valor; });
+    overlay.querySelector('.ath-caderno-referencias h3 span').textContent = String(novosDados.referencias.length);
+    const referencias = overlay.querySelector('.ath-caderno-referencias');
+    referencias.querySelectorAll('ol, p').forEach(item => item.remove());
+    referencias.insertAdjacentHTML('beforeend', htmlReferenciasCaderno(novosDados, false, falha));
+  };
   return fechar;
 }
