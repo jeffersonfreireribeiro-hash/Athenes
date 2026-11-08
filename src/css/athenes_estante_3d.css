@@ -318,6 +318,19 @@
   box-sizing: border-box;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .ath-livro-3d:not(.aberto):hover .ath-livro-capa {
+    transform: perspective(900px) rotateY(-9deg);
+  }
+  .ath-livro-3d:not(.aberto):hover .ath-livro-paginas-dir {
+    right: -10px;
+    width: 14px;
+    transform: none;
+    opacity: 1;
+    border-radius: 0 3px 3px 0;
+  }
+}
+
 /* Face interna da capa (verso visível quando aberto a -140deg) */
 .ath-livro-capa-verso,
 .ath-livro-capa-interna {
