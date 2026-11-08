@@ -50,13 +50,13 @@
   border-radius: 6px;
   z-index: 0;
   pointer-events: none;
-  /* Madeira natural de carvalho com furinhos cilíndricos repetidos */
-  background:
-    radial-gradient(circle at 50% 50%, #2E1505 0%, #200E03 40%, #562E10 60%, rgba(255, 230, 205, 0.3) 80%, transparent 88%),
+  /* Madeira natural de carvalho com furinhos perfeitamente circulares */
+  background-image:
+    radial-gradient(circle 5px at 16px 20px, #261104 0%, #170902 60%, #4D260D 75%, rgba(255, 235, 210, 0.35) 90%, transparent 100%),
     linear-gradient(90deg, #915423 0%, #BA7A44 25%, #CF915B 65%, #9B5D2B 100%);
-  background-size: 10px 42px, 100% 100%;
+  background-size: 32px 40px, 100% 100%;
   background-repeat: repeat-y, no-repeat;
-  background-position: center 20px, 0 0;
+  background-position: 0 0, 0 0;
   box-shadow: 
     3px 6px 18px rgba(35, 18, 8, 0.22),
     -2px 0 6px rgba(0, 0, 0, 0.06),
@@ -624,8 +624,9 @@
   z-index: 100;
   perspective: none;
   transform-style: preserve-3d;
-  /* Não altera width nem flex-basis: o livro mantém seu lugar na estante sem afastar vizinhos */
+  /* Mantém o slot fixo no grid flex sem empurrar vizinhos */
   transform: translateZ(60px);
+  overflow: visible;
   box-shadow: 0 24px 52px rgba(15, 23, 42, 0.38);
   transition: transform 0.55s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.45s ease;
 }
@@ -637,9 +638,15 @@
 
 .ath-livro-3d.aberto .ath-livro-capa,
 .ath-livro-3d.aberto .ath-livro-capa-frente {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 290px;
+  height: 420px;
   transform-style: preserve-3d;
   transform: rotateY(-160deg);
-  box-shadow: -6px 8px 18px rgba(0, 0, 0, 0.28);
+  transform-origin: left bottom;
+  box-shadow: -8px 12px 24px rgba(0, 0, 0, 0.32);
   backface-visibility: visible;
 }
 
@@ -659,10 +666,10 @@
 
 .ath-livro-folha-interna {
   position: absolute;
-  top: 0;
+  bottom: 0;
   left: 0;
   width: 290px;
-  min-height: 100%;
+  height: 420px;
   max-height: 420px;
   background: #FFFFFF;
   border-radius: 4px 8px 8px 4px;
@@ -713,9 +720,9 @@
   visibility: visible;
   opacity: 1;
   pointer-events: auto;
-  height: 100%;
-  max-height: 100%;
-  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.32);
+  height: 420px;
+  max-height: 420px;
+  box-shadow: 0 24px 56px rgba(15, 23, 42, 0.38), 0 4px 12px rgba(15, 23, 42, 0.15);
 }
 
 /* Cabeçalho da folha */
