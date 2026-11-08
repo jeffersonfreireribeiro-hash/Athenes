@@ -639,13 +639,15 @@
 .ath-livro-3d.aberto .ath-livro-capa,
 .ath-livro-3d.aberto .ath-livro-capa-frente {
   position: absolute;
-  bottom: 0;
+  top: 0;
+  bottom: auto;
   left: 0;
+  right: auto;
   width: 290px;
   height: 420px;
   transform-style: preserve-3d;
   transform: rotateY(-160deg);
-  transform-origin: left bottom;
+  transform-origin: left center;
   box-shadow: -8px 12px 24px rgba(0, 0, 0, 0.32);
   backface-visibility: visible;
 }
@@ -666,8 +668,10 @@
 
 .ath-livro-folha-interna {
   position: absolute;
-  bottom: 0;
+  top: 0;
+  bottom: auto;
   left: 0;
+  right: auto;
   width: 290px;
   height: 420px;
   max-height: 420px;
@@ -716,10 +720,16 @@
 }
 
 .ath-livro-3d.aberto .ath-livro-folha-interna {
+  position: absolute;
+  top: 0;
+  bottom: auto;
+  left: 0;
+  right: auto;
   display: flex;
   visibility: visible;
   opacity: 1;
   pointer-events: auto;
+  width: 290px;
   height: 420px;
   max-height: 420px;
   box-shadow: 0 24px 56px rgba(15, 23, 42, 0.38), 0 4px 12px rgba(15, 23, 42, 0.15);
