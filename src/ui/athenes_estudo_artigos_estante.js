@@ -542,6 +542,8 @@ export function abrirLivro3D(livroEl, ref, { callbacks = {} } = {}) {
   }
 
   if (livroEl.classList) livroEl.classList.add('aberto');
+  container?.classList?.add('ath-estante-com-livro-aberto');
+  livroEl.closest?.('.ath-estante-prateleira')?.classList?.add('ath-prateleira-com-livro-aberto');
   if (!livroEl.style) livroEl.style = {};
   const prateleira = typeof livroEl.closest === 'function' ? livroEl.closest('.ath-estante-prateleira') : null;
   if (prateleira?.getBoundingClientRect && livroEl.getBoundingClientRect && livroEl.style.setProperty) {
@@ -600,9 +602,7 @@ export function abrirLivro3D(livroEl, ref, { callbacks = {} } = {}) {
       try { alvoFoco.focus({ preventScroll: true }); } catch (_) {}
     }
     if (typeof livroEl.scrollIntoView === 'function') {
-      const movimentoReduzido = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      livroEl.scrollIntoView({ behavior: movimentoReduzido ? 'instant' : 'smooth', block: 'center', inline: 'nearest' });
+      livroEl.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' });
     }
   }, 50);
 }
@@ -621,6 +621,9 @@ export function fecharLivro3D(livroEl) {
   }
 
   if (livroEl.classList) livroEl.classList.remove('aberto');
+  livroEl.closest?.('.ath-estante-prateleira')?.classList?.remove('ath-prateleira-com-livro-aberto');
+  (livroEl.closest?.('.ath-estante-3d') || livroEl.closest?.('.ath-estante-container'))
+    ?.classList?.remove('ath-estante-com-livro-aberto');
   if (!livroEl.style) livroEl.style = {};
   if (livroEl.style.removeProperty) livroEl.style.removeProperty('--ath-open-shift-x');
   livroEl.style.transform = 'rotateY(0deg) translateZ(0)';

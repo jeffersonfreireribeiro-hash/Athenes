@@ -464,6 +464,21 @@ describe('Grupo 3: Cinemática 3D de Abertura, Fechamento e Teclado (R4 / F7)', 
     assert.ok(!livroA.classList.contains('aberto'), 'Livro A deve ter sido fechado automaticamente');
   });
 
+  it('3.7a: Efeito 3D fica ativo apenas na prateleira com livro aberto', () => {
+    const ref = criarBookReferenceItem({ id: 'liv_foco' });
+    const estante = renderizarEstante3D([ref]);
+    const livro = estante.querySelector('.ath-livro-3d');
+    const prateleira = estante.querySelector('.ath-estante-prateleira');
+
+    abrirLivro3D(livro, ref);
+    assert.ok(estante.classList.contains('ath-estante-com-livro-aberto'));
+    assert.ok(prateleira.classList.contains('ath-prateleira-com-livro-aberto'));
+
+    fecharLivro3D(livro);
+    assert.ok(!estante.classList.contains('ath-estante-com-livro-aberto'));
+    assert.ok(!prateleira.classList.contains('ath-prateleira-com-livro-aberto'));
+  });
+
   it('3.8: Disparos de fechar/abrir/teclado com entradas nulas não geram exceções', () => {
     assert.doesNotThrow(() => fecharLivro3D(null));
     assert.doesNotThrow(() => abrirLivro3D(null, {}));
