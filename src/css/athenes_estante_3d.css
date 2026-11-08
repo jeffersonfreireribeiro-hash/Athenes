@@ -26,7 +26,7 @@
 
 .ath-estante-3d,
 .ath-estante-container {
-  --ath-estante-gap: 24px;
+  --ath-estante-gap: 48px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -44,9 +44,14 @@
   perspective: none !important;
 }
 
-@media (min-width: 520px) and (max-width: 1200px) {
+@media (min-width: 521px) and (max-width: 1200px) {
   .ath-estante-3d,
   .ath-estante-container { --ath-estante-gap: 38px; }
+}
+
+@media (max-width: 520px) {
+  .ath-estante-3d,
+  .ath-estante-container { --ath-estante-gap: 24px; }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -73,7 +78,7 @@
   align-items: flex-end;
   justify-content: flex-start;
   gap: var(--ath-estante-gap);
-  padding: 0;
+  padding: 0 16px;
   min-height: 240px;
   z-index: 2;
   box-sizing: border-box;

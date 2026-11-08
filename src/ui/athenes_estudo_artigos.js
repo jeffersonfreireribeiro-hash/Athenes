@@ -663,7 +663,12 @@ export class EstudoArtigosView {
   atualizarGridCatalogo() {
     const grid = this.container.querySelector('#athArtigosZoteroGrid');
     if (!grid) return;
-    const espacamentoEstante = () => typeof window !== 'undefined' && window.matchMedia?.('(min-width: 520px) and (max-width: 1200px)').matches ? 38 : 24;
+    const espacamentoEstante = () => {
+      if (typeof window === 'undefined' || !window.matchMedia) return 48;
+      if (window.matchMedia('(max-width: 520px)').matches) return 24;
+      if (window.matchMedia('(max-width: 1200px)').matches) return 38;
+      return 48;
+    };
     const maxPorPrateleira = calcularLivrosPorPrateleira(grid.getBoundingClientRect?.().width || grid.clientWidth, espacamentoEstante());
     this._livrosPorPrateleira = maxPorPrateleira;
     if (typeof ResizeObserver !== 'undefined' && !this._observadorEstante) {
