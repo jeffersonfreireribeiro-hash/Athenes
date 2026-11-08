@@ -99,3 +99,13 @@ test('pasta excluída some em todos (com o que há dentro) e os documentos volta
   assert.equal(r.indice.documentos[0].pastaId, '');
   assert.ok('arq' in r.indice.pastasExcluidas, 'a exclusão vai para o servidor e vale nos outros computadores');
 });
+
+test('cor da pasta: a escolha mais recente vale e sobrevive à sincronização', () => {
+  const srv = { pastas: [{ id: 'p1', nome: 'TCC', cor: '#314F79', subpastas: [] }], documentos: [], excluidos: {} };
+  const local = { pastas: [{ id: 'p1', nome: 'TCC', cor: '#B45309', corEm: '2026-11-08T20:00:00.000Z', subpastas: [] }], documentos: [] };
+  const r = mesclarPerfil(srv, local);
+  assert.equal(r.pastas[0].cor, '#B45309');
+  assert.equal(r.mudouServidor, true);
+  const outro = mesclarPerfil(r.indice, { pastas: [{ id: 'p1', nome: 'TCC', cor: '#314F79', subpastas: [] }], documentos: [] });
+  assert.equal(outro.pastas[0].cor, '#B45309');
+});

@@ -55,6 +55,8 @@ function mesclarArvore(base = [], extra = [], mapa = {}, excluidas = {}) {
     }
     if (igual.id !== p.id) mapa[p.id] = igual.id;
     if (!igual.driveId && p.driveId) igual.driveId = p.driveId; // o servidor ainda não sabia o id da pasta no Drive
+    // cor da pasta: vale a escolha mais recente (`corEm`); sem carimbo, a primeira cor conhecida
+    if (p.cor && (!igual.cor || (p.corEm || '') > (igual.corEm || ''))) { igual.cor = p.cor; if (p.corEm) igual.corEm = p.corEm; }
     igual.subpastas = mesclarArvore(igual.subpastas || [], p.subpastas || [], mapa, excluidas);
   };
   for (const p of base) juntar(p);

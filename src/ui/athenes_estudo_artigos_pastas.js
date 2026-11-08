@@ -954,8 +954,10 @@ export const metodosEstudoPastas = {
       // aplicada na MESMA árvore que será gravada, senão a alteração se perde.
       const arvore = obterPastasDriveLocais();
       const alvo = buscarPastaNaArvore(arvore, pastaId);
-      if (alvo) alvo.cor = corEscolhida;
+      const corEm = new Date().toISOString();
+      if (alvo) { alvo.cor = corEscolhida; alvo.corEm = corEm; }
       pasta.cor = corEscolhida;
+      pasta.corEm = corEm;
       salvarPastasDriveLocais(arvore);
       fechar();
       const topoWrapper = this.container?.querySelector('#athBibTopoPastasWrapper');
