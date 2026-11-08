@@ -4,7 +4,7 @@
  * citação ABNT e utilidades do desenho à mão livre. Separado da tela (athenes_estudo_artigos.js) para o arquivo não crescer sem fim.
  */
 import * as bib from '../core/athenes_biblioteca_artigos.js';
-import { obterTokenDrive, obterPastaRaizDrive, buscarOuCriarPasta, obterOuCriarPastaDoArtigoNoDrive, moverArquivoNoDrive } from '../core/athenes_drive_sync.js';
+import { obterTokenDrive, obterPastaRaizDrive, buscarOuCriarPasta, obterOuCriarPastaDoArtigoNoDrive, moverArquivoNoDrive, reconciliarArtigosComDrive } from '../core/athenes_drive_sync.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import { salvarArquivoNoGoogleDrive } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
@@ -715,9 +715,25 @@ export async function garantirPdfDoArtigo(art, { forcarBuscaIdentificadores = fa
 /**
  * Garante que os PDFs locais estejam sincronizados no Google Drive.
  */
+export async function reorganizarArquivosAntigosNoDrive(token = null) {
+  const tokenFinal = token || (await obterTokenDrive());
+  if (!tokenFinal) return { total: 0, movidos: 0 };
+  const artigos = carregarArtigosEstudo();
+  const res = await reconciliarArtigosComDrive(artigos, tokenFinal);
+  if (res.movidos > 0) {
+    salvarArtigosEstudo(artigos);
+  }
+  return res;
+}
+
+/**
+ * Garante que os PDFs locais estejam sincronizados no Google Drive e reorganiza
+ * no Drive os arquivos salvos antes desta atualização em suas respectivas coleções.
+ */
 export async function migrarPdfsLocaisParaODrive() {
   const token = await obterTokenDrive();
   if (!token) return 0;
+  reorganizarArquivosAntigosNoDrive(token).catch(() => {});
   let movidos = 0;
   for (const art of carregarArtigosEstudo()) {
     try {

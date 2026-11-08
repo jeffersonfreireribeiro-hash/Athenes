@@ -223,7 +223,7 @@ export async function moverArquivoNoDrive(fileId, novaPastaDriveId, token, { fet
     if (!atual || atual.trashed) return null;
     const paisAtuais = atual.parents || [];
     if (paisAtuais.includes(novaPastaDriveId)) {
-      return atual; // Já está na pasta destino
+      return { ...atual, jaEstavaNaPasta: true }; // Já está na pasta destino
     }
     const remover = paisAtuais.length ? `&removeParents=${encodeURIComponent(paisAtuais.join(','))}` : '';
     const movido = await chamar(
@@ -232,7 +232,7 @@ export async function moverArquivoNoDrive(fileId, novaPastaDriveId, token, { fet
       { method: 'PATCH' },
       token
     );
-    return movido;
+    return { ...movido, jaEstavaNaPasta: false };
   } catch (e) {
     if (e.status === 404) return null;
     throw e;
@@ -307,6 +307,60 @@ export async function moverArquivosDoArtigoNoDrive(art, pastaDestinoId, { token 
     art.driveFolderId = novaPastaDriveId;
   } catch (e) {
     r.erros.push({ geral: e.message });
+  }
+
+  return r;
+}
+
+/**
+ * Reconcilia e reorganiza no Google Drive todos os arquivos de artigos e referências
+ * que foram salvos antes dessa atualização (ou que estejam na pasta errada/raiz/Bibliografia_PDFs).
+ * Move os arquivos PDF e anotações JSON para a pasta correspondente à sua coleção/categoria.
+ *
+ * @param {Array<object>} artigos - Lista de artigos
+ * @param {string} token - Token de acesso do Google Drive
+ * @param {object} [opcoes]
+ * @returns {Promise<{ total: number, movidos: number, erros: Array }>}
+ */
+export async function reconciliarArtigosComDrive(artigos, token, { fetchImpl = globalThis.fetch, pastas = obterPastasDriveLocais(), aoProgresso = null } = {}) {
+  const r = { total: 0, movidos: 0, erros: [] };
+  if (!token || !Array.isArray(artigos) || artigos.length === 0) return r;
+
+  await sincronizarPastasComDrive(token, { fetchImpl, pastas });
+
+  const lista = artigos.filter(a => Boolean(a?.driveFileId || a?.driveAnnotationFileId));
+  r.total = lista.length;
+
+  for (let i = 0; i < lista.length; i++) {
+    const art = lista[i];
+    try {
+      const pastaDestinoId = await obterOuCriarPastaDoArtigoNoDrive(art.pastaId, token, { fetchImpl, pastas });
+      if (pastaDestinoId) {
+        let moveuAlgum = false;
+
+        const idPdf = String(art.driveFileId || '').trim();
+        if (idPdf && !idPdf.startsWith('drive_pdf_')) {
+          const resPdf = await moverArquivoNoDrive(idPdf, pastaDestinoId, token, { fetchImpl });
+          if (resPdf && !resPdf.jaEstavaNaPasta) moveuAlgum = true;
+        }
+
+        const idAnot = String(art.driveAnnotationFileId || '').trim();
+        if (idAnot && !idAnot.startsWith('drive_pdf_')) {
+          const resAnot = await moverArquivoNoDrive(idAnot, pastaDestinoId, token, { fetchImpl });
+          if (resAnot && !resAnot.jaEstavaNaPasta) moveuAlgum = true;
+        }
+
+        if (moveuAlgum) {
+          r.movidos++;
+          art.driveFolderId = pastaDestinoId;
+        }
+      }
+    } catch (e) {
+      r.erros.push({ artigo: art.titulo || art.id, erro: e.message });
+    }
+    if (typeof aoProgresso === 'function') {
+      aoProgresso(i + 1, lista.length);
+    }
   }
 
   return r;

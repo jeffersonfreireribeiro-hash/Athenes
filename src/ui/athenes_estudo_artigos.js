@@ -19,7 +19,7 @@
 import * as bib from '../core/athenes_biblioteca_artigos.js';
 import { gravarConfigZotero } from '../core/athenes_zotero_config.js';
 import { lerConta, gravarConta, obterContaAtiva } from '../core/athenes_conta.js';
-import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive, obterOuCriarPastaDoArtigoNoDrive, moverArquivosDoArtigoNoDrive } from '../core/athenes_drive_sync.js';
+import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive, obterOuCriarPastaDoArtigoNoDrive, moverArquivosDoArtigoNoDrive, reconciliarArtigosComDrive, moverArquivoNoDrive } from '../core/athenes_drive_sync.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import { obterPerfilColaborador, obterConfigGoogleDrive, salvarArquivoNoGoogleDrive, autenticarGoogleDrive, listarPdfsDoGoogleDrive, salvarDocumentoNoSupabase, obterPastasDriveLocais, salvarPastasDriveLocais, buscarPastaNaArvore } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
@@ -1774,7 +1774,12 @@ export class EstudoArtigosView {
               }
             }
           }
-          if (pastaDriveArtigoId) art.driveFolderId = pastaDriveArtigoId;
+          if (pastaDriveArtigoId) {
+            art.driveFolderId = pastaDriveArtigoId;
+            if (art.driveFileId && !String(art.driveFileId).startsWith('drive_pdf_')) {
+              await moverArquivoNoDrive(art.driveFileId, pastaDriveArtigoId, token).catch(() => {});
+            }
+          }
           resultados.push('Google Drive ✓');
         } catch (_) {}
       }
@@ -1913,6 +1918,7 @@ export class EstudoArtigosView {
       this.artigos.forEach(a => { if (a.chaveZotero) aplicarFilhosZoteroAoArtigo(a, a.chaveZotero, filhos); });
     } catch (e) { console.warn('[Athenes] Anexos e notas do Zotero:', e.message); }
     salvarArtigosEstudo(this.artigos);
+    obterTokenDrive().then(tok => { if (tok) reconciliarArtigosComDrive(this.artigos, tok).catch(() => {}); });
     if (typeof this.aoMudarPastas === 'function') this.aoMudarPastas({ pastasNovas });
     this.renderizar();
     if (!silencioso) {

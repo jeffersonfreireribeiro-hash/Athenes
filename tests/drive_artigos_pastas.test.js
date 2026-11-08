@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import {
   obterOuCriarPastaDoArtigoNoDrive,
   moverArquivoNoDrive,
-  moverArquivosDoArtigoNoDrive
+  moverArquivosDoArtigoNoDrive,
+  reconciliarArtigosComDrive
 } from '../src/core/athenes_drive_sync.js';
 import { salvarConfigGoogleDrive } from '../src/core/athenes_colaboracao.js';
 
@@ -91,6 +92,7 @@ test('moverArquivoNoDrive: envia PATCH com addParents e removeParents para o Goo
 
   const res = await moverArquivoNoDrive('file_pdf_123', 'pasta_nova_id', 'token_teste', { fetchImpl: fetchMock });
   assert.ok(res);
+  assert.equal(res.jaEstavaNaPasta, false, 'Deve indicar que o arquivo foi movido');
   assert.ok(patchChamado, 'Deve ter disparado o PATCH de movimentação');
   assert.match(patchChamado.url, /addParents=pasta_nova_id/);
   assert.match(patchChamado.url, /removeParents=pasta_antiga_id/);
@@ -114,6 +116,7 @@ test('moverArquivoNoDrive: não dispara PATCH se o arquivo já está na pasta de
 
   const res = await moverArquivoNoDrive('file_pdf_123', 'pasta_destino_id', 'token_teste', { fetchImpl: fetchMock });
   assert.ok(res);
+  assert.equal(res.jaEstavaNaPasta, true, 'Deve indicar que já estava na pasta');
   assert.equal(patchChamado, false, 'Não deve fazer PATCH redundante');
 });
 
@@ -178,4 +181,73 @@ test('moverArquivosDoArtigoNoDrive: move tanto o PDF quanto o arquivo de anotaç
   assert.ok(movidosUrls[1].includes('anot_drive_789'));
   assert.ok(movidosUrls[0].includes('addParents=drive_mestrado_id'));
   assert.ok(movidosUrls[1].includes('addParents=drive_mestrado_id'));
+});
+
+test('reconciliarArtigosComDrive: reorganiza artigos antigos salvos na raiz ou pasta errada para sua coleção', async () => {
+  const patches = [];
+
+  const { fetchMock } = criarFetchMock({
+    'fields=id,parents,trashed': (url) => {
+      // O PDF do art_antigo_1 estava na raiz antiga
+      if (url.includes('antigo_pdf_1')) {
+        return { ok: true, status: 200, json: async () => ({ id: 'antigo_pdf_1', parents: ['raiz_athenes_antiga'], trashed: false }) };
+      }
+      // O PDF do art_antigo_2 já estava na pasta certa
+      if (url.includes('antigo_pdf_2')) {
+        return { ok: true, status: 200, json: async () => ({ id: 'antigo_pdf_2', parents: ['drive_doutorado_id'], trashed: false }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ id: 'generico', parents: [], trashed: false }) };
+    },
+    'addParents=': (url) => {
+      patches.push(url);
+      return { ok: true, status: 200, json: async () => ({ id: 'ok' }) };
+    }
+  });
+
+  const pastas = [
+    {
+      id: 'pasta_bib_raiz',
+      nome: 'Bibliografia & Leituras',
+      tipo: 'bibliografia',
+      driveId: 'drive_bib_raiz_id',
+      subpastas: [
+        {
+          id: 'pasta_doutorado',
+          nome: 'Doutorado',
+          driveId: 'drive_doutorado_id',
+          subpastas: []
+        }
+      ]
+    }
+  ];
+
+  const artigos = [
+    {
+      id: 'art_1',
+      titulo: 'Acústica Arquitetônica',
+      pastaId: 'pasta_doutorado',
+      driveFileId: 'antigo_pdf_1',
+      driveFolderId: 'raiz_athenes_antiga'
+    },
+    {
+      id: 'art_2',
+      titulo: 'Reverberação Sonora',
+      pastaId: 'pasta_doutorado',
+      driveFileId: 'antigo_pdf_2',
+      driveFolderId: 'drive_doutorado_id'
+    }
+  ];
+
+  const res = await reconciliarArtigosComDrive(artigos, 'token_sync_1', {
+    fetchImpl: fetchMock,
+    pastas
+  });
+
+  assert.equal(res.total, 2, 'Total de artigos com arquivos no Drive');
+  assert.equal(res.movidos, 1, 'Apenas o artigo que estava fora da pasta deve ser movido');
+  assert.equal(patches.length, 1, 'Deve ter disparado 1 PATCH no Drive');
+  assert.ok(patches[0].includes('antigo_pdf_1'));
+  assert.ok(patches[0].includes('addParents=drive_doutorado_id'));
+  assert.ok(patches[0].includes('removeParents=raiz_athenes_antiga'));
+  assert.equal(artigos[0].driveFolderId, 'drive_doutorado_id');
 });
