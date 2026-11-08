@@ -227,10 +227,10 @@ describe('Grupo 1: Prateleiras e Estrutura Horizontal da Estante 3D (R3 / F5)', 
     assert.equal(calcularLivrosPorPrateleira(1024), 5);
     assert.equal(calcularLivrosPorPrateleira(1920), 10);
   });
-  it('1.1: Container da estante .ath-estante-3d possui perspectiva tridimensional de 1000px', () => {
+  it('1.1: Container da estante evita perspectiva global para livros fechados', () => {
     const estante = renderizarEstante3D([]);
     assert.ok(estante.classList.contains('ath-estante-3d'), 'Deve ter classe .ath-estante-3d');
-    assert.equal(estante.style.perspective, '1000px', 'Perspectiva 3D deve ser 1000px');
+    assert.equal(estante.style.perspective, undefined);
   });
 
   it('1.2: Prateleiras contêm base chanfrada .ath-prateleira-base e sombra projetada .ath-prateleira-sombra', () => {
@@ -284,11 +284,11 @@ describe('Grupo 1: Prateleiras e Estrutura Horizontal da Estante 3D (R3 / F5)', 
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('Grupo 2: Anatomia Esquematizada e Atributos Visuais dos Livros 3D (R3 / F6)', () => {
-  it('2.1: Cada livro renderiza com a classe .ath-livro-3d e preserve-3d', () => {
+  it('2.1: Cada livro renderiza sem camada 3D permanente', () => {
     const ref = criarBookReferenceItem({ id: 'livro_1', titulo: 'Geodésia' });
     const livroEl = renderizarLivro3D(ref);
     assert.ok(livroEl.classList.contains('ath-livro-3d'), 'Deve ter classe .ath-livro-3d');
-    assert.equal(livroEl.style.transformStyle, 'preserve-3d');
+    assert.equal(livroEl.style.transformStyle, undefined);
     assert.equal(livroEl.getAttribute('data-livro-id'), 'livro_1');
   });
 

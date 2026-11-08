@@ -254,10 +254,10 @@ describe('Empirical Adversarial Challenge — Iteração 2 (Milestone 3)', () =>
         capaMatch[1].includes('backface-visibility: visible;'),
         'Capa frontal DEVE ter backface-visibility: visible para não sumir no giro'
       );
-      assert.ok(
-        capaMatch[1].includes('transform-style: preserve-3d;'),
-        'Capa frontal DEVE ter transform-style: preserve-3d para suportar filho com rotateY(180deg)'
-      );
+      assert.ok(capaMatch[1].includes('transform-style: flat;'), 'Capa fechada deve evitar camada 3D durante a rolagem');
+      const capaAbertaRegex = /\.ath-livro-3d\.aberto \.ath-livro-capa,\s*\.ath-livro-3d\.aberto \.ath-livro-capa-frente\s*\{([^}]+)\}/;
+      assert.ok(cssContent.match(capaAbertaRegex)?.[1].includes('transform-style: preserve-3d;'),
+        'Capa aberta deve preservar as duas faces');
 
       // Verso deve ter rotação de 180deg e backface-visibility: hidden
       const versoRegex = /\.ath-livro-capa-verso,\s*\.ath-livro-capa-interna\s*\{([^}]+)\}/;

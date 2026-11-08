@@ -266,7 +266,7 @@ describe('Cenário 1: Agrupamento e Quebra de Prateleiras com Volumes Extremos',
     const estante = renderizarEstante3D([]);
     assert.ok(estante, 'Estante deve ser criada');
     assert.ok(estante.classList.contains('ath-estante-3d'), 'Container deve possuir classe .ath-estante-3d');
-    assert.equal(estante.style.perspective, '1000px', 'Perspectiva deve ser 1000px');
+    assert.equal(estante.style.perspective, undefined, 'Estante fechada não deve criar uma camada 3D global');
 
     const prateleiras = estante.querySelectorAll('.ath-estante-prateleira');
     assert.equal(prateleiras.length, 1, 'Deve existir exatamente 1 prateleira de estado vazio');
@@ -630,12 +630,12 @@ describe('Cenário 4: Perspectiva 3D, Classes Canônicas e Auditoria CSS', () =>
     const estante = renderizarEstante3D([ref]);
 
     // Container
-    assert.equal(estante.style.perspective, '1000px', 'Container deve ter perspective: 1000px');
+    assert.equal(estante.style.perspective, undefined, 'Perspectiva fica restrita ao livro');
 
     // Livro 3D
     const livroEl = estante.querySelector('.ath-livro-3d');
     assert.ok(livroEl, 'Elemento de livro deve existir');
-    assert.equal(livroEl.style.transformStyle, 'preserve-3d', 'Livro deve ter preserve-3d');
+    assert.equal(livroEl.style.transformStyle, undefined, 'Livro fechado deve permanecer plano');
 
     // Anatomia de faces 3D
     assert.ok(livroEl.querySelector('.ath-livro-lombada'), 'Deve conter lombada');
@@ -670,7 +670,8 @@ describe('Cenário 4: Perspectiva 3D, Classes Canônicas e Auditoria CSS', () =>
     // 1. Perspectiva da estante
     assert.ok(cssContent.includes('perspective: 1000px'), 'CSS deve declarar perspective: 1000px');
 
-    // 2. preserve-3d nos livros e prateleiras
+    // 2. Livros fechados planos; profundidade apenas ao abrir
+    assert.ok(cssContent.includes('transform-style: flat'), 'CSS deve manter a estante fechada plana');
     assert.ok(cssContent.includes('transform-style: preserve-3d'), 'CSS deve declarar transform-style: preserve-3d');
 
     // 3. Rotação canônica de repouso dos livros

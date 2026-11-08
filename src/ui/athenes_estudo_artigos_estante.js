@@ -304,7 +304,6 @@ export function moverLivroParaPasta(livroId, pastaDestinoId, livros = [], pastas
 export function renderizarEstante3D(livros = [], { maxPorPrateleira = 6, callbacks = {} } = {}) {
   const estanteEl = criarElemento('div', 'ath-estante-3d ath-estante-container');
   if (!estanteEl.style) estanteEl.style = {};
-  estanteEl.style.perspective = '1000px';
 
   const listaLivros = Array.isArray(livros) ? livros : [];
 
@@ -380,7 +379,6 @@ export function renderizarLivro3D(ref = {}, { callbacks = {} } = {}) {
   livroEl.setAttribute('aria-haspopup', 'dialog');
   livroEl.setAttribute('aria-expanded', 'false');
   livroEl.setAttribute('aria-label', `Livro: ${ref?.titulo || 'Sem Título'}`);
-  livroEl.style.transformStyle = 'preserve-3d';
 
   const corLivro = ref?.corCapa || '#314F79';
 

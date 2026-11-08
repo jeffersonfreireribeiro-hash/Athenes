@@ -35,8 +35,6 @@
   padding: 20px 4px 56px;
   max-width: none;
   margin: 0;
-  perspective: 1000px;
-  perspective-origin: 50% 35%;
   overflow: visible;
   box-sizing: border-box;
   width: 100%;
@@ -56,7 +54,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  transform-style: preserve-3d;
+  transform-style: flat;
   box-sizing: border-box;
 }
 
@@ -158,7 +156,7 @@
   position: relative;
   width: 164px;
   height: 226px;
-  transform-style: preserve-3d;
+  transform-style: flat;
   transform: rotateY(0deg) translateZ(0);
   transform-origin: 50% 100%;
   transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.45s ease;
@@ -301,7 +299,7 @@
   inset: 0;
   transform-origin: left center;
   transform: translateZ(0);
-  transform-style: preserve-3d;
+  transform-style: flat;
   background: linear-gradient(135deg, 
     var(--ath-livro-cor, #314F79) 0%, 
     color-mix(in srgb, var(--ath-livro-cor, #314F79) 82%, #000000) 100%
@@ -414,8 +412,6 @@
   text-transform: uppercase;
   color: #FFFFFF;
   background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   padding: 2px 6px;
   border-radius: 4px;
   white-space: nowrap;
@@ -490,6 +486,7 @@
 .ath-livro-3d.aberto {
   z-index: 100;
   perspective: none;
+  transform-style: preserve-3d;
   translate: var(--ath-open-shift-x, 0px) 0;
   width: 290px;
   height: 420px;
@@ -500,6 +497,7 @@
 
 .ath-livro-3d.aberto .ath-livro-capa,
 .ath-livro-3d.aberto .ath-livro-capa-frente {
+  transform-style: preserve-3d;
   transform: rotateY(-160deg);
   box-shadow: -6px 8px 18px rgba(0, 0, 0, 0.28);
   backface-visibility: visible;
