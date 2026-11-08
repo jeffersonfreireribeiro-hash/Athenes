@@ -950,8 +950,13 @@ export const metodosEstudoPastas = {
     });
 
     modal.querySelector('#athBtnSalvarCor')?.addEventListener('click', () => {
+      // obterPastasDriveLocais() devolve uma árvore nova a cada chamada: a cor precisa ser
+      // aplicada na MESMA árvore que será gravada, senão a alteração se perde.
+      const arvore = obterPastasDriveLocais();
+      const alvo = buscarPastaNaArvore(arvore, pastaId);
+      if (alvo) alvo.cor = corEscolhida;
       pasta.cor = corEscolhida;
-      salvarPastasDriveLocais(obterPastasDriveLocais());
+      salvarPastasDriveLocais(arvore);
       fechar();
       const topoWrapper = this.container?.querySelector('#athBibTopoPastasWrapper');
       if (topoWrapper) this.renderizarBarraPastasTopo(topoWrapper);
