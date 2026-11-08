@@ -74,7 +74,11 @@ class MockDOMElement {
     this.tagName = String(tag || 'div').toUpperCase();
     this.classList = new MockClassList(classes);
     this.attributes = new Map();
-    this.style = {};
+    this.style = {
+      setProperty: (k, v) => { this.style[k] = String(v); },
+      removeProperty: (k) => { delete this.style[k]; },
+      getPropertyValue: (k) => this.style[k] || ''
+    };
     this.children = [];
     this.parentNode = null;
     this.listeners = new Map();
@@ -534,6 +538,60 @@ describe('Grupo 3: Cinemática 3D de Abertura, Fechamento e Teclado (R4 / F7)', 
     const titulo = livroEl.querySelector('.ath-folha-titulo');
     assert.equal(titulo.getAttribute('tabindex'), '-1', 'Título deve ter tabindex="-1" para foco programático');
     assert.equal(globalThis.document.activeElement, titulo, 'Foco ativo deve ser o título da folha');
+  });
+
+  it('3.12: abrirLivro3D calcula deslocamento lateral --ath-open-shift-x quando o exemplar está na lateral esquerda', () => {
+    const ref = criarBookReferenceItem({ id: 'lateral_esq_1', titulo: 'Livro Borda Esquerda' });
+    const estante = renderizarEstante3D([ref]);
+    const livroEl = estante.querySelector('.ath-livro-3d');
+
+    // Simula prateleira/container largo com livro posicionado no extremo esquerdo (left: 30px)
+    estante.getBoundingClientRect = () => ({ left: 0, right: 1200, width: 1200 });
+    livroEl.getBoundingClientRect = () => ({ left: 30, right: 194, width: 164 });
+
+    abrirLivro3D(livroEl, ref);
+    const shift = livroEl.style.getPropertyValue('--ath-open-shift-x');
+    assert.ok(shift, 'Deve definir --ath-open-shift-x para compensar margem esquerda');
+    const valorNum = parseInt(shift, 10);
+    assert.ok(valorNum > 0, `Deslocamento deve ser positivo para mover o livro para a direita (${valorNum}px)`);
+
+    fecharLivro3D(livroEl);
+    assert.equal(livroEl.style.getPropertyValue('--ath-open-shift-x'), '', 'Ao fechar deve remover --ath-open-shift-x');
+  });
+
+  it('3.13: abrirLivro3D calcula deslocamento lateral negativo quando o exemplar está na lateral direita', () => {
+    const ref = criarBookReferenceItem({ id: 'lateral_dir_1', titulo: 'Livro Borda Direita' });
+    const estante = renderizarEstante3D([ref]);
+    const livroEl = estante.querySelector('.ath-livro-3d');
+
+    // Simula livro no extremo direito (left: 1050px em container de 1200px)
+    estante.getBoundingClientRect = () => ({ left: 0, right: 1200, width: 1200 });
+    livroEl.getBoundingClientRect = () => ({ left: 1050, right: 1214, width: 164 });
+
+    abrirLivro3D(livroEl, ref);
+    const shift = livroEl.style.getPropertyValue('--ath-open-shift-x');
+    assert.ok(shift, 'Deve definir --ath-open-shift-x para compensar margem direita');
+    const valorNum = parseInt(shift, 10);
+    assert.ok(valorNum < 0, `Deslocamento deve ser negativo para mover o livro para a esquerda (${valorNum}px)`);
+  });
+
+  it('3.14: abrirLivro3D calcula escala responsiva proporcional --ath-open-scale em contêineres tipo tablet sem sobreposição', () => {
+    const ref = criarBookReferenceItem({ id: 'tablet_scale_1', titulo: 'Livro em Tela Tablet' });
+    const estante = renderizarEstante3D([ref]);
+    const livroEl = estante.querySelector('.ath-livro-3d');
+
+    // Simula contêiner de tablet com largura útil de 480px (menor que os 575px de envergadura total)
+    estante.getBoundingClientRect = () => ({ left: 0, right: 480, width: 480 });
+    livroEl.getBoundingClientRect = () => ({ left: 160, right: 324, width: 164 });
+
+    abrirLivro3D(livroEl, ref);
+    const scale = livroEl.style.getPropertyValue('--ath-open-scale');
+    assert.ok(scale, 'Deve definir --ath-open-scale para caber no contêiner de tablet');
+    const scaleNum = parseFloat(scale);
+    assert.ok(scaleNum > 0.6 && scaleNum < 1.0, `Escala deve ser proporcional (${scaleNum})`);
+
+    fecharLivro3D(livroEl);
+    assert.equal(livroEl.style.getPropertyValue('--ath-open-scale'), '', 'Ao fechar deve limpar --ath-open-scale');
   });
 });
 

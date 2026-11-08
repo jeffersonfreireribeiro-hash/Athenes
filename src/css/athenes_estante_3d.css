@@ -227,7 +227,7 @@
   transform-style: flat;
   transform: rotateY(0deg) translateZ(0);
   transform-origin: 50% 100%;
-  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.45s ease;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), translate 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.45s ease;
   box-sizing: border-box;
 }
 
@@ -624,16 +624,14 @@
   z-index: 100;
   perspective: none;
   transform-style: preserve-3d;
-  /* Mantém o slot fixo no grid flex sem empurrar vizinhos */
+  /* Mantém o slot fixo no grid flex sem empurrar vizinhos e desloca lateralmente se estiver nas bordas */
   transform: translateZ(60px);
+  translate: var(--ath-open-shift-x, 0px) 0;
+  scale: var(--ath-open-scale, 1);
+  transform-origin: 50% 50%;
   overflow: visible;
   box-shadow: 0 24px 52px rgba(15, 23, 42, 0.38);
-  transition: transform 0.55s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.45s ease;
-}
-
-.ath-livro-3d.aberto.ath-aberto-alinha-dir .ath-livro-folha-interna {
-  left: auto;
-  right: 0;
+  transition: transform 0.55s cubic-bezier(0.25, 1, 0.5, 1), translate 0.55s cubic-bezier(0.25, 1, 0.5, 1), scale 0.55s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.45s ease;
 }
 
 .ath-livro-3d.aberto .ath-livro-capa,
@@ -1099,10 +1097,6 @@
     gap: var(--ath-estante-gap);
     padding: 0;
   }
-  .ath-livro-folha-interna {
-    width: calc(100vw - 32px);
-    max-width: 320px;
-  }
 }
 
 @media (max-width: 600px) {
@@ -1110,6 +1104,7 @@
     width: min(100%, 320px);
     flex-basis: min(100%, 320px);
     translate: 0 0;
+    scale: 1 !important;
   }
   .ath-livro-3d.aberto .ath-livro-capa,
   .ath-livro-3d.aberto .ath-livro-capa-tras {
@@ -1117,6 +1112,7 @@
   }
   .ath-livro-3d.aberto .ath-livro-folha-interna {
     width: 100%;
+    max-width: 100%;
   }
 }
 

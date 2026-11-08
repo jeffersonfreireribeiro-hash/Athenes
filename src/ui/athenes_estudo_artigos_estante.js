@@ -115,12 +115,29 @@ class SimpleMockClassList {
   }
 }
 
+class SimpleMockStyle {
+  constructor() {
+    this._props = {};
+  }
+  setProperty(prop, val) {
+    this._props[prop] = String(val);
+    this[prop] = String(val);
+  }
+  getPropertyValue(prop) {
+    return this._props[prop] || this[prop] || '';
+  }
+  removeProperty(prop) {
+    delete this._props[prop];
+    delete this[prop];
+  }
+}
+
 class SimpleMockElement {
   constructor(tag = 'div', classes = '') {
     this.tagName = String(tag || 'div').toUpperCase();
     this.classList = new SimpleMockClassList(classes);
     this.attributes = new Map();
-    this.style = {};
+    this.style = new SimpleMockStyle();
     this.children = [];
     this.parentNode = null;
     this.listeners = new Map();
@@ -593,17 +610,87 @@ export function abrirLivro3D(livroEl, ref, { callbacks = {} } = {}) {
   container?.classList?.add('ath-estante-com-livro-aberto');
   livroEl.closest?.('.ath-estante-prateleira')?.classList?.add('ath-prateleira-com-livro-aberto');
   if (!livroEl.style) livroEl.style = {};
-  const prateleira = typeof livroEl.closest === 'function' ? livroEl.closest('.ath-estante-prateleira') : null;
-  if (prateleira?.getBoundingClientRect && livroEl.getBoundingClientRect) {
+
+  // Redefine eventuais transformações dinâmicas prévias
+  if (livroEl.style.removeProperty) {
+    livroEl.style.removeProperty('--ath-open-shift-x');
+    livroEl.style.removeProperty('--ath-open-scale');
+  } else if (livroEl.style) {
+    delete livroEl.style['--ath-open-shift-x'];
+    delete livroEl.style['--ath-open-scale'];
+  }
+
+  // Ajuste lateral e de escala dinâmico: impede que a capa (à esquerda) ou folha (à direita) sejam cortadas ou sobrepostas
+  const containerRef = (typeof livroEl.closest === 'function')
+    ? (livroEl.closest('.ath-estante-container') || livroEl.closest('.ath-estante-3d') || livroEl.closest('.ath-estante-prateleira') || livroEl.parentElement)
+    : null;
+
+  if (typeof livroEl.getBoundingClientRect === 'function' && typeof containerRef?.getBoundingClientRect === 'function') {
     const rectLivro = livroEl.getBoundingClientRect();
-    const rectPrat = prateleira.getBoundingClientRect();
-    if (rectLivro.left + 300 > rectPrat.right) {
-      livroEl.classList.add('ath-aberto-alinha-dir');
-    } else {
-      livroEl.classList.remove('ath-aberto-alinha-dir');
+    const rectCont = containerRef.getBoundingClientRect();
+
+    if (rectLivro && rectCont && (rectCont.width > 0 || (typeof window !== 'undefined' && window.innerWidth > 0))) {
+      const margemSeguranca = 20;
+      const limiteEsq = Math.max(0, rectCont.left || 0) + margemSeguranca;
+      const viewportDir = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 99999;
+      const limiteDir = Math.min(viewportDir, (rectCont.right || viewportDir)) - margemSeguranca;
+
+      const larguraAbertoEsq = 280; // Projeção da capa aberta em 3D à esquerda (~290px * cos(20deg))
+      const larguraAbertoDir = 295; // Projeção da folha interna à direita com folga
+      const larguraTotalLivro = larguraAbertoEsq + larguraAbertoDir; // ~575px
+
+      const larguraDisponivel = limiteDir - limiteEsq;
+      let escala = 1;
+
+      // Em telas tipo tablet onde o espaço livre para a estante é menor que a envergadura completa (575px),
+      // escala suavemente o livro aberto para manter a proporção exata entre capa e folha sem sobreposição
+      if (larguraDisponivel > 0 && larguraDisponivel < larguraTotalLivro) {
+        escala = Math.max(0.65, Math.min(1, Math.floor((larguraDisponivel / larguraTotalLivro) * 100) / 100));
+      }
+
+      if (escala < 1) {
+        if (typeof livroEl.style.setProperty === 'function') {
+          livroEl.style.setProperty('--ath-open-scale', String(escala));
+        } else if (livroEl.style) {
+          livroEl.style['--ath-open-scale'] = String(escala);
+        }
+      }
+
+      const larguraEsqEfetiva = larguraAbertoEsq * escala;
+      const larguraDirEfetiva = larguraAbertoDir * escala;
+
+      let shiftX = 0;
+
+      // 1. Se a capa aberta ultrapassa a lateral esquerda visível
+      const bordaEsq = rectLivro.left - larguraEsqEfetiva;
+      if (bordaEsq < limiteEsq) {
+        shiftX = Math.round(limiteEsq - bordaEsq);
+      }
+
+      // 2. Se a folha interna ultrapassa a lateral direita visível
+      const bordaDir = rectLivro.left + shiftX + larguraDirEfetiva;
+      if (bordaDir > limiteDir) {
+        shiftX -= Math.round(bordaDir - limiteDir);
+      }
+
+      // 3. Centralização em contêineres/telas no limite da largura disponível
+      const larguraEfetivaTotal = larguraEsqEfetiva + larguraDirEfetiva;
+      if (larguraDisponivel < larguraEfetivaTotal && larguraDisponivel > 0) {
+        const centroDisponivel = (limiteEsq + limiteDir) / 2;
+        const centroLivro = rectLivro.left + (larguraDirEfetiva - larguraEsqEfetiva) / 2;
+        shiftX = Math.round(centroDisponivel - centroLivro);
+      }
+
+      if (shiftX !== 0) {
+        if (typeof livroEl.style.setProperty === 'function') {
+          livroEl.style.setProperty('--ath-open-shift-x', `${shiftX}px`);
+        } else if (livroEl.style) {
+          livroEl.style['--ath-open-shift-x'] = `${shiftX}px`;
+        }
+      }
     }
   }
-  if (livroEl.style?.removeProperty) livroEl.style.removeProperty('--ath-open-shift-x');
+
   livroEl.style.transform = 'translateZ(60px)';
   if (typeof livroEl.setAttribute === 'function') {
     livroEl.setAttribute('aria-expanded', 'true');
@@ -675,13 +762,18 @@ export function fecharLivro3D(livroEl) {
 
   if (livroEl.classList) {
     livroEl.classList.remove('aberto');
-    livroEl.classList.remove('ath-aberto-alinha-dir');
   }
   livroEl.closest?.('.ath-estante-prateleira')?.classList?.remove('ath-prateleira-com-livro-aberto');
   (livroEl.closest?.('.ath-estante-3d') || livroEl.closest?.('.ath-estante-container'))
     ?.classList?.remove('ath-estante-com-livro-aberto');
   if (!livroEl.style) livroEl.style = {};
-  if (livroEl.style.removeProperty) livroEl.style.removeProperty('--ath-open-shift-x');
+  if (livroEl.style.removeProperty) {
+    livroEl.style.removeProperty('--ath-open-shift-x');
+    livroEl.style.removeProperty('--ath-open-scale');
+  } else if (livroEl.style) {
+    delete livroEl.style['--ath-open-shift-x'];
+    delete livroEl.style['--ath-open-scale'];
+  }
   livroEl.style.transform = 'rotateY(0deg) translateZ(0)';
   if (typeof livroEl.setAttribute === 'function') {
     livroEl.setAttribute('aria-expanded', 'false');
