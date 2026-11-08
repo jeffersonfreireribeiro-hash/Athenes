@@ -2669,6 +2669,38 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
 .ath-artigo-menu-contexto button { display:block; width:100%; padding:8px 10px; border:0; border-radius:7px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
 .ath-artigo-menu-contexto button:hover { background:#EEF4FA; }.ath-artigo-menu-contexto button:disabled { opacity:.45; cursor:default; }
 .ath-artigo-menu-contexto hr { border:0; border-top:1px solid #E3EAF2; margin:4px 2px; }
+.ath-menu-pasta-contexto button { display:flex; align-items:center; gap:10px; }
+.ath-menu-pasta-contexto button svg { flex:none; color:#526A86; }
+.ath-menu-pasta-contexto .ath-menu-pasta-excluir { color:#C93636; }
+.ath-menu-pasta-contexto .ath-menu-pasta-excluir svg { color:inherit; }
+
+.ath-modal-cor-pasta { width:min(520px, calc(100vw - 24px)); max-width:520px; max-height:calc(100dvh - 24px); border-radius:18px; }
+.ath-modal-cor-pasta-head { align-items:flex-start; padding:22px 24px 18px; }
+.ath-modal-cor-pasta-sobretitulo { color:#60738B; font-size:10px; font-weight:800; letter-spacing:.12em; }
+.ath-modal-cor-pasta-head h2 { margin:5px 0 0; color:#1D2D43; font-size:21px; line-height:1.25; }
+.ath-modal-cor-pasta-head p { margin:6px 0 0; color:#66788D; font-size:12px; }
+.ath-modal-cor-pasta .ath-modal-corpo { padding:20px 24px 22px; }
+.ath-pasta-cor-preview { display:flex; align-items:center; gap:18px; padding:17px 18px; min-height:112px; background:#F5F8FC; border:1px solid #DDE6F0; border-radius:14px; }
+.ath-pasta-cor-preview-fichario { position:relative; flex:none; width:58px; height:78px; border-radius:5px 7px 6px 6px; background:linear-gradient(110deg, color-mix(in srgb, var(--ath-pasta-cor) 72%, #172B45), var(--ath-pasta-cor) 22%, color-mix(in srgb, var(--ath-pasta-cor) 82%, #FFFFFF)); box-shadow:inset 4px 0 5px rgba(255,255,255,.18), inset -3px 0 5px rgba(0,0,0,.16), 3px 6px 12px rgba(25,42,65,.2); }
+.ath-pasta-cor-preview-fichario::before { content:""; position:absolute; left:7px; top:-5px; width:22px; height:7px; border-radius:4px 4px 0 0; background:var(--ath-pasta-cor); }
+.ath-pasta-cor-preview-rotulo { position:absolute; left:10px; right:10px; top:15px; height:32px; border-radius:2px; background:#FFFFFF; box-shadow:inset 0 0 0 1px #D5DFE8; }
+.ath-pasta-cor-preview-anel { position:absolute; left:50%; bottom:9px; width:13px; height:13px; transform:translateX(-50%); border:3px solid #D7E1EA; border-radius:50%; background:#263D5B; box-shadow:0 0 0 1px rgba(0,0,0,.28); }
+.ath-pasta-cor-preview-texto { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.ath-pasta-cor-preview-texto span { color:#718299; font-size:10px; font-weight:800; letter-spacing:.1em; }
+.ath-pasta-cor-preview-texto strong { color:#23354B; font-size:15px; line-height:1.35; overflow-wrap:anywhere; }
+.ath-pasta-cor-paleta { margin:22px 0 0; padding:0; border:0; min-width:0; }
+.ath-pasta-cor-paleta legend { margin:0 0 10px; padding:0; color:#2D4058; font-size:12px; font-weight:800; }
+.ath-pasta-cor-opcoes { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; }
+.ath-pasta-cor-opcao { display:flex; align-items:center; gap:10px; min-width:0; padding:9px 11px; border:1px solid #DFE7F0; border-radius:10px; background:#FFFFFF; color:#31435A; font:700 12px var(--glx-font,system-ui); text-align:left; cursor:pointer; transition:background .15s ease,border-color .15s ease,box-shadow .15s ease; }
+.ath-pasta-cor-opcao:hover { background:#F5F8FC; border-color:#B9C9DB; }
+.ath-pasta-cor-opcao[aria-pressed="true"] { background:#EDF4FB; border-color:#53739B; box-shadow:0 0 0 1px #53739B; }
+.ath-pasta-cor-opcao:focus-visible { outline:2px solid #314F79; outline-offset:2px; }
+.ath-pasta-cor-amostra { flex:none; width:25px; height:25px; border-radius:7px; background:var(--ath-pasta-cor); box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); }
+.ath-pasta-cor-opcao > span:nth-child(2) { flex:1; min-width:0; }
+.ath-pasta-cor-opcao svg { flex:none; opacity:0; color:#314F79; }
+.ath-pasta-cor-opcao[aria-pressed="true"] svg { opacity:1; }
+.ath-modal-cor-pasta .ath-modal-foot { padding:14px 24px; }
+@media (max-width:480px) { .ath-modal-cor-pasta-head,.ath-modal-cor-pasta .ath-modal-corpo { padding-left:18px; padding-right:18px; } .ath-pasta-cor-preview { gap:14px; padding:14px; } .ath-pasta-cor-opcao { padding:8px; gap:7px; font-size:11px; } }
 
 .ath-btn-filtro-ativo svg {
   stroke: #2563EB !important;

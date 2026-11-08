@@ -47,6 +47,11 @@ export const CORES_PASTAS_CRONOS = Object.freeze([
   '#DC2626'  // Carmim / Alerta
 ]);
 
+const NOMES_CORES_PASTAS = Object.freeze([
+  'Azul Athenes', 'Laranja', 'Verde', 'Roxo',
+  'Âmbar', 'Grafite', 'Azul céu', 'Vermelho'
+]);
+
 export {
   normalizarHexCor,
   calcularLuminanciaRelativa,
@@ -814,10 +819,10 @@ export const metodosEstudoPastas = {
     menu.style.zIndex = '100005';
 
     menu.innerHTML = `
-      <button type="button" data-acao="mudar-cor">🎨 Alterar Cor</button>
-      <button type="button" data-acao="renomear">✏️ Renomear</button>
+      <button type="button" data-acao="mudar-cor">${svgIcone('pincel', 15)}<span>Alterar cor</span></button>
+      <button type="button" data-acao="renomear">${svgIcone('lapis', 15)}<span>Renomear</span></button>
       <hr>
-      <button type="button" data-acao="excluir" style="color:#DC2626;">🗑️ Excluir Pasta</button>
+      <button type="button" data-acao="excluir" class="ath-menu-pasta-excluir">${svgIcone('lixeira', 15)}<span>Excluir pasta</span></button>
     `;
 
     const fecharMenu = () => menu.remove();
@@ -880,29 +885,54 @@ export const metodosEstudoPastas = {
 
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
-    let corEscolhida = pasta.cor || CORES_PASTAS_CRONOS[0];
+    let corEscolhida = normalizarHexCor(pasta.cor, CORES_PASTAS_CRONOS[0]);
 
     modal.innerHTML = `
-      <div class="ath-modal" style="max-width: 360px;">
-        <div class="ath-modal-head">
-          <h3>Cor da Pasta "${escapeHtml(pasta.nome)}"</h3>
-          <button type="button" class="ath-btn ath-btn-icon" id="athBtnFecharModalCor">${svgIcone('fechar', 16)}</button>
+      <div class="ath-modal ath-modal-cor-pasta" role="dialog" aria-modal="true" aria-labelledby="athCorPastaTitulo">
+        <div class="ath-modal-head ath-modal-cor-pasta-head">
+          <div>
+            <span class="ath-modal-cor-pasta-sobretitulo">PERSONALIZAR PASTA</span>
+            <h2 id="athCorPastaTitulo">Escolher cor</h2>
+            <p>Identifique esta coleção na estante.</p>
+          </div>
+          <button type="button" class="ath-btn ath-btn-icon" id="athBtnFecharModalCor" aria-label="Fechar">${svgIcone('fechar', 16)}</button>
         </div>
         <div class="ath-modal-corpo">
-          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
-            ${CORES_PASTAS_CRONOS.map(c => `
-              <button type="button" class="ath-swatch-btn ${c === corEscolhida ? 'sel' : ''}" data-cor="${c}" style="width:32px; height:32px; border-radius:50%; background:${c}; border:2px solid ${c === corEscolhida ? '#FFFFFF' : 'transparent'}; outline:${c === corEscolhida ? '2px solid #314F79' : 'none'}; cursor:pointer;"></button>
-            `).join('')}
+          <div class="ath-pasta-cor-preview" style="--ath-pasta-cor:${corEscolhida}">
+            <div class="ath-pasta-cor-preview-fichario" aria-hidden="true"><span class="ath-pasta-cor-preview-rotulo"></span><span class="ath-pasta-cor-preview-anel"></span></div>
+            <div class="ath-pasta-cor-preview-texto"><span>PRÉVIA DA PASTA</span><strong>${escapeHtml(pasta.nome)}</strong></div>
           </div>
+          <fieldset class="ath-pasta-cor-paleta">
+            <legend>Escolha uma cor</legend>
+            <div class="ath-pasta-cor-opcoes">
+            ${CORES_PASTAS_CRONOS.map((c, indice) => `
+              <button type="button" class="ath-pasta-cor-opcao" data-cor="${c}" aria-label="${NOMES_CORES_PASTAS[indice]}" aria-pressed="${c.toLowerCase() === corEscolhida.toLowerCase()}">
+                <span class="ath-pasta-cor-amostra" style="--ath-pasta-cor:${c}" aria-hidden="true"></span>
+                <span>${NOMES_CORES_PASTAS[indice]}</span>
+                ${svgIcone('check', 14)}
+              </button>
+            `).join('')}
+            </div>
+          </fieldset>
         </div>
-        <div class="ath-modal-rodape" style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <div class="ath-modal-foot">
           <button type="button" class="ath-btn ath-btn-sm" id="athBtnCancelarCor">Cancelar</button>
-          <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnSalvarCor">Salvar Cor</button>
+          <button type="button" class="ath-btn ath-btn-sm ath-btn-primary" id="athBtnSalvarCor">Aplicar cor</button>
         </div>
       </div>
     `;
 
-    const fechar = () => modal.remove();
+    const aoTeclado = ev => {
+      if (ev.key === 'Escape') { ev.preventDefault(); fechar(); }
+      if (ev.key !== 'Tab') return;
+      const botoes = [...modal.querySelectorAll('button')];
+      const primeiro = botoes[0];
+      const ultimo = botoes[botoes.length - 1];
+      if (ev.shiftKey && document.activeElement === primeiro) { ev.preventDefault(); ultimo.focus(); }
+      else if (!ev.shiftKey && document.activeElement === ultimo) { ev.preventDefault(); primeiro.focus(); }
+    };
+    const fechar = () => { document.removeEventListener('keydown', aoTeclado, true); modal.remove(); };
+    modal.addEventListener('click', ev => { if (ev.target === modal) fechar(); });
     modal.querySelector('#athBtnFecharModalCor')?.addEventListener('click', fechar);
     modal.querySelector('#athBtnCancelarCor')?.addEventListener('click', fechar);
 
@@ -911,10 +941,9 @@ export const metodosEstudoPastas = {
       btn.addEventListener('click', () => {
         corEscolhida = btn.dataset.cor;
         swatches.forEach(b => {
-          const sel = b.dataset.cor === corEscolhida;
-          b.style.borderColor = sel ? '#FFFFFF' : 'transparent';
-          b.style.outline = sel ? '2px solid #314F79' : 'none';
+          b.setAttribute('aria-pressed', String(b.dataset.cor === corEscolhida));
         });
+        modal.querySelector('.ath-pasta-cor-preview')?.style.setProperty('--ath-pasta-cor', corEscolhida);
       });
     });
 
@@ -928,5 +957,7 @@ export const metodosEstudoPastas = {
     });
 
     document.body.appendChild(modal);
+    document.addEventListener('keydown', aoTeclado, true);
+    modal.querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
   }
 };

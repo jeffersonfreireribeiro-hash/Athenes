@@ -827,14 +827,14 @@ describe('Grupo 7: CSS e Acessibilidade de Movimento (WCAG 2.3.3 / Iteração 2)
     );
   });
 
-  it('7.3: Regra de :hover na prateleira possui !important para prevalecer sobre transform inline', () => {
+  it('7.3: Perspectiva de hover aparece na capa sem mover o livro inteiro', () => {
     assert.ok(
       cssContent.includes(':not(.aberto):hover'),
       'Deve conter seletor de hover para livros não abertos'
     );
     assert.ok(
-      cssContent.includes('translateZ(16px) !important;'),
-      'Hover 3D deve usar !important para sobrepor inline style'
+      cssContent.includes('transform: perspective(900px) rotateY(-9deg)'),
+      'Hover deve inclinar a capa'
     );
   });
 

@@ -163,13 +163,6 @@
   box-sizing: border-box;
 }
 
-/* Hover na prateleira (destaque sutil do exemplar quando fechado) */
-.ath-livro-3d:not(.aberto):hover,
-.ath-livro-3d-wrap:hover.ath-livro-3d:not(.aberto),
-.ath-livro-3d-wrap:hover .ath-livro-3d:not(.aberto) {
-  transform: translateY(-8px) rotateY(-13deg) translateZ(16px) !important;
-}
-
 /* Sombra de contato basal do livro pousado na prateleira */
 .ath-livro-sombra-base {
   position: absolute;
@@ -251,10 +244,6 @@
   transition: opacity 0.25s ease;
 }
 
-.ath-livro-3d:not(.aberto):hover .ath-livro-paginas-dir {
-  opacity: 1;
-}
-
 .ath-livro-paginas-baixo {
   position: absolute;
   bottom: 0;
@@ -318,16 +307,43 @@
   box-sizing: border-box;
 }
 
+.ath-livro-3d:not(.aberto) .ath-livro-paginas-dir {
+  right: -16px;
+  width: 20px;
+  transform: translateX(-18px);
+  opacity: 1;
+  z-index: 1;
+  transition: transform .65s cubic-bezier(.25, 1, .5, 1);
+}
+
+.ath-livro-3d:not(.aberto) .ath-livro-capa-tras {
+  right: -22px;
+  transform: translateX(-24px);
+  z-index: 0;
+  transition: transform .65s cubic-bezier(.25, 1, .5, 1);
+}
+
+.ath-livro-3d:not(.aberto) .ath-livro-capa {
+  z-index: 2;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .ath-livro-3d:not(.aberto):hover .ath-livro-capa {
     transform: perspective(900px) rotateY(-9deg);
+    z-index: 2;
   }
   .ath-livro-3d:not(.aberto):hover .ath-livro-paginas-dir {
-    right: -10px;
-    width: 14px;
+    right: -16px;
+    width: 20px;
     transform: none;
-    opacity: 1;
     border-radius: 0 3px 3px 0;
+    box-shadow: 2px 3px 5px rgba(15, 23, 42, .22), inset 2px 0 3px rgba(0, 0, 0, .1);
+  }
+  .ath-livro-3d:not(.aberto):hover .ath-livro-capa-tras {
+    right: -22px;
+    transform: none;
+    border-right: 3px solid color-mix(in srgb, var(--ath-livro-cor, #314F79) 65%, #0F172A);
+    box-shadow: 3px 5px 8px rgba(15, 23, 42, .22);
   }
 }
 
@@ -1001,6 +1017,8 @@
   .ath-livro-3d.aberto,
   .ath-livro-capa,
   .ath-livro-capa-frente,
+  .ath-livro-paginas-dir,
+  .ath-livro-capa-tras,
   .ath-livro-folha-interna,
   .ath-estante-scrim,
   .ath-livro-sombra-base,

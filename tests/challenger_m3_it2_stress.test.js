@@ -174,26 +174,14 @@ describe('Empirical Adversarial Challenge — Iteração 2 (Milestone 3)', () =>
     });
   });
 
-  describe('Desafio 3: Precedência de :hover com !important sobre Estilos Inline', () => {
-    it('3.1: CSS de :hover deve utilizar !important para anular especificidade inline (1,0,0,0)', () => {
-      // Procura a regra de hover do livro
-      const hoverRegex = /\.ath-livro-3d:not\(\.aberto\):hover[\s\S]*?\{([^}]+)\}/;
-      const hoverMatch = cssContent.match(hoverRegex);
-      assert.ok(hoverMatch, 'Regra de :hover para livro fechado DEVE existir no CSS');
-
-      const corpoHover = hoverMatch[1];
-      assert.ok(
-        corpoHover.includes('!important'),
-        'A transformação de hover DEVE conter !important para superar style.transform inline'
-      );
-      assert.ok(
-        corpoHover.includes('translateY(-8px)'),
-        'Hover deve conter elevação em Y'
-      );
-      assert.ok(
-        corpoHover.includes('translateZ(16px)'),
-        'Hover deve conter projeção tridimensional em Z'
-      );
+  describe('Desafio 3: Perspectiva estável no hover', () => {
+    it('3.1: perspectiva fica na capa e as páginas entram sem deslocar o livro', () => {
+      assert.ok(cssContent.includes('.ath-livro-3d:not(.aberto):hover .ath-livro-capa'));
+      assert.ok(cssContent.includes('transform: perspective(900px) rotateY(-9deg)'));
+      assert.ok(cssContent.includes('.ath-livro-3d:not(.aberto):hover .ath-livro-paginas-dir'));
+      assert.match(cssContent, /\.ath-livro-3d:not\(\.aberto\) \.ath-livro-paginas-dir\s*\{[^}]*transform: translateX\(-18px\);[^}]*opacity: 1;[^}]*transition: transform \.65s/s);
+      assert.match(cssContent, /\.ath-livro-3d:not\(\.aberto\) \.ath-livro-capa-tras\s*\{[^}]*transform: translateX\(-24px\);[^}]*transition: transform \.65s/s);
+      assert.ok(!cssContent.includes('translateY(-8px) rotateY(-13deg)'));
     });
 
     it('3.2: O estilo inline de repouso em fecharLivro3D NÃO deve conter !important', () => {
@@ -212,18 +200,18 @@ describe('Empirical Adversarial Challenge — Iteração 2 (Milestone 3)', () =>
       assert.equal(transformInline, 'rotateY(0deg) translateZ(0)');
     });
 
-    it('3.3: Seletores combinadores cobrem tanto classes irmãs (.ath-livro-3d-wrap:hover.ath-livro-3d) quanto descendentes', () => {
+    it('3.3: capa, páginas e contracapa acompanham o hover do mesmo livro', () => {
       assert.ok(
-        cssContent.includes('.ath-livro-3d:not(.aberto):hover'),
-        'Seletor simples :hover deve estar presente'
+        cssContent.includes('.ath-livro-3d:not(.aberto):hover .ath-livro-capa'),
+        'Capa deve responder ao hover'
       );
       assert.ok(
-        cssContent.includes('.ath-livro-3d-wrap:hover.ath-livro-3d:not(.aberto)'),
-        'Seletor composto mesmo elemento deve estar presente'
+        cssContent.includes('.ath-livro-3d:not(.aberto):hover .ath-livro-paginas-dir'),
+        'Páginas devem responder ao hover'
       );
       assert.ok(
-        cssContent.includes('.ath-livro-3d-wrap:hover .ath-livro-3d:not(.aberto)'),
-        'Seletor descendente deve estar presente'
+        cssContent.includes('.ath-livro-3d:not(.aberto):hover .ath-livro-capa-tras'),
+        'Contracapa deve responder ao hover'
       );
     });
   });
