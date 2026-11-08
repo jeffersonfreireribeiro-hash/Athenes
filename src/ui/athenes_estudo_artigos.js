@@ -19,7 +19,7 @@
 import * as bib from '../core/athenes_biblioteca_artigos.js';
 import { gravarConfigZotero } from '../core/athenes_zotero_config.js';
 import { lerConta, gravarConta, obterContaAtiva } from '../core/athenes_conta.js';
-import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive, obterOuCriarPastaDoArtigoNoDrive, moverArquivosDoArtigoNoDrive, reconciliarArtigosComDrive, moverArquivoNoDrive } from '../core/athenes_drive_sync.js';
+import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive, obterOuCriarPastaDoArtigoNoDrive, moverArquivosDoArtigoNoDrive, reconciliarArtigosComDrive, moverArquivoNoDrive, removerPastaExcluida } from '../core/athenes_drive_sync.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import { obterPerfilColaborador, obterConfigGoogleDrive, salvarArquivoNoGoogleDrive, autenticarGoogleDrive, listarPdfsDoGoogleDrive, salvarDocumentoNoSupabase, obterPastasDriveLocais, salvarPastasDriveLocais, buscarPastaNaArvore } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
@@ -1883,6 +1883,9 @@ export class EstudoArtigosView {
     try {
       const colecoes = await this.zoteroClient.listarColecoes();
       if (colecoes.length) {
+        for (const col of colecoes) {
+          if (col && col.key) removerPastaExcluida(`zot_col_${col.key}`);
+        }
         const esp = espelharColecoesNasPastas(obterPastasDriveLocais(), colecoes);
         mapaPastas = esp.mapa;
         pastasNovas = esp.criadas;

@@ -45,8 +45,10 @@ const nomeNorm = (n) => String(n || '').trim().toLowerCase();
 function mesclarArvore(base = [], extra = [], mapa = {}, excluidas = {}) {
   const saida = [];
   const juntar = (p) => {
-    if (excluidas[p.id] || (p.driveId && excluidas[p.driveId]) || excluidas[`n:${nomeNorm(p.nome)}`]) return;
-    const igual = saida.find(q => q.id === p.id || (p.driveId && q.driveId && p.driveId === q.driveId) || nomeNorm(q.nome) === nomeNorm(p.nome));
+    if (excluidas[p.id] || (p.driveId && excluidas[p.driveId])) return;
+    // Duas coleções do Zotero com chaves diferentes são entidades distintas e nunca se fundem mesmo se tiverem o mesmo nome
+    const distintas = (q) => q.zoteroKey && p.zoteroKey && q.zoteroKey !== p.zoteroKey;
+    const igual = saida.find(q => !distintas(q) && (q.id === p.id || (p.driveId && q.driveId && p.driveId === q.driveId) || nomeNorm(q.nome) === nomeNorm(p.nome)));
     if (!igual) {
       const novo = { ...clone(p), subpastas: [] };
       saida.push(novo);

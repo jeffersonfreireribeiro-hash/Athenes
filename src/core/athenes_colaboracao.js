@@ -1221,10 +1221,9 @@ export function obterPastasDriveLocais() {
               for (const ex of excluidasRaw) {
                 if (ex.id) mapaExcl.add(ex.id);
                 if (ex.driveId) mapaExcl.add(ex.driveId);
-                if (ex.nome) mapaExcl.add(String(ex.nome).trim().toLowerCase());
               }
               const filtrarExcluidas = (lista) => lista.filter(item => {
-                if (mapaExcl.has(item.id) || (item.driveId && mapaExcl.has(item.driveId)) || (item.nome && mapaExcl.has(String(item.nome).trim().toLowerCase()))) {
+                if (mapaExcl.has(item.id) || (String(item.id).startsWith('drive_') && item.driveId && mapaExcl.has(item.driveId))) {
                   return false;
                 }
                 if (item.subpastas && item.subpastas.length > 0) {
