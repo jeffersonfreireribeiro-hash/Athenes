@@ -594,11 +594,16 @@ export function abrirLivro3D(livroEl, ref, { callbacks = {} } = {}) {
   livroEl.closest?.('.ath-estante-prateleira')?.classList?.add('ath-prateleira-com-livro-aberto');
   if (!livroEl.style) livroEl.style = {};
   const prateleira = typeof livroEl.closest === 'function' ? livroEl.closest('.ath-estante-prateleira') : null;
-  if (prateleira?.getBoundingClientRect && livroEl.getBoundingClientRect && livroEl.style.setProperty) {
-    const margem = prateleira.getBoundingClientRect().left + 18;
-    const esquerda = livroEl.getBoundingClientRect().left;
-    livroEl.style.setProperty('--ath-open-shift-x', `${Math.max(0, Math.ceil(margem - (esquerda - 290)))}px`);
+  if (prateleira?.getBoundingClientRect && livroEl.getBoundingClientRect) {
+    const rectLivro = livroEl.getBoundingClientRect();
+    const rectPrat = prateleira.getBoundingClientRect();
+    if (rectLivro.left + 300 > rectPrat.right) {
+      livroEl.classList.add('ath-aberto-alinha-dir');
+    } else {
+      livroEl.classList.remove('ath-aberto-alinha-dir');
+    }
   }
+  if (livroEl.style?.removeProperty) livroEl.style.removeProperty('--ath-open-shift-x');
   livroEl.style.transform = 'translateZ(60px)';
   if (typeof livroEl.setAttribute === 'function') {
     livroEl.setAttribute('aria-expanded', 'true');
@@ -668,7 +673,10 @@ export function fecharLivro3D(livroEl) {
     delete livroEl._fecharAoClicarFora;
   }
 
-  if (livroEl.classList) livroEl.classList.remove('aberto');
+  if (livroEl.classList) {
+    livroEl.classList.remove('aberto');
+    livroEl.classList.remove('ath-aberto-alinha-dir');
+  }
   livroEl.closest?.('.ath-estante-prateleira')?.classList?.remove('ath-prateleira-com-livro-aberto');
   (livroEl.closest?.('.ath-estante-3d') || livroEl.closest?.('.ath-estante-container'))
     ?.classList?.remove('ath-estante-com-livro-aberto');
