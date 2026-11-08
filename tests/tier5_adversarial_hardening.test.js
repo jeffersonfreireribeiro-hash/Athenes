@@ -619,7 +619,7 @@ describe('Tier 5 Hardening — Botão Circular de Salvamento e Auditoria CSS', (
 
     assert.ok(css.includes('perspective: 1000px'), 'Estante deve ter perspectiva espacial de 1000px');
     assert.ok(css.includes('transform-style: preserve-3d'), 'Livros devem preservar contexto tridimensional');
-    assert.ok(css.includes('rotateY(-140deg)'), 'Cinemática de abertura deve girar capa a -140 graus');
+    assert.ok(css.includes('rotateY(-160deg)'), 'Cinemática de abertura deve girar capa a -160 graus');
     assert.ok(css.includes('display: none !important'), 'Folha interna fechada deve ter ocultação estrita !important');
     assert.ok(css.includes('@media (prefers-reduced-motion: reduce)'), 'Deve conter media query de acessibilidade de movimento');
   });

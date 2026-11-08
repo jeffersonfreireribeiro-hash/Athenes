@@ -8,7 +8,7 @@
  * 1. Agrupamento e quebra de prateleiras com volumes extremos (0 livros, 1 livro, 7 livros, 50 livros, 300 livros).
  * 2. Títulos de livros extremos (título com 1000 caracteres, título vazio, caracteres especiais, tags HTML neutralizadas).
  * 3. Variações anatômicas de livros (livros sem autor, sem ano, sem tipo, sem PDF, capa personalizada com cores hex arbitrárias).
- * 4. Verificação de perspectiva e classes canônicas (`perspective: 1000px`, `preserve-3d`, `rotateY(-18deg) rotateX(4deg)`).
+ * 4. Verificação de perspectiva e classes canônicas (`perspective: 1000px`, `preserve-3d`, `rotateY(0deg) translateZ(0)`).
  * 5. Estado de estante vazia (`.ath-estante-vazia-card`) com mensagem textual e acessibilidade.
  * 6. Cinemática de abertura 3D, exclusividade estrita, acessibilidade por teclado (Escape) e Scrim.
  * 7. Folha interna de fichamento, Citation Tracker, contadores de citação e callbacks de interação.
@@ -646,7 +646,7 @@ describe('Cenário 4: Perspectiva 3D, Classes Canônicas e Auditoria CSS', () =>
     assert.ok(livroEl.querySelector('.ath-livro-capa-frente'), 'Deve conter capa frontal');
   });
 
-  it('4.2. Cinemática de inclinação: fechado reverte para rotateY(-18deg) rotateX(4deg)', () => {
+  it('4.2. Cinemática de inclinação: fechado reverte para rotateY(0deg) translateZ(0)', () => {
     const ref = { id: 'ref-cinem', titulo: 'Dinâmica 3D' };
     const livroEl = renderizarLivro3D(ref);
 
@@ -658,7 +658,7 @@ describe('Cenário 4: Perspectiva 3D, Classes Canônicas e Auditoria CSS', () =>
     // Fecha
     fecharLivro3D(livroEl);
     assert.ok(!livroEl.classList.contains('aberto'), 'Livro fechado remove classe aberto');
-    assert.equal(livroEl.style.transform, 'rotateY(-18deg) rotateX(4deg)', 'Livro fechado reverte para inclinação canônica');
+    assert.equal(livroEl.style.transform, 'rotateY(0deg) translateZ(0)', 'Livro fechado reverte para inclinação canônica');
   });
 
   it('4.3. Auditoria Estática Rigorosa do arquivo CSS src/css/athenes_estante_3d.css', () => {
@@ -674,10 +674,10 @@ describe('Cenário 4: Perspectiva 3D, Classes Canônicas e Auditoria CSS', () =>
     assert.ok(cssContent.includes('transform-style: preserve-3d'), 'CSS deve declarar transform-style: preserve-3d');
 
     // 3. Rotação canônica de repouso dos livros
-    assert.ok(cssContent.includes('rotateY(-18deg) rotateX(4deg)'), 'CSS deve declarar rotateY(-18deg) rotateX(4deg)');
+    assert.ok(cssContent.includes('rotateY(0deg) translateZ(0)'), 'CSS deve declarar rotateY(0deg) translateZ(0)');
 
     // 4. Rotação canônica de abertura da capa (-140deg)
-    assert.ok(cssContent.includes('rotateY(-140deg)'), 'CSS deve declarar rotateY(-140deg)');
+    assert.ok(cssContent.includes('rotateY(-160deg)'), 'CSS deve declarar rotateY(-160deg)');
 
     // 5. Elevação em Z para o livro aberto
     assert.ok(cssContent.includes('translateZ(60px)'), 'CSS deve declarar translateZ(60px)');
@@ -779,7 +779,7 @@ describe('Cenário 6: Cinemática de Abertura, Exclusividade, Teclado e Scrim', 
     // 2. Abre Livro B (deve fechar Livro A)
     abrirLivro3D(livroB, livros[1]);
     assert.ok(!livroA.classList.contains('aberto'), 'Livro A deve ter sido fechado');
-    assert.equal(livroA.style.transform, 'rotateY(-18deg) rotateX(4deg)', 'Livro A deve retornar ao repouso');
+    assert.equal(livroA.style.transform, 'rotateY(0deg) translateZ(0)', 'Livro A deve retornar ao repouso');
     assert.ok(livroB.classList.contains('aberto'), 'Livro B deve estar aberto');
   });
 
@@ -801,7 +801,7 @@ describe('Cenário 6: Cinemática de Abertura, Exclusividade, Teclado e Scrim', 
     fecharLivro3D(livroEl);
 
     assert.ok(!livroEl.classList.contains('aberto'), 'Deve estar fechado');
-    assert.equal(livroEl.style.transform, 'rotateY(-18deg) rotateX(4deg)');
+    assert.equal(livroEl.style.transform, 'rotateY(0deg) translateZ(0)');
   });
 
   it('6.3. Fechar todos os livros simultaneamente com fecharTodosLivros3D', () => {
@@ -822,7 +822,7 @@ describe('Cenário 6: Cinemática de Abertura, Exclusividade, Teclado e Scrim', 
 
     for (const el of els) {
       assert.ok(!el.classList.contains('aberto'), 'Todos os livros devem ser fechados');
-      assert.equal(el.style.transform, 'rotateY(-18deg) rotateX(4deg)');
+      assert.equal(el.style.transform, 'rotateY(0deg) translateZ(0)');
     }
   });
 

@@ -18,7 +18,8 @@ import {
   fecharTodosLivros3D,
   tratarTecladoLivro3D,
   renderizarFolhaInterna,
-  moverLivroParaPasta
+  moverLivroParaPasta,
+  CORES_CAPA_SELECAO
 } from '../src/ui/athenes_estudo_artigos_estante.js';
 
 import {
@@ -414,7 +415,7 @@ describe('Grupo 3: Cinemática 3D de Abertura, Fechamento e Teclado (R4 / F7)', 
     abrirLivro3D(livroEl, ref);
     fecharLivro3D(livroEl);
     assert.ok(!livroEl.classList.contains('aberto'), 'Não deve conter .aberto');
-    assert.equal(livroEl.style.transform, 'rotateY(-18deg) rotateX(4deg)');
+    assert.equal(livroEl.style.transform, 'rotateY(0deg) translateZ(0)');
     assert.equal(livroEl.getAttribute('aria-expanded'), 'false');
   });
 
@@ -716,6 +717,26 @@ describe('Grupo 6: Ações da Folha, Leitor e Movimentação entre Pastas (R4)',
     assert.equal(metaChamado, true);
     assert.equal(moverChamado, true);
     assert.equal(corChamado, true);
+  });
+
+  it('6.4a: seis cores alteram a capa aberta e entregam a cor para persistência', () => {
+    const ref = criarBookReferenceItem({ id: 'cor_1', corCapa: '#314F79' });
+    let corSalva = null;
+    const callbacks = { onMudarCor: (_art, cor) => { corSalva = cor; } };
+    const livro = renderizarLivro3D(ref, { callbacks });
+    abrirLivro3D(livro, ref, { callbacks });
+    const amostras = livro.querySelectorAll('.ath-folha-cor-amostra');
+    assert.equal(amostras.length, 6);
+    assert.equal(amostras[0].getAttribute('aria-pressed'), 'true');
+
+    amostras[2].dispatchEvent({ type: 'click' });
+    assert.equal(ref.corCapa, CORES_CAPA_SELECAO[2].cor);
+    assert.equal(corSalva, ref.corCapa);
+    assert.equal(amostras[0].getAttribute('aria-pressed'), 'false');
+    assert.equal(amostras[2].getAttribute('aria-pressed'), 'true');
+    assert.equal(livro.querySelector('.ath-livro-capa-frente').style.backgroundColor, ref.corCapa);
+    assert.equal(livro.querySelector('.ath-livro-capa-verso').style.backgroundColor, ref.corCapa);
+    assert.equal(livro.querySelector('.ath-livro-lombada').style.backgroundColor, ref.corCapa);
   });
 
   it('6.5: moverLivroParaPasta atualiza pastaId e rejeita pasta inexistente', () => {

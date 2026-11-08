@@ -125,7 +125,7 @@ export function restaurarPastaAtiva({ pastas = [], storage = (typeof sessionStor
 }
 
 /**
- * Seleciona a pasta ativa, atualiza sessionStorage e o breadcrumb (formato: 📚 Bibliografia / 📁 [Nome])
+ * Seleciona a pasta ativa, atualiza sessionStorage e o breadcrumb.
  * @param {string} pastaId
  * @param {object} opcoes
  * @returns {string} id da pasta selecionada
@@ -142,7 +142,7 @@ export function selecionarPasta(pastaId, { pastas = [], storage = (typeof sessio
   } catch (_) {}
 
   if (breadcrumbEl) {
-    breadcrumbEl.textContent = `📚 Bibliografia / 📁 ${alvo.nome}`;
+    breadcrumbEl.textContent = `Bibliografia / ${alvo.nome}`;
   }
 
   if (typeof onSelect === 'function') {
@@ -173,12 +173,12 @@ export function renderizarBreadcrumb(container, pastaAtiva = 'todas', { pastas =
 
   nav.innerHTML = `
     <button type="button" class="ath-bib-breadcrumb-btn ${pastaObj.id === 'todas' ? 'ath-bib-breadcrumb-btn--active' : ''}" data-nav-pasta="todas" title="Ver todas as obras (Estante Geral)">
-      <span class="ath-bib-breadcrumb-icon">📚</span>
+      <span class="ath-bib-breadcrumb-icon" aria-hidden="true">${svgIcone('livro', 15)}</span>
       <span class="ath-bib-breadcrumb-txt">Bibliografia</span>
     </button>
     <span class="ath-bib-breadcrumb-sep" aria-hidden="true">/</span>
     <span class="ath-bib-breadcrumb-current" aria-current="page" title="${escapeHtml(pastaObj.nome)}">
-      <span class="ath-bib-breadcrumb-icon">📁</span>
+      <span class="ath-bib-breadcrumb-icon" aria-hidden="true">${svgIcone('pasta', 15)}</span>
       <span class="ath-bib-breadcrumb-txt">${escapeHtml(pastaObj.nome)}</span>
     </span>
   `;
@@ -230,12 +230,10 @@ export function renderizarPastasCronos(pastas = [], pastaAtivaId = 'todas', mapa
 
     const cores = calcularCoresPasta(p.cor || '#314F79');
     const corFundo = cores.bg;
-    const corTexto = obterCorTextoAcessivel(corFundo);
 
-    card.style.backgroundColor = corFundo;
-    card.style.color = corTexto;
-    card.style.setProperty('--ath-folder-bg', corFundo);
-    card.style.setProperty('--ath-folder-fg', corTexto);
+    card.style.setProperty('--ath-folder-accent', normalizarHexCor(p.cor || '#314F79'));
+    card.style.setProperty('--ath-folder-bg', '#FFFFFF');
+    card.style.setProperty('--ath-folder-fg', '#1E293B');
     card.style.setProperty('--ath-folder-border', cores.border);
     card.style.setProperty('--ath-folder-badge-bg', cores.badgeBg);
     card.style.setProperty('--ath-folder-divider', cores.divider);
@@ -245,6 +243,7 @@ export function renderizarPastasCronos(pastas = [], pastaAtivaId = 'todas', mapa
     // 1. Aba Superior Esquerda (Folder Tab)
     const tab = document.createElement('div');
     tab.className = 'ath-bib-folder-tab';
+    tab.setAttribute('aria-hidden', 'true');
     tab.textContent = nomePasta;
     card.appendChild(tab);
 
@@ -267,7 +266,7 @@ export function renderizarPastasCronos(pastas = [], pastaAtivaId = 'todas', mapa
     const iconWrap = document.createElement('span');
     iconWrap.className = 'ath-bib-folder-icon';
     iconWrap.setAttribute('aria-hidden', 'true');
-    iconWrap.innerHTML = svgIcone(p.icone || 'pasta', 16);
+    iconWrap.innerHTML = svgIcone('pasta', 22);
     topo.appendChild(iconWrap);
 
     const topActions = document.createElement('div');
@@ -501,7 +500,7 @@ export function abrirModalMoverLivro(livro, { pastas = coletarPastasBibliografia
   modal.innerHTML = `
     <div class="ath-modal" style="max-width: 440px;">
       <div class="ath-modal-head">
-        <h3 class="ath-modal-title">📁 Mover Obra</h3>
+        <h3 class="ath-modal-title">${svgIcone('pasta', 17)} Mover Obra</h3>
         <button type="button" class="ath-btn ath-btn-icon" id="athBtnFecharModalMover" aria-label="Fechar">${svgIcone('fechar', 16)}</button>
       </div>
       <div class="ath-modal-corpo">
@@ -615,19 +614,19 @@ export const metodosEstudoPastas = {
     navBar.innerHTML = `
       <nav class="ath-bib-breadcrumb" id="athBibBreadcrumb" aria-label="Navegação da Bibliografia">
         <button type="button" class="ath-bib-breadcrumb-btn ${pastaAtiva === 'todas' ? 'ath-bib-breadcrumb-btn--active' : ''}" data-nav-pasta="todas" title="Ver todas as obras (Estante Geral)">
-          <span class="ath-bib-breadcrumb-icon">📚</span>
+          <span class="ath-bib-breadcrumb-icon" aria-hidden="true">${svgIcone('livro', 15)}</span>
           <span class="ath-bib-breadcrumb-txt">Bibliografia</span>
         </button>
         <span class="ath-bib-breadcrumb-sep" aria-hidden="true">/</span>
         <span class="ath-bib-breadcrumb-current" aria-current="page" title="${escapeHtml(nomeAtivo)}">
-          <span class="ath-bib-breadcrumb-icon">📁</span>
+          <span class="ath-bib-breadcrumb-icon" aria-hidden="true">${svgIcone('pasta', 15)}</span>
           <span class="ath-bib-breadcrumb-txt">${escapeHtml(nomeAtivo)}</span>
         </span>
       </nav>
 
       <div class="ath-bib-nav-actions">
         <button type="button" class="ath-btn-estante-geral ${pastaAtiva === 'todas' ? 'ath-btn-estante-geral--on ath-btn-estante-geral--active' : ''}" id="athBtnEstanteGeral" data-nav-pasta="todas" title="Exibir todas as referências sem filtro de pasta">
-          <span>📚</span>
+          <span aria-hidden="true">${svgIcone('livro', 15)}</span>
           <span>Estante Geral</span>
           <span class="ath-bib-count-pill" id="athBibTotalObrasPill">${totalGeral}</span>
         </button>

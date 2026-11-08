@@ -825,7 +825,7 @@ describe('Adversarial 4: WAI-ARIA 1.2 Dinâmico e Ciclo de Focus Trap (Tab / Shi
     });
 
     assert.equal(livroEl.classList.contains('aberto'), false, 'Livro deve ser fechado');
-    assert.equal(livroEl.style.transform, 'rotateY(-18deg) rotateX(4deg)');
+    assert.equal(livroEl.style.transform, 'rotateY(0deg) translateZ(0)');
     assert.equal(globalThis.document.activeElement, botaoDisparador, 'Foco deve ter sido restaurado para o disparador original');
   });
 });

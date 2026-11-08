@@ -209,7 +209,7 @@ describe('Empirical Adversarial Challenge — Iteração 2 (Milestone 3)', () =>
         !transformInline.includes('!important'),
         'O estilo inline de repouso NÃO PODE conter !important (caso contrário anularia o hover da folha de estilos)'
       );
-      assert.equal(transformInline, 'rotateY(-18deg) rotateX(4deg)');
+      assert.equal(transformInline, 'rotateY(0deg) translateZ(0)');
     });
 
     it('3.3: Seletores combinadores cobrem tanto classes irmãs (.ath-livro-3d-wrap:hover.ath-livro-3d) quanto descendentes', () => {
@@ -278,7 +278,7 @@ describe('Empirical Adversarial Challenge — Iteração 2 (Milestone 3)', () =>
       const abertoMatch = cssContent.match(abertoRegex);
       assert.ok(abertoMatch, 'Regra de capa aberta deve existir');
       assert.ok(
-        abertoMatch[1].includes('transform: rotateY(-140deg);'),
+        abertoMatch[1].includes('transform: rotateY(-160deg);'),
         'Capa aberta deve girar para -140deg'
       );
 

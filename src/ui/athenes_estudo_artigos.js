@@ -38,7 +38,7 @@ import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_dire
 import { metodosEstudoAnotacoes } from './athenes_estudo_artigos_anotacoes.js';
 import { metodosEstudoModais } from './athenes_estudo_artigos_modais.js';
 import { metodosEstudoPastas, restaurarPastaAtiva, coletarPastasBibliografia, CORES_PASTAS_CRONOS } from './athenes_estudo_artigos_pastas.js';
-import { renderizarEstante3D, fecharTodosLivros3D, tratarTecladoLivro3D, moverLivroParaPasta } from './athenes_estudo_artigos_estante.js';
+import { renderizarEstante3D, fecharTodosLivros3D, tratarTecladoLivro3D, moverLivroParaPasta, CORES_CAPA_SELECAO } from './athenes_estudo_artigos_estante.js';
 
 export { ehArtigoExemploFicticio, criarArtigosEstudoExemplo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, gerarHtmlNotaZoteroDoArtigo, calcularPontoFinalLinhaReta } from './athenes_estudo_artigos_dados.js';
 
@@ -752,8 +752,7 @@ export class EstudoArtigosView {
         onMudarCor: (art, cor) => {
           if (cor) {
             art.corCapa = cor;
-            salvarArtigosEstudo(this.artigos);
-            this.atualizarGridCatalogo();
+            salvarArtigosEstudo(this.artigos, art);
           } else {
             this.abrirModalCorCapa(art);
           }
@@ -761,8 +760,7 @@ export class EstudoArtigosView {
         onAlterarCorCapa: (art, cor) => {
           if (cor) {
             art.corCapa = cor;
-            salvarArtigosEstudo(this.artigos);
-            this.atualizarGridCatalogo();
+            salvarArtigosEstudo(this.artigos, art);
           } else {
             this.abrirModalCorCapa(art);
           }
@@ -791,13 +789,13 @@ export class EstudoArtigosView {
 
     card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h3 style="margin:0; font-size:16px; font-weight:800; color:#1E293B;">📁 Mover para Pasta</h3>
+        <h3 style="margin:0; font-size:16px; font-weight:800; color:#1E293B; display:flex; align-items:center; gap:8px;">${svgIcone('pasta', 17)} Mover para Pasta</h3>
         <button type="button" class="ath-btn ath-btn-sm ath-btn-fechar" id="athBtnFecharMover" style="border:none; background:transparent; font-size:18px; cursor:pointer;">&times;</button>
       </div>
       <p style="font-size:12.5px; color:#64748B; margin:0 0 16px 0;">Selecione o destino para <strong>${escapeHtml(art.titulo || 'esta obra')}</strong>:</p>
       <div id="athListaPastasDestino" style="display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; margin-bottom:18px;">
         <button type="button" class="ath-btn ath-btn-soft" data-pasta-dest="todas" style="text-align:left; padding:8px 12px; font-size:12.5px; font-weight:700;">
-          📚 Estante Geral (Raiz)
+          ${svgIcone('livro', 16)} Estante Geral (Raiz)
         </button>
         ${pastas.map(p => `
           <button type="button" class="ath-btn ath-btn-soft" data-pasta-dest="${escapeHtml(p.id)}" style="text-align:left; padding:8px 12px; font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:8px;">
@@ -844,12 +842,12 @@ export class EstudoArtigosView {
 
     card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-        <h3 style="margin:0; font-size:15px; font-weight:800; color:#1E293B;">🎨 Escolher Cor da Capa</h3>
+        <h3 style="margin:0; font-size:15px; font-weight:800; color:#1E293B;">Escolher cor da capa</h3>
         <button type="button" class="ath-btn ath-btn-sm" id="athBtnFecharCorCapa" style="border:none; background:transparent; font-size:18px; cursor:pointer;">&times;</button>
       </div>
-      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px;">
-        ${CORES_PASTAS_CRONOS.map(c => `
-          <button type="button" data-cor="${c}" style="height:36px; border-radius:6px; border:2px solid ${art.corCapa === c ? '#0F172A' : 'transparent'}; background:${c}; cursor:pointer; transition:transform 0.15s ease;" title="${c}"></button>
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:16px;">
+        ${CORES_CAPA_SELECAO.map(({ cor, nome }) => `
+          <button type="button" data-cor="${cor}" aria-label="${nome}" aria-pressed="${String(art.corCapa === cor)}" style="height:36px; border-radius:6px; border:2px solid ${art.corCapa === cor ? '#0F172A' : 'transparent'}; background:${cor}; cursor:pointer; transition:transform 0.15s ease;" title="${nome}"></button>
         `).join('')}
       </div>
     `;
@@ -864,7 +862,7 @@ export class EstudoArtigosView {
     card.querySelectorAll('[data-cor]').forEach(btn => {
       btn.addEventListener('click', () => {
         art.corCapa = btn.dataset.cor;
-        salvarArtigosEstudo(this.artigos);
+        salvarArtigosEstudo(this.artigos, art);
         fechar();
         this.atualizarGridCatalogo();
       });

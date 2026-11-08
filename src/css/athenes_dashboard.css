@@ -473,9 +473,9 @@
 }
 
 .ath-artigos-zotero-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 14px;
+  display: block;
+  width: 100%;
+  min-width: 0;
 }
 
 .ath-artigo-zotero-card {
@@ -2443,6 +2443,15 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   min-width: 0;
 }
 
+.ath-bib-breadcrumb-icon,
+.ath-btn-estante-geral > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: #314F79;
+}
+
 .ath-bib-breadcrumb-btn {
   display: inline-flex;
   align-items: center;
@@ -2617,27 +2626,27 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   background: #94A3B8;
 }
 
-/* Card no Formato de Pasta com Aba Superior Esquerda */
+/* Fichários de registro em pé: lombada, etiqueta e argola. */
 .ath-bib-folder-card {
   position: relative;
-  min-width: 190px;
-  max-width: 240px;
-  flex: 0 0 210px;
-  height: 132px;
-  padding-top: 20px; /* Reserva espaço para a aba saliente */
-  color: var(--ath-folder-fg, #1E293B);
+  min-width: 148px;
+  max-width: 148px;
+  flex: 0 0 148px;
+  height: 204px;
+  padding: 0 0 5px 6px;
+  color: #FFFFFF;
   cursor: pointer;
   user-select: none;
   box-sizing: border-box;
   outline: none;
   border: none;
-  background: transparent;
+  background: transparent !important;
   text-align: left;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
 }
 
 .ath-bib-folder-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-5px);
 }
 
 .ath-bib-folder-card:focus-visible {
@@ -2651,47 +2660,46 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
 /* Aba Superior Esquerda (Folder Tab) */
 .ath-bib-folder-tab {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 48%;
-  min-width: 80px;
-  max-width: 110px;
-  height: 24px;
-  background: var(--ath-folder-bg, #EDF2FA);
-  border: 1.5px solid var(--ath-folder-border, #CBD5E1);
-  border-bottom: 2px solid var(--ath-folder-bg, #EDF2FA); /* Elimina a costura com o corpo */
-  border-radius: 11px 13px 0 0;
-  z-index: 2;
+  top: 4px;
+  left: 2px;
+  width: 10px;
+  height: calc(100% - 12px);
+  background: color-mix(in srgb, var(--ath-folder-accent, #314F79) 68%, #172B45);
+  border: 1px solid color-mix(in srgb, var(--ath-folder-accent, #314F79) 45%, #172B45);
+  border-radius: 7px 0 0 7px;
+  z-index: 0;
   box-sizing: border-box;
-  font-size: 11px;
-  font-weight: 750;
-  padding: 2px 8px;
+  font-size: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: background 0.18s ease, border-color 0.18s ease;
 }
 
-/* Corpo Principal da Pasta */
+.ath-bib-folder-tab::after {
+  content: none;
+}
+
 .ath-bib-folder-body {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  height: 112px;
-  min-height: 112px;
-  padding: 12px 14px 10px 14px;
-  background: var(--ath-folder-bg, #EDF2FA);
-  border: 1.5px solid var(--ath-folder-border, #CBD5E1);
-  border-radius: 0 14px 14px 14px; /* Canto superior esquerdo reto em 0 */
-  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  justify-content: flex-start;
+  height: 198px;
+  min-height: 198px;
+  padding: 12px 12px 14px 16px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--ath-folder-accent, #314F79) 76%, #172B45) 0%,
+    var(--ath-folder-accent, #314F79) 17%,
+    color-mix(in srgb, var(--ath-folder-accent, #314F79) 88%, #FFFFFF) 84%,
+    color-mix(in srgb, var(--ath-folder-accent, #314F79) 76%, #172B45) 100%);
+  border: 1px solid color-mix(in srgb, var(--ath-folder-accent, #314F79) 70%, #172B45);
+  border-radius: 8px 9px 6px 6px;
+  box-shadow: inset 3px 0 4px rgba(255,255,255,.16), inset -3px 0 5px rgba(0,0,0,.12), 2px 8px 11px rgba(15,23,42,.18);
   box-sizing: border-box;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
 }
 
 .ath-bib-folder-card:hover .ath-bib-folder-body {
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
+  box-shadow: inset 3px 0 4px rgba(255,255,255,.16), inset -3px 0 5px rgba(0,0,0,.12), 3px 12px 16px rgba(15,23,42,.23);
 }
 
 /* Estado Ativo (.ath-bib-folder-card--active) */
@@ -2700,25 +2708,16 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
 }
 
 .ath-bib-folder-card--active .ath-bib-folder-tab {
-  border-color: #314F79;
+  border-color: var(--ath-folder-accent, #314F79);
 }
 
 .ath-bib-folder-card--active .ath-bib-folder-body {
-  border-color: #314F79;
-  box-shadow: 0 8px 24px rgba(49, 79, 121, 0.18), 0 0 0 2.5px #314F79;
+  box-shadow: inset 3px 0 4px rgba(255,255,255,.16), inset -3px 0 5px rgba(0,0,0,.12), 0 0 0 2px #FFFFFF, 0 0 0 4px var(--ath-folder-accent, #314F79), 3px 12px 16px rgba(15,23,42,.2);
 }
 
 /* Marcador visual luminoso na aba ativa */
 .ath-bib-folder-card--active .ath-bib-folder-tab::before {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 6px;
-  right: 6px;
-  height: 3px;
-  background: #314F79;
-  border-radius: 999px;
-  box-shadow: 0 1px 3px rgba(49, 79, 121, 0.4);
+  content: none;
 }
 
 /* Elementos Internos do Card */
@@ -2731,13 +2730,13 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
 
 .ath-bib-folder-icon-wrap,
 .ath-bib-folder-icon {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   border-radius: 8px;
-  background: var(--ath-folder-badge-bg, rgba(255, 255, 255, 0.5));
-  color: currentColor;
+  background: rgba(255,255,255,.18);
+  color: #FFFFFF;
   flex-shrink: 0;
 }
 
@@ -2755,8 +2754,8 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   font-weight: 800;
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--ath-folder-badge-bg, rgba(255, 255, 255, 0.65));
-  color: currentColor;
+  background: rgba(255,255,255,.22);
+  color: #FFFFFF;
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
@@ -2787,27 +2786,37 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
 
 /* Bloco Informativo de Texto */
 .ath-bib-folder-info {
-  margin: 6px 0 auto 0;
+  margin: 12px 0 0 0;
   min-width: 0;
+  min-height: 82px;
+  padding: 9px 7px;
+  background: #FFFFFF;
+  border: 1px solid #D9E0E8;
+  border-left: 3px solid #E1E7EE;
+  border-radius: 2px;
+  box-shadow: 0 2px 3px rgba(0,0,0,.12);
 }
 
 .ath-bib-folder-title,
 .ath-bib-folder-name {
   display: block;
-  font-size: 13.5px;
+  font-size: 11.5px;
   font-weight: 800;
   line-height: 1.25;
-  color: currentColor;
+  color: #1E293B;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
 }
 
 .ath-bib-folder-sub,
 .ath-bib-folder-desc {
   display: block;
   font-size: 10px;
-  opacity: 0.75;
+  opacity: 1;
+  color: #64748B;
   font-weight: 600;
   margin-top: 2px;
   overflow: hidden;
@@ -2820,15 +2829,32 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 6px;
-  border-top: 1px solid var(--ath-folder-divider, rgba(0, 0, 0, 0.06));
+  margin-top: auto;
+  min-height: 26px;
+  padding-top: 0;
+  border-top: 0;
   font-size: 10px;
+}
+
+.ath-bib-folder-footer::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 15px;
+  width: 21px;
+  height: 21px;
+  transform: translateX(-50%);
+  border: 4px solid #C7D0DA;
+  border-radius: 50%;
+  background: radial-gradient(circle, #192A3D 0 46%, #415265 60%, #192A3D 75%);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.7), 0 1px 2px rgba(0,0,0,.4);
 }
 
 .ath-bib-folder-color-indicator,
 .ath-bib-folder-color-dot {
-  width: 9px;
-  height: 9px;
+  width: 0;
+  height: 0;
+  visibility: hidden;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
@@ -2839,7 +2865,11 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
 .ath-bib-tag-comp {
   font-size: 9.5px;
   font-weight: 700;
-  opacity: 0.85;
+  opacity: 1;
+  color: #FFFFFF;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Estado Drag & Drop Target (Arrastar Livro para Pasta) */
@@ -2852,9 +2882,7 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
 .ath-bib-folder-card.ath-drop-target-over .ath-bib-folder-body,
 .ath-drop-target-over .ath-bib-folder-tab,
 .ath-drop-target-over .ath-bib-folder-body {
-  background: #DCEBFA !important;
   border-color: #2F7BD0 !important;
-  color: #1E3A8A !important;
   outline: 2px dashed #2F7BD0;
   outline-offset: -2px;
 }
@@ -2873,8 +2901,8 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
     padding-bottom: 12px;
   }
   .ath-bib-folder-card {
-    min-width: 175px;
-    flex: 0 0 185px;
+    min-width: 148px;
+    flex: 0 0 148px;
   }
   .ath-bib-nav-bar {
     flex-direction: column;

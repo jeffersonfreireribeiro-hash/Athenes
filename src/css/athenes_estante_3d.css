@@ -28,10 +28,11 @@
 
 .ath-estante-3d,
 .ath-estante-container {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 56px;
-  padding: 32px 16px 64px 16px;
+  gap: 36px;
+  padding: 20px 16px 56px;
   max-width: 1320px;
   margin: 0 auto;
   perspective: 1000px;
@@ -39,6 +40,11 @@
   overflow: visible;
   box-sizing: border-box;
   width: 100%;
+}
+
+.ath-estante-3d:has(.ath-livro-3d.aberto) {
+  z-index: 91;
+  perspective: none !important;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -54,14 +60,18 @@
   box-sizing: border-box;
 }
 
+.ath-estante-prateleira:has(.ath-livro-3d.aberto) {
+  z-index: 3;
+}
+
 /* Área de repouso dos livros na prateleira */
 .ath-prateleira-livros {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: flex-start;
-  gap: 36px 32px;
-  padding: 0 24px;
+  gap: 24px;
+  padding: 0 18px;
   min-height: 240px;
   z-index: 2;
   box-sizing: border-box;
@@ -86,7 +96,7 @@
 .ath-prateleira-superficie {
   width: 100%;
   height: 6px;
-  background: linear-gradient(90deg, #CBD5E1 0%, #E2E8F0 50%, #CBD5E1 100%);
+  background: linear-gradient(90deg, #F8FAFC 0%, #FFFFFF 50%, #F8FAFC 100%);
   border-top: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.6);
   box-sizing: border-box;
@@ -96,9 +106,9 @@
 .ath-prateleira-chanfro {
   width: 100%;
   height: 10px;
-  background: linear-gradient(180deg, #94A3B8 0%, #64748B 60%, #475569 100%);
-  border-top: 1px solid rgba(255, 255, 255, 0.3);
-  border-bottom: 1px solid #1E293B;
+  background: linear-gradient(180deg, #F1F5F9 0%, #DDE5EF 100%);
+  border-top: 1px solid #FFFFFF;
+  border-bottom: 1px solid #CBD5E1;
   box-sizing: border-box;
 }
 
@@ -110,7 +120,7 @@
   left: 2%;
   right: 2%;
   height: 20px;
-  background: radial-gradient(ellipse at 50% 0%, rgba(15, 23, 42, 0.28) 0%, rgba(15, 23, 42, 0.08) 50%, transparent 80%);
+  background: radial-gradient(ellipse at 50% 0%, rgba(15, 23, 42, 0.16) 0%, rgba(15, 23, 42, 0.05) 50%, transparent 80%);
   pointer-events: none;
 }
 
@@ -120,8 +130,9 @@
 
 .ath-livro-3d-wrap {
   position: relative;
-  width: 154px;
-  height: 226px; /* Proporção áurea vertical 1:1.47 */
+  width: 164px;
+  height: 226px;
+  flex: 0 0 164px;
   perspective: 1000px;
   perspective-origin: 50% 40%;
   cursor: pointer;
@@ -145,10 +156,10 @@
 
 .ath-livro-3d {
   position: relative;
-  width: 100%;
-  height: 100%;
+  width: 164px;
+  height: 226px;
   transform-style: preserve-3d;
-  transform: rotateY(-18deg) rotateX(4deg) translateZ(0);
+  transform: rotateY(0deg) translateZ(0);
   transform-origin: 50% 100%;
   transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.45s ease;
   box-sizing: border-box;
@@ -158,7 +169,7 @@
 .ath-livro-3d:not(.aberto):hover,
 .ath-livro-3d-wrap:hover.ath-livro-3d:not(.aberto),
 .ath-livro-3d-wrap:hover .ath-livro-3d:not(.aberto) {
-  transform: translateY(-8px) rotateY(-8deg) rotateX(2deg) translateZ(16px) !important;
+  transform: translateY(-8px) rotateY(-13deg) translateZ(16px) !important;
 }
 
 /* Sombra de contato basal do livro pousado na prateleira */
@@ -199,6 +210,8 @@
   justify-content: center;
   overflow: hidden;
   box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .ath-livro-lombada-texto {
@@ -236,6 +249,12 @@
   );
   box-shadow: inset 2px 0 4px rgba(0, 0, 0, 0.14);
   box-sizing: border-box;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.ath-livro-3d:not(.aberto):hover .ath-livro-paginas-dir {
+  opacity: 1;
 }
 
 .ath-livro-paginas-baixo {
@@ -244,6 +263,7 @@
   left: 3px;
   right: 3px;
   height: 22px;
+  opacity: 0;
   transform-origin: bottom center;
   transform: rotateX(-90deg);
   background: repeating-linear-gradient(
@@ -316,6 +336,55 @@
   border-left: 2px solid rgba(255, 255, 255, 0.15);
   pointer-events: none;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px 22px 18px;
+  color: #FFFFFF;
+  overflow: hidden;
+}
+
+.ath-livro-verso-rotulo,
+.ath-livro-verso-resumo-rotulo {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  color: #C8D7E6;
+}
+
+.ath-livro-verso-titulo {
+  font-size: 15px;
+  line-height: 1.3;
+  font-weight: 800;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.ath-livro-verso-resumo-rotulo {
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, .25);
+}
+
+.ath-livro-verso-resumo {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #E7EDF5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 11;
+  overflow: hidden;
+}
+
+.ath-livro-verso-fonte {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, .25);
+  font-size: 10px;
+  line-height: 1.3;
+  color: #D6E2F0;
 }
 
 /* Vinco de articulação da encadernação */
@@ -420,13 +489,18 @@
 
 .ath-livro-3d.aberto {
   z-index: 100;
+  perspective: none;
+  translate: var(--ath-open-shift-x, 0px) 0;
+  width: 290px;
+  height: 420px;
+  flex-basis: 290px;
   transform: translateZ(60px);
   transition: transform 0.55s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .ath-livro-3d.aberto .ath-livro-capa,
 .ath-livro-3d.aberto .ath-livro-capa-frente {
-  transform: rotateY(-140deg);
+  transform: rotateY(-160deg);
   box-shadow: -6px 8px 18px rgba(0, 0, 0, 0.28);
   backface-visibility: visible;
 }
@@ -447,7 +521,7 @@
 
 .ath-livro-folha-interna {
   position: absolute;
-  top: -8px;
+  top: 0;
   left: 0;
   width: 290px;
   min-height: 100%;
@@ -462,7 +536,7 @@
   overflow-y: auto;
   box-sizing: border-box;
   z-index: 10;
-  transform: rotateY(-4deg) translateZ(6px);
+  transform: translateZ(6px);
   transition: transform 0.5s 0.08s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
 }
 
@@ -479,6 +553,9 @@
   visibility: visible;
   opacity: 1;
   pointer-events: auto;
+  height: 100%;
+  max-height: 100%;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.32);
 }
 
 /* Cabeçalho da folha */
@@ -551,6 +628,46 @@
   line-height: 1.35;
   margin: 0;
   word-break: break-word;
+}
+
+.ath-folha-cores-capa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -3px 0 12px;
+}
+
+.ath-folha-cores-rotulo {
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ath-folha-cores-amostras {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.ath-folha-cor-amostra {
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  border: 2px solid #FFFFFF;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #CBD5E1;
+  cursor: pointer;
+}
+
+.ath-folha-cor-amostra[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px #1E293B;
+}
+
+.ath-folha-cor-amostra:focus-visible {
+  outline: 2px solid #314F79;
+  outline-offset: 4px;
 }
 
 .ath-folha-meta,

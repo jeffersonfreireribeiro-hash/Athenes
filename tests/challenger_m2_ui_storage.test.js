@@ -554,7 +554,7 @@ describe('1. Resiliência Adversarial de sessionStorage e Fallbacks Seguros', ()
     assert.equal(idRetornado, 'pasta_urbanismo');
     assert.ok(callbackDisparado, 'Callback onSelect deve ser acionado mesmo se storage falhar');
     assert.equal(pastaSelecionadaCb, 'pasta_urbanismo');
-    assert.equal(breadcrumb.textContent, '📚 Bibliografia / 📁 Direito Urbanístico');
+    assert.equal(breadcrumb.textContent, 'Bibliografia / Direito Urbanístico');
   });
 
   it('1.6. selecionarPasta: storage lançando SecurityError em setItem não interrompe fluxo', () => {
@@ -583,7 +583,7 @@ describe('1. Resiliência Adversarial de sessionStorage e Fallbacks Seguros', ()
     });
 
     assert.equal(id, 'todas');
-    assert.equal(breadcrumb.textContent, '📚 Bibliografia / 📁 Estante Geral');
+    assert.equal(breadcrumb.textContent, 'Bibliografia / Estante Geral');
   });
 
   it('1.8. Resiliência do componente sob storage esgotado durante navegação contínua', () => {
@@ -841,7 +841,7 @@ describe('3. Colisão de IDs de Pastas Personalizadas com IDs Reservados ("todas
     });
 
     assert.equal(id, 'todas');
-    assert.equal(breadcrumb.textContent, '📚 Bibliografia / 📁 Estante Geral');
+    assert.equal(breadcrumb.textContent, 'Bibliografia / Estante Geral');
   });
 
   it('3.4. moverReferenciaEntrePastas: mover para "todas" normaliza atomicamente para RAIZ_BIBLIOGRAFIA', () => {
@@ -1007,7 +1007,7 @@ describe('4. Estresse do Breadcrumb: Títulos Longos (>200 chars), Emojis e Unic
       breadcrumbEl: breadcrumb
     });
 
-    assert.equal(breadcrumb.textContent, `📚 Bibliografia / 📁 ${TITULO_GIGANTE}`);
+    assert.equal(breadcrumb.textContent, `Bibliografia / ${TITULO_GIGANTE}`);
   });
 
 });

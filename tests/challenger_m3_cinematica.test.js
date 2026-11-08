@@ -9,7 +9,7 @@
  *    (garantir invariante de estrita exclusividade: somente o livro ativo com .aberto e translateZ(60px),
  *    e fechamento determinístico de todos os livros prévios na estante inteira, inclusive multilinear).
  * 2. Fechamento suave: tecla Escape (código 27 ou key 'Escape'), clique no backdrop/scrim (#athEstanteScrim)
- *    e clique fora retornando com precisão absoluta a 'rotateY(-18deg) rotateX(4deg)'.
+ *    e clique fora retornando com precisão absoluta a 'rotateY(0deg) translateZ(0)'.
  * 3. Folha interna: alternância de status de leitura (nao_lido -> lendo -> fichado -> ciclo),
  *    cópia de citação formatada com feedback visual e clipboard, e anotações com caracteres especiais,
  *    scripts de injeção XSS e textos volumosos sem corrupção de pinnedNotes.
@@ -358,7 +358,7 @@ describe('Desafio 1: Concorrência de Aberturas e Exclusividade Estrita (R4)', (
           assert.ok(!outroLivro.classList.contains('aberto'), `Livro ${j} não pode ter .aberto`);
           assert.equal(outroLivro.getAttribute('aria-expanded'), 'false', `Livro ${j} deve ter aria-expanded="false"`);
           if (outroLivro.style.transform) {
-            assert.equal(outroLivro.style.transform, 'rotateY(-18deg) rotateX(4deg)', `Livro ${j} deve ter retornado à posição de repouso`);
+            assert.equal(outroLivro.style.transform, 'rotateY(0deg) translateZ(0)', `Livro ${j} deve ter retornado à posição de repouso`);
           }
         }
       }
@@ -402,13 +402,13 @@ describe('Desafio 1: Concorrência de Aberturas e Exclusividade Estrita (R4)', (
     abrirLivro3D(livroPrat3, itens[12]);
     assert.ok(livroPrat3.classList.contains('aberto'));
     assert.ok(!livroPrat1.classList.contains('aberto'), 'Livro da prateleira 1 deve ser fechado');
-    assert.equal(livroPrat1.style.transform, 'rotateY(-18deg) rotateX(4deg)');
+    assert.equal(livroPrat1.style.transform, 'rotateY(0deg) translateZ(0)');
 
     // Abre na prateleira 2 (deve fechar prateleira 3)
     abrirLivro3D(livroPrat2, itens[6]);
     assert.ok(livroPrat2.classList.contains('aberto'));
     assert.ok(!livroPrat3.classList.contains('aberto'), 'Livro da prateleira 3 deve ser fechado');
-    assert.equal(livroPrat3.style.transform, 'rotateY(-18deg) rotateX(4deg)');
+    assert.equal(livroPrat3.style.transform, 'rotateY(0deg) translateZ(0)');
   });
 
   it('1.4: Alternância de clique direto (Toggle) e imunidade contra fechamento ao clicar dentro da folha interna', () => {
@@ -433,7 +433,7 @@ describe('Desafio 1: Concorrência de Aberturas e Exclusividade Estrita (R4)', (
     const capa = livroEl.querySelector('.ath-livro-capa');
     livroEl.dispatchEvent({ type: 'click', target: capa });
     assert.ok(!livroEl.classList.contains('aberto'), 'Clique na capa deve fechar o exemplar');
-    assert.equal(livroEl.style.transform, 'rotateY(-18deg) rotateX(4deg)');
+    assert.equal(livroEl.style.transform, 'rotateY(0deg) translateZ(0)');
   });
 });
 
@@ -443,7 +443,7 @@ describe('Desafio 2: Fechamento Suave (Escape, Scrim e Clique Fora) (R4)', () =>
     globalThis.document.clearRegisteredElements();
   });
 
-  it('2.1: Tecla Escape via key: "Escape" fecha suavemente e retorna a rotateY(-18deg) rotateX(4deg)', () => {
+  it('2.1: Tecla Escape via key: "Escape" fecha suavemente e retorna a rotateY(0deg) translateZ(0)', () => {
     const item = criarBookReferenceItem({ id: 'esc_1', titulo: 'Escape Obra' });
     const livroEl = renderizarLivro3D(item);
     abrirLivro3D(livroEl, item);
@@ -451,7 +451,7 @@ describe('Desafio 2: Fechamento Suave (Escape, Scrim e Clique Fora) (R4)', () =>
 
     tratarTecladoLivro3D({ key: 'Escape', keyCode: 27 }, livroEl);
     assert.ok(!livroEl.classList.contains('aberto'), 'Deve remover classe .aberto');
-    assert.equal(livroEl.style.transform, 'rotateY(-18deg) rotateX(4deg)', 'Transform de repouso exato');
+    assert.equal(livroEl.style.transform, 'rotateY(0deg) translateZ(0)', 'Transform de repouso exato');
     assert.equal(livroEl.getAttribute('aria-expanded'), 'false');
   });
 
@@ -463,7 +463,7 @@ describe('Desafio 2: Fechamento Suave (Escape, Scrim e Clique Fora) (R4)', () =>
 
     tratarTecladoLivro3D({ keyCode: 27 }, livroEl);
     assert.ok(!livroEl.classList.contains('aberto'));
-    assert.equal(livroEl.style.transform, 'rotateY(-18deg) rotateX(4deg)');
+    assert.equal(livroEl.style.transform, 'rotateY(0deg) translateZ(0)');
   });
 
   it('2.3: Teclas não-Escape (Enter, Space, Tab, ArrowDown, Escapade) são ignoradas', () => {
@@ -511,7 +511,7 @@ describe('Desafio 2: Fechamento Suave (Escape, Scrim e Clique Fora) (R4)', () =>
     // Simula listener do scrim disparando fecharTodosLivros3D
     fecharTodosLivros3D(container);
     assert.ok(!livro1.classList.contains('aberto'), 'Livro 1 deve ser fechado');
-    assert.equal(livro1.style.transform, 'rotateY(-18deg) rotateX(4deg)');
+    assert.equal(livro1.style.transform, 'rotateY(0deg) translateZ(0)');
     assert.ok(!scrim.classList.contains('ativo'), 'Scrim deve perder classe .ativo após fechamento');
   });
 
@@ -536,7 +536,7 @@ describe('Desafio 2: Fechamento Suave (Escape, Scrim e Clique Fora) (R4)', () =>
     }
 
     assert.ok(!livroEl.classList.contains('aberto'), 'Livro deve ser fechado após clique em fundo neutro');
-    assert.equal(livroEl.style.transform, 'rotateY(-18deg) rotateX(4deg)');
+    assert.equal(livroEl.style.transform, 'rotateY(0deg) translateZ(0)');
   });
 
   it('2.6: Operações de fechamento com nós nulos, desconectados ou sem classe operam sem exceções', () => {

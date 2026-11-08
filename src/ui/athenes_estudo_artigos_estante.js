@@ -30,10 +30,20 @@ import {
   calcularContadoresPastas,
   filtrarReferenciasPorPasta,
   moverReferenciaEntrePastas,
+  CORES_CAPA_PADRAO,
   RAIZ_BIBLIOGRAFIA
 } from '../core/athenes_referencias.js';
 
 import { artigoTemPdf } from './athenes_estudo_artigos_dados.js';
+
+export const CORES_CAPA_SELECAO = Object.freeze([
+  { cor: CORES_CAPA_PADRAO[0], nome: 'Azul' },
+  { cor: CORES_CAPA_PADRAO[1], nome: 'Laranja' },
+  { cor: CORES_CAPA_PADRAO[2], nome: 'Verde' },
+  { cor: CORES_CAPA_PADRAO[3], nome: 'Roxo' },
+  { cor: CORES_CAPA_PADRAO[4], nome: 'Âmbar' },
+  { cor: CORES_CAPA_PADRAO[6], nome: 'Grafite' }
+]);
 
 export {
   renderizarPastasCronos,
@@ -404,6 +414,23 @@ export function renderizarLivro3D(ref = {}, { callbacks = {} } = {}) {
   const capaVerso = criarElemento('div', 'ath-livro-capa-verso ath-livro-capa-interna');
   if (!capaVerso.style) capaVerso.style = {};
   capaVerso.style.backgroundColor = corLivro;
+  const versoRotulo = criarElemento('span', 'ath-livro-verso-rotulo');
+  versoRotulo.textContent = 'SOBRE A OBRA';
+  capaVerso.appendChild(versoRotulo);
+  const versoTitulo = criarElemento('strong', 'ath-livro-verso-titulo');
+  versoTitulo.textContent = ref?.titulo || 'Sem título';
+  capaVerso.appendChild(versoTitulo);
+  const versoResumoRotulo = criarElemento('span', 'ath-livro-verso-resumo-rotulo');
+  versoResumoRotulo.textContent = 'RESUMO';
+  capaVerso.appendChild(versoResumoRotulo);
+  const versoResumo = criarElemento('p', 'ath-livro-verso-resumo');
+  versoResumo.textContent = String(ref?.resumoOriginal || ref?.resumo || ref?.camposZotero?.abstractNote || '').trim()
+    || 'Esta obra ainda não tem resumo cadastrado.';
+  capaVerso.appendChild(versoResumo);
+  const versoFonte = criarElemento('small', 'ath-livro-verso-fonte');
+  versoFonte.textContent = [ref?.publicacao || ref?.camposZotero?.publicationTitle || ref?.editora, ref?.ano]
+    .filter(Boolean).join(' · ') || 'Dados bibliográficos da obra';
+  capaVerso.appendChild(versoFonte);
   capa.appendChild(capaVerso);
 
   const vinco = criarElemento('div', 'ath-livro-capa-vinco-esq');
@@ -509,6 +536,12 @@ export function abrirLivro3D(livroEl, ref, { callbacks = {} } = {}) {
 
   if (livroEl.classList) livroEl.classList.add('aberto');
   if (!livroEl.style) livroEl.style = {};
+  const prateleira = typeof livroEl.closest === 'function' ? livroEl.closest('.ath-estante-prateleira') : null;
+  if (prateleira?.getBoundingClientRect && livroEl.getBoundingClientRect && livroEl.style.setProperty) {
+    const margem = prateleira.getBoundingClientRect().left + 18;
+    const esquerda = livroEl.getBoundingClientRect().left;
+    livroEl.style.setProperty('--ath-open-shift-x', `${Math.max(0, Math.ceil(margem - (esquerda - 290)))}px`);
+  }
   livroEl.style.transform = 'translateZ(60px)';
   if (typeof livroEl.setAttribute === 'function') {
     livroEl.setAttribute('aria-expanded', 'true');
@@ -521,6 +554,16 @@ export function abrirLivro3D(livroEl, ref, { callbacks = {} } = {}) {
   if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
     const scrim = document.getElementById('athEstanteScrim');
     if (scrim?.classList) scrim.classList.add('ativo');
+  }
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function' && !livroEl._fecharAoClicarFora) {
+    livroEl._fecharAoClicarFora = (ev) => {
+      const dentro = typeof livroEl.contains === 'function'
+        ? livroEl.contains(ev.target)
+        : ev.target?.closest?.('.ath-livro-3d') === livroEl;
+      if (!dentro) fecharLivro3D(livroEl);
+    };
+    document.addEventListener('click', livroEl._fecharAoClicarFora, true);
   }
 
   // Instancia ou exibe a folha interna sem duplicar nós no DOM
@@ -543,11 +586,18 @@ export function abrirLivro3D(livroEl, ref, { callbacks = {} } = {}) {
   }
   const alvoFoco = tituloFolha || (folha && typeof folha.querySelector === 'function' ? folha.querySelector('.ath-status-btn.ativo, .ath-status-btn, .ath-btn-abrir-leitor') : null) || folha;
 
-  if (alvoFoco && typeof alvoFoco.focus === 'function') {
-    setTimeout(() => {
-      try { alvoFoco.focus(); } catch (_) {}
-    }, 50);
-  }
+  setTimeout(() => {
+    if (!livroEl.classList?.contains?.('aberto') && !livroEl.classList?.has?.('aberto')) return;
+    // O foco no controle não deve antecipar a rolagem para a folha.
+    if (alvoFoco && typeof alvoFoco.focus === 'function') {
+      try { alvoFoco.focus({ preventScroll: true }); } catch (_) {}
+    }
+    if (typeof livroEl.scrollIntoView === 'function') {
+      const movimentoReduzido = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      livroEl.scrollIntoView({ behavior: movimentoReduzido ? 'instant' : 'smooth', block: 'center', inline: 'nearest' });
+    }
+  }, 50);
 }
 
 /**
@@ -558,9 +608,15 @@ export function abrirLivro3D(livroEl, ref, { callbacks = {} } = {}) {
 export function fecharLivro3D(livroEl) {
   if (!livroEl) return;
 
+  if (livroEl._fecharAoClicarFora && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+    document.removeEventListener('click', livroEl._fecharAoClicarFora, true);
+    delete livroEl._fecharAoClicarFora;
+  }
+
   if (livroEl.classList) livroEl.classList.remove('aberto');
   if (!livroEl.style) livroEl.style = {};
-  livroEl.style.transform = 'rotateY(-18deg) rotateX(4deg)';
+  if (livroEl.style.removeProperty) livroEl.style.removeProperty('--ath-open-shift-x');
+  livroEl.style.transform = 'rotateY(0deg) translateZ(0)';
   if (typeof livroEl.setAttribute === 'function') {
     livroEl.setAttribute('aria-expanded', 'false');
     // Restaura o papel canônico de botão de disparo no exemplar fechado
@@ -753,9 +809,9 @@ export function renderizarFolhaInterna(ref = {}, {
   statusBox.setAttribute('aria-label', 'Status de Leitura');
 
   const opcoesStatus = [
-    { id: 'nao_lido', label: '⚪ Não lido' },
-    { id: 'lendo', label: '🟡 Lendo' },
-    { id: 'fichado', label: '🟢 Fichado' }
+    { id: 'nao_lido', label: 'Não lido' },
+    { id: 'lendo', label: 'Lendo' },
+    { id: 'fichado', label: 'Fichado' }
   ];
 
   for (const st of opcoesStatus) {
@@ -801,6 +857,45 @@ export function renderizarFolhaInterna(ref = {}, {
   }
   cabecalho.appendChild(meta);
   folha.appendChild(cabecalho);
+
+  if (fnMudarCor) {
+    const seletorCor = criarElemento('div', 'ath-folha-cores-capa');
+    seletorCor.setAttribute('role', 'group');
+    seletorCor.setAttribute('aria-label', 'Cor da capa');
+    const rotuloCor = criarElemento('span', 'ath-folha-cores-rotulo');
+    rotuloCor.textContent = 'Cor da capa';
+    seletorCor.appendChild(rotuloCor);
+    const amostras = criarElemento('div', 'ath-folha-cores-amostras');
+    for (const opcao of CORES_CAPA_SELECAO) {
+      const amostra = criarElemento('button', 'ath-folha-cor-amostra');
+      amostra.setAttribute('type', 'button');
+      amostra.setAttribute('aria-label', opcao.nome);
+      amostra.setAttribute('title', opcao.nome);
+      amostra.setAttribute('data-cor-capa', opcao.cor);
+      amostra.setAttribute('aria-pressed', String((ref?.corCapa || CORES_CAPA_PADRAO[0]).toLowerCase() === opcao.cor.toLowerCase()));
+      amostra.style.backgroundColor = opcao.cor;
+      amostra.addEventListener('click', (ev) => {
+        if (ev?.stopPropagation) ev.stopPropagation();
+        ref.corCapa = opcao.cor;
+        for (const botao of amostras.querySelectorAll('.ath-folha-cor-amostra')) {
+          botao.setAttribute('aria-pressed', String(botao === amostra));
+        }
+        const livro = folha.closest?.('.ath-livro-3d') || folha.parentNode;
+        if (livro?.querySelector) {
+          for (const seletor of ['.ath-livro-lombada', '.ath-livro-capa-tras', '.ath-livro-capa-frente', '.ath-livro-capa-verso']) {
+            const parte = livro.querySelector(seletor);
+            if (parte?.style) parte.style.backgroundColor = opcao.cor;
+          }
+          const capa = livro.querySelector('.ath-livro-capa-frente');
+          if (capa?.style) capa.style.color = obterCorTextoAcessivel(opcao.cor);
+        }
+        fnMudarCor(ref, opcao.cor);
+      });
+      amostras.appendChild(amostra);
+    }
+    seletorCor.appendChild(amostras);
+    folha.appendChild(seletorCor);
+  }
 
   // 2. Citation Tracker
   const tracker = criarElemento('div', 'ath-citation-tracker ath-folha-citation-tracker');
@@ -959,7 +1054,7 @@ export function renderizarFolhaInterna(ref = {}, {
   if (onMoverPasta) {
     const btnMover = criarElemento('button', 'ath-btn ath-btn-sm ath-btn-soft');
     btnMover.setAttribute('type', 'button');
-    btnMover.textContent = '📁 Mover';
+    btnMover.textContent = 'Mover';
     btnMover.setAttribute('title', 'Mover para outra pasta');
     btnMover.addEventListener('click', (ev) => {
       if (ev?.stopPropagation) ev.stopPropagation();
