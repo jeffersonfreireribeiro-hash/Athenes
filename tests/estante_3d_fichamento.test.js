@@ -224,6 +224,7 @@ globalThis.document = {
 describe('Grupo 1: Prateleiras e Estrutura Horizontal da Estante 3D (R3 / F5)', () => {
   it('1.0: quantidade por prateleira acompanha a largura de tablet e desktop', () => {
     assert.equal(calcularLivrosPorPrateleira(650), 3);
+    assert.equal(calcularLivrosPorPrateleira(760, 38), 3);
     assert.equal(calcularLivrosPorPrateleira(1024), 5);
     assert.equal(calcularLivrosPorPrateleira(1920), 10);
   });

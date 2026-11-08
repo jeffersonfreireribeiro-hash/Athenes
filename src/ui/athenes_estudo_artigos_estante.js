@@ -46,11 +46,10 @@ export const CORES_CAPA_SELECAO = Object.freeze([
   { cor: CORES_CAPA_PADRAO[6], nome: 'Grafite' }
 ]);
 
-export function calcularLivrosPorPrateleira(larguraDisponivel) {
+export function calcularLivrosPorPrateleira(larguraDisponivel, espaco = 24) {
   const largura = Number(larguraDisponivel);
   if (!Number.isFinite(largura) || largura <= 0) return 6;
   const larguraLivro = 164;
-  const espaco = 24;
   const recuo = 8;
   return Math.max(1, Math.floor((Math.max(0, largura - recuo) + espaco) / (larguraLivro + espaco)));
 }
@@ -486,8 +485,48 @@ export function renderizarLivro3D(ref = {}, { callbacks = {} } = {}) {
   capa.appendChild(footerCapa);
   livroEl.appendChild(capa);
 
+  // No toque, a prévia acompanha o dedo sem interferir na rolagem da estante.
+  let ignorarCliqueAte = 0;
+  livroEl.addEventListener('pointerdown', ev => {
+    if (ev.pointerType !== 'touch' || typeof document === 'undefined') return;
+    const estante = livroEl.closest?.('.ath-estante-3d');
+    const inicioX = ev.clientX;
+    const inicioY = ev.clientY;
+    const pointerId = ev.pointerId;
+    let alvoAtivo = null;
+    let arrastou = false;
+    const atualizarPrevia = evento => {
+      if (evento.pointerId !== pointerId) return;
+      const sobDedo = document.elementFromPoint?.(evento.clientX, evento.clientY)?.closest?.('.ath-livro-3d');
+      const proximo = sobDedo && estante && sobDedo.closest?.('.ath-estante-3d') === estante && !sobDedo.classList.contains('aberto') ? sobDedo : null;
+      if (proximo !== alvoAtivo) {
+        alvoAtivo?.classList.remove('ath-livro-previa');
+        proximo?.classList.add('ath-livro-previa');
+        alvoAtivo = proximo;
+      }
+    };
+    const aoMover = evento => {
+      if (evento.pointerId !== pointerId) return;
+      if (Math.hypot(evento.clientX - inicioX, evento.clientY - inicioY) > 12) arrastou = true;
+      atualizarPrevia(evento);
+    };
+    const aoTerminar = evento => {
+      if (evento.pointerId !== pointerId) return;
+      alvoAtivo?.classList.remove('ath-livro-previa');
+      if (arrastou) ignorarCliqueAte = Date.now() + 500;
+      document.removeEventListener('pointermove', aoMover);
+      document.removeEventListener('pointerup', aoTerminar);
+      document.removeEventListener('pointercancel', aoTerminar);
+    };
+    atualizarPrevia(ev);
+    document.addEventListener('pointermove', aoMover, { passive: true });
+    document.addEventListener('pointerup', aoTerminar);
+    document.addEventListener('pointercancel', aoTerminar);
+  });
+
   // Microinterações de Clique e Acessibilidade por Teclado
   livroEl.addEventListener('click', (ev) => {
+    if (ev.detail && Date.now() < ignorarCliqueAte) return;
     if (ev?.target && typeof ev.target.closest === 'function' && ev.target.closest('.ath-livro-folha-interna')) {
       return;
     }

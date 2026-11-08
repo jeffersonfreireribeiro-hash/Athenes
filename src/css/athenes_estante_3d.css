@@ -26,6 +26,7 @@
 
 .ath-estante-3d,
 .ath-estante-container {
+  --ath-estante-gap: 24px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -41,6 +42,11 @@
 .ath-estante-3d.ath-estante-com-livro-aberto {
   z-index: 91;
   perspective: none !important;
+}
+
+@media (min-width: 520px) and (max-width: 1200px) {
+  .ath-estante-3d,
+  .ath-estante-container { --ath-estante-gap: 38px; }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -66,7 +72,7 @@
   flex-wrap: nowrap;
   align-items: flex-end;
   justify-content: flex-start;
-  gap: 24px;
+  gap: var(--ath-estante-gap);
   padding: 0;
   min-height: 240px;
   z-index: 2;
@@ -126,10 +132,10 @@
 
 .ath-livro-3d-wrap {
   position: relative;
-  width: calc((100% + 24px) / var(--ath-livros-por-prateleira, 6) - 24px);
+  width: calc((100% + var(--ath-estante-gap)) / var(--ath-livros-por-prateleira, 6) - var(--ath-estante-gap));
   height: auto;
   aspect-ratio: 164 / 226;
-  flex: 0 0 calc((100% + 24px) / var(--ath-livros-por-prateleira, 6) - 24px);
+  flex: 0 0 calc((100% + var(--ath-estante-gap)) / var(--ath-livros-por-prateleira, 6) - var(--ath-estante-gap));
   perspective: 1000px;
   perspective-origin: 50% 40%;
   cursor: pointer;
@@ -153,7 +159,7 @@
 
 .ath-livro-3d {
   position: relative;
-  width: calc((100% + 24px) / var(--ath-livros-por-prateleira, 6) - 24px);
+  width: calc((100% + var(--ath-estante-gap)) / var(--ath-livros-por-prateleira, 6) - var(--ath-estante-gap));
   height: auto;
   aspect-ratio: 164 / 226;
   transform-style: flat;
@@ -345,6 +351,20 @@
     border-right: 3px solid color-mix(in srgb, var(--ath-livro-cor, #314F79) 65%, #0F172A);
     box-shadow: 3px 5px 8px rgba(15, 23, 42, .22);
   }
+}
+
+.ath-livro-3d:not(.aberto).ath-livro-previa .ath-livro-capa {
+  transform: perspective(900px) rotateY(-9deg);
+}
+.ath-livro-3d:not(.aberto).ath-livro-previa .ath-livro-paginas-dir {
+  transform: none;
+  border-radius: 0 3px 3px 0;
+  box-shadow: 2px 3px 5px rgba(15, 23, 42, .22), inset 2px 0 3px rgba(0, 0, 0, .1);
+}
+.ath-livro-3d:not(.aberto).ath-livro-previa .ath-livro-capa-tras {
+  transform: none;
+  border-right: 3px solid color-mix(in srgb, var(--ath-livro-cor, #314F79) 65%, #0F172A);
+  box-shadow: 3px 5px 8px rgba(15, 23, 42, .22);
 }
 
 /* Face interna da capa (verso visível quando aberto a -140deg) */
@@ -984,7 +1004,7 @@
 
 @media (max-width: 768px) {
   .ath-prateleira-livros {
-    gap: 24px;
+    gap: var(--ath-estante-gap);
     padding: 0;
   }
   .ath-livro-folha-interna {
