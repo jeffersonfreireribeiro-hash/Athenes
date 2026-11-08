@@ -339,6 +339,9 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .ath-livro-3d:not(.aberto):hover {
+    transform: translateX(-11px);
+  }
   .ath-livro-3d:not(.aberto):hover .ath-livro-capa {
     transform: perspective(900px) rotateY(-9deg);
     z-index: 2;
@@ -358,6 +361,13 @@
   }
 }
 
+.ath-livro-3d:not(.aberto):focus-visible {
+  transform: translateX(-11px);
+}
+
+.ath-livro-3d:not(.aberto).ath-livro-previa {
+  transform: translateX(-11px);
+}
 .ath-livro-3d:not(.aberto).ath-livro-previa .ath-livro-capa {
   transform: perspective(900px) rotateY(-9deg);
 }
