@@ -9,6 +9,7 @@
 
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { svgIcone } from './athenes_icones.js';
+import { moverArquivosDoArtigoNoDrive } from '../core/athenes_drive_sync.js';
 import {
   obterPastasDriveLocais,
   salvarPastasDriveLocais,
@@ -797,6 +798,7 @@ export const metodosEstudoPastas = {
 
     // Persiste e atualiza interface
     salvarArtigosEstudo(this.artigos, resultado.livroModificado);
+    moverArquivosDoArtigoNoDrive(resultado.livroModificado, pastaDestinoId).catch(() => {});
     this.atualizarBarraPastasContadores();
     this.atualizarGridCatalogo();
     const nomeDestino = (pastaDestinoId === RAIZ_BIBLIOGRAFIA || pastaDestinoId === 'todas')

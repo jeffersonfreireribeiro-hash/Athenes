@@ -19,7 +19,7 @@
 import * as bib from '../core/athenes_biblioteca_artigos.js';
 import { gravarConfigZotero } from '../core/athenes_zotero_config.js';
 import { lerConta, gravarConta, obterContaAtiva } from '../core/athenes_conta.js';
-import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive } from '../core/athenes_drive_sync.js';
+import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive, obterOuCriarPastaDoArtigoNoDrive, moverArquivosDoArtigoNoDrive } from '../core/athenes_drive_sync.js';
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import { obterPerfilColaborador, obterConfigGoogleDrive, salvarArquivoNoGoogleDrive, autenticarGoogleDrive, listarPdfsDoGoogleDrive, salvarDocumentoNoSupabase, obterPastasDriveLocais, salvarPastasDriveLocais, buscarPastaNaArvore } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
@@ -833,6 +833,7 @@ export class EstudoArtigosView {
         const pId = btn.dataset.pastaDest;
         moverLivroParaPasta(art.id, pId, this.artigos, pastas);
         salvarArtigosEstudo(this.artigos);
+        moverArquivosDoArtigoNoDrive(art, pId).catch(() => {});
         fechar();
         this.atualizarGridCatalogo();
         mostrarAviso('Obra movida com sucesso!', { tipo: 'ok' });
@@ -1744,11 +1745,12 @@ export class EstudoArtigosView {
       if (driveCfg.accessToken || driveCfg.clientId) {
         try {
           const token = await obterTokenOuConectar(driveCfg);
+          const pastaDriveArtigoId = await obterOuCriarPastaDoArtigoNoDrive(art.pastaId, token).catch(() => driveCfg.pastaId || null);
           const salvoDrive = await salvarArquivoNoGoogleDrive({
             nomeArquivo: `${(art.driveFileName || 'Artigo').replace(/\.pdf$/i, '')}.athenes-pdf.json`,
             conteudoBlobOuTexto: art,
             accessToken: token,
-            pastaId: driveCfg.pastaId || null,
+            pastaId: pastaDriveArtigoId || driveCfg.pastaId || null,
             driveFileId: art.driveAnnotationFileId || null
           });
           if (salvoDrive?.id) art.driveAnnotationFileId = salvoDrive.id;
@@ -1763,7 +1765,7 @@ export class EstudoArtigosView {
                 conteudoBlobOuTexto: pdfBlob,
                 mimeType: 'application/pdf',
                 accessToken: token,
-                pastaId: driveCfg.pastaId || null
+                pastaId: pastaDriveArtigoId || driveCfg.pastaId || null
               });
               if (salvoPdf?.id) {
                 art.driveFileId = salvoPdf.id;
@@ -1772,6 +1774,7 @@ export class EstudoArtigosView {
               }
             }
           }
+          if (pastaDriveArtigoId) art.driveFolderId = pastaDriveArtigoId;
           resultados.push('Google Drive ✓');
         } catch (_) {}
       }

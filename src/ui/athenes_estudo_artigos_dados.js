@@ -4,7 +4,7 @@
  * citação ABNT e utilidades do desenho à mão livre. Separado da tela (athenes_estudo_artigos.js) para o arquivo não crescer sem fim.
  */
 import * as bib from '../core/athenes_biblioteca_artigos.js';
-import { obterTokenDrive, obterPastaRaizDrive, buscarOuCriarPasta } from '../core/athenes_drive_sync.js';
+import { obterTokenDrive, obterPastaRaizDrive, buscarOuCriarPasta, obterOuCriarPastaDoArtigoNoDrive, moverArquivoNoDrive } from '../core/athenes_drive_sync.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import { salvarArquivoNoGoogleDrive } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
@@ -472,14 +472,17 @@ export async function enviarPdfDoArtigoAoDrive(art, blob) {
   if (!await blobEhPdf(blob)) throw new Error('O arquivo não é um PDF válido.');
   const token = await obterTokenDrive();
   if (!token) return false;
-  const raizId = await obterPastaRaizDrive(token);
-  const { id: pastaId } = await buscarOuCriarPasta(token, PASTA_PDFS_DRIVE, raizId);
+  const pastaId = await obterOuCriarPastaDoArtigoNoDrive(art?.pastaId, token);
   const idAtual = String(art.driveFileId || '').trim();
   const salvo = await salvarArquivoNoGoogleDrive({
     nomeArquivo: art.driveFileName || blob.name || `${art.id}.pdf`, conteudoBlobOuTexto: blob, mimeType: 'application/pdf', accessToken: token,
     driveFileId: idAtual && !art.pdfVerificadoInvalido && !/^drive_pdf_/.test(idAtual) ? idAtual : null, pastaId
   });
+  if (idAtual && !art.pdfVerificadoInvalido && !/^drive_pdf_/.test(idAtual) && pastaId) {
+    await moverArquivoNoDrive(idAtual, pastaId, token).catch(() => {});
+  }
   art.driveFileId = salvo.id;
+  art.driveFolderId = pastaId;
   art.pdfVerificadoInvalido = false;
   art.driveStatus = 'PDF no Google Drive';
   salvarArtigosEstudo(carregarArtigosEstudo(), art); // o id do arquivo vai para o servidor

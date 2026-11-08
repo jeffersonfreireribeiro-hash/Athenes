@@ -210,6 +210,108 @@ async function enviarDocumentoAoDriveInterno(doc, token, { fetchImpl = globalThi
   return salvo;
 }
 
+/**
+ * Move um arquivo no Google Drive alterando seus pais (parents).
+ * Executa PATCH /files/{fileId}?addParents={novaPasta}&removeParents={paisAtuais}
+ */
+export async function moverArquivoNoDrive(fileId, novaPastaDriveId, token, { fetchImpl = globalThis.fetch } = {}) {
+  if (!fileId || !novaPastaDriveId || !token) return null;
+  const idStr = String(fileId).trim();
+  if (idStr.startsWith('drive_pdf_')) return null;
+  try {
+    const atual = await chamar(fetchImpl, `${API}/${encodeURIComponent(idStr)}?fields=id,parents,trashed`, {}, token);
+    if (!atual || atual.trashed) return null;
+    const paisAtuais = atual.parents || [];
+    if (paisAtuais.includes(novaPastaDriveId)) {
+      return atual; // Já está na pasta destino
+    }
+    const remover = paisAtuais.length ? `&removeParents=${encodeURIComponent(paisAtuais.join(','))}` : '';
+    const movido = await chamar(
+      fetchImpl,
+      `${API}/${encodeURIComponent(idStr)}?addParents=${encodeURIComponent(novaPastaDriveId)}${remover}&fields=id,parents`,
+      { method: 'PATCH' },
+      token
+    );
+    return movido;
+  } catch (e) {
+    if (e.status === 404) return null;
+    throw e;
+  }
+}
+
+/**
+ * Obtém ou cria a pasta correspondente a uma coleção/categoria de bibliografia no Google Drive.
+ * Se o artigo pertence a uma pasta específica (ou coleção do Zotero), localiza sua pasta correspondente
+ * dentro da árvore "Bibliografia & Leituras" (pasta_bib_raiz).
+ * Retorna o driveId da pasta destino no Google Drive.
+ */
+export async function obterOuCriarPastaDoArtigoNoDrive(pastaId, token, { fetchImpl = globalThis.fetch, pastas = obterPastasDriveLocais() } = {}) {
+  if (!token) return null;
+  // Sincroniza a árvore de pastas no Drive para garantir que as pastas e subpastas tenham driveId
+  await sincronizarPastasComDrive(token, { fetchImpl, pastas });
+
+  const pId = String(pastaId || '').trim();
+  if (pId && pId !== 'todas' && pId !== 'pasta_bib_raiz') {
+    const pastaEspecifica = acharPasta(pastas, pId);
+    if (pastaEspecifica?.driveId) {
+      return pastaEspecifica.driveId;
+    }
+  }
+
+  // Raiz de bibliografia
+  const bibRaiz = (pastas || []).find(p => p.id === 'pasta_bib_raiz' || p.tipo === 'bibliografia');
+  if (bibRaiz?.driveId) {
+    return bibRaiz.driveId;
+  }
+
+  // Fallback: raiz Athenes
+  return await obterPastaRaizDrive(token, fetchImpl, pastas);
+}
+
+/**
+ * Move todos os arquivos vinculados a um artigo (PDF e fichamento .athenes-pdf.json)
+ * para a pasta correspondente no Google Drive.
+ */
+export async function moverArquivosDoArtigoNoDrive(art, pastaDestinoId, { token = null, fetchImpl = globalThis.fetch, pastas = obterPastasDriveLocais() } = {}) {
+  if (!art) return { movidos: 0, erros: [] };
+  const r = { movidos: 0, erros: [] };
+  const tokenFinal = token || (await obterTokenDrive());
+  if (!tokenFinal) return r;
+
+  try {
+    const novaPastaDriveId = await obterOuCriarPastaDoArtigoNoDrive(pastaDestinoId, tokenFinal, { fetchImpl, pastas });
+    if (!novaPastaDriveId) return r;
+
+    // 1. Move o arquivo PDF
+    const idPdf = String(art.driveFileId || '').trim();
+    if (idPdf && !idPdf.startsWith('drive_pdf_')) {
+      try {
+        await moverArquivoNoDrive(idPdf, novaPastaDriveId, tokenFinal, { fetchImpl });
+        r.movidos++;
+      } catch (e) {
+        r.erros.push({ arquivo: 'pdf', erro: e.message });
+      }
+    }
+
+    // 2. Move o arquivo de anotações/fichamento JSON
+    const idAnotacao = String(art.driveAnnotationFileId || '').trim();
+    if (idAnotacao && !idAnotacao.startsWith('drive_pdf_')) {
+      try {
+        await moverArquivoNoDrive(idAnotacao, novaPastaDriveId, tokenFinal, { fetchImpl });
+        r.movidos++;
+      } catch (e) {
+        r.erros.push({ arquivo: 'anotacoes', erro: e.message });
+      }
+    }
+
+    art.driveFolderId = novaPastaDriveId;
+  } catch (e) {
+    r.erros.push({ geral: e.message });
+  }
+
+  return r;
+}
+
 /** Documento precisa subir? (nunca enviado, alterado depois do último envio ou movido de pasta). */
 export function precisaEnviarAoDrive(doc, pastas = obterPastasDriveLocais()) {
   if (!doc || doc.precisaCarregarConteudo || doc.proprietarioExterno) return false;
