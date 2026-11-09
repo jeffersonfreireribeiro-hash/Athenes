@@ -660,6 +660,38 @@ export class PainelPropriedades {
           </button>
         </div>
 
+        <!-- Modo de Apresentação: Com Rótulos (ABNT) vs Só Imagem (Sem Marca) -->
+        <div style="border:1px solid var(--ath-primary-line, #C8D7E6); border-radius:10px; padding:10px 12px; margin-bottom:8px; background:#fff;">
+          <div style="font:800 11.5px var(--glx-font); color:var(--ath-primary, #314F79); text-transform:uppercase; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span>Apresentação da Imagem</span>
+            <span style="font-size:10.5px; font-weight:700; color:${b.mostrar_titulo === false && b.mostrar_legenda === false && b.mostrar_fonte === false ? '#15803D' : '#314F79'};">
+              ${b.mostrar_titulo === false && b.mostrar_legenda === false && b.mostrar_fonte === false ? '🖼️ Só a imagem' : '📋 Com rótulos'}
+            </span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px;">
+            <button type="button" class="glx-btn glx-btn-xs ${b.mostrar_titulo !== false ? 'glx-btn-primario' : 'glx-btn-soft'}" id="athBtnModoCompletoFig" style="height:28px; justify-content:center; font-weight:750; font-size:11px;">
+              📋 Com Rótulos
+            </button>
+            <button type="button" class="glx-btn glx-btn-xs ${b.mostrar_titulo === false && b.mostrar_legenda === false && b.mostrar_fonte === false ? 'glx-btn-primario' : 'glx-btn-soft'}" id="athBtnModoSoImagemFig" style="height:28px; justify-content:center; font-weight:750; font-size:11px;">
+              🖼️ Só Imagem
+            </button>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:5px; font-size:11.5px; padding-top:4px; border-top:1px dashed #E2E8F0;">
+            <label style="display:inline-flex !important; flex-direction:row !important; align-items:center !important; gap:6px !important; margin:0 !important; cursor:pointer;">
+              <input type="checkbox" id="athChkMostrarTituloFig" ${b.mostrar_titulo !== false ? 'checked' : ''} style="width:14px; height:14px; margin:0; cursor:pointer; accent-color:#314F79;">
+              <span style="color:#334155; font-weight:600;">Mostrar Título (${obterPrefixoNumeracao(b).trim()})</span>
+            </label>
+            <label style="display:inline-flex !important; flex-direction:row !important; align-items:center !important; gap:6px !important; margin:0 !important; cursor:pointer;">
+              <input type="checkbox" id="athChkMostrarLegendaFig" ${b.mostrar_legenda !== false ? 'checked' : ''} style="width:14px; height:14px; margin:0; cursor:pointer; accent-color:#314F79;">
+              <span style="color:#334155; font-weight:600;">Mostrar Legenda Geral</span>
+            </label>
+            <label style="display:inline-flex !important; flex-direction:row !important; align-items:center !important; gap:6px !important; margin:0 !important; cursor:pointer;">
+              <input type="checkbox" id="athChkMostrarFonteFig" ${b.mostrar_fonte !== false ? 'checked' : ''} style="width:14px; height:14px; margin:0; cursor:pointer; accent-color:#314F79;">
+              <span style="color:#334155; font-weight:600;">Mostrar Fonte / Atribuição</span>
+            </label>
+          </div>
+        </div>
+
         <!-- Categoria / Subtipo (Prefixo do Elemento) -->
         <label>Prefixo / Tipo do Elemento
           <select id="rmFigSubtipo" class="glx-select">
@@ -760,6 +792,46 @@ export class PainelPropriedades {
           <div id="athFigTipografia"></div>
         </div>
       `;
+
+      box.querySelector('#athBtnModoSoImagemFig')?.addEventListener('click', () => {
+        b.mostrar_titulo = false;
+        b.mostrar_legenda = false;
+        b.mostrar_fonte = false;
+        b.moldura_tipo = 'limpo';
+        b.borda_ativa = false;
+        b.fundo_ativo = false;
+        b.padding_pt = 0;
+        this.notificarMudanca();
+        this.reconstruirFigura(b.id);
+        this.selecionarBloco(b);
+      });
+
+      box.querySelector('#athBtnModoCompletoFig')?.addEventListener('click', () => {
+        b.mostrar_titulo = true;
+        b.mostrar_legenda = true;
+        b.mostrar_fonte = true;
+        this.notificarMudanca();
+        this.reconstruirFigura(b.id);
+        this.selecionarBloco(b);
+      });
+
+      box.querySelector('#athChkMostrarTituloFig')?.addEventListener('change', (e) => {
+        b.mostrar_titulo = e.target.checked;
+        this.notificarMudanca();
+        this.reconstruirFigura(b.id);
+      });
+
+      box.querySelector('#athChkMostrarLegendaFig')?.addEventListener('change', (e) => {
+        b.mostrar_legenda = e.target.checked;
+        this.notificarMudanca();
+        this.reconstruirFigura(b.id);
+      });
+
+      box.querySelector('#athChkMostrarFonteFig')?.addEventListener('change', (e) => {
+        b.mostrar_fonte = e.target.checked;
+        this.notificarMudanca();
+        this.reconstruirFigura(b.id);
+      });
 
       box.querySelector('#athBtnConfigLayoutBloco')?.addEventListener('click', () => {
         new ModalLayoutBloco(this.doc, b, {

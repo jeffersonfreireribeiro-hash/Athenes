@@ -259,12 +259,12 @@ export function renderizarBlocoHtml(bloco, estilosMap, documento, opcoes = {}) {
       // mesmo visual do editor: sem estilo escolhido, título 13px/negrito, legenda 12px cinza e fonte 11px itálico; blocos separados por 6px
       const estLegFig = estilosMap.legenda || null; const estFonteFig = estilosMap.fonte_citada || null;
       return '<figure class="ath-bloco ath-figura-composta" style="margin:12px 0; break-inside:avoid; display:flex; flex-direction:column; gap:6px; ' + Object.entries(gerarCssMolduraBloco(bloco)).map(([k, v]) => `${k.replace(/([A-Z])/g, '-$1').toLowerCase()}:${v};`).join(' ') + ' ' + cssObjParaString(d.bloco) + '; margin-bottom:12px;" data-id="' + bloco.id + '">' + // o editor limpa a margem inferior da moldura e fica a da classe da figura (12px)
-        (titFig ? '<div class="ath-legenda" style="' + cssTextoPapel(bloco, 'titulo', estilosMap, estLegFig, 'font-size:9.75pt; line-height:1.5; font-weight:800; color:#1F2733;') + '">' + tituloComNumeracaoHtml(bloco, estilosMap) + '</div>' : '') +
-        '<div style="' + cssObjParaString(d.grade) + '; padding:6px; background:#F8FAFC; border-radius:6px;">' +
+        (bloco.mostrar_titulo !== false && titFig ? '<div class="ath-legenda" style="' + cssTextoPapel(bloco, 'titulo', estilosMap, estLegFig, 'font-size:9.75pt; line-height:1.5; font-weight:800; color:#1F2733;') + '">' + tituloComNumeracaoHtml(bloco, estilosMap) + '</div>' : '') +
+        '<div style="' + cssObjParaString(d.grade) + (bloco.moldura_tipo === 'cartao_suave' ? '; padding:6px; background:#F8FAFC; border-radius:6px;' : '') + '">' +
           itensHtml +
         '</div>' +
-        (bloco.legenda_geral ? '<div style="' + cssTextoPapel(bloco, 'legenda', estilosMap, null, 'font-size:9pt; color:#475569; line-height:1.35;') + '">' + bloco.legenda_geral + '</div>' : '') +
-        (bloco.fonte ? '<div class="ath-fonte" style="' + cssTextoPapel(bloco, 'fonte', estilosMap, estFonteFig, 'font-size:8.25pt; line-height:1.5; color:#6B7585; font-style:italic;') + '">' + bloco.fonte + '</div>' : '') +
+        (bloco.mostrar_legenda !== false && bloco.legenda_geral ? '<div style="' + cssTextoPapel(bloco, 'legenda', estilosMap, null, 'font-size:9pt; color:#475569; line-height:1.35;') + '">' + bloco.legenda_geral + '</div>' : '') +
+        (bloco.mostrar_fonte !== false && bloco.fonte ? '<div class="ath-fonte" style="' + cssTextoPapel(bloco, 'fonte', estilosMap, estFonteFig, 'font-size:8.25pt; line-height:1.5; color:#6B7585; font-style:italic;') + '">' + bloco.fonte + '</div>' : '') +
       '</figure>';
     }
 

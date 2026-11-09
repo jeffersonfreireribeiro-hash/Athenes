@@ -331,6 +331,23 @@ export function criarBarraItemFigura({ b, idx, aoAlterar, aoTrocarImagem, aoLimp
   trocar.addEventListener('click', () => aoTrocarImagem(idx));
   barra.appendChild(trocar);
 
+  const btnModoImagem = document.createElement('button');
+  btnModoImagem.type = 'button'; btnModoImagem.className = 'ath-ic-bt';
+  const soImagemAtual = b.mostrar_titulo === false && b.mostrar_legenda === false && b.mostrar_fonte === false;
+  btnModoImagem.title = soImagemAtual ? 'Modo: Só Imagem (clique para mostrar rótulos ABNT)' : 'Modo: Com Rótulos (clique para deixar só a imagem limpa)';
+  btnModoImagem.innerHTML = soImagemAtual ? '<span style="font-size:12px;font-weight:800;color:#314F79">🖼️ Só Img</span>' : '<span style="font-size:12px;font-weight:700;color:#475569">📋 ABNT</span>';
+  if (soImagemAtual) btnModoImagem.setAttribute('aria-pressed', 'true');
+  btnModoImagem.addEventListener('click', () => {
+    if (soImagemAtual) {
+      b.mostrar_titulo = true; b.mostrar_legenda = true; b.mostrar_fonte = true;
+    } else {
+      b.mostrar_titulo = false; b.mostrar_legenda = false; b.mostrar_fonte = false;
+      b.moldura_tipo = 'limpo'; b.borda_ativa = false; b.fundo_ativo = false; b.padding_pt = 0;
+    }
+    aoAlterar();
+  });
+  barra.appendChild(btnModoImagem);
+
   if (aoEditarCodigo) {
     const cod = document.createElement('button');
     cod.type = 'button'; cod.className = 'ath-ic-bt'; cod.title = ehCodigo ? 'Editar código (SVG, HTML, Mermaid, gráfico JSON)' : 'Inserir via código / vetor';

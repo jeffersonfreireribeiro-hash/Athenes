@@ -122,7 +122,8 @@ function resumoBloco(b) {
 const MENUS_BLOCO = {
   figura: [
     { tipo: 'figura', acao: 'modal_figura', icone: 'figura', rotulo: 'Nova figura…', desc: 'Para que vai servir? Gráfico, figura, diagrama, esquema ou quadro — upload ou código (SVG, HTML, Mermaid, JSON)' },
-    { tipo: 'figura', subtipo: 'figura', icone: 'imagem', rotulo: 'Figura', desc: 'Imagem, esquema ou ilustração numerada' },
+    { tipo: 'figura', subtipo: 'imagem_pura', icone: 'imagem', rotulo: 'Só Imagem (Sem Marca)', desc: 'Imagem limpa sem título, legenda, fonte ou moldura' },
+    { tipo: 'figura', subtipo: 'figura', icone: 'imagem', rotulo: 'Figura (ABNT)', desc: 'Imagem ou ilustração numerada com legenda e fonte' },
     { tipo: 'figura', subtipo: 'grafico', icone: 'grafico', rotulo: 'Gráfico', desc: 'Barras, linhas, dispersão — numeração própria' },
     { tipo: 'figura', subtipo: 'fotografia', icone: 'fotografia', rotulo: 'Fotografia', desc: 'Registro fotográfico, com fonte e crédito' },
     { tipo: 'figura', subtipo: 'diagrama', icone: 'diagrama', rotulo: 'Diagrama', desc: 'Relações e estruturas entre elementos' },
@@ -1330,7 +1331,9 @@ export class EditorView {
           abrirModalInserirFigura({ aoConfirmar: (r) => this.inserirFiguraClassificada(r, adicionar) });
           return;
         }
-        const dados = it.tipo === 'figura'
+        const dados = it.subtipo === 'imagem_pura'
+          ? { subtipo: 'figura', titulo: '', mostrar_titulo: false, mostrar_legenda: false, mostrar_fonte: false, moldura_tipo: 'limpo', borda_ativa: false, fundo_ativo: false, padding_pt: 0 }
+          : it.tipo === 'figura'
           ? { subtipo: it.subtipo, titulo: `${it.rotulo} — Descrição` }
           : (it.tipo === 'quadro' ? { titulo: 'Quadro — Dados conceituais' } : (it.tipo === 'tabela' ? { titulo: 'Tabela — Dados quantitativos' } : {}));
         adicionar(it.tipo, dados);

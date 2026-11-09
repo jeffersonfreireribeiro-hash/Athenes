@@ -861,12 +861,12 @@ export async function exportarParaDocx(documento, opcoes = {}) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titQuadro)}</w:t></w:r></w:p>`);
         }
         bodyXmlParts.push(gerarTabelaDocxEstilizada(b));
-        if (b.fonte) {
+        if (b.mostrar_fonte !== false && b.fonte) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:jc w:val="left"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:color w:val="64748B"/></w:rPr><w:t>${escaparXml(b.fonte)}</w:t></w:r></w:p>`);
         }
       } else if (b.tipo === 'figura') {
         const jcFig = ({ esquerda: 'left', direita: 'right' })[b.alinhamento_bloco] || 'center';
-        const titFig = obterTituloCompletoComNumeracao(b);
+        const titFig = b.mostrar_titulo !== false ? obterTituloCompletoComNumeracao(b) : '';
         if (titFig) {
           bodyXmlParts.push(`<w:p><w:pPr><w:pStyle w:val="Legenda"/><w:keepNext/><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(titFig)}</w:t></w:r></w:p>`);
         }
@@ -951,7 +951,7 @@ export async function exportarParaDocx(documento, opcoes = {}) {
           const wDxa = Math.floor(larguraCelEmu / 635);
           bodyXmlParts.push(`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:jc w:val="${jcFig}"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="40" w:type="dxa"/><w:right w:w="40" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${Array.from({ length: colunas }, () => `<w:gridCol w:w="${wDxa}"/>`).join('')}</w:tblGrid>${linhasT.map(l => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${Array.from({ length: colunas }, (_, k) => `<w:tc><w:tcPr><w:tcW w:w="${wDxa}" w:type="dxa"/></w:tcPr>${l[k]?.xml || '<w:p/>'}</w:tc>`).join('')}</w:tr>`).join('')}</w:tbl>`);
         }
-        if (b.legenda_geral) {
+        if (b.mostrar_legenda !== false && b.legenda_geral) {
           bodyXmlParts.push(`<w:p><w:pPr><w:jc w:val="${jcFig}"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t>${escaparXml(String(b.legenda_geral).replace(/<[^>]+>/g, ''))}</w:t></w:r></w:p>`);
         }
         if (b.fonte) {

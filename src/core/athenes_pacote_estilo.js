@@ -366,6 +366,9 @@ export function aplicarPacoteEstilo(documento, pacote, opcoes = {}) {
         if (conf.linha_cor) b.linha_cor = conf.linha_cor;
         if (conf.padding_pt !== undefined) b.padding_pt = conf.padding_pt;
         if (conf.subgrade_colunas) b.subgrade_colunas = conf.subgrade_colunas;
+        if (conf.mostrar_titulo !== undefined) b.mostrar_titulo = conf.mostrar_titulo;
+        if (conf.mostrar_legenda !== undefined) b.mostrar_legenda = conf.mostrar_legenda;
+        if (conf.mostrar_fonte !== undefined) b.mostrar_fonte = conf.mostrar_fonte;
         if (conf.estilo_figura) aplicarEstiloFiguraAoBloco(b, conf.estilo_figura); // preserva imagens e nº de slots
         blocosAtualizados++;
       } else if (b.tipo === 'tabela' && p.layout_padrao_figuras.tabela) {

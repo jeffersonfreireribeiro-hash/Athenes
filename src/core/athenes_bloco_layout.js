@@ -107,6 +107,20 @@ export const MODELOS_LAYOUT_BLOCO = {
   ],
   figura: [
     {
+      id: 'figura_so_imagem',
+      nome: 'Só Imagem (Sem Marca / Sem Rótulos)',
+      descricao: 'Apenas a imagem limpa, sem título, legenda, fonte ou moldura externa.',
+      moldura_tipo: 'limpo',
+      posicao_titulo: 'topo',
+      subgrade_colunas: 1,
+      mostrar_titulo: false,
+      mostrar_legenda: false,
+      mostrar_fonte: false,
+      fundo_ativo: false,
+      borda_ativa: false,
+      padding_pt: 0
+    },
+    {
       id: 'figura_abnt',
       nome: 'Padrão ABNT (Limpo)',
       descricao: 'Título no topo, imagem sem moldura no centro, legenda e fonte na base.',
@@ -339,6 +353,7 @@ export function aplicarModeloLayoutBloco(bloco, modeloIdOuConfig, doc = null) {
 
   // Subgrade / Variáveis específicas
   if (cfg.posicao_numero) bloco.posicao_numero = cfg.posicao_numero;
+  if (cfg.mostrar_titulo !== undefined) bloco.mostrar_titulo = cfg.mostrar_titulo;
   if (cfg.mostrar_legenda !== undefined) bloco.mostrar_legenda = cfg.mostrar_legenda;
   if (cfg.mostrar_fonte !== undefined) bloco.mostrar_fonte = cfg.mostrar_fonte;
   if (cfg.posicao_titulo) bloco.posicao_titulo = cfg.posicao_titulo;
@@ -397,6 +412,7 @@ export function salvarModeloLayoutCustomizado(doc, nome, bloco) {
     raio_borda_px: bloco.raio_borda_px !== undefined ? bloco.raio_borda_px : 0,
     padding_pt: bloco.padding_pt !== undefined ? bloco.padding_pt : 8,
     posicao_numero: bloco.posicao_numero,
+    mostrar_titulo: bloco.mostrar_titulo,
     mostrar_legenda: bloco.mostrar_legenda,
     mostrar_fonte: bloco.mostrar_fonte,
     posicao_titulo: bloco.posicao_titulo,

@@ -341,3 +341,18 @@ test('Tabela/quadro/figura — estilo de texto próprio para a NUMERAÇÃO ("Tab
   aplicarCamadaSelecao(t, { r0: 1, c0: 0, r1: 1, c1: 0 }, { negrito: false });
   assert.ok(/<td style="[^"]*font-weight:400/.test(renderizarBlocoHtml(t, estilos, doc)));
 });
+
+
+test('Figura — modo Só Imagem (sem marca / sem rótulos) omite título, legenda e fonte e não injeta borda/fundo cinza', () => {
+  const doc = criarDocumento({ titulo: 'Só Imagem' });
+  const b = fig({
+    mostrar_titulo: false,
+    mostrar_legenda: false,
+    mostrar_fonte: false,
+    moldura_tipo: 'limpo'
+  });
+  const html = renderizarBlocoHtml(b, {}, doc);
+  assert.ok(!html.includes('ath-legenda'), 'sem título/legenda quando mostrar_titulo e mostrar_legenda são false');
+  assert.ok(!html.includes('ath-fonte'), 'sem fonte quando mostrar_fonte é false');
+  assert.ok(!html.includes('background:#F8FAFC'), 'grade limpa não injeta fundo cinza');
+});

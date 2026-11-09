@@ -251,22 +251,25 @@ export const metodosBlocoNaFolha = {
       Object.assign(figBox.style, gerarCssMolduraBloco(b));
 
       // Título da Figura com Prefixo Intrínseco não-editável
-      const tit = document.createElement('div');
-      tit.className = 'ath-fig-titulo';
-      const rot = rotuloDaFigura(b);
-      const num = b.numero_sequencial || 1;
-      const prefixoStr = obterPrefixoNumeracao(b);
-      const textoPuro = obterTextoPuroTitulo(b) || 'Descrição da Ilustração';
+      let tit = null;
+      if (b.mostrar_titulo !== false) {
+        tit = document.createElement('div');
+        tit.className = 'ath-fig-titulo';
+        const rot = rotuloDaFigura(b);
+        const num = b.numero_sequencial || 1;
+        const prefixoStr = obterPrefixoNumeracao(b);
+        const textoPuro = obterTextoPuroTitulo(b) || 'Descrição da Ilustração';
 
-      tit.innerHTML = `
-        <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoStr}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuro}</span>
-      `;
-      this.aplicarTipografiaBloco(tit, b, 'titulo', tit.querySelector('.ath-num-prefixo-fixo'));
-      const spanEditavel = tit.querySelector('.ath-titulo-texto-editavel');
-      spanEditavel.addEventListener('blur', () => {
-        b.titulo = removerPrefixoNumeracaoTitulo(spanEditavel.innerText.trim());
-        this.notificarMudancaRapida();
-      });
+        tit.innerHTML = `
+          <span class="ath-num-prefixo-fixo" contenteditable="false" style="user-select:none; font-weight:800; color:var(--ath-primary, #314F79); margin-right:4px;">${prefixoStr}</span><span class="ath-titulo-texto-editavel" contenteditable="true" style="outline:none;">${textoPuro}</span>
+        `;
+        this.aplicarTipografiaBloco(tit, b, 'titulo', tit.querySelector('.ath-num-prefixo-fixo'));
+        const spanEditavel = tit.querySelector('.ath-titulo-texto-editavel');
+        spanEditavel.addEventListener('blur', () => {
+          b.titulo = removerPrefixoNumeracaoTitulo(spanEditavel.innerText.trim());
+          this.notificarMudancaRapida();
+        });
+      }
 
       // Grade de imagens (subgrid): estilo vindo de `descreverFigura`, o mesmo usado na exportação PDF
       const margensFig = modeloDaPagina(this.doc, pag)?.margens_mm || { l: 25, r: 20 };
@@ -342,18 +345,18 @@ export const metodosBlocoNaFolha = {
         colDir.style.flexDirection = 'column';
         colDir.style.gap = '6px';
 
-        colDir.appendChild(tit);
+        if (tit) colDir.appendChild(tit);
         if (leg) colDir.appendChild(leg);
         if (fonte) colDir.appendChild(fonte);
 
         figBox.appendChild(grid);
-        figBox.appendChild(colDir);
+        if (colDir.childNodes.length > 0) figBox.appendChild(colDir);
       } else {
         if (b.posicao_titulo === 'base') {
           figBox.appendChild(grid);
-          figBox.appendChild(tit);
+          if (tit) figBox.appendChild(tit);
         } else {
-          figBox.appendChild(tit);
+          if (tit) figBox.appendChild(tit);
           figBox.appendChild(grid);
         }
         if (leg) figBox.appendChild(leg);

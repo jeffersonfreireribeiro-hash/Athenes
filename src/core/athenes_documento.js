@@ -336,6 +336,9 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.posicao_titulo = dados.posicao_titulo || 'topo';
       b.subgrade_colunas = dados.subgrade_colunas || 1;
       b.padding_pt = dados.padding_pt !== undefined ? dados.padding_pt : 4;
+      if (dados.mostrar_titulo !== undefined) b.mostrar_titulo = dados.mostrar_titulo;
+      if (dados.mostrar_legenda !== undefined) b.mostrar_legenda = dados.mostrar_legenda;
+      if (dados.mostrar_fonte !== undefined) b.mostrar_fonte = dados.mostrar_fonte;
       // diagramação do subgrid (gap, rótulos, moldura da imagem, sombra, enquadramento, largura, fluxo...)
       for (const k of CHAVES_ESTILO_FIGURA) {
         if (dados[k] !== undefined && k !== 'layout' && k !== 'largura_pct') b[k] = dados[k];
@@ -412,6 +415,9 @@ export function criarNovoBloco(tipo, dados = {}) {
       b.altura_mm = dados.altura_mm || 60;
       b.numero_sequencial = dados.numero_sequencial || 1;
       b.moldura_tipo = dados.moldura_tipo || 'limpo';
+      if (dados.mostrar_titulo !== undefined) b.mostrar_titulo = dados.mostrar_titulo;
+      if (dados.mostrar_legenda !== undefined) b.mostrar_legenda = dados.mostrar_legenda;
+      if (dados.mostrar_fonte !== undefined) b.mostrar_fonte = dados.mostrar_fonte;
       break;
 
     case 'nota':

@@ -927,10 +927,10 @@ body .rm-main .rm-hl > textarea, body .rm-main .rm-hl > input { background: tran
 .ath-fig-grid {
   display: grid;
   gap: 8px;
-  background: #F8FAFC;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  padding: 8px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 .ath-fig-grid[data-layout="1"] { grid-template-columns: 1fr; }
