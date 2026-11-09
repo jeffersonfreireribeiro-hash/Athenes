@@ -33,6 +33,7 @@ export const CATALOGO = [
   // B. Inline
   { id: 'link', cat: 'inline', rotulo: 'Inserir link', atalhos: ['Mod+K'], escopo: 'edicao' },
   { id: 'limpar_formatacao', cat: 'inline', rotulo: 'Limpar formatação', atalhos: ['Mod+\\', 'Mod+Space'], mac: ['Mod+\\'], escopo: 'edicao' },
+  { id: 'assistente_ia', cat: 'inline', rotulo: 'Assistente de IA de Escrita', atalhos: ['Mod+J'], escopo: 'global' },
   // C. Parágrafo
   { id: 'recuo_aumentar', cat: 'paragrafo', rotulo: 'Aumentar recuo', atalhos: ['Tab'], escopo: 'edicao' },
   { id: 'recuo_diminuir', cat: 'paragrafo', rotulo: 'Diminuir recuo', atalhos: ['Shift+Tab'], escopo: 'edicao' },

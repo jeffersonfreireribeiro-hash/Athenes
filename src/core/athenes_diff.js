@@ -16,9 +16,10 @@ import { repaginarDocumento } from './athenes_documento.js';
 
 const RE_INS = /<ins\b[^>]*\bath-sug-mark\b[^>]*>([\s\S]*?)<\/ins>/gi;
 const RE_DEL = /<del\b[^>]*\bath-sug-mark\b[^>]*>([\s\S]*?)<\/del>/gi;
+const RE_GHOST = /<span\b[^>]*\bath-ghost-text\b[^>]*>([\s\S]*?)<\/span>/gi;
 
 export function temMarcasSugestao(html) {
-  return typeof html === 'string' && html.includes('ath-sug-mark');
+  return typeof html === 'string' && (html.includes('ath-sug-mark') || html.includes('ath-ghost-text'));
 }
 
 /**
@@ -30,7 +31,7 @@ export function resolverSugestoesEmHtml(html, acao = 'aceitar') {
   if (!temMarcasSugestao(html)) return html;
   const aceitar = acao === 'aceitar';
   return String(html)
-    .replace(RE_INS, aceitar ? '$1' : '')
+    .replace(RE_GHOST, '').replace(RE_INS, aceitar ? '$1' : '')
     .replace(RE_DEL, aceitar ? '' : '$1');
 }
 

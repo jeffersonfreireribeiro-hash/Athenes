@@ -10,6 +10,7 @@ import {
 } from '../core/athenes_atalhos.js';
 import { criarNovoBloco, dividirBlocoTexto, duplicarBlocoNaSecao, removerBlocoDaSecao, moverBlocoPorLinha, buscarSecaoDoBloco } from '../core/athenes_documento.js';
 import { modoSomenteLeitura } from '../core/athenes_colaboracao.js';
+import { PainelFlutuanteIa, GhostTextEngine } from './athenes_assistente_ia_ui.js';
 
 const MAPA_TOOLTIPS = [
   ['#rmDesfazer', 'desfazer'], ['#rmRefazer', 'refazer'], ['#rmSalvar', 'salvar'], ['#rmAddNota', 'nota_rodape'],
@@ -56,6 +57,7 @@ export class AtalhosDoEditor {
     this.registrar();
     this.ligarColagem();
     this.ligarMenuContexto();
+    this.ghostEngine = new GhostTextEngine(this.ed);
     this.aoInput = (e) => { if (e.target?.isContentEditable && this.ed.container.contains(e.target)) this.ed._edicaoNativa = true; };
     document.addEventListener('input', this.aoInput, true);
     this.gerenciador.anexar();
@@ -64,6 +66,7 @@ export class AtalhosDoEditor {
 
   destruir() {
     this.fecharTudo();
+    this.ghostEngine?.destruir?.();
     this.gerenciador.destruir();
     this.removerColagem?.();
     this.removerMenuContexto?.();
@@ -154,6 +157,7 @@ export class AtalhosDoEditor {
     g.registrar('salvar', () => { ed.container.querySelector('#rmSalvar')?.click(); });
     g.registrar('exportar', () => { ed.onAbrirExportar?.(); });
     g.registrar('guia_atalhos', () => { this.abrirAjuda(); });
+    g.registrar('assistente_ia', () => { this.abrirAssistenteIa(); });
     // Esc: fecha busca/diálogos próprios
     this.aoEsc = (e) => { if (e.key === 'Escape' && this.pops.size) { this.fecharTudo(); } };
     document.addEventListener('keydown', this.aoEsc, true);
@@ -389,6 +393,7 @@ export class AtalhosDoEditor {
     if (!el || !b || !['paragrafo', 'titulo'].includes(b.tipo)) return false;
     if ((el.textContent || '').replace(/​/g, '').trim() !== '') return false; // só no início de linha vazia
     const itens = [
+      ['✨ Assistente de IA (/ia)', () => this.abrirAssistenteIa()],
       ['Título 1', () => this.converterBloco('titulo', 1)], ['Título 2', () => this.converterBloco('titulo', 2)], ['Título 3', () => this.converterBloco('titulo', 3)],
       ['Texto normal', () => this.converterBloco('paragrafo', 0)],
       ['Tabela', () => this.inserirAposVazio('tabela', { titulo: 'Tabela — Dados quantitativos' })], ['Fórmula', () => this.inserirAposVazio('formula', { latex: 'E = m \\cdot c^2' })],
@@ -422,6 +427,15 @@ export class AtalhosDoEditor {
     sec.blocos.splice(i + 1, 0, novo);
     sec.blocos.splice(i, 1); // o parágrafo vazio dá lugar ao novo bloco
     ed.blocoSelecionado = novo; ed.notificarMudanca(); ed.renderizar(); ed.onSelecionarBloco?.(novo, null);
+  }
+
+  // ───────────── assistente de IA ─────────────
+  abrirAssistenteIa(ancora = null, trecho = '') {
+    if (this.somenteLeitura()) return null;
+    const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+    const textoSel = trecho || (sel && !sel.isCollapsed ? sel.toString() : '');
+    const anc = ancora || this.editavelAtual() || this.palco;
+    return new PainelFlutuanteIa(this.ed, { ancora: anc, trechoInicial: textoSel });
   }
 
   // ───────────── busca e substituição ─────────────
