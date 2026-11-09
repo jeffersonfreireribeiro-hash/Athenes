@@ -16,7 +16,8 @@
 
 #athSecaoDashEscrita:not([hidden]),
 #athSecaoDashArtigosZotero:not([hidden]) {
-  flex: 1 0 auto;
+  flex: 1 1 0;
+  min-height: 100%;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -25,6 +26,23 @@
   border-radius: 18px;
   padding: 20px 24px 28px 24px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  box-sizing: border-box;
+}
+
+#athContainerEstudoArtigos {
+  flex: 1 1 0;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.ath-estudo-catalogo,
+.ath-artigos-zotero-grid {
+  flex: 1 1 0;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
 }
 
@@ -1411,9 +1429,9 @@
   display: flex !important;
   flex-direction: column !important;
   padding: 10px 12px !important;
-  flex: 1 1 auto !important;
-  height: auto !important;
-  max-height: none !important;
+  flex: 1 1 0 !important;
+  height: calc(100% - 52px) !important;
+  max-height: calc(100% - 52px) !important;
   min-height: 0 !important;
   overflow: hidden !important;
   box-sizing: border-box !important;
@@ -1428,10 +1446,27 @@
 }
 
 .ath-estudio-full-shell .rm-ed-grade {
+  display: grid !important;
   grid-template-columns: 340px minmax(0, 1fr) 350px;
   grid-template-columns: var(--ath-col-esq, 340px) minmax(0, 1fr) var(--ath-col-dir, 350px) !important;
   gap: 12px !important;
+  flex: 1 1 0 !important;
   height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.ath-estudio-full-shell #athEstudioColEsq,
+.ath-estudio-full-shell #athEstudioColPrev,
+.ath-estudio-full-shell #athEstudioColDir {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
   overflow: hidden !important;
   box-sizing: border-box !important;
 }
