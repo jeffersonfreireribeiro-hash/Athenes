@@ -254,8 +254,32 @@ export class GhostTextEngine {
     this.blocoAtivo = null;
     this.sugestaoAtual = '';
 
+    const salvo = (typeof localStorage !== 'undefined') ? localStorage.getItem('athenes_ghost_text_ativo') : null;
+    this.ativo = salvo === null ? true : salvo !== 'false';
+
     injetarCssIa();
     this.ligarListeners();
+  }
+
+  estaAtivo() {
+    return Boolean(this.ativo);
+  }
+
+  definirAtivo(valor) {
+    this.ativo = Boolean(valor);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('athenes_ghost_text_ativo', this.ativo ? 'true' : 'false');
+      }
+    } catch (_) {}
+    if (!this.ativo) {
+      this.descartar();
+    }
+    return this.ativo;
+  }
+
+  alternarAtivo() {
+    return this.definirAtivo(!this.ativo);
   }
 
   destruir() {
@@ -288,6 +312,8 @@ export class GhostTextEngine {
   }
 
   tratarInput(e) {
+    if (!this.ativo) return;
+
     // Descarta sugestão anterior ao continuar digitando
     if (this.spanAtivo) {
       this.removerSpanFantasma();
@@ -305,7 +331,7 @@ export class GhostTextEngine {
   }
 
   tratarKeydown(e) {
-    if (!this.spanAtivo) return;
+    if (!this.ativo || !this.spanAtivo) return;
 
     // 1. Tecla TAB: Aceita a sugestão fantasma
     if (e.key === 'Tab' || e.keyCode === 9) {

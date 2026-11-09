@@ -212,22 +212,25 @@ export class AtalhosDoEditor {
     const fechar = () => { this.menuContexto?.remove(); this.menuContexto = null; };
     const aoContexto = (e) => {
       const alvo = e.target instanceof Element ? e.target : e.target?.parentElement;
-      const editavel = alvo?.closest?.('[contenteditable="true"]');
-      if (!editavel || !this.ed.container.contains(editavel)) return;
-      // O menu nativo mostra as sugestões de ortografia; Alt abre as ações do Athenes.
-      if (!e.altKey && e.button !== -1) { fechar(); return; }
+      const editavel = alvo?.closest?.('[contenteditable="true"]') || alvo?.querySelector?.('[contenteditable="true"]');
+      const blocoEl = alvo?.closest?.('.ath-bloco-folha, [data-bloco-id]');
+      if (!this.ed.container.contains(alvo) && !editavel && !blocoEl) return;
       e.preventDefault();
       fechar();
       const selecao = getSelection();
-      const range = selecao?.rangeCount && editavel.contains(selecao.anchorNode) ? selecao.getRangeAt(0).cloneRange() : null;
+      const range = selecao?.rangeCount && editavel && editavel.contains(selecao.anchorNode) ? selecao.getRangeAt(0).cloneRange() : null;
       const temTrecho = Boolean(range && !range.collapsed);
       const leitura = this.somenteLeitura();
+      const ghostAtivo = this.ghostEngine?.estaAtivo?.() !== false;
       const menu = document.createElement('div');
       menu.className = 'ath-at-contexto'; menu.setAttribute('role', 'menu');
       menu.innerHTML = `
         <button type="button" role="menuitem" data-cm="recortar" ${!temTrecho || leitura ? 'disabled' : ''}>Recortar <span>Ctrl+X</span></button>
         <button type="button" role="menuitem" data-cm="copiar" ${!temTrecho ? 'disabled' : ''}>Copiar <span>Ctrl+C</span></button>
         <button type="button" role="menuitem" data-cm="colar" ${leitura ? 'disabled' : ''}>Colar texto <span>Ctrl+V</span></button>
+        <hr>
+        <button type="button" role="menuitem" data-cm="ia_assistente">✨ Assistente de IA… <span>${this.mac ? '⌘J' : 'Ctrl+J'}</span></button>
+        <button type="button" role="menuitem" data-cm="ia_completar_toggle">${ghostAtivo ? '✓' : '○'} Autocompletar da IA (Smart Compose)</button>
         <hr>
         <button type="button" role="menuitem" data-cm="link" ${leitura ? 'disabled' : ''}>Inserir link <span>Ctrl+K</span></button>
         <button type="button" role="menuitem" data-cm="limpar" ${!temTrecho || leitura ? 'disabled' : ''}>Limpar formatação</button>
@@ -247,10 +250,17 @@ export class AtalhosDoEditor {
         const acao = ev.target.closest('[data-cm]')?.dataset.cm;
         if (!acao) return;
         fechar();
-        editavel.focus({ preventScroll: true });
+        if (editavel) editavel.focus({ preventScroll: true });
         if (range && ['recortar', 'copiar', 'colar', 'link', 'limpar', 'nota'].includes(acao)) { selecao.removeAllRanges(); selecao.addRange(range); }
         if (acao === 'recortar' || acao === 'copiar') { document.execCommand(acao === 'recortar' ? 'cut' : 'copy'); if (acao === 'recortar') this.sinalizarEdicao(); }
         else if (acao === 'colar') { try { const texto = await navigator.clipboard.readText(); document.execCommand('insertText', false, texto); this.sinalizarEdicao(); } catch (_) { this.ed.toast?.('Use Ctrl+V para colar neste navegador.'); } }
+        else if (acao === 'ia_assistente') { this.abrirAssistenteIa(editavel || blocoEl, temTrecho ? selecao?.toString() : ''); }
+        else if (acao === 'ia_completar_toggle') {
+          const novo = this.ghostEngine?.alternarAtivo?.();
+          const msg = novo ? 'Autocompletar da IA ativado' : 'Autocompletar da IA desativado';
+          if (this.ed.toast) this.ed.toast(msg);
+          else if (typeof window !== 'undefined' && typeof window.mostrarAviso === 'function') window.mostrarAviso(msg, { tipo: 'info' });
+        }
         else if (acao === 'link') this.abrirLink();
         else if (acao === 'limpar') { document.execCommand('removeFormat'); document.execCommand('unlink'); this.sinalizarEdicao(); }
         else if (acao === 'zotero') this.ed.abrirPainelZotero();
@@ -272,7 +282,7 @@ export class AtalhosDoEditor {
         aoContexto({ target: editavel, altKey: true, button: -1, clientX: rect.left, clientY: rect.bottom, preventDefault() {} });
       }
     };
-    this.ed.container.addEventListener('contextmenu', aoContexto);
+        this.ed.container.addEventListener('contextmenu', aoContexto);
     document.addEventListener('pointerdown', aoClique);
     document.addEventListener('keydown', aoTeclar);
     this.removerMenuContexto = () => { fechar(); this.ed.container.removeEventListener('contextmenu', aoContexto); document.removeEventListener('pointerdown', aoClique); document.removeEventListener('keydown', aoTeclar); };

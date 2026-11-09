@@ -319,6 +319,19 @@ export const metodosEstudoTela = {
       </div>
     `;
 
+    root.style.height = '100%';
+    root.style.minHeight = '100%';
+    root.style.flex = '1 1 auto';
+    editorEl.style.height = 'calc(100% - 52px)';
+    editorEl.style.minHeight = 'calc(100% - 52px)';
+    editorEl.style.flex = '1 1 auto';
+    const gradeEl = editorEl.querySelector('.rm-ed-grade');
+    if (gradeEl) {
+      gradeEl.style.height = '100%';
+      gradeEl.style.minHeight = '100%';
+      gradeEl.style.flex = '1 1 auto';
+    }
+
     root.appendChild(editorEl);
     this.container.appendChild(root);
     tornarColunasRedimensionaveis(editorEl.querySelector('.rm-ed-grade'), { nome: 'estudio', padraoEsq: 340, padraoDir: 350 }); // barras laterais: recolher e ajustar a largura

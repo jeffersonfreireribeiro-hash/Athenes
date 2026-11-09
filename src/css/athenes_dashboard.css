@@ -1388,6 +1388,8 @@
   min-height: 0 !important;
 }
 
+.ath-dashboard.ath-dashboard-estudio-full .ath-dash-main-area > #athSecaoDashArtigosZotero,
+.ath-dashboard.ath-dashboard-estudio-full .ath-dash-main-area > #athSecaoDashArtigosZotero:not([hidden]),
 .ath-dashboard.ath-dashboard-estudio-full #athSecaoDashArtigosZotero,
 .ath-dashboard.ath-dashboard-estudio-full #athContainerEstudoArtigos {
   display: flex !important;

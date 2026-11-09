@@ -4,7 +4,7 @@
  * Permite instalar a interface no navegador, tablet e celular, funcionando com suporte offline.
  */
 
-const CACHE_NAME = 'athenes-pwa-v34';
+const CACHE_NAME = 'athenes-pwa-v35';
 
 const ASSETS_CANONICOS = [
   './',
@@ -25,6 +25,9 @@ const ASSETS_CANONICOS = [
   './src/ui/athenes_dashboard_modais.js',
   './src/ui/athenes_dashboard_sincronia.js',
   './src/ui/athenes_editor.js',
+  './src/ui/athenes_atalhos_editor.js',
+  './src/core/athenes_assistente_ia.js',
+  './src/ui/athenes_assistente_ia_ui.js',
   './src/ui/athenes_estudo_artigos.js',
   './src/ui/athenes_estudo_artigos_pastas.js',
   './src/ui/athenes_estudo_artigos_estante.js',

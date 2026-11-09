@@ -328,4 +328,26 @@ describe('Grupo 5: Motor de Texto Fantasma (GhostTextEngine / Smart Compose)', (
     assert.equal(engine.spanAtivo, null);
     assert.equal(engine.sugestaoAtual, '');
   });
+
+  it('5.4: definirAtivo() e alternarAtivo() controlam estado e descartam sugestões ativas', () => {
+    const mockEditor = { doc: { titulo: 'Doc Teste' } };
+    const engine = new GhostTextEngine(mockEditor);
+
+    assert.equal(engine.estaAtivo(), true);
+
+    let removido = false;
+    engine.spanAtivo = { remove: () => { removido = true; } };
+    engine.sugestaoAtual = 'sugestão ativa';
+
+    engine.definirAtivo(false);
+    assert.equal(engine.estaAtivo(), false);
+    assert.ok(removido, 'Desativar deve descartar span ativo');
+    assert.equal(engine.spanAtivo, null);
+
+    const novo = engine.alternarAtivo();
+    assert.equal(novo, true);
+    assert.equal(engine.estaAtivo(), true);
+
+    engine.destruir();
+  });
 });

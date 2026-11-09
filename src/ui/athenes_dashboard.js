@@ -644,7 +644,13 @@ export class DashboardView {
       this.atualizarGrid();
     } else {
       const boxEstudo = root.querySelector('#athContainerEstudoArtigos');
-      if (boxEstudo) boxEstudo.style.display = 'block';
+      if (boxEstudo) {
+        boxEstudo.style.display = 'flex';
+        boxEstudo.style.flexDirection = 'column';
+        boxEstudo.style.flex = '1 1 auto';
+        boxEstudo.style.height = '100%';
+        boxEstudo.style.minHeight = '100%';
+      }
       this.estudoView = new EstudoArtigosView(boxEstudo, {
         pastaFiltroId: this.pastaAtivaId,
         artigoInicialId: this.artigoInicialId,
