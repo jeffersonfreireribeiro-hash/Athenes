@@ -170,7 +170,7 @@
 .rm-editor:not([hidden]) { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 .rm-ed-grade { flex: 1 1 0; min-height: 0; align-items: stretch; height: 100%; overflow: hidden; }
 .rm-col-esq, .rm-col-dir { min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
-.rm-col-prev { position: static; min-height: 0; flex: 1 1 0; height: 100%; }
+.rm-col-prev { position: relative !important; min-height: 0; flex: 1 1 0; height: 100%; }
 .rm-col-prev .rm-prev { flex: 1 1 0; height: auto; min-height: 0; }
 .rm-col-dir .rm-vars { max-height: none; flex: 0 0 auto; }
 

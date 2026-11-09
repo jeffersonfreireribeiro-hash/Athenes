@@ -25,8 +25,19 @@ const CSS = `
 .ath-at-pop button{height:28px;padding:0 10px;border:1px solid #D5DEE9;border-radius:8px;background:#fff;color:#314F79;font:700 11.5px var(--glx-font,inherit);cursor:pointer}
 .ath-at-pop button:hover:not(:disabled){background:#EEF4FA;border-color:#314F79}.ath-at-pop button:disabled{opacity:.45;cursor:default}
 .ath-at-pop button.pri{background:#314F79;color:#fff;border-color:#314F79}
-.ath-at-busca{top:12px;right:24px;display:flex;align-items:center;gap:6px;padding:8px 10px}
-.ath-at-busca .n{min-width:64px;text-align:center;color:#64748B}
+.ath-at-busca{position:absolute !important;top:14px !important;right:24px !important;z-index:1000 !important;display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border:1px solid #CBD5E1;border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.18),0 2px 6px rgba(15,23,42,.08)}
+.ath-at-busca input[type=text]{height:34px;padding:0 11px;border:1.5px solid #CBD5E1;border-radius:8px;font:600 13px var(--glx-font,inherit);color:#1F2733;outline:none;min-width:0;transition:border-color .15s,box-shadow .15s}
+.ath-at-busca input[type=text]:focus{border-color:#314F79;box-shadow:0 0 0 3px rgba(49,79,121,.15)}
+.ath-at-busca button{height:34px;min-width:34px;padding:0 12px;border:1.5px solid #CBD5E1;border-radius:8px;background:#fff;color:#314F79;font:750 13px var(--glx-font,inherit);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s ease;user-select:none}
+.ath-at-busca button[data-ant],.ath-at-busca button[data-prox],.ath-at-busca button[data-fechar]{width:34px;height:34px;padding:0;font-size:18px;font-weight:800;line-height:1}
+.ath-at-busca button:hover:not(:disabled){background:#EEF4FA;border-color:#314F79;color:#1B2D47}
+.ath-at-busca button.pri{background:#314F79;color:#fff;border-color:#314F79}
+.ath-at-busca button.pri:hover:not(:disabled){background:#233959}
+.ath-at-busca button:disabled{opacity:.42;cursor:default}
+.ath-at-busca .n{min-width:68px;text-align:center;color:#64748B;font-size:12px;font-weight:700;padding:0 4px}
+.ath-at-busca .ath-at-chk-label{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#475569;padding:4px 6px;border-radius:6px;cursor:pointer;user-select:none;transition:background .15s,color .15s}
+.ath-at-busca .ath-at-chk-label:hover{background:#F1F5F9;color:#1E293B}
+.ath-at-busca .ath-at-chk-label input[type=checkbox]{width:15px;height:15px;margin:0;cursor:pointer;accent-color:#314F79}
 .ath-at-fundo{position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:8vh}
 .ath-at-modal{width:min(640px,94vw);max-height:80vh;display:flex;flex-direction:column;position:relative;background:#fff;border-radius:14px;box-shadow:0 20px 50px rgba(15,23,42,.35);overflow:hidden;font:600 12.5px var(--glx-font,system-ui);color:#1F2733}
 .ath-at-modal header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #E3EAF2}
@@ -505,21 +516,24 @@ export class AtalhosDoEditor {
     const B = this.busca;
     const selTxt = (getSelection()?.toString() || '').trim();
     if (selTxt && selTxt.length < 80 && !selTxt.includes('\n')) B.termo = selTxt;
+    const canvasHost = this.ed.container.querySelector('.rm-col-prev') || this.palco;
     const pop = this.criarPop('ath-at-pop ath-at-busca', `
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <div style="display:flex;align-items:center;gap:6px">
-          <input type="text" data-q placeholder="Buscar" style="width:200px" value="${esc(B.termo)}">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="text" data-q placeholder="Buscar" style="width:220px" value="${esc(B.termo)}">
           <span class="n"></span>
-          <button data-ant title="Ocorrência anterior (Shift+Enter)">‹</button><button data-prox title="Próxima ocorrência (Enter / F3)">›</button>
-          <label style="display:flex;gap:3px;align-items:center;font-size:11px"><input type="checkbox" data-mai ${B.maiusculas ? 'checked' : ''}> Aa</label>
-          <label style="display:flex;gap:3px;align-items:center;font-size:11px"><input type="checkbox" data-pal ${B.palavra ? 'checked' : ''}> Palavra</label>
-          <button data-fechar title="Fechar (Esc)">×</button>
+          <button type="button" data-ant title="Ocorrência anterior (Shift+Enter)">‹</button>
+          <button type="button" data-prox title="Próxima ocorrência (Enter / F3)">›</button>
+          <label class="ath-at-chk-label"><input type="checkbox" data-mai ${B.maiusculas ? 'checked' : ''}> Aa</label>
+          <label class="ath-at-chk-label"><input type="checkbox" data-pal ${B.palavra ? 'checked' : ''}> Palavra</label>
+          <button type="button" data-fechar title="Fechar (Esc)">×</button>
         </div>
-        <div data-linha-sub style="display:${comSubstituir ? 'flex' : 'none'};align-items:center;gap:6px">
-          <input type="text" data-sub placeholder="Substituir por" style="width:200px" value="${esc(B.subst)}">
-          <button data-subst>Substituir</button><button data-subst-todas class="pri">Substituir todas</button>
+        <div data-linha-sub style="display:${comSubstituir ? 'flex' : 'none'};align-items:center;gap:8px;padding-top:4px;border-top:1px solid #E2E8F0">
+          <input type="text" data-sub placeholder="Substituir por" style="width:220px" value="${esc(B.subst)}">
+          <button type="button" data-subst>Substituir</button>
+          <button type="button" data-subst-todas class="pri">Substituir todas</button>
         </div>
-      </div>`);
+      </div>`, false, canvasHost);
     pop.classList.add('ath-at-busca');
     this.pop = pop; this.popBusca = pop;
     const q = pop.querySelector('[data-q]'); const sub = pop.querySelector('[data-sub]');
@@ -604,10 +618,10 @@ export class AtalhosDoEditor {
   }
 
   // ───────────── popovers ─────────────
-  criarPop(classe, html, fundo = false) {
+  criarPop(classe, html, fundo = false, containerPai = null) {
     const el = document.createElement('div');
     el.className = classe; el.innerHTML = html;
-    document.body.appendChild(el);
+    (containerPai || document.body).appendChild(el);
     this.pops.add(el);
     return el;
   }
