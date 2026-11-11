@@ -3102,6 +3102,7 @@ a.ath-citacao-link { color: inherit; text-decoration: none; cursor: pointer; }
 .rm-editor.ath-modo-revisao .ath-regua-h, .rm-editor.ath-modo-revisao .ath-regua-v, .rm-editor.ath-modo-revisao .ath-regua-canto { display: none; }
 .rm-editor.ath-modo-revisao .ath-palco-reguas > .rm-prev-palco { margin: 0; }
 ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-simbolo); }
+ol.ath-lista-config > li[data-rotulo]::before { content: attr(data-rotulo) !important; }
 
 /* Marcadores e numeração do estilo: modos, paleta de símbolos e formatos de sequência */
 .ath-mk { display: flex; flex-direction: column; gap: 8px; }
@@ -3111,12 +3112,19 @@ ul.ath-lista-config[data-marcador="simbolo"] > li::before { content: attr(data-s
 .ath-mk-modos button.on { background: #fff; color: #314F79; box-shadow: 0 1px 3px rgba(15, 23, 42, .14); }
 .ath-mk-painel[hidden] { display: none; }
 .ath-mk-painel { display: flex; flex-direction: column; gap: 8px; }
-.ath-mk-grade { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 6px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; }
-.ath-mk-grade-seq { grid-template-columns: repeat(4, 1fr); }
-.ath-mk-cel { height: 32px; border: 1px solid transparent; border-radius: 8px; background: #fff; color: #1E293B; font: 600 16px/1 var(--glx-font, sans-serif); cursor: pointer; display: grid; place-items: center; padding: 0; }
-.ath-mk-cel-seq { font-size: 12.5px; font-weight: 700; }
+.ath-mk-cats { display: flex; flex-wrap: wrap; gap: 4px; }
+.ath-mk-cat { border: 1px solid #D5DDE8; background: #F8FAFC; color: #475569; border-radius: 999px; padding: 3px 9px; font: 700 11px var(--glx-font); cursor: pointer; transition: all .12s ease; }
+.ath-mk-cat:hover { background: #EEF4FA; border-color: #B4C6DC; color: #314F79; }
+.ath-mk-cat.on { background: #314F79; border-color: #314F79; color: #fff; }
+.ath-mk-grade { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; padding: 6px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; max-height: 204px; overflow-y: auto; }
+.ath-mk-grade-seq { grid-template-columns: repeat(4, 1fr); max-height: 196px; overflow-y: auto; }
+.ath-mk-cel[hidden] { display: none !important; }
+.ath-mk-cel { height: 32px; border: 1px solid transparent; border-radius: 8px; background: #fff; color: #1E293B; font: 600 15px/1 var(--glx-font, sans-serif); cursor: pointer; display: grid; place-items: center; padding: 0; }
+.ath-mk-cel-seq { font-size: 12px; font-weight: 700; }
 .ath-mk-cel:hover { background: #EEF4FA; border-color: #C8D7E6; }
 .ath-mk-cel.on { background: #314F79; border-color: #314F79; color: #fff; }
+.ath-mk-custom-row { display: flex; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 8px !important; }
+.ath-mk-custom-row .ath-input { width: 84px !important; text-align: center; font-weight: 700; }
 .ath-mk-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ath-mk-campo { display: flex; flex-direction: column; gap: 3px; font: 700 11.5px var(--glx-font); color: #334155; }
 .ath-mk-campo .ath-input, .ath-mk-campo .ath-select { height: 34px; width: 100%; box-sizing: border-box; }

@@ -4,15 +4,16 @@
  * Três escolhas: Nenhum, Marcadores (paleta de símbolos) e Sequência (paleta de formatos: 1. / a) / (i) / 01 –…).
  * Só o estilo de texto tem marcador/numeração: o bloco não sobrescreve nada.
  */
-import { SIMBOLOS_MARCADOR, FORMATOS_SEQUENCIA, rotuloMarcador } from '../core/athenes_marcadores.js';
+import { CATEGORIAS_SIMBOLOS_MARCADOR, SIMBOLOS_MARCADOR, FORMATOS_SEQUENCIA, rotuloMarcador, simboloValido } from '../core/athenes_marcadores.js';
 
-const nomeEstilo = (id) => ({ decimal: 'Números', decimal_zero: 'Números com zero', lower_alpha: 'Letras minúsculas', upper_alpha: 'Letras maiúsculas', lower_roman: 'Romanos minúsculos', upper_roman: 'Romanos maiúsculos' }[id] || id);
-const nomeSep = (id) => ({ ponto: 'com ponto', parentese: 'com parêntese', entre_parenteses: 'entre parênteses', travessao: 'com travessão' }[id] || id);
+const nomeEstilo = (id) => ({ decimal: 'Números', decimal_zero: 'Números com zero', ordinal: 'Ordinais', lower_alpha: 'Letras minúsculas', upper_alpha: 'Letras maiúsculas', lower_roman: 'Romanos minúsculos', upper_roman: 'Romanos maiúsculos', lower_greek: 'Gregos minúsculos' }[id] || id);
+const nomeSep = (id) => ({ ponto: 'com ponto', parentese: 'com parêntese', entre_parenteses: 'entre parênteses', travessao: 'com travessão', colchetes: 'entre colchetes', dois_pontos: 'com dois-pontos', seta: 'com seta', ponto_traco: 'com ponto e travessão' }[id] || id);
 
 /** Seção "Marcadores e numeração" do estilo de texto (ligada por ligarMarcadoresEstilo). */
 export function htmlMarcadoresEstilo() {
   const campoNum = (mk, rot, extra) => `<label class="ath-mk-campo">${rot}<input type="number" class="ath-input" data-mk="${mk}" ${extra}></label>`;
-  const simbolos = SIMBOLOS_MARCADOR.map(s => `<button type="button" class="ath-mk-cel" data-mk-simbolo="${s}" title="Marcador ${s}" aria-label="Marcador ${s}">${s}</button>`).join('');
+  const abasCat = [`<button type="button" class="ath-mk-cat on" data-mk-cat-filtro="todos">Todos (${SIMBOLOS_MARCADOR.length})</button>`, ...CATEGORIAS_SIMBOLOS_MARCADOR.map(c => `<button type="button" class="ath-mk-cat" data-mk-cat-filtro="${c.id}">${c.rotulo}</button>`)].join('');
+  const simbolos = CATEGORIAS_SIMBOLOS_MARCADOR.flatMap(c => c.simbolos.map(s => `<button type="button" class="ath-mk-cel" data-mk-cat="${c.id}" data-mk-simbolo="${s}" title="${c.rotulo} · Marcador ${s}" aria-label="Marcador ${s}">${s}</button>`)).join('');
   const formatos = FORMATOS_SEQUENCIA.map(f => `<button type="button" class="ath-mk-cel ath-mk-cel-seq" data-mk-estilo="${f.estilo}" data-mk-sep="${f.sep}" title="${nomeEstilo(f.estilo)}, ${nomeSep(f.sep)}">${rotuloMarcador({ tipo: 'numero', estiloNum: f.estilo, separador: f.sep }, 1)}</button>`).join('');
   return `<div id="athMarcadoresEstilo" class="ath-mk">
     <span class="ath-mk-titulo">Marcadores e numeração</span>
@@ -22,7 +23,9 @@ export function htmlMarcadoresEstilo() {
       <button type="button" role="tab" data-mk-modo="sequencia">Sequência</button>
     </div>
     <div class="ath-mk-painel" data-mk-painel="marcadores">
+      <div class="ath-mk-cats" role="tablist" aria-label="Categorias de símbolos">${abasCat}</div>
       <div class="ath-mk-grade" role="listbox" aria-label="Símbolos de marcador">${simbolos}</div>
+      <label class="ath-mk-campo ath-mk-custom-row"><span>Símbolo personalizado (até 2 caracteres)</span><input type="text" class="ath-input" data-mk="simbolo_custom" maxlength="2" placeholder="Ex.: ★"></label>
     </div>
     <div class="ath-mk-painel" data-mk-painel="sequencia">
       <div class="ath-mk-grade ath-mk-grade-seq" role="listbox" aria-label="Formatos de sequência">${formatos}</div>
@@ -43,7 +46,7 @@ export function ligarMarcadoresEstilo(raiz, r, aoMudar) {
   const caixa = raiz.querySelector('#athMarcadoresEstilo');
   if (!caixa) return;
   const q = (n) => caixa.querySelector(`[data-mk="${n}"]`);
-  const GLIFOS_ANTIGOS = { circulo: '•', quadrado: '▪' }; // tipos antigos que existem na paleta
+  const GLIFOS_ANTIGOS = { circulo: '•', quadrado: '▪', traco: '–', ponto_traco: '·–' };
   q('alinhamento').value = r.marcador_alinhamento || 'left';
   q('inicio').value = r.marcador_inicio ?? 1;
   q('nivel').value = r.marcador_nivel ?? 1;
@@ -59,6 +62,7 @@ export function ligarMarcadoresEstilo(raiz, r, aoMudar) {
     caixa.querySelector('[data-mk-painel="sequencia"]').hidden = modo !== 'sequencia';
     caixa.querySelector('[data-mk-painel="comum"]').hidden = modo === 'nenhum';
     const sim = simboloAtual();
+    if (q('simbolo_custom') && document.activeElement !== q('simbolo_custom')) q('simbolo_custom').value = sim || '';
     caixa.querySelectorAll('[data-mk-simbolo]').forEach(b => { const on = b.dataset.mkSimbolo === sim; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
     caixa.querySelectorAll('[data-mk-estilo]').forEach(b => { const on = modo === 'sequencia' && b.dataset.mkEstilo === (r.marcador_estilo_num || 'decimal') && b.dataset.mkSep === (r.marcador_separador || 'ponto'); b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
   };
@@ -70,6 +74,14 @@ export function ligarMarcadoresEstilo(raiz, r, aoMudar) {
     if (r.marcador_tipo === 'numero') r.marcador_inicio = Math.max(1, parseInt(q('inicio').value, 10) || 1);
   };
   const concluir = () => { desenhar(); aoMudar?.(); };
+
+  caixa.querySelectorAll('[data-mk-cat-filtro]').forEach(b => b.addEventListener('click', () => {
+    const cat = b.dataset.mkCatFiltro;
+    caixa.querySelectorAll('[data-mk-cat-filtro]').forEach(x => x.classList.toggle('on', x === b));
+    caixa.querySelectorAll('[data-mk-simbolo]').forEach(cel => {
+      cel.hidden = cat !== 'todos' && cel.dataset.mkCat !== cat;
+    });
+  }));
 
   caixa.querySelectorAll('[data-mk-modo]').forEach(b => b.addEventListener('click', () => {
     const modo = b.dataset.mkModo;
@@ -85,10 +97,20 @@ export function ligarMarcadoresEstilo(raiz, r, aoMudar) {
   caixa.querySelectorAll('[data-mk-simbolo]').forEach(b => b.addEventListener('click', () => {
     r.marcador_tipo = 'simbolo'; r.marcador_simbolo = b.dataset.mkSimbolo; limparNumeracao(); lerCampos(); concluir();
   }));
+  if (q('simbolo_custom')) {
+    q('simbolo_custom').addEventListener('input', () => {
+      const sv = simboloValido(q('simbolo_custom').value);
+      if (!sv) return;
+      r.marcador_tipo = 'simbolo'; r.marcador_simbolo = sv; limparNumeracao(); lerCampos(); concluir();
+    });
+  }
   caixa.querySelectorAll('[data-mk-estilo]').forEach(b => b.addEventListener('click', () => {
     r.marcador_tipo = 'numero'; delete r.marcador_simbolo; r.marcador_estilo_num = b.dataset.mkEstilo; r.marcador_separador = b.dataset.mkSep; lerCampos(); concluir();
   }));
-  caixa.querySelectorAll('[data-mk]').forEach(el => el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => { if (modoAtual() === 'nenhum') return; lerCampos(); concluir(); }));
+  caixa.querySelectorAll('[data-mk]').forEach(el => {
+    if (el.dataset.mk === 'simbolo_custom') return;
+    el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => { if (modoAtual() === 'nenhum') return; lerCampos(); concluir(); });
+  });
   desenhar();
 }
 

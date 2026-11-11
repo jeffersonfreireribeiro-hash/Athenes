@@ -145,7 +145,8 @@ export function secaoAvancadaHtml() {
        ${campo('Espaç. letras (em)', 'avancado.primeira_linha.espacamento_letras_em', 'number', 'step="0.01" min="-0.1" max="1"')}${marca('Caixa alta', 'avancado.primeira_linha.caixa_alta')}${marca('Itálico', 'avancado.primeira_linha.italico')}`)}
     ${grupo('Ornamento de fim de texto', 'avancado.ornamento_fim.ativo',
       `${campo('Glifo', 'avancado.ornamento_fim.glifo', 'text', 'maxlength="3"')}${campo('Cor', 'avancado.ornamento_fim.cor', 'color')}
-       ${campo('Tamanho (em)', 'avancado.ornamento_fim.tamanho_em', 'number', 'step="0.1" min="0.4" max="3"')}${campo('Afastamento (em)', 'avancado.ornamento_fim.afastamento_em', 'number', 'step="0.1" min="0" max="3"')}`)}
+       ${campo('Tamanho (em)', 'avancado.ornamento_fim.tamanho_em', 'number', 'step="0.1" min="0.4" max="3"')}${campo('Afastamento (em)', 'avancado.ornamento_fim.afastamento_em', 'number', 'step="0.1" min="0" max="3"')}
+       <div style="grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:4px; padding-top:2px;">${['■', '□', '◆', '◇', '◈', '❖', '✦', '✧', '★', '☆', '❦', '❧', '☙', '※', '⁂', '⁑', '●', '◉', '◎', '§', '¶', '†', '‡', '✿'].map(g => `<button type="button" class="ath-mk-cel" data-ornamento-glifo="${g}" title="Usar ornamento ${g}" style="width:28px;height:28px;font-size:14px;">${g}</button>`).join('')}</div>`)}
   </div>`;
 }
 
@@ -175,6 +176,16 @@ export function ligarCamposAvancados(raiz, rascunho, aoMudar) {
       else if (inp.type === 'number') v = inp.value === '' ? 0 : (emMm ? mmParaPt(parseFloat(inp.value)) : parseFloat(inp.value));
       else v = inp.value;
       gravarCaminho(rascunho, path, v);
+      aoMudar?.();
+    });
+  });
+  raiz.querySelectorAll('[data-ornamento-glifo]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const g = btn.dataset.ornamentoGlifo;
+      const inp = raiz.querySelector('[data-av="avancado.ornamento_fim.glifo"]');
+      if (inp) inp.value = g;
+      gravarCaminho(rascunho, 'avancado.ornamento_fim.glifo', g);
+      raiz.querySelectorAll('[data-ornamento-glifo]').forEach(b => b.classList.toggle('on', b.dataset.ornamentoGlifo === g));
       aoMudar?.();
     });
   });

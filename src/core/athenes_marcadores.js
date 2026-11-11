@@ -20,28 +20,73 @@ export const TIPOS_MARCADOR = Object.freeze([
 export const ESTILOS_NUMERO = Object.freeze([
   ['decimal', '1, 2, 3…'],
   ['decimal_zero', '01, 02, 03…'],
+  ['ordinal', '1º, 2º, 3º…'],
   ['lower_alpha', 'a, b, c…'],
   ['upper_alpha', 'A, B, C…'],
   ['lower_roman', 'i, ii, iii…'],
-  ['upper_roman', 'I, II, III…']
+  ['upper_roman', 'I, II, III…'],
+  ['lower_greek', 'α, β, γ…']
 ]);
 
 export const SEPARADORES_NUMERO = Object.freeze([
   ['ponto', '1.'],
   ['parentese', '1)'],
   ['entre_parenteses', '(1)'],
-  ['travessao', '1 –']
+  ['travessao', '1 –'],
+  ['colchetes', '[1]'],
+  ['dois_pontos', '1:'],
+  ['seta', '1 ›'],
+  ['ponto_traco', '1.–']
 ]);
 
-/** Paleta de símbolos para marcadores (qualquer um serve; fica em `marcador_simbolo` com `marcador_tipo: "simbolo"`). */
-export const SIMBOLOS_MARCADOR = Object.freeze([
-  '•', '◦', '▪', '▫', '●', '○', '■', '□', '◆', '◇', '◉', '◈',
-  '★', '☆', '✦', '✧', '❖', '✱', '✲', '※', '✓', '✔', '✗', '✘',
-  '➤', '►', '▸', '▶', '➔', '➜', '➢', '→', '⇒', '»', '❯', '‣',
-  '–', '—', '·', '⁃', '⚬', '♦', '♠', '♣', '♥', '☑', '☐', '✎'
+/** Categorias completas de símbolos para marcadores editoriais, acadêmicos, geométricos e de destaque. */
+export const CATEGORIAS_SIMBOLOS_MARCADOR = Object.freeze([
+  Object.freeze({
+    id: 'classicos',
+    rotulo: 'Clássicos e Pontos',
+    simbolos: Object.freeze(['•', '◦', '∙', '·', '⋅', '●', '○', '◉', '◎', '◌', '◍', '◐', '◑', '◒', '◓', '◔', '◕', '⚬', '⚭', '⚮', '⁌', '⁍', '‣', '⁃'])
+  }),
+  Object.freeze({
+    id: 'geometricos',
+    rotulo: 'Geométricos e Formas',
+    simbolos: Object.freeze(['▪', '▫', '■', '□', '▢', '▣', '▤', '▥', '▦', '▧', '▨', '▩', '◻', '◼', '◽', '◾', '◧', '◨', '◩', '◪', '◆', '◇', '◈', '◊', '⬘', '⬙', '⬚', '▲', '△', '▴', '▵', '▼', '▽', '▾', '▿', '◀', '◁', '◂', '◃', '⬢', '⬡', '⬟', '⬠', '◯'])
+  }),
+  Object.freeze({
+    id: 'setas',
+    rotulo: 'Setas e Indicadores',
+    simbolos: Object.freeze(['▸', '▹', '►', '▻', '▶', '▷', '➔', '➜', '➤', '➢', '➣', '→', '↠', '↣', '↦', '↪', '↬', '⇀', '⇒', '⟹', '⇨', '⇾', '»', '›', '❯', '❱', '⋙', '⟡', '☞', '☛', '☜', '↳', '↴', '↵', '↗', '↘', '⟲', '⟳', '⟿', '⤇'])
+  }),
+  Object.freeze({
+    id: 'alineas',
+    rotulo: 'Travessões e Alíneas',
+    simbolos: Object.freeze(['–', '—', '―', '‒', '·–', '•–', '—•', '›–', '»–', '~', '∼', '≈', '≡', '∷', '∶', '⊢', '⊣', '⊤', '⊥', '∣', '∥', '⋮', '⋯', '⸰'])
+  }),
+  Object.freeze({
+    id: 'estrelas',
+    rotulo: 'Estrelas e Ornamentos',
+    simbolos: Object.freeze(['★', '☆', '✦', '✧', '✪', '✫', '✬', '✭', '✮', '✯', '✰', '✱', '✲', '✳', '✴', '✵', '✶', '✷', '✸', '✹', '✺', '✻', '✼', '✽', '✾', '✿', '❀', '❁', '❂', '❃', '❇', '❈', '❉', '❊', '❋', '❖', '❦', '❧', '☙', '❘', '❙', '❚'])
+  }),
+  Object.freeze({
+    id: 'status',
+    rotulo: 'Checks e Status',
+    simbolos: Object.freeze(['✓', '✔', '☑', '✗', '✘', '☒', '☐', '✕', '✖', '✚', '➕', '➖', '⊕', '⊖', '⊗', '⊘', '⊙', '⊚', '⊛', '⊜', '⊝', '⊞', '⊟', '⊠', '⊡', '⚑', '⚐', '⚠', '⚡', '⏳', '⌛', '🔒', '🔓', '📌', '📍', '🔔'])
+  }),
+  Object.freeze({
+    id: 'editorial',
+    rotulo: 'Editorial e Acadêmico',
+    simbolos: Object.freeze(['§', '¶', '†', '‡', '※', '⁂', '⁑', '⁜', '⸫', '⸬', '⸭', '✎', '✏', '✒', '✑', '⌘', '⌥', '⌖', '⌗', '℗', '©', '®', '™', '№', 'º', 'ª', '°', '‰', '∟', '∠', '∴', '∵', '∞', '∆', '∇', '∂', '∫', '∑', '∏', '√', '∝', '∈', '⊂', '∪', '∩', '∧', '∨', '∀', '∃', 'ℵ'])
+  }),
+  Object.freeze({
+    id: 'destaques',
+    rotulo: 'Avaliação e Destaques',
+    simbolos: Object.freeze(['♥', '♡', '♦', '♢', '♠', '♤', '♣', '♧', '☀', '☼', '☾', '☽', '☁', '☂', '☃', '☄', '♪', '♫', '♬', '♭', '♮', '♯', '🔥', '👍', '👎', '🏆', '🥇', '🥈', '🥉', '🏅', '🎖', '👑', '💎', '🎯', '🚀', '💡', '🍀', '🌱', '🌿', '🧭', '⚖', '⚙', '⚗', '🔬', '🔭', '📚', '📖', '🏷', '💬', '💭', '✨', '💯'])
+  })
 ]);
 
-/** Formatos de sequência: cada estilo de numeração com cada pontuação (24 combinações). */
+/** Paleta plana de símbolos para marcadores (qualquer um serve; fica em `marcador_simbolo` com `marcador_tipo: "simbolo"`). */
+export const SIMBOLOS_MARCADOR = Object.freeze(CATEGORIAS_SIMBOLOS_MARCADOR.flatMap(c => c.simbolos));
+
+/** Formatos de sequência: cada estilo de numeração com cada pontuação (64 combinações). */
 export const FORMATOS_SEQUENCIA = Object.freeze(ESTILOS_NUMERO.flatMap(([estilo]) => SEPARADORES_NUMERO.map(([sep]) => ({ estilo, sep }))));
 
 export const CAMPOS_MARCADOR = Object.freeze(['marcador_tipo', 'marcador_simbolo', 'marcador_estilo_num', 'marcador_separador', 'marcador_inicio', 'marcador_nivel', 'marcador_tab_mm', 'marcador_alinhamento']);
@@ -78,22 +123,26 @@ export function marcadorEfetivo(bloco, estilo) {
 }
 
 const ROMANOS = [[1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']];
+const GREGOS = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω'];
 
 export function formatarNumeroMarcador(n, estiloNum = 'decimal') {
   const v = Math.max(1, Math.floor(n) || 1);
   const letras = (x) => { let s = ''; let r = x; while (r > 0) { r -= 1; s = String.fromCharCode(97 + (r % 26)) + s; r = Math.floor(r / 26); } return s; };
+  const grego = (x) => { let s = ''; let r = x; while (r > 0) { r -= 1; s = GREGOS[r % GREGOS.length] + s; r = Math.floor(r / GREGOS.length); } return s; };
   const romano = () => { let r = v; let s = ''; for (const [val, sim] of ROMANOS) while (r >= val) { s += sim; r -= val; } return s; };
   switch (estiloNum) {
     case 'decimal_zero': return String(v).padStart(2, '0');
+    case 'ordinal': return `${v}º`;
     case 'lower_alpha': return letras(v);
     case 'upper_alpha': return letras(v).toUpperCase();
     case 'lower_roman': return romano();
     case 'upper_roman': return romano().toUpperCase();
+    case 'lower_greek': return grego(v);
     default: return String(v);
   }
 }
 
-/** Texto do marcador para o item de número `n` ("•", "1.", "a)", "(iii)", "01 –"…). */
+/** Texto do marcador para o item de número `n` ("•", "1.", "a)", "(iii)", "01 –", "[1]", "1º."…). */
 export function rotuloMarcador(cfg, n = 1) {
   if (!cfg) return '';
   if (cfg.tipo === 'simbolo') return simboloValido(cfg.simbolo) || '•';
@@ -103,6 +152,10 @@ export function rotuloMarcador(cfg, n = 1) {
     case 'parentese': return `${num})`;
     case 'entre_parenteses': return `(${num})`;
     case 'travessao': return `${num} –`;
+    case 'colchetes': return `[${num}]`;
+    case 'dois_pontos': return `${num}:`;
+    case 'seta': return `${num} ›`;
+    case 'ponto_traco': return `${num}.–`;
     default: return `${num}.`;
   }
 }

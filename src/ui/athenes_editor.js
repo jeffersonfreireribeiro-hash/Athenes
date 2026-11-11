@@ -57,7 +57,7 @@ import { svgIcone, svgLogo } from './athenes_icones.js';
 import { modosPermitidos, modoInicialDoPapel } from '../core/athenes_compartilhamento.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { montarCitacao, indiceNaLista } from '../core/athenes_citacao.js';
-import { mapaMarcadores, marcadorEfetivo } from '../core/athenes_marcadores.js';
+import { mapaMarcadores, marcadorEfetivo, rotuloMarcador } from '../core/athenes_marcadores.js';
 
 import { linhasEstimadas, porLinhaUsadoNoTexto, calibracaoDoTexto, definirCalibracaoTexto, definirAlturaMedida, TIPOS_COM_ALTURA_MEDIDA } from '../core/athenes_fragmentos.js';
 import { removerHifensCondicionais } from '../core/athenes_hifenizacao.js';
@@ -2821,8 +2821,13 @@ export class EditorView {
       if (local) return;
 
       if (lista.tagName.toLowerCase() === 'ol') {
-        lista.dataset.numEstilo = cfg?.estiloNum ?? 'decimal';
-        lista.dataset.numSep = cfg?.separador ?? 'ponto';
+        const estiloNum = cfg?.estiloNum ?? 'decimal';
+        const sep = cfg?.separador ?? 'ponto';
+        lista.dataset.numEstilo = estiloNum;
+        lista.dataset.numSep = sep;
+        lista.querySelectorAll(':scope > li').forEach((li, idx) => {
+          li.dataset.rotulo = rotuloMarcador({ tipo: 'numero', estiloNum, separador: sep }, inicio + idx);
+        });
       } else {
         const tipoMarc = (cfg && cfg.tipo !== 'numero') ? cfg.tipo
           : lista.classList.contains('ath-lista-alinea') ? 'traco'

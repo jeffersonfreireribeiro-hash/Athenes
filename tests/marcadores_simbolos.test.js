@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { marcadorEfetivo, rotuloMarcador, sanearCamposMarcador, simboloValido, SIMBOLOS_MARCADOR, FORMATOS_SEQUENCIA, CAMPOS_MARCADOR, segmentosDeLista, configListaDoBloco } from '../src/core/athenes_marcadores.js';
+import { marcadorEfetivo, rotuloMarcador, sanearCamposMarcador, simboloValido, CATEGORIAS_SIMBOLOS_MARCADOR, SIMBOLOS_MARCADOR, FORMATOS_SEQUENCIA, CAMPOS_MARCADOR, segmentosDeLista, configListaDoBloco } from '../src/core/athenes_marcadores.js';
 import { criarDocumento, criarNovoBloco, repaginarDocumento } from '../src/core/athenes_documento.js';
 import { gerarDocumentoHtmlPdf } from '../src/core/athenes_export_pdf.js';
 
@@ -13,14 +13,17 @@ test('marcador por símbolo da paleta: o rótulo é o símbolo escolhido', () =>
   assert.equal(rotuloMarcador(marcadorEfetivo({}, { marcador_tipo: 'quadrado' }), 1), '▪', 'tipos antigos continuam valendo');
 });
 
-test('paletas: 48 símbolos e 24 formatos de sequência, todos válidos e sem repetição', () => {
-  assert.equal(SIMBOLOS_MARCADOR.length, 48);
-  assert.equal(new Set(SIMBOLOS_MARCADOR).size, 48);
+test('paletas: catálogo completo de símbolos em categorias e 64 formatos de sequência, todos válidos e sem repetição', () => {
+  assert.equal(CATEGORIAS_SIMBOLOS_MARCADOR.length, 8);
+  assert.equal(SIMBOLOS_MARCADOR.length, 312);
+  assert.equal(new Set(SIMBOLOS_MARCADOR).size, SIMBOLOS_MARCADOR.length);
   assert.ok(SIMBOLOS_MARCADOR.every(s => simboloValido(s) === s));
-  assert.equal(FORMATOS_SEQUENCIA.length, 24);
+  assert.equal(FORMATOS_SEQUENCIA.length, 64);
   assert.deepEqual(rotuloMarcador({ tipo: 'numero', estiloNum: 'lower_roman', separador: 'entre_parenteses' }, 4), '(iv)');
   assert.deepEqual(rotuloMarcador({ tipo: 'numero', estiloNum: 'upper_alpha', separador: 'parentese' }, 2), 'B)');
   assert.deepEqual(rotuloMarcador({ tipo: 'numero', estiloNum: 'decimal_zero', separador: 'travessao' }, 7), '07 –');
+  assert.deepEqual(rotuloMarcador({ tipo: 'numero', estiloNum: 'ordinal', separador: 'ponto' }, 3), '3º.');
+  assert.deepEqual(rotuloMarcador({ tipo: 'numero', estiloNum: 'lower_greek', separador: 'colchetes' }, 2), '[β]');
 });
 
 test('símbolo de tema importado é saneado: sem marcação, no máximo 2 caracteres; inválido volta ao círculo', () => {
