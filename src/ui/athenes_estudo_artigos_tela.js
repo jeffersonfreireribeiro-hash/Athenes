@@ -186,8 +186,11 @@ export const metodosEstudoTela = {
             </button>
             <span class="rm-barra-sep" aria-hidden="true"></span>
 
-            <button type="button" class="rm-ic-bt" id="athBtnDesfazerTraco" title="Desfazer último risco da página ativa" aria-label="Desfazer risco">
+            <button type="button" class="rm-ic-bt" id="athBtnDesfazerTraco" title="Desfazer (Ctrl+Z)" aria-label="Desfazer">
               ${svgIcone('desfazer', 16)}
+            </button>
+            <button type="button" class="rm-ic-bt" id="athBtnRefazerTraco" title="Refazer (Ctrl+Shift+Z)" aria-label="Refazer">
+              ${svgIcone('refazer', 16)}
             </button>
             <button type="button" class="rm-ic-bt" id="athBtnLimparTracosPagina" title="Limpar riscos da página ativa" aria-label="Limpar riscos">
               ${svgIcone('lixeira', 15)}
@@ -516,6 +519,7 @@ export const metodosEstudoTela = {
     root.querySelector('#athInputTituloArtigoTopo').addEventListener('change', e => {
       art.titulo = e.target.value.trim() || art.titulo;
       salvarArtigosEstudo(this.artigos, art);
+      this.registrarSnapshotArtigo?.(art);
       this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, paginasPdf);
     });
 
@@ -535,22 +539,22 @@ export const metodosEstudoTela = {
     root.querySelector('#athBtnSalvarDriveEZotero')?.addEventListener('click', (e) => acionarSalvarCompleto(e.currentTarget));
     root.querySelector('#athBtnSalvarPilula')?.addEventListener('click', (e) => acionarSalvarCompleto(e.currentTarget));
 
-    // Desfazer último risco e limpar riscos da página ativa
+    // Desfazer, refazer e limpar riscos da página ativa
     root.querySelector('#athBtnDesfazerTraco').addEventListener('click', () => {
-      const lista = art.fichamento?.tracosPorPagina?.[this.paginaAtual];
-      if (Array.isArray(lista) && lista.length > 0) {
-        lista.pop();
-        salvarArtigosEstudo(this.artigos, art);
-        const canvasAtivo = root.querySelector(`canvas[data-canvas-pag="${this.paginaAtual}"]`);
-        this.redesenharCanvasTinta(canvasAtivo, art, this.paginaAtual);
-        this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, paginasPdf);
-      }
+      this.desfazerEstudo?.();
     });
+
+    root.querySelector('#athBtnRefazerTraco')?.addEventListener('click', () => {
+      this.refazerEstudo?.();
+    });
+
+    this.atualizarBotoesHistoricoEstudio?.(root);
 
     root.querySelector('#athBtnLimparTracosPagina').addEventListener('click', () => {
       if (!art.fichamento.tracosPorPagina) art.fichamento.tracosPorPagina = {};
       art.fichamento.tracosPorPagina[this.paginaAtual] = [];
       salvarArtigosEstudo(this.artigos, art);
+      this.registrarSnapshotArtigo?.(art);
       const canvasAtivo = root.querySelector(`canvas[data-canvas-pag="${this.paginaAtual}"]`);
       this.redesenharCanvasTinta(canvasAtivo, art, this.paginaAtual);
       this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, paginasPdf);
@@ -1138,6 +1142,7 @@ export const metodosEstudoTela = {
         artAtivo.totalPaginas = artAtivo.conteudoPaginasPdf.length;
         if (this.paginaAtual > artAtivo.totalPaginas) this.paginaAtual = artAtivo.totalPaginas;
         salvarArtigosEstudo(this.artigos, artAtivo);
+        this.registrarSnapshotArtigo?.(artAtivo);
         this.renderizar();
       });
     });

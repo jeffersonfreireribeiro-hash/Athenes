@@ -145,6 +145,8 @@ export class CamadaSemanticaEditorUI {
       editavel.dataset.alteracaoSemanticaPendente = '1';
       try { editavel.dispatchEvent(new Event('input', { bubbles: true })); }
       finally { delete editavel.dataset.alteracaoSemanticaPendente; }
+      this.editor._edicaoNativa = false;
+      this.editor.salvarSnapshot?.();
       this.sincronizarOverlayCss();
       return true;
     };

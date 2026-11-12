@@ -81,6 +81,7 @@ export const metodosEstudoAnotacoes = {
             pin.texto = txtArea.value.trim() || pin.texto;
             pin.cor = dot.dataset.corPin;
             salvarArtigosEstudo(this.artigos);
+            this.registrarSnapshotArtigo?.(art);
             this.renderizarPinsDaPagina(layerEl, art, numPag, root);
             this.atualizarPaineisLateraisDeNotas(root, art);
           });
@@ -92,6 +93,7 @@ export const metodosEstudoAnotacoes = {
           pin.texto = txtArea.value.trim() || pin.texto;
           pin.tamanho = pin.tamanho === 'pequena' ? 'normal' : 'pequena';
           salvarArtigosEstudo(this.artigos);
+          this.registrarSnapshotArtigo?.(art);
           this.renderizarPinsDaPagina(layerEl, art, numPag, root);
         });
 
@@ -101,6 +103,7 @@ export const metodosEstudoAnotacoes = {
           if (minimizarAoSalvar) pin.minimizado = true;
           this.pinEditandoId = null;
           salvarArtigosEstudo(this.artigos);
+          this.registrarSnapshotArtigo?.(art);
           this.renderizarPinsDaPagina(layerEl, art, numPag, root);
           this.atualizarPaineisLateraisDeNotas(root, art);
         };
@@ -125,6 +128,7 @@ export const metodosEstudoAnotacoes = {
           art.fichamento.notasPagina[numPag] = pins.filter(p => p.id !== pin.id);
           this.pinEditandoId = null;
           salvarArtigosEstudo(this.artigos);
+          this.registrarSnapshotArtigo?.(art);
           this.renderizarPinsDaPagina(layerEl, art, numPag, root);
           this.atualizarPaineisLateraisDeNotas(root, art);
         });
@@ -147,6 +151,7 @@ export const metodosEstudoAnotacoes = {
             e.stopPropagation();
             pin.minimizado = false;
             salvarArtigosEstudo(this.artigos);
+            this.registrarSnapshotArtigo?.(art);
             this.renderizarPinsDaPagina(layerEl, art, numPag, root);
             this.atualizarPaineisLateraisDeNotas(root, art);
           });
@@ -156,6 +161,7 @@ export const metodosEstudoAnotacoes = {
           e.stopPropagation();
           art.fichamento.notasPagina[numPag] = pins.filter(p => p.id !== pin.id);
           salvarArtigosEstudo(this.artigos);
+          this.registrarSnapshotArtigo?.(art);
           this.renderizarPinsDaPagina(layerEl, art, numPag, root);
           this.atualizarPaineisLateraisDeNotas(root, art);
         });
@@ -187,6 +193,7 @@ export const metodosEstudoAnotacoes = {
           e.stopPropagation();
           pin.minimizado = true;
           salvarArtigosEstudo(this.artigos);
+          this.registrarSnapshotArtigo?.(art);
           this.renderizarPinsDaPagina(layerEl, art, numPag, root);
           this.atualizarPaineisLateraisDeNotas(root, art);
         });
@@ -195,6 +202,7 @@ export const metodosEstudoAnotacoes = {
           e.stopPropagation();
           pin.tamanho = pin.tamanho === 'pequena' ? 'normal' : 'pequena';
           salvarArtigosEstudo(this.artigos);
+          this.registrarSnapshotArtigo?.(art);
           this.renderizarPinsDaPagina(layerEl, art, numPag, root);
         });
 
@@ -202,6 +210,7 @@ export const metodosEstudoAnotacoes = {
           e.stopPropagation();
           art.fichamento.notasPagina[numPag] = pins.filter(p => p.id !== pin.id);
           salvarArtigosEstudo(this.artigos);
+          this.registrarSnapshotArtigo?.(art);
           this.renderizarPinsDaPagina(layerEl, art, numPag, root);
           this.atualizarPaineisLateraisDeNotas(root, art);
         });
@@ -235,10 +244,12 @@ export const metodosEstudoAnotacoes = {
             window.removeEventListener('pointerup', onUp);
             if (moveu) {
               salvarArtigosEstudo(this.artigos);
+              this.registrarSnapshotArtigo?.(art);
             } else if (!estaEditando) {
               if (estaMinimizado) {
                 pin.minimizado = false;
                 salvarArtigosEstudo(this.artigos);
+                this.registrarSnapshotArtigo?.(art);
               } else {
                 this.pinEditandoId = pin.id;
               }
@@ -451,6 +462,7 @@ export const metodosEstudoAnotacoes = {
           numPag
         );
         salvarArtigosEstudo(this.artigos);
+        this.registrarSnapshotArtigo?.(art);
       } else {
         try {
           const mark = document.createElement('mark');
@@ -470,6 +482,7 @@ export const metodosEstudoAnotacoes = {
               art.conteudoPaginasPdf[numPag - 1].htmlGrifado = colEl.innerHTML;
             }
             salvarArtigosEstudo(this.artigos);
+            this.registrarSnapshotArtigo?.(art);
           }
         } catch (_) {}
       }
@@ -709,6 +722,7 @@ export const metodosEstudoAnotacoes = {
       rectCache = null;
       this.redesenharCanvasTinta(canvas, art, numPag);
       salvarArtigosEstudoDebounced(this.artigos, 180);
+      this.registrarSnapshotArtigo?.(art);
       if (root) {
         this.renderizarColunaEsquerdaEstudio(root.querySelector('#athEstudioColEsq'), art, art.conteudoPaginasPdf);
       }

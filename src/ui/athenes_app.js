@@ -361,6 +361,8 @@ export class AthenesApp {
         this.editorView.inserirCitacaoLonga(ref, dados);
       },
       onAlterado: () => {
+        this.editorView?.salvarSnapshot?.();
+        this.editorView?.renderizarFolhasPaginas?.();
         this.autoSalvar();
       }
     });

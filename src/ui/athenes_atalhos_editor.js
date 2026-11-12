@@ -73,7 +73,10 @@ export class AtalhosDoEditor {
     this.ligarColagem();
     this.ligarMenuContexto();
     this.ghostEngine = new GhostTextEngine(this.ed);
-    this.aoInput = (e) => { if (e.target?.isContentEditable && this.ed.container.contains(e.target)) this.ed._edicaoNativa = true; };
+    this.aoInput = (e) => {
+      if (e.target?.dataset?.alteracaoSemanticaPendente === '1') return;
+      if (e.target?.isContentEditable && this.ed.container.contains(e.target)) this.ed._edicaoNativa = true;
+    };
     document.addEventListener('input', this.aoInput, true);
     this.gerenciador.anexar();
     this.gerenciador.observarTooltips(MAPA_TOOLTIPS);

@@ -23,6 +23,14 @@ import { obterTokenOuConectar, obterTokenDrive, sincronizarZoteroComDrive, obter
 import { ZoteroClient } from '../core/athenes_zotero.js';
 import { obterPerfilColaborador, obterConfigGoogleDrive, salvarArquivoNoGoogleDrive, autenticarGoogleDrive, listarPdfsDoGoogleDrive, salvarDocumentoNoSupabase, obterPastasDriveLocais, salvarPastasDriveLocais, buscarPastaNaArvore } from '../core/athenes_colaboracao.js';
 import { escapeHtml } from '../core/athenes_seguranca.js';
+import {
+  HistoricoLinear,
+  clonarEstadoArtigo,
+  aplicarEstadoArtigo,
+  clonarEstadoCatalogo,
+  restaurarEstadoCatalogo,
+  classificarAtalhoHistorico
+} from '../core/athenes_estudo_historico.js';
 import { svgIcone } from './athenes_icones.js';
 import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { aplicarFilhosZoteroAoArtigo } from '../core/athenes_zotero_anexos_notas.js';
@@ -96,6 +104,13 @@ export class EstudoArtigosView {
     this.aoMudarPastas = opcoes.aoMudarPastas || null; // a página inicial refaz a lista de pastas quando as coleções do Zotero chegam
     this.zoteroClient = new ZoteroClient();
     this.carregarConfigZotero();
+    this._historicosArtigo = new Map();
+    this._aplicandoHistorico = false;
+    this._historicoCatalogo = new HistoricoLinear({
+      limite: 50,
+      estadoInicial: clonarEstadoCatalogo(this.artigos, coletarPastasBibliografia())
+    });
+    this._instalarAtalhosHistoricoEstudio();
     this.hidratarSnapshotIndexedDb();
     this.restaurarArtigoAbertoSessao();
     if (!this.artigoAberto) this.renderizar();
@@ -274,7 +289,196 @@ export class EstudoArtigosView {
       }
       this.alternarModoDashboardFull(false);
       this.renderizarCatalogoArtigos();
+      this.registrarSnapshotCatalogo();
     }
+  }
+
+  _instalarAtalhosHistoricoEstudio() {
+    if (typeof window === 'undefined') return;
+    if (this._atalhoHistoricoEstudio) {
+      window.removeEventListener('keydown', this._atalhoHistoricoEstudio);
+    }
+    this._atalhoHistoricoEstudio = (e) => {
+      if (!this.container?.isConnected) return;
+      if (this.container.closest?.('[hidden]') || this.container.style.display === 'none') return;
+      if (typeof document !== 'undefined' && document.querySelector('.ath-modal-backdrop, .ath-modal-overlay')) {
+        return;
+      }
+      const acao = classificarAtalhoHistorico(e);
+      if (!acao) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (acao === 'desfazer') this.desfazerEstudo();
+      else if (acao === 'refazer') this.refazerEstudo();
+    };
+    window.addEventListener('keydown', this._atalhoHistoricoEstudio);
+  }
+
+  destruir() {
+    if (typeof window !== 'undefined') {
+      if (this._atalhoHistoricoEstudio) {
+        window.removeEventListener('keydown', this._atalhoHistoricoEstudio);
+        this._atalhoHistoricoEstudio = null;
+      }
+      if (this._tecladoZoomHandler) {
+        window.removeEventListener('keydown', this._tecladoZoomHandler);
+        this._tecladoZoomHandler = null;
+      }
+    }
+    if (typeof document !== 'undefined') {
+      if (this._selectionChangeHandler) {
+        document.removeEventListener('selectionchange', this._selectionChangeHandler);
+        this._selectionChangeHandler = null;
+      }
+      if (this._fecharImportarBib) {
+        document.removeEventListener('click', this._fecharImportarBib);
+        this._fecharImportarBib = null;
+      }
+    }
+    this._observadorEstante?.disconnect?.();
+    this._observadorEstante = null;
+    this._cancelarBib?.();
+    this._cancelarBib = null;
+  }
+
+  garantirHistoricoArtigo(art) {
+    if (!art?.id) return null;
+    if (!this._historicosArtigo) this._historicosArtigo = new Map();
+    const chave = String(art.id);
+    if (!this._historicosArtigo.has(chave)) {
+      this._historicosArtigo.set(chave, new HistoricoLinear({
+        limite: 50,
+        estadoInicial: clonarEstadoArtigo(art)
+      }));
+    }
+    return this._historicosArtigo.get(chave);
+  }
+
+  registrarSnapshotArtigo(art = this.artigoAberto) {
+    if (!art || this._aplicandoHistorico) return false;
+    const hist = this.garantirHistoricoArtigo(art);
+    if (!hist) return false;
+    const gravou = hist.registrar(clonarEstadoArtigo(art));
+    this.atualizarBotoesHistoricoEstudio(this.container);
+    return gravou;
+  }
+
+  registrarSnapshotCatalogo() {
+    if (this._aplicandoHistorico) return false;
+    if (!this._historicoCatalogo) {
+      this._historicoCatalogo = new HistoricoLinear({ limite: 50 });
+    }
+    return this._historicoCatalogo.registrar(
+      clonarEstadoCatalogo(this.artigos, coletarPastasBibliografia())
+    );
+  }
+
+  atualizarBotoesHistoricoEstudio(root = this.container) {
+    if (!root) return;
+    const hist = this.artigoAberto ? this.garantirHistoricoArtigo(this.artigoAberto) : null;
+    const btnDesfazer = root.querySelector('#athBtnDesfazerTraco');
+    const btnRefazer = root.querySelector('#athBtnRefazerTraco');
+    if (btnDesfazer) btnDesfazer.disabled = !hist || !hist.podeDesfazer();
+    if (btnRefazer) btnRefazer.disabled = !hist || !hist.podeRefazer();
+  }
+
+  aplicarRestauracaoArtigoNoDom(art, qtdPaginasAnterior) {
+    const root = this.container;
+    if (!root || !art) {
+      this.renderizar();
+      return;
+    }
+    const paginas = art.conteudoPaginasPdf || [];
+    if (paginas.length !== qtdPaginasAnterior) {
+      this.paginaAtual = Math.max(1, Math.min(this.paginaAtual || 1, Math.max(1, paginas.length)));
+      this.renderizar();
+      return;
+    }
+
+    let precisaReRenderHtml = false;
+    paginas.forEach((pag, idx) => {
+      const n = idx + 1;
+      const colEl = root.querySelector(`[data-colunas-pag="${n}"]`);
+      if (colEl) {
+        if (!pag.htmlGrifado && colEl.querySelector('mark.ath-pdf-grifo-texto')) {
+          precisaReRenderHtml = true;
+        } else if (pag.htmlGrifado && colEl.innerHTML !== pag.htmlGrifado) {
+          precisaReRenderHtml = true;
+        }
+      }
+    });
+    if (precisaReRenderHtml) {
+      this.renderizar();
+      return;
+    }
+
+    const inputTitulo = root.querySelector('#athInputTituloArtigoTopo');
+    if (inputTitulo && inputTitulo.value !== (art.titulo || '')) {
+      inputTitulo.value = art.titulo || '';
+    }
+
+    paginas.forEach((_, idx) => {
+      const n = idx + 1;
+      const canvas = root.querySelector(`canvas[data-canvas-pag="${n}"]`);
+      if (canvas) this.redesenharCanvasTinta(canvas, art, n);
+      const layerHl = root.querySelector(`[data-hl-pag="${n}"]`);
+      if (layerHl) this.renderizarGrifosRetangularesDaPagina(layerHl, art, n);
+      const layerPins = root.querySelector(`[data-pins-pag="${n}"]`);
+      if (layerPins) this.renderizarPinsDaPagina(layerPins, art, n, root);
+    });
+
+    this.atualizarPaineisLateraisDeNotas(root, art);
+    const colEsq = root.querySelector('#athEstudioColEsq');
+    if (colEsq) this.renderizarColunaEsquerdaEstudio(colEsq, art, paginas);
+    this.atualizarAbaCitacoesEContadores(art);
+    this.atualizarBotoesHistoricoEstudio(root);
+  }
+
+  desfazerEstudo() {
+    return this._navegarHistoricoEstudo('desfazer');
+  }
+
+  refazerEstudo() {
+    return this._navegarHistoricoEstudo('refazer');
+  }
+
+  _navegarHistoricoEstudo(direcao) {
+    if (this._aplicandoHistorico) return false;
+    if (this.artigoAberto) {
+      const art = this.artigoAberto;
+      const hist = this.garantirHistoricoArtigo(art);
+      const snap = direcao === 'desfazer' ? hist?.desfazer() : hist?.refazer();
+      if (!snap) return false;
+      const qtdPaginasAnterior = (art.conteudoPaginasPdf || []).length;
+      this._aplicandoHistorico = true;
+      try {
+        aplicarEstadoArtigo(art, snap);
+        salvarArtigosEstudo(this.artigos, art);
+        this.salvarCacheArtigoAbertoSessao(art);
+        this.aplicarRestauracaoArtigoNoDom(art, qtdPaginasAnterior);
+      } finally {
+        this._aplicandoHistorico = false;
+      }
+      this.registrarSnapshotCatalogo();
+      return true;
+    }
+
+    const histCat = this._historicoCatalogo;
+    const snap = direcao === 'desfazer' ? histCat?.desfazer() : histCat?.refazer();
+    if (!snap) return false;
+    this._aplicandoHistorico = true;
+    try {
+      const restaurado = restaurarEstadoCatalogo(this.artigos, snap);
+      this.artigos = restaurado.artigos;
+      salvarPastasDriveLocais(restaurado.pastas);
+      salvarArtigosEstudo(this.artigos);
+      this.aoMudarPastas?.({});
+      this.renderizar();
+      mostrarAviso(direcao === 'desfazer' ? 'Ação desfeita.' : 'Ação refeita.', { tipo: 'ok' });
+    } finally {
+      this._aplicandoHistorico = false;
+    }
+    return true;
   }
 
   /* ==========================================================================
@@ -542,6 +746,7 @@ export class EstudoArtigosView {
           }
         });
         salvarArtigosEstudo(this.artigos);
+        this.registrarSnapshotCatalogo();
         this.atualizarGridCatalogo();
       };
       reader.readAsText(arq);
@@ -754,9 +959,11 @@ export class EstudoArtigosView {
         },
         onStatusChange: (status) => {
           salvarArtigosEstudo(this.artigos);
+          this.registrarSnapshotCatalogo();
         },
         onSalvarNota: (nota) => {
           salvarArtigosEstudo(this.artigos);
+          this.registrarSnapshotCatalogo();
           mostrarAviso('Anotação de fichamento salva com sucesso!', { tipo: 'ok' });
         },
         onEditarMeta: (art) => {
@@ -772,12 +979,14 @@ export class EstudoArtigosView {
           if (cor) {
             art.corCapa = cor;
             salvarArtigosEstudo(this.artigos, art);
+            this.registrarSnapshotCatalogo();
           }
         },
         onAlterarCorCapa: (art, cor) => {
           if (cor) {
             art.corCapa = cor;
             salvarArtigosEstudo(this.artigos, art);
+            this.registrarSnapshotCatalogo();
           }
         }
       }
@@ -833,6 +1042,7 @@ export class EstudoArtigosView {
         const pId = btn.dataset.pastaDest;
         moverLivroParaPasta(art.id, pId, this.artigos, pastas);
         salvarArtigosEstudo(this.artigos);
+        this.registrarSnapshotCatalogo();
         moverArquivosDoArtigoNoDrive(art, pId).catch(() => {});
         fechar();
         this.atualizarGridCatalogo();
@@ -910,6 +1120,7 @@ export class EstudoArtigosView {
     const trocouArtigo = this.artigoAberto && String(this.artigoAberto.id) !== String(art?.id);
     definirArtigoAbertoAtivo(art);
     this.artigoAberto = art;
+    this.garantirHistoricoArtigo(art);
     this.paginaAtual = Math.max(1, parseInt(paginaInicial, 10) || 1);
     this.pinEditandoId = null;
     try {
@@ -1039,6 +1250,10 @@ export class EstudoArtigosView {
         art.conteudoPaginasPdf = [...pagsReais, ...extras];
       }
       art.totalPaginas = art.conteudoPaginasPdf.length;
+      const histArt = this._historicosArtigo?.get(String(art.id));
+      if (histArt && histArt.pilha.length === 1 && histArt.indice === 0) {
+        histArt.pilha[0] = JSON.stringify(clonarEstadoArtigo(art));
+      }
       this._pdfDocs.set(url, { doc, dims, n });
       return true;
     } catch (err) {
@@ -1227,6 +1442,7 @@ export class EstudoArtigosView {
     art.fichamento.notasPagina[numPag].push(novoPin);
     this.pinEditandoId = novoPin.id;
     salvarArtigosEstudo(this.artigos);
+    this.registrarSnapshotArtigo(art);
 
     if (root) {
       const layer = root.querySelector(`[data-pins-pag="${numPag}"]`);
@@ -1292,6 +1508,7 @@ export class EstudoArtigosView {
     art.totalPaginas = lista.length;
     this.paginaAtual = novoNum;
     salvarArtigosEstudo(this.artigos);
+    this.registrarSnapshotArtigo(art);
     this.renderizar();
     requestAnimationFrame(() => {
       this.rolarParaPagina(novoNum, this.container);

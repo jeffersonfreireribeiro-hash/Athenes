@@ -756,6 +756,7 @@ export const metodosEstudoPastas = {
           this.renderizarBarraPastasTopo(topoWrapper);
         }
         this.selecionarPastaBib(nova.id);
+        this.registrarSnapshotCatalogo?.();
       }
     });
   },
@@ -798,6 +799,7 @@ export const metodosEstudoPastas = {
 
     // Persiste e atualiza interface
     salvarArtigosEstudo(this.artigos, resultado.livroModificado);
+    this.registrarSnapshotCatalogo?.();
     moverArquivosDoArtigoNoDrive(resultado.livroModificado, pastaDestinoId).catch(() => {});
     this.atualizarBarraPastasContadores();
     this.atualizarGridCatalogo();
@@ -850,6 +852,7 @@ export const metodosEstudoPastas = {
       if (novoNome && novoNome.trim()) {
         pasta.nome = novoNome.trim();
         salvarPastasDriveLocais(obterPastasDriveLocais());
+        this.registrarSnapshotCatalogo?.();
         const topoWrapper = this.container?.querySelector('#athBibTopoPastasWrapper');
         if (topoWrapper) this.renderizarBarraPastasTopo(topoWrapper);
         mostrarAviso('Pasta renomeada com sucesso!', { tipo: 'sucesso' });
@@ -868,6 +871,7 @@ export const metodosEstudoPastas = {
           }
         }
         salvarArtigosEstudo(this.artigos);
+        this.registrarSnapshotCatalogo?.();
         if (this.pastaFiltroId === pastaId) {
           this.selecionarPastaBib('todas');
         } else {
@@ -959,6 +963,7 @@ export const metodosEstudoPastas = {
       pasta.cor = corEscolhida;
       pasta.corEm = corEm;
       salvarPastasDriveLocais(arvore);
+      this.registrarSnapshotCatalogo?.();
       fechar();
       const topoWrapper = this.container?.querySelector('#athBibTopoPastasWrapper');
       if (topoWrapper) this.renderizarBarraPastasTopo(topoWrapper);

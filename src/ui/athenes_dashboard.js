@@ -651,6 +651,7 @@ export class DashboardView {
         boxEstudo.style.height = '100%';
         boxEstudo.style.minHeight = '100%';
       }
+      this.estudoView?.destruir?.();
       this.estudoView = new EstudoArtigosView(boxEstudo, {
         pastaFiltroId: this.pastaAtivaId,
         artigoInicialId: this.artigoInicialId,

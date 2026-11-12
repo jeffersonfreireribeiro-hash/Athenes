@@ -248,6 +248,7 @@ export const metodosEstudoPainelDireito = {
             alvo.minimizado = !alvo.minimizado;
             if (alvo.minimizado && this.pinEditandoId === pinId) this.pinEditandoId = null;
             salvarArtigosEstudo(this.artigos);
+            this.registrarSnapshotArtigo?.(art);
             const layer = this.container?.querySelector(`[data-pins-pag="${pg}"]`);
             this.renderizarPinsDaPagina(layer, art, pg, this.container);
             this.atualizarPaineisLateraisDeNotas(this.container, art);
@@ -263,6 +264,7 @@ export const metodosEstudoPainelDireito = {
             art.fichamento.notasPagina[pg] = art.fichamento.notasPagina[pg].filter(p => p.id !== pinId);
             if (this.pinEditandoId === pinId) this.pinEditandoId = null;
             salvarArtigosEstudo(this.artigos);
+            this.registrarSnapshotArtigo?.(art);
             const layer = this.container?.querySelector(`[data-pins-pag="${pg}"]`);
             this.renderizarPinsDaPagina(layer, art, pg, this.container);
             this.atualizarPaineisLateraisDeNotas(this.container, art);
@@ -270,19 +272,24 @@ export const metodosEstudoPainelDireito = {
         });
       });
 
-      box.querySelector('#athEstudoResumoPessoal').addEventListener('input', e => {
+      const elResumo = box.querySelector('#athEstudoResumoPessoal');
+      elResumo.addEventListener('input', e => {
         f.resumoPessoal = e.target.value;
         salvarArtigosEstudoDebounced(this.artigos);
       });
+      elResumo.addEventListener('change', () => this.registrarSnapshotArtigo?.(art));
 
-      box.querySelector('#athEstudoMetodoNotas').addEventListener('input', e => {
+      const elMetodo = box.querySelector('#athEstudoMetodoNotas');
+      elMetodo.addEventListener('input', e => {
         f.metodologiaNotas = e.target.value;
         salvarArtigosEstudoDebounced(this.artigos);
       });
+      elMetodo.addEventListener('change', () => this.registrarSnapshotArtigo?.(art));
 
       box.querySelector('#athEstudoTagsInput').addEventListener('change', e => {
         art.palavrasChave = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
         salvarArtigosEstudo(this.artigos);
+        this.registrarSnapshotArtigo?.(art);
       });
       return;
     }
@@ -356,6 +363,7 @@ export const metodosEstudoPainelDireito = {
         btn.addEventListener('click', () => {
           f.citacoesMarcadas = citacoes.filter(x => x.id !== btn.dataset.delCit);
           salvarArtigosEstudo(this.artigos);
+          this.registrarSnapshotArtigo?.(art);
           this.atualizarAbaCitacoesEContadores(art);
         });
       });

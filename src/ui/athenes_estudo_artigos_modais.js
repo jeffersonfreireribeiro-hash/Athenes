@@ -174,6 +174,8 @@ export const metodosEstudoModais = {
         if (!await registrarPdfLocalNoArtigo(art, file)) return;
         if (this._pdfFalhou) this._pdfFalhou.clear();
         salvarArtigosEstudo(this.artigos);
+        this.registrarSnapshotArtigo?.(art);
+        this.registrarSnapshotCatalogo?.();
         this.renderizar();
       });
 
@@ -458,6 +460,8 @@ export const metodosEstudoModais = {
           artAlvo.conteudoPaginasPdf[0].autores = (artAlvo.autores || []).map(a => `${a.prenome || ''} ${a.sobrenome}`.trim()).join(' · ');
         }
         salvarArtigosEstudo(this.artigos);
+        this.registrarSnapshotArtigo?.(artAlvo);
+        this.registrarSnapshotCatalogo?.();
         this.renderizar();
       }
       if (onSelecionado) onSelecionado(ref);
@@ -697,6 +701,7 @@ export const metodosEstudoModais = {
 
       this.artigos.unshift(novoArt);
       salvarArtigosEstudo(this.artigos);
+      this.registrarSnapshotCatalogo?.();
       fechar();
       this.abrirArtigoNoEstudio(novoArt);
     });
@@ -883,6 +888,7 @@ export const metodosEstudoModais = {
       }
 
       salvarArtigosEstudo(this.artigos);
+      this.registrarSnapshotArtigo?.(art);
       this.abaDireita = 'citacoes';
       fechar();
       this.atualizarAbaCitacoesEContadores(art);

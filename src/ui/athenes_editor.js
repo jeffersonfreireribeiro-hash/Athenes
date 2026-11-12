@@ -381,6 +381,7 @@ export class EditorView {
   }
 
   salvarSnapshot() {
+    clearTimeout(this._tSnap);
     podarNotasOrfas(this.doc);
     const snap = JSON.stringify(this.doc);
     this._edicaoNativa = false; // edição consolidada: o próximo Ctrl+Z volta um estado do documento
