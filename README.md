@@ -14,6 +14,7 @@ O **Athenes** é um ambiente completo para a web voltado à escrita e diagramaç
 - **Perfis de Formatação Acadêmica**: Perfis prontos para **ABNT** (NBR 14724 / 6023 / 10520), **APA 7ª Edição**, **IEEE** (duas colunas), **Vancouver** e **Personalizado**.
 - **Sumário Dinâmico e Numeração**: Geração automática de sumário (TOC) com linhas pontilhadas (leader dots) e numeração de páginas calculada em tempo real.
 - **Integração Zotero & Biblioteca de Leitura**: Conexão com a Zotero Web API oficial v3 e suporte offline a arquivos BibTeX (`.bib`). Permite busca de referências, inserção de citações no cursor, fichamento pessoal (sem sobrescrever dados do Zotero) e visualização do Grafo de Conexões entre autores, obras, temas e anos.
+- **Busca no artigo aberto**: `Ctrl+F` (ou `Cmd+F`) pesquisa o texto de todas as páginas do PDF, com trechos por página, destaques temporários e opções de palavra inteira, caixa e acentuação. `Enter` avança, `Shift+Enter` volta e `Esc` fecha. PDFs sem camada de texto precisam de OCR.
 - **Exportação Dupla de Alta Fidelidade**:
   1. **PDF**: Renderização W3C Paged Media (`@page`) milimétrica com quebras exatas e fontes incorporadas.
   2. **DOCX Nativo**: Pacote Office Open XML compatível com Microsoft Word e Google Docs, mapeando estilos semânticos (`Heading 1`, `Heading 2`, `Normal`), tabelas, imagens, legendas e notas.

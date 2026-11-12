@@ -1,3 +1,4 @@
+import {instalarBuscaArtigo,registrarTextoPdfBuscavel} from './athenes_busca_artigo.js';
 import {podeEditarRelacoes as podeEditarRelacoesDestino} from '../core/athenes_relacoes.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
@@ -280,6 +281,7 @@ export class EstudoArtigosView {
 
   renderizar() {
     if (!this.container) return;
+    this._buscaArtigo?.destroy();this._buscaArtigo=null;
     this._observadorEstante?.disconnect();
     this._observadorEstante = null;
     const palcoAntigo = this.container.querySelector('#athEstudioPalco');
@@ -293,6 +295,9 @@ export class EstudoArtigosView {
       if (headerAcoes) headerAcoes.innerHTML = '';
       this.alternarModoDashboardFull(true);
       this.renderizarEstudioPdfFullScreen(this.artigoAberto, scrollSalvo);
+      const chave=String(this.artigoAberto.id)+':'+(this.artigoAberto.pdfBlobUrl||'');
+      if(this._estadoBuscaArtigo?.chave!==chave)this._estadoBuscaArtigo={chave};
+      this._buscaArtigo=instalarBuscaArtigo(this,this.container.querySelector('.ath-estudio-full-shell'),this.artigoAberto,this._estadoBuscaArtigo);
     } else {
       if (this._tecladoZoomHandler) {
         window.removeEventListener('keydown', this._tecladoZoomHandler);
@@ -330,6 +335,7 @@ export class EstudoArtigosView {
   }
 
   destruir() {
+    this._buscaArtigo?.destroy();this._buscaArtigo=null;
     this._fecharRelacoes?.();
     if (typeof window !== 'undefined') {
       if (this._atalhoHistoricoEstudio) {
@@ -1345,11 +1351,13 @@ export class EstudoArtigosView {
         camada.style.setProperty('--total-scale-factor', String(escala));
         const lib = await carregarPdfJs();
         const textContent = await page.getTextContent();
-        await new lib.TextLayer({
+        const camadaPdf=new lib.TextLayer({
           textContentSource: textContent,
           container: camada,
           viewport
-        }).render();
+        });
+        await camadaPdf.render();
+        registrarTextoPdfBuscavel(camada,textContent.items,camadaPdf.textDivs);
 
         let endOfContent = camada.querySelector('.endOfContent');
         if (!endOfContent) {
