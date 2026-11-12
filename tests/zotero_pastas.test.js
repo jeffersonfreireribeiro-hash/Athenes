@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { espelharColecoesNasPastas, ordenarColecoes, pastasDoItemZotero, artigoEstaNaPasta } from '../src/core/athenes_zotero_pastas.js';
+import { espelharColecoesNasPastas, ordenarColecoes, pastasDoItemZotero, artigoEstaNaPasta, caminhoDaPasta, pastasDoNivel } from '../src/core/athenes_zotero_pastas.js';
+import {mesclarPerfil} from '../src/core/athenes_perfil_servidor.js';
 
 const raiz = () => [{ id: 'pasta_bib_raiz', nome: 'Bibliografia & Leituras', tipo: 'bibliografia', origem: 'minhas', subpastas: [] }];
 const colecoes = [
@@ -9,6 +10,38 @@ const colecoes = [
   { key: 'A', nome: 'Arquitetura', parentCollection: false },
   { key: 'C', nome: 'Urbanismo', parentCollection: false }
 ];
+test('subcoleções existentes mudam de pai sem trocar id, arquivos ou filhos locais',()=>{
+ const initial=espelharColecoesNasPastas(raiz(),colecoes,{agora:'2026-01-01'});
+ const arq=initial.pastas[0].subpastas.find(p=>p.zoteroKey==='A'),filho=arq.subpastas[0];
+ filho.driveId='drive-preservado';filho.subpastas.push({id:'manual',nome:'Minhas notas',subpastas:[]});
+ const moved=espelharColecoesNasPastas(initial.pastas,colecoes.map(c=>c.key==='B'?{...c,parentCollection:'C'}:c),{agora:'2026-02-01'});
+ const urbano=moved.pastas[0].subpastas.find(p=>p.zoteroKey==='C');
+ assert.equal(moved.movidas,1);assert.equal(moved.criadas,0);assert.equal(urbano.subpastas[0].id,filho.id);
+ assert.equal(urbano.subpastas[0].driveId,'drive-preservado');assert.equal(urbano.subpastas[0].subpastas[0].id,'manual');
+ assert.equal(moved.pastas[0].subpastas.find(p=>p.zoteroKey==='A').subpastas.length,0);
+ assert.equal(espelharColecoesNasPastas(moved.pastas,colecoes.map(c=>c.key==='B'?{...c,parentCollection:'C'}:c)).mudou,false);
+});
+test('perfil antigo não desfaz a nova hierarquia nem duplica coleções entre computadores',()=>{
+ const old=espelharColecoesNasPastas(raiz(),colecoes,{agora:'2026-01-01'}).pastas;
+ const nested=espelharColecoesNasPastas(old,colecoes.map(c=>c.key==='C'?{...c,parentCollection:'B'}:c),{agora:'2026-02-01'}).pastas;
+ const local={pastas:nested,documentos:[]},server={pastas:old,documentos:[]};
+ const merged=mesclarPerfil(server,local);const all=[];const walk=ps=>ps.forEach(p=>{all.push(p);walk(p.subpastas||[])});walk(merged.pastas);
+ assert.equal(all.filter(p=>p.zoteroKey==='C').length,1);assert.equal(all.find(p=>p.zoteroKey==='C').parentId,'zot_col_B');
+ const stale=mesclarPerfil(merged.indice,{pastas:old,documentos:[]});const a=stale.pastas[0].subpastas.find(p=>p.zoteroKey==='A');
+ assert.equal(a.subpastas[0].subpastas[0].zoteroKey,'C');
+ assert.equal(mesclarPerfil(merged.indice,{pastas:merged.pastas,documentos:[]}).mudouServidor,false);
+});
+test('hierarquia sincronizada não ressuscita uma coleção excluída',()=>{
+ const old=espelharColecoesNasPastas(raiz(),colecoes,{agora:'2026-01-01'}).pastas;
+ const merged=mesclarPerfil({pastas:old,documentos:[],pastasExcluidas:{zot_col_A:'2026-02-01'}},{pastas:old,documentos:[]});
+ assert.ok(!JSON.stringify(merged.pastas).includes('zot_col_A'));assert.ok(!JSON.stringify(merged.pastas).includes('zot_col_B'));
+});
+test('caminho completo e faixa por nível não apresentam subpastas como raízes',()=>{
+ const all=[{id:'root',nome:'Raiz'},{id:'a',nome:'Mãe',parentId:'root'},{id:'b',nome:'Filha',parentId:'a'},{id:'c',nome:'Neta',parentId:'b'}];
+ assert.deepEqual(caminhoDaPasta(all,'c').map(p=>p.id),['root','a','b','c']);
+ assert.deepEqual(pastasDoNivel(all,'a').map(p=>p.id),['a','b']);
+ assert.deepEqual(pastasDoNivel(all,'b').map(p=>p.id),['b','c']);
+});
 
 test('coleções do Zotero viram pastas com os mesmos nomes e a mesma hierarquia', () => {
   const { pastas, mapa, criadas } = espelharColecoesNasPastas(raiz(), colecoes);

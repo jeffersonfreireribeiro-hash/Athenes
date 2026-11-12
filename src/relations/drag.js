@@ -20,7 +20,7 @@ export function installRelationDrag(viewport,drawing,{layout=()=> 'force'}={}){
  }
  function tick(now){
   frame=0;if(now-lastFrame<32){frame=requestAnimationFrame(tick);return;}lastFrame=now;if(!geometry?.svg?.isConnected)return;
-  stepNetwork(simulation,geometry.edges,active?.id,heat,{layout:layout(),width:geometry.svg.viewBox.baseVal.width,height:geometry.svg.viewBox.baseVal.height});
+  stepNetwork(simulation,geometry.edges,active?.id,heat,{layout:layout(),width:geometry.svg.viewBox.baseVal.width,height:Number(geometry.svg.dataset.relationHeight)||geometry.svg.viewBox.baseVal.height});
   for(const n of simulation){const base=n.base;offsets.set(n.id,{x:n.x-base.x,y:n.y-base.y});}
   apply();heat*=.95;if(heat>.02)frame=requestAnimationFrame(tick);
  }

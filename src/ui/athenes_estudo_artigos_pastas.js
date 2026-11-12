@@ -17,7 +17,7 @@ import {
   removerPastaDriveLocal,
   buscarPastaNaArvore
 } from '../core/athenes_colaboracao.js';
-import { RAIZ_BIBLIOGRAFIA, artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
+import { RAIZ_BIBLIOGRAFIA, artigoEstaNaPasta, caminhoDaPasta, pastasDoNivel } from '../core/athenes_zotero_pastas.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import {
   normalizarHexCor,
@@ -78,7 +78,7 @@ export function coletarPastasBibliografia(pastasRaiz = obterPastasDriveLocais())
     const coletarFilhas = (pai) => {
       for (const f of (pai.subpastas || [])) {
         if (!f) continue;
-        lista.push(f);
+        lista.push({ ...f, parentId: pai.id });
         if (f.subpastas?.length) coletarFilhas(f);
       }
     };
@@ -177,23 +177,10 @@ export function renderizarBreadcrumb(container, pastaAtiva = 'todas', { pastas =
   nav.id = 'athBibBreadcrumb';
   nav.setAttribute('aria-label', 'Navegação da Bibliografia');
 
-  nav.innerHTML = `
-    <button type="button" class="ath-bib-breadcrumb-btn ${pastaObj.id === 'todas' ? 'ath-bib-breadcrumb-btn--active' : ''}" data-nav-pasta="todas" title="Ver todas as obras (Estante Geral)">
-      <span class="ath-bib-breadcrumb-icon" aria-hidden="true">${svgIcone('livro', 15)}</span>
-      <span class="ath-bib-breadcrumb-txt">Bibliografia</span>
-    </button>
-    <span class="ath-bib-breadcrumb-sep" aria-hidden="true">/</span>
-    <span class="ath-bib-breadcrumb-current" aria-current="page" title="${escapeHtml(pastaObj.nome)}">
-      <span class="ath-bib-breadcrumb-icon" aria-hidden="true">${svgIcone('pasta', 15)}</span>
-      <span class="ath-bib-breadcrumb-txt">${escapeHtml(pastaObj.nome)}</span>
-    </span>
-  `;
-
-  nav.querySelector('[data-nav-pasta="todas"]')?.addEventListener('click', () => {
-    if (typeof onSelect === 'function') {
-      onSelect('todas');
-    }
-  });
+  const caminho=caminhoDaPasta(pastas,pastaObj.id);
+  const etapas=caminho.length?caminho:[pastaObj];
+  nav.innerHTML = `<button type="button" class="ath-bib-breadcrumb-btn ${pastaObj.id==='todas'?'ath-bib-breadcrumb-btn--active':''}" data-nav-pasta="todas" title="Estante Geral"><span class="ath-bib-breadcrumb-icon" aria-hidden="true">${svgIcone('livro',15)}</span><span class="ath-bib-breadcrumb-txt">Bibliografia</span></button>`+etapas.map((p,i)=>`<span class="ath-bib-breadcrumb-sep" aria-hidden="true">/</span>${i===etapas.length-1?`<span class="ath-bib-breadcrumb-current" aria-current="page" title="${escapeHtml(p.nome)}"><span class="ath-bib-breadcrumb-txt">${escapeHtml(p.nome)}</span></span>`:`<button type="button" class="ath-bib-breadcrumb-btn" data-nav-pasta="${escapeHtml(p.id)}" title="${escapeHtml(p.nome)}">${escapeHtml(p.nome)}</button>`}`).join('');
+  nav.querySelectorAll('[data-nav-pasta]').forEach(btn=>btn.addEventListener('click',()=>onSelect?.(btn.dataset.navPasta)));
 
   if (container !== nav && !container.contains(nav)) {
     container.innerHTML = '';
@@ -211,7 +198,7 @@ export function renderizarBreadcrumb(container, pastaAtiva = 'todas', { pastas =
  * @param {object} opcoes
  * @returns {HTMLElement}
  */
-export function renderizarPastasCronos(pastas = [], pastaAtivaId = 'todas', mapaAgrupado = null, { onSelecionarPasta = null, onOpcoesPasta = null, onMoverLivro = null } = {}) {
+export function renderizarPastasCronos(pastas = [], pastaAtivaId = 'todas', mapaAgrupado = null, { onSelecionarPasta = null, onOpcoesPasta = null, onMoverLivro = null, todasPastas = pastas } = {}) {
   const container = document.createElement('div');
   container.className = 'ath-bib-folders-grid ath-bib-pastas-faixa';
 
@@ -309,7 +296,8 @@ export function renderizarPastasCronos(pastas = [], pastaAtivaId = 'todas', mapa
 
     const sub = document.createElement('small');
     sub.className = 'ath-bib-folder-sub';
-    sub.textContent = p.origemZotero ? 'Coleção Zotero' : (p.id === RAIZ_BIBLIOGRAFIA ? 'Coleção Principal' : 'Pasta Temática');
+    sub.textContent = caminhoDaPasta(todasPastas,p.id).slice(0,-1).map(p=>p.nome).join(' / ') || (p.origemZotero ? 'Coleção Zotero' : (p.id === RAIZ_BIBLIOGRAFIA ? 'Coleção Principal' : 'Pasta Temática'));
+    sub.title=sub.textContent;
     info.appendChild(sub);
     body.appendChild(info);
 
@@ -643,11 +631,7 @@ export const metodosEstudoPastas = {
       </div>
     `;
 
-    navBar.querySelectorAll('[data-nav-pasta]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.selecionarPastaBib('todas');
-      });
-    });
+    renderizarBreadcrumb(navBar.querySelector('#athBibBreadcrumb'),pastaAtiva,{pastas,onSelect:id=>this.selecionarPastaBib(id)});
 
     navBar.querySelector('#athBtnNovaPastaBib')?.addEventListener('click', () => {
       this.abrirModalCriarNovaPasta();
@@ -663,7 +647,8 @@ export const metodosEstudoPastas = {
     }
     trackContainer.innerHTML = '';
 
-    const faixaCards = renderizarPastasCronos(pastas, pastaAtiva, mapaAgrupado, {
+    const faixaCards = renderizarPastasCronos(pastasDoNivel(pastas,pastaAtiva), pastaAtiva, mapaAgrupado, {
+      todasPastas:pastas,
       onSelecionarPasta: (pId) => this.selecionarPastaBib(pId),
       onOpcoesPasta: (pId, anchor) => this.abrirMenuOpcoesPasta(pId, anchor),
       onMoverLivro: (livroId, pId) => this.moverArtigoParaPasta(livroId, pId)
@@ -694,6 +679,8 @@ export const metodosEstudoPastas = {
         this.pastaFiltroId = id;
         this.atualizarSelecaoVisualPastas(id);
         this.atualizarGridCatalogo();
+        const topo=this.container?.querySelector('#athBibTopoPastasWrapper');
+        if(topo)this.renderizarBarraPastasTopo(topo);
         this.aoMudarPastas?.();
       }
     });

@@ -2143,7 +2143,7 @@ export class EstudoArtigosView {
         const esp = espelharColecoesNasPastas(obterPastasDriveLocais(), colecoes);
         mapaPastas = esp.mapa;
         pastasNovas = esp.criadas;
-        if (esp.criadas || esp.renomeadas) salvarPastasDriveLocais(esp.pastas);
+        if (esp.mudou) salvarPastasDriveLocais(esp.pastas);
       }
     } catch (e) { console.warn('[Athenes] Coleções do Zotero:', e.message); }
     const naRaizOuZotero = (a) => !a.pastaId || a.pastaId === 'pasta_bib_raiz' || String(a.pastaId).startsWith('zot_col_'); // pasta escolhida à mão não é desfeita

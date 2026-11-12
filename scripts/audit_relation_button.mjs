@@ -63,7 +63,11 @@ try{
  const layouts=await evaluate(`[...document.querySelectorAll('[data-rel-layout]')].map(b=>b.dataset.relLayout)`);
  for(const layout of layouts){
   await evaluate(`document.querySelector('[data-rel-action=fit]').click();document.querySelector('[data-rel-layout="${layout}"]').click();`);
-  const node=await evaluate(`(()=>{const r=document.querySelector('[data-relation-node] circle,[data-relation-node] rect').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,count:document.querySelectorAll('[data-relation-node]').length};})()`);
+  let node=await evaluate(`(()=>{const r=document.querySelector('[data-relation-node] circle,[data-relation-node] rect').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,count:document.querySelectorAll('[data-relation-node]').length};})()`);
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',x:node.x,y:node.y,button:'left',clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:node.x,y:node.y,button:'left',clickCount:1});
+  assert.ok(await evaluate(`document.querySelector('[data-relation-node].is-selected')&&document.querySelector('.rel-inspect li')`),layout+' selection');
+  node=await evaluate(`(()=>{const r=document.querySelector('[data-relation-node] circle,[data-relation-node] rect').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,count:document.querySelectorAll('[data-relation-node]').length};})()`);
   await send('Input.dispatchMouseEvent',{type:'mousePressed',x:node.x,y:node.y,button:'left',clickCount:1});
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:node.x+40,y:node.y+25,button:'left',buttons:1});
   await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:node.x+40,y:node.y+25,button:'left',clickCount:1});
