@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { espelharColecoesNasPastas, ordenarColecoes, pastasDoItemZotero, artigoEstaNaPasta, caminhoDaPasta, pastasDoNivel } from '../src/core/athenes_zotero_pastas.js';
+import { espelharColecoesNasPastas, ordenarColecoes, pastasDoItemZotero, artigoEstaNaPasta, caminhoDaPasta, pastasDoNivel, remapearPastasDosArtigos } from '../src/core/athenes_zotero_pastas.js';
 import {mesclarPerfil} from '../src/core/athenes_perfil_servidor.js';
 
 const raiz = () => [{ id: 'pasta_bib_raiz', nome: 'Bibliografia & Leituras', tipo: 'bibliografia', origem: 'minhas', subpastas: [] }];
@@ -43,6 +43,23 @@ test('pasta manual com mesmo nome não absorve a identidade de uma coleção Zot
  const children=result.pastas[0].subpastas;
  assert.ok(children.some(p=>p.id==='minha_pesquisa'&&!p.zoteroKey));
  assert.ok(children.some(p=>p.zoteroKey==='A'&&p.subpastas[0]?.zoteroKey==='B'));
+});
+test('renomear numa árvore antiga não desfaz uma mudança de pai mais recente',()=>{
+ const old=espelharColecoesNasPastas(raiz(),colecoes,{agora:'2026-01-01'}).pastas;
+ const moved=espelharColecoesNasPastas(old,colecoes.map(c=>c.key==='B'?{...c,parentCollection:'C'}:c),{agora:'2026-02-01'}).pastas;
+ for(const legacy of [false,true]){
+  const stale=structuredClone(old);if(legacy)for(const p of [stale[0].subpastas[0],stale[0].subpastas[0].subpastas[0]]){delete p.zoteroEstruturaEm;delete p.zoteroNomeEm;delete p.parentId;}
+  const renamed=espelharColecoesNasPastas(stale,colecoes.map(c=>c.key==='B'?{...c,nome:'Acústica revisada'}:c),{agora:'2026-03-01'}).pastas;
+  const result=mesclarPerfil({pastas:moved,documentos:[]},{pastas:renamed,documentos:[]});
+  const urban=result.pastas[0].subpastas.find(p=>p.zoteroKey==='C');
+  assert.equal(urban.subpastas[0].zoteroKey,'B');assert.equal(urban.subpastas[0].nome,'Acústica revisada');
+ }
+});
+test('todas as referências acompanham aliases de pastas, inclusive as ausentes da resposta atual',()=>{
+ const records=[{id:'fora_da_resposta',pastaId:'velha',pastasIds:['velha','meio','outra']},{id:'shared',compartilhadoComigo:true,pastaId:'velha'}];
+ assert.equal(remapearPastasDosArtigos(records,{velha:'meio',meio:'nova'}),true);
+ assert.equal(records[0].pastaId,'nova');assert.deepEqual(records[0].pastasIds,['nova','outra']);assert.equal(records[1].pastaId,'velha');
+ assert.equal(remapearPastasDosArtigos(records,{velha:'meio',meio:'nova'}),false);
 });
 test('caminho completo e faixa por nível não apresentam subpastas como raízes',()=>{
  const all=[{id:'root',nome:'Raiz'},{id:'a',nome:'Mãe',parentId:'root'},{id:'b',nome:'Filha',parentId:'a'},{id:'c',nome:'Neta',parentId:'b'}];

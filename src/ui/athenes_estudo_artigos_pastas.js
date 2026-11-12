@@ -633,6 +633,7 @@ export const metodosEstudoPastas = {
 
     renderizarBreadcrumb(navBar.querySelector('#athBibBreadcrumb'),pastaAtiva,{pastas,onSelect:id=>this.selecionarPastaBib(id)});
 
+    navBar.querySelector('#athBtnEstanteGeral')?.addEventListener('click',()=>this.selecionarPastaBib('todas'));
     navBar.querySelector('#athBtnNovaPastaBib')?.addEventListener('click', () => {
       this.abrirModalCriarNovaPasta();
     });

@@ -22,8 +22,9 @@ try{
    const root=ids();open('zot_col_A');const first=ids();open('zot_col_B');const second=ids();open('zot_col_C');
    const path=document.querySelector('#athBibBreadcrumb').textContent;
    document.querySelector('#athBibBreadcrumb [data-nav-pasta="zot_col_A"]').click();
-   return {root,first,second,path,returned:view.pastaFiltroId,final:ids()};
+   const returned=view.pastaFiltroId,final=ids();document.querySelector('#athBtnEstanteGeral').click();
+   return {root,first,second,path,returned,final,general:view.pastaFiltroId};
   }finally{folders.salvarPastasDriveLocais(before);}
  })()`);
- assert.ok(result.root.includes('zot_col_A'));assert.ok(!result.root.includes('zot_col_B'));assert.deepEqual(result.first,['zot_col_A','zot_col_B']);assert.deepEqual(result.second,['zot_col_B','zot_col_C']);assert.match(result.path,/Pesquisa.*Artigos.*Mobilidade/s);assert.equal(result.returned,'zot_col_A');console.log(result);
+ assert.ok(result.root.includes('zot_col_A'));assert.ok(!result.root.includes('zot_col_B'));assert.deepEqual(result.first,['zot_col_A','zot_col_B']);assert.deepEqual(result.second,['zot_col_B','zot_col_C']);assert.match(result.path,/Pesquisa.*Artigos.*Mobilidade/s);assert.equal(result.returned,'zot_col_A');assert.equal(result.general,'todas');console.log(result);
 }finally{ws.close();await fetch('http://127.0.0.1:9223/json/close/'+tab.id);}

@@ -36,7 +36,7 @@ import { svgIcone } from './athenes_icones.js';
 import {PainelConexoes} from './athenes_painel_conexoes.js';
 import {registrosReferencias,CAMPOS_RELACOES,inserirFiguraRelacoes} from '../core/athenes_relacoes.js';
 import * as documentosRelacoes from '../core/athenes_repositorio.js';
-import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
+import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta, remapearPastasDosArtigos } from '../core/athenes_zotero_pastas.js';
 import { aplicarFilhosZoteroAoArtigo } from '../core/athenes_zotero_anexos_notas.js';
 import { tokenPodeLerTodoODrive, listarConteudoDoDrive, copiarPdfDoDriveParaAthenes, ESCOPOS_COM_LEITURA } from '../core/athenes_drive_navegar.js';
 import { mostrarAviso } from './athenes_aviso.js';
@@ -2142,6 +2142,7 @@ export class EstudoArtigosView {
         }
         const esp = espelharColecoesNasPastas(obterPastasDriveLocais(), colecoes);
         mapaPastas = esp.mapa;
+        remapearPastasDosArtigos(this.artigos,esp.idsUnificados);
         pastasNovas = esp.criadas;
         if (esp.mudou) salvarPastasDriveLocais(esp.pastas);
       }

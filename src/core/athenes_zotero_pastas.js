@@ -56,15 +56,16 @@ export function ordenarColecoes(colecoes) {
  */
 // Extract the newest known Zotero hierarchy before merging local/server trees.
 export function colecoesMaisRecentes(...arvores) {
-  const mapa = new Map();
+  const mapa = new Map(),nomes=new Map();
   const visitar = (lista, pai) => { for (const p of lista || []) {
     if (p.zoteroKey) {
-      const c = { key:p.zoteroKey, nome:p.nome, parentCollection:p.zoteroParentKey ?? pai?.zoteroKey ?? false, estruturaEm:p.zoteroEstruturaEm || '' };
+      const c = { key:p.zoteroKey, nome:p.nome, parentCollection:p.zoteroParentKey ?? pai?.zoteroKey ?? false, estruturaEm:p.zoteroEstruturaEm || '',nomeEm:p.zoteroNomeEm||p.zoteroEstruturaEm||'' };
+      if(!nomes.has(c.key)||c.nomeEm>nomes.get(c.key).nomeEm)nomes.set(c.key,c);
       if (!mapa.has(c.key) || c.estruturaEm > mapa.get(c.key).estruturaEm) mapa.set(c.key,c);
     }
     visitar(p.subpastas,p);
   }};
-  arvores.forEach(a=>visitar(a,null));return [...mapa.values()];
+  arvores.forEach(a=>visitar(a,null));return [...mapa.values()].map(c=>({...c,nome:nomes.get(c.key).nome,nomeEm:nomes.get(c.key).nomeEm}));
 }
 
 function retirarColecao(lista,key,paiId='',encontradas=[]) {
@@ -89,15 +90,34 @@ export function espelharColecoesNasPastas(pastas, colecoes, {agora=new Date().to
     let pasta=existentes[0]?.pasta,alterada=false;
     if(!pasta){pasta={id:`zot_col_${c.key}`,nome,tipo:'bibliografia',origem:'minhas',origemZotero:true,zoteroKey:c.key,subpastas:[]};criadas++;alterada=true;}
     else {
-      if(pasta.nome!==nome){pasta.nome=nome;renomeadas++;alterada=true;}
-      if(existentes[0].paiId!==pai.id||pasta.parentId!==pai.id){movidas++;alterada=true;}
+      if(pasta.nome!==nome){pasta.nome=nome;renomeadas++;pasta.zoteroNomeEm=c.nomeEm||agora;}
+      if(existentes[0].paiId!==pai.id){movidas++;alterada=true;}
       for(const outra of existentes.slice(1)){if(outra.pasta.id!==pasta.id)idsUnificados[outra.pasta.id]=pasta.id;unirFilhas(pasta.subpastas||=([]),outra.pasta.subpastas);if(!pasta.driveId&&outra.pasta.driveId)pasta.driveId=outra.pasta.driveId;}
     }
+    if(!pasta.zoteroNomeEm)pasta.zoteroNomeEm=c.nomeEm||c.estruturaEm||(alterada?agora:'');
     pasta.parentId=pai.id;pasta.zoteroParentKey=c.parentCollection||false;
-    if(alterada||!pasta.zoteroEstruturaEm)pasta.zoteroEstruturaEm=c.estruturaEm||agora;
+    if(alterada)pasta.zoteroEstruturaEm=c.estruturaEm||agora;
+    else if((c.estruturaEm||'')>(pasta.zoteroEstruturaEm||''))pasta.zoteroEstruturaEm=c.estruturaEm;
+    else if(!pasta.zoteroEstruturaEm)pasta.zoteroEstruturaEm='';
     (pai.subpastas||=[]).push(pasta);mapa.set(c.key,pasta.id);
   }
   return {pastas:arvore,mapa,criadas,renomeadas,movidas,idsUnificados,mudou:JSON.stringify(arvore)!==JSON.stringify(pastas||[])};
+}
+
+export function resolverAliasPasta(id,aliases={}){
+  const vistos=new Set();let atual=id;
+  while(aliases[atual]&&!vistos.has(atual)){vistos.add(atual);atual=aliases[atual];}
+  return atual;
+}
+export function remapearPastasDosArtigos(artigos,aliases={}){
+  let mudou=false;
+  for(const a of artigos||[]){
+    if(a.compartilhadoComigo||a.proprietarioExterno)continue;
+    const id=resolverAliasPasta(a.pastaId,aliases);
+    if(id!==a.pastaId){a.pastaId=id;mudou=true;}
+    if(Array.isArray(a.pastasIds)){const ids=[...new Set(a.pastasIds.map(id=>resolverAliasPasta(id,aliases)))];if(JSON.stringify(ids)!==JSON.stringify(a.pastasIds)){a.pastasIds=ids;mudou=true;}}
+  }
+  return mudou;
 }
 
 /** Ids das pastas de um item (uma por coleção do Zotero a que ele pertence; sem coleção, a raiz). */
