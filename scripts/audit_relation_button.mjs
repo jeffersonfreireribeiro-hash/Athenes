@@ -54,6 +54,11 @@ try{
  await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:cluster.x+70,y:cluster.y+20,button:'left',buttons:1});
  await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:cluster.x+70,y:cluster.y+20,button:'left',clickCount:1});
  assert.notEqual(await evaluate(`document.querySelector('[data-relation-halo]').outerHTML`),cluster.halo);
+ const edgePan=await evaluate(`(()=>{const edge=document.querySelector('[data-relation-edge]'),p=edge.getPointAtLength(edge.getTotalLength()*.37).matrixTransform(edge.getScreenCTM());return {x:p.x,y:p.y,before:document.querySelector('.rel-drawing').style.transform};})()`);
+ await send('Input.dispatchMouseEvent',{type:'mousePressed',x:edgePan.x,y:edgePan.y,button:'left',clickCount:1});
+ await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:edgePan.x+30,y:edgePan.y+20,button:'left',buttons:1});
+ await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:edgePan.x+30,y:edgePan.y+20,button:'left',clickCount:1});
+ assert.notEqual(await evaluate(`document.querySelector('.rel-drawing').style.transform`),edgePan.before);
  await send('Input.dispatchMouseEvent',{type:'mouseWheel',x:geometry.x,y:geometry.y,deltaY:-150,deltaX:0});
  assert.match(await evaluate(`document.querySelector('.rel-drawing').style.transform`),/scale\(1\./);
  await evaluate(`const mode=document.querySelector('[name=mode]');mode.value='terms';mode.dispatchEvent(new Event('change',{bubbles:true}));`);

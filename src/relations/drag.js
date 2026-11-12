@@ -24,7 +24,7 @@ export function installRelationDrag(viewport,drawing,{elastic=()=>false}={}){
   apply();heat*=.95;if(heat>.02)frame=requestAnimationFrame(tick);
  }
  function wake(){
-  const g=cache();if(!elastic()||!g.nodes.every(n=>n.el.querySelector('circle')))return;
+  const g=cache();if(!elastic()||g.nodes.length>180||g.edges.length>900||!g.nodes.every(n=>n.el.querySelector('circle')))return;
   simulation=g.nodes.map(n=>{const o=offsets.get(n.id)||{x:0,y:0};return {id:n.id,x:n.x+o.x,y:n.y+o.y,base:n,vx:0,vy:0};});
   heat=1;if(!frame)frame=requestAnimationFrame(tick);
  }
