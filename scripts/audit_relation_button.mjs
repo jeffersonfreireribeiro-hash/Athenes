@@ -48,4 +48,8 @@ try{
  const screenshot=await send('Page.captureScreenshot',{format:'png'});
  const {writeFile}=await import('node:fs/promises');await writeFile('docs/relations-audit/athenes-panel-refined.png',Buffer.from(screenshot.data,'base64'));
  console.log('Node drag, pointer-centered zoom, stable modal height and term ranking passed.');
+ await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
+ const mobile=await evaluate(`(()=>{const r=document.querySelector('.ath-relations-modal').getBoundingClientRect();return {width:r.width,height:r.height,overflow:document.querySelector('.relation-panel').scrollWidth>document.querySelector('.relation-panel').clientWidth};})()`);
+ assert.ok(mobile.width<=390);assert.ok(mobile.height<=844);assert.equal(mobile.overflow,false);
+ console.log('390px viewport: no horizontal overflow.');
 }finally{ws.close();await fetch('http://127.0.0.1:9223/json/close/'+tab.id);}
