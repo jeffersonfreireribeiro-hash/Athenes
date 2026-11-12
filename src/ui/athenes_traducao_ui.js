@@ -71,24 +71,32 @@ export function configurarTraducaoEstudio(view, root, art) {
     const pagina = root.querySelector(`.ath-pdf-folha-container[data-num-pagina="${view.paginaAtual}"]`);
     if (!pagina) return;
     const anterior = pagina.querySelector('.ath-pdf-traducao-pagina');
-    if (anterior) { anterior.remove(); botao.setAttribute('aria-pressed', 'false'); return; }
+    if (anterior) { anterior.controladorTraducao?.abort(); anterior.remove(); botao.setAttribute('aria-pressed', 'false'); return; }
+    const controlador = new AbortController();
     const camadaTexto = pagina.querySelector('.ath-pdf-folha-texto');
     const texto = camadaTexto?.classList.contains('ath-pdf-text-layer')
       ? [...camadaTexto.querySelectorAll('span')].map(el => el.textContent).filter(Boolean).join(' ')
       : camadaTexto?.innerText?.trim();
     const painel = document.createElement('div');
     painel.className = 'ath-pdf-traducao-pagina';
+    painel.controladorTraducao = controlador;
     painel.innerHTML = `<div class="ath-pdf-traducao-topo"><strong>${svgIcone('globo', 16)} Página ${view.paginaAtual} · ${IDIOMAS_TRADUCAO[idioma.value]}</strong><button type="button">Ver original</button></div><div class="ath-pdf-traducao-corpo" aria-live="polite">Traduzindo página…</div>`;
     pagina.append(painel);
     botao.setAttribute('aria-pressed', 'true');
-    const fechar = () => { painel.remove(); botao.setAttribute('aria-pressed', 'false'); };
+    const fechar = () => { controlador.abort(); painel.remove(); botao.setAttribute('aria-pressed', 'false'); };
     painel.querySelector('button').addEventListener('click', fechar);
     if (!texto) { painel.querySelector('.ath-pdf-traducao-corpo').textContent = 'Esta página não contém texto selecionável para traduzir.'; return; }
     try {
-      const traduzido = await traduzirTextoAcademico(texto, { destino: idioma.value });
+      const traduzido = await traduzirTextoAcademico(texto, {
+        destino: idioma.value,
+        signal: controlador.signal,
+        aoProgresso: (concluidos, total) => {
+          if (painel.isConnected && total > 1) painel.querySelector('.ath-pdf-traducao-corpo').textContent = `Traduzindo página… ${concluidos}/${total} trechos`;
+        }
+      });
       if (painel.isConnected) painel.querySelector('.ath-pdf-traducao-corpo').textContent = traduzido;
     } catch (erro) {
-      if (painel.isConnected) painel.querySelector('.ath-pdf-traducao-corpo').textContent = erro.message || 'Não foi possível traduzir esta página.';
+      if (painel.isConnected && !controlador.signal.aborted) painel.querySelector('.ath-pdf-traducao-corpo').textContent = erro.message || 'Não foi possível traduzir esta página.';
     }
   });
 

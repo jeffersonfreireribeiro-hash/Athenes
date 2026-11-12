@@ -38,6 +38,10 @@ npm start
 ```
 Acesse a aplicação no navegador em `http://127.0.0.1:3300`.
 
+### Tradução acadêmica em Referências
+
+Configure `GEMINI_API_KEY` no ambiente do servidor local e nos ambientes necessários do projeto na Vercel. A chave deve permanecer no servidor e nunca ser colocada no código ou no navegador. O modelo padrão é `gemini-3.8-flash`; `GEMINI_TRANSLATION_MODEL` permite escolher outro modelo Gemini Flash disponível para sua conta. A tradução por seleção e por página funciona somente na área de Referências, exige conexão e envia o trecho selecionado à API Gemini. Páginas longas são processadas em partes. O Athenes não impõe um teto diário próprio, mas as cotas e cobranças da conta Google continuam valendo.
+
 ---
 
 ## Estrutura do Código

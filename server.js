@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolverPdfAberto } from './src/server/athenes_pdf_aberto.js';
+import { resolverTraducaoReferencia } from './src/server/athenes_traducao.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +35,35 @@ const MIME_TYPES = {
 
 const server = http.createServer((req, res) => {
   let reqPath = decodeURIComponent(req.url.split('?')[0]);
+
+  if (reqPath === '/api/traduzir-referencia') {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    if (req.method !== 'POST') { res.writeHead(405); res.end(JSON.stringify({ erro: 'Método não permitido.' })); return; }
+    const host = req.headers.host;
+    try {
+      if (req.headers.origin && host && new URL(req.headers.origin).host !== host) {
+        res.writeHead(403); res.end(JSON.stringify({ erro: 'Origem não permitida.' })); return;
+      }
+    } catch { res.writeHead(403); res.end(JSON.stringify({ erro: 'Origem não permitida.' })); return; }
+    const partes = [];
+    let bytes = 0;
+    req.on('data', parte => {
+      bytes += parte.length;
+      if (bytes > 30000) { res.writeHead(413); res.end(JSON.stringify({ erro: 'Trecho grande demais.' })); req.destroy(); return; }
+      partes.push(parte);
+    });
+    req.on('end', async () => {
+      if (bytes > 30000) return;
+      let dados;
+      try { dados = JSON.parse(Buffer.concat(partes).toString('utf8')); }
+      catch { res.writeHead(400); res.end(JSON.stringify({ erro: 'Solicitação inválida.' })); return; }
+      const resultado = await resolverTraducaoReferencia(dados);
+      res.writeHead(resultado.status);
+      res.end(JSON.stringify(resultado.status === 200 ? { traducao: resultado.traducao } : { erro: resultado.erro }));
+    });
+    return;
+  }
 
   if (reqPath === '/api/pdf-aberto') {
     if (req.method !== 'GET') { res.writeHead(405); res.end(); return; }
