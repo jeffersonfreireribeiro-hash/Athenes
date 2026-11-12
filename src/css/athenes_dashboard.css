@@ -2523,14 +2523,15 @@ button.ath-dn-pasta:hover { background: #EEF4FA; border-color: #C8D7E6; }
   position: relative !important;
   flex: none !important;
   margin: 0 auto !important;
-  will-change: width, height;
+  width: calc(794px * var(--ath-zoom, 1)) !important;
+  height: calc(var(--ath-pdf-page-height, 1123px) * var(--ath-zoom, 1)) !important;
 }
 .ath-pdf-escala > .ath-pdf-folha-container {
   position: absolute !important;
   left: 0 !important;
   top: 0 !important;
   transform-origin: 0 0 !important;
-  will-change: transform;
+  transform: scale(var(--ath-zoom, 1)) !important;
 }
 .ath-pdf-pagina-bloco-wrap > .ath-pdf-etiqueta-pagina {
   width: max(calc(794px * var(--ath-zoom, 1)), 260px) !important;

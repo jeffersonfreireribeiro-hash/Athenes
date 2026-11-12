@@ -303,6 +303,8 @@ test('Estúdio de Artigos: Botão direito do mouse e botão borracha da caneta a
   assert.equal(ehBotaoBorracha({ button: 2, buttons: 2 }), true);
   assert.equal(ehBotaoBorracha({ button: 5, buttons: 32 }), true);
   assert.equal(ehBotaoBorracha({ button: -1, buttons: 2 }), true);
+  assert.equal(ehBotaoBorracha({ button: -1, buttons: 64, pointerType: 'pen' }), true);
+  assert.equal(ehBotaoBorracha({ button: -1, buttons: 64, pointerType: 'mouse' }), false);
   assert.equal(ehBotaoBorracha({ button: 0, buttons: 1 }), false);
 
   const criarAlvoComEventos = () => {

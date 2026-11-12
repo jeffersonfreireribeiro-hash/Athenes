@@ -923,5 +923,6 @@ export function calcularPontoFinalLinhaReta(p0, p1, toleranciaGraus = 6) {
  */
 export function ehBotaoBorracha(ev) {
   if (!ev) return false;
-  return ev.button === 2 || ev.button === 5 || ((ev.buttons & 2) === 2) || ((ev.buttons & 32) === 32);
+  return ev.button === 2 || ev.button === 5 || ((ev.buttons & 2) === 2) ||
+    ((ev.buttons & 32) === 32) || (ev.pointerType === 'pen' && (ev.buttons & 64) === 64);
 }

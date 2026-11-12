@@ -608,6 +608,23 @@ export const metodosEstudoAnotacoes = {
     let tracoPointerId = null;
     let usandoBorrachaDireito = false;
 
+    const iniciarTracoTinta = (ev, pos) => {
+      pontoInicialReta = { x: pos.x, y: pos.y };
+      let espessuraEfetiva = this.ferramentaAtiva === 'marcatexto' ? (this.espessuraMarca || 18) : this.espessuraTinta;
+      if (ev.pointerType === 'pen' && typeof ev.pressure === 'number' && ev.pressure > 0.05 && this.ferramentaAtiva === 'caneta') {
+        espessuraEfetiva = Math.max(1, Math.round(this.espessuraTinta * (0.6 + ev.pressure * 0.8)));
+      }
+      tracoAtual = {
+        tipo: this.ferramentaAtiva === 'marcatexto' ? 'marcatexto' : 'caneta',
+        reta: Boolean(this.modoLinhaReta || ev.shiftKey),
+        cor: this.corTinta,
+        espessura: espessuraEfetiva,
+        pontos: [{ x: pos.x, y: pos.y }]
+      };
+      art.fichamento.tracosPorPagina[numPag].push(tracoAtual);
+      agendarRedesenho();
+    };
+
     const apagarNoPonto = (ev, pos) => {
       const folha = canvas.closest?.('.ath-pdf-folha-container') || null;
       const rect = rectCache || canvas.getBoundingClientRect();
@@ -649,6 +666,11 @@ export const metodosEstudoAnotacoes = {
       alvoFolha.addEventListener('pointermove', (ev) => {
         if (!desenhando || !usandoBorrachaDireito) return;
         if (tracoPointerId !== null && ev.pointerId !== tracoPointerId) return;
+        if (ev.target === canvas) return;
+        if (ev.pointerType === 'pen' && !ehBotaoBorracha(ev)) {
+          finalizarTraco(ev);
+          return;
+        }
         ev.preventDefault?.();
         apagarNoPonto(ev, obterPosicaoNoCanvas(ev));
       });
@@ -716,20 +738,7 @@ export const metodosEstudoAnotacoes = {
       desenhando = true;
       tracoPointerId = ev.pointerId;
       canvas.setPointerCapture?.(ev.pointerId);
-      pontoInicialReta = { x: pos.x, y: pos.y };
-      let espessuraEfetiva = this.ferramentaAtiva === 'marcatexto' ? (this.espessuraMarca || 18) : this.espessuraTinta;
-      if (ev.pointerType === 'pen' && typeof ev.pressure === 'number' && ev.pressure > 0.05 && this.ferramentaAtiva === 'caneta') {
-        espessuraEfetiva = Math.max(1, Math.round(this.espessuraTinta * (0.6 + ev.pressure * 0.8)));
-      }
-      tracoAtual = {
-        tipo: this.ferramentaAtiva === 'marcatexto' ? 'marcatexto' : 'caneta',
-        reta: Boolean(this.modoLinhaReta || ev.shiftKey),
-        cor: this.corTinta,
-        espessura: espessuraEfetiva,
-        pontos: [{ x: pos.x, y: pos.y }]
-      };
-      art.fichamento.tracosPorPagina[numPag].push(tracoAtual);
-      agendarRedesenho();
+      iniciarTracoTinta(ev, pos);
     });
 
     canvas.addEventListener('pointermove', (ev) => {
@@ -759,11 +768,29 @@ export const metodosEstudoAnotacoes = {
       ev.preventDefault();
 
       const pos = obterPosicaoNoCanvas(ev);
+      let tracoIniciadoAgora = false;
+      if (ev.pointerType === 'pen' && this.ferramentaAtiva !== 'borracha') {
+        const botaoPressionado = ehBotaoBorracha(ev);
+        if (botaoPressionado && !usandoBorrachaDireito) {
+          usandoBorrachaDireito = true;
+          tracoAtual = null;
+          pontoInicialReta = null;
+        } else if (!botaoPressionado && usandoBorrachaDireito) {
+          usandoBorrachaDireito = false;
+          if (this.ferramentaAtiva === 'cursor' || this.ferramentaAtiva === 'nota') {
+            finalizarTraco(ev);
+            return;
+          }
+          iniciarTracoTinta(ev, pos);
+          tracoIniciadoAgora = true;
+        }
+      }
       if (this.ferramentaAtiva === 'borracha' || usandoBorrachaDireito) {
         apagarNoPonto(ev, pos);
         return;
       }
       if (!tracoAtual) return;
+      if (tracoIniciadoAgora) return;
 
       // Se Modo Linha Reta estiver ativo ou tecla Shift pressionada, desenha segmento reto com trava ortogonal
       if (this.modoLinhaReta || ev.shiftKey || tracoAtual.reta) {

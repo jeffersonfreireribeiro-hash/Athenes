@@ -443,6 +443,7 @@ export const metodosEstudoTela = {
       let midIniY = 0;
       let conteudoIniX = 0;
       let conteudoIniY = 0;
+      let palcoZoomRect = null;
       let rafTouchId = null;
       let pinchPendente = null;
 
@@ -460,9 +461,9 @@ export const metodosEstudoTela = {
           distIniTouch = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
           if (distIniTouch > 10) {
             zoomBaseTouch = this.zoomPct;
-            const rect = palcoZoomEl.getBoundingClientRect();
-            midIniX = (t0.clientX + t1.clientX) / 2 - rect.left;
-            midIniY = (t0.clientY + t1.clientY) / 2 - rect.top;
+            palcoZoomRect = palcoZoomEl.getBoundingClientRect();
+            midIniX = (t0.clientX + t1.clientX) / 2 - palcoZoomRect.left;
+            midIniY = (t0.clientY + t1.clientY) / 2 - palcoZoomRect.top;
             conteudoIniX = palcoZoomEl.scrollLeft + midIniX;
             conteudoIniY = palcoZoomEl.scrollTop + midIniY;
           }
@@ -475,9 +476,8 @@ export const metodosEstudoTela = {
           const t0 = e.touches[0];
           const t1 = e.touches[1];
           const distAtual = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
-          const rect = palcoZoomEl.getBoundingClientRect();
-          const midAtualX = (t0.clientX + t1.clientX) / 2 - rect.left;
-          const midAtualY = (t0.clientY + t1.clientY) / 2 - rect.top;
+          const midAtualX = (t0.clientX + t1.clientX) / 2 - palcoZoomRect.left;
+          const midAtualY = (t0.clientY + t1.clientY) / 2 - palcoZoomRect.top;
 
           const ratio = distAtual / distIniTouch;
           const novoZoom = zoomBaseTouch * ratio;
@@ -493,8 +493,10 @@ export const metodosEstudoTela = {
       }, { passive: false });
 
       const finalizarTouch = () => {
+        executarPinch();
         distIniTouch = 0;
         pinchPendente = null;
+        palcoZoomRect = null;
         if (rafTouchId) {
           cancelAnimationFrame(rafTouchId);
           rafTouchId = null;

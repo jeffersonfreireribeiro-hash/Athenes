@@ -1566,18 +1566,11 @@ export class EstudoArtigosView {
 
   /** A folha ocupa no layout o tamanho que aparece (sem sobrar espaço entre as páginas): caixa com o tamanho escalado e a folha escalada dentro. */
   aplicarEscalaNaFolha(wrap, escala) {
-    if (wrap) wrap.style.minHeight = '';
     const folha = wrap?.querySelector('.ath-pdf-folha-container');
     const caixa = folha?.parentElement;
     if (!folha || !caixa?.classList.contains('ath-pdf-escala')) return;
     const h = parseFloat(folha.dataset.alturaReal) || 1123;
-    const wPx = `${Math.round(794 * escala)}px`;
-    const hPx = `${Math.round(h * escala)}px`;
-    if (caixa.style.width !== wPx) caixa.style.width = wPx;
-    if (caixa.style.height !== hPx) caixa.style.height = hPx;
-    folha.style.transformOrigin = '0 0';
-    const tr = escala === 1 ? '' : `scale(${escala})`;
-    if (folha.style.transform !== tr) folha.style.transform = tr;
+    caixa.style.setProperty('--ath-pdf-page-height', `${h}px`);
   }
 
   aplicarPinchZoom(novoZoom, root, conteudoIniX, conteudoIniY, zoomBaseTouch, midAtualX, midAtualY) {
@@ -1591,7 +1584,6 @@ export class EstudoArtigosView {
     const razao = this.zoomPct / zoomBaseTouch;
 
     palco.style.setProperty('--ath-zoom', String(escalaNova));
-    palco.querySelectorAll('.ath-pdf-pagina-bloco-wrap').forEach(wrap => this.aplicarEscalaNaFolha(wrap, escalaNova));
 
     const novoScrollX = Math.round(conteudoIniX * razao - midAtualX);
     const novoScrollY = Math.round(conteudoIniY * razao - midAtualY);
@@ -1633,7 +1625,6 @@ export class EstudoArtigosView {
       const conteudoY = palco.scrollTop + fy;
 
       palco.style.setProperty('--ath-zoom', String(escalaNova));
-      palco.querySelectorAll('.ath-pdf-pagina-bloco-wrap').forEach(wrap => this.aplicarEscalaNaFolha(wrap, escalaNova));
 
       // Mantém exatamente o mesmo ponto sob o foco após a nova escala
       const novoScrollX = Math.round(conteudoX * razao - fx);
