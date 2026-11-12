@@ -36,7 +36,7 @@ import { svgIcone } from './athenes_icones.js';
 import {PainelConexoes} from './athenes_painel_conexoes.js';
 import {registrosReferencias,CAMPOS_RELACOES,inserirFiguraRelacoes} from '../core/athenes_relacoes.js';
 import * as documentosRelacoes from '../core/athenes_repositorio.js';
-import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta, remapearPastasDosArtigos } from '../core/athenes_zotero_pastas.js';
+import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta, remapearPastasDosArtigos, resolverAliasPasta } from '../core/athenes_zotero_pastas.js';
 import { aplicarFilhosZoteroAoArtigo } from '../core/athenes_zotero_anexos_notas.js';
 import { tokenPodeLerTodoODrive, listarConteudoDoDrive, copiarPdfDoDriveParaAthenes, ESCOPOS_COM_LEITURA } from '../core/athenes_drive_navegar.js';
 import { mostrarAviso } from './athenes_aviso.js';
@@ -49,7 +49,7 @@ import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
 import { metodosEstudoAnotacoes } from './athenes_estudo_artigos_anotacoes.js';
 import { metodosEstudoModais } from './athenes_estudo_artigos_modais.js';
-import { metodosEstudoPastas, restaurarPastaAtiva, coletarPastasBibliografia, CORES_PASTAS_CRONOS } from './athenes_estudo_artigos_pastas.js';
+import { metodosEstudoPastas, restaurarPastaAtiva, coletarPastasBibliografia, CORES_PASTAS_CRONOS, remapearSelecaoPastas } from './athenes_estudo_artigos_pastas.js';
 import { renderizarEstante3D, fecharTodosLivros3D, tratarTecladoLivro3D, moverLivroParaPasta, calcularLivrosPorPrateleira } from './athenes_estudo_artigos_estante.js';
 
 export { ehArtigoExemploFicticio, criarArtigosEstudoExemplo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, gerarHtmlNotaZoteroDoArtigo, calcularPontoFinalLinhaReta, ehBotaoBorracha } from './athenes_estudo_artigos_dados.js';
@@ -2143,6 +2143,8 @@ export class EstudoArtigosView {
         const esp = espelharColecoesNasPastas(obterPastasDriveLocais(), colecoes);
         mapaPastas = esp.mapa;
         remapearPastasDosArtigos(this.artigos,esp.idsUnificados);
+        this.pastaFiltroId=resolverAliasPasta(this.pastaFiltroId,esp.idsUnificados);
+        remapearSelecaoPastas(esp.idsUnificados);
         pastasNovas = esp.criadas;
         if (esp.mudou) salvarPastasDriveLocais(esp.pastas);
       }

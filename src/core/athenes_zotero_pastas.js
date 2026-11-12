@@ -32,9 +32,16 @@ function acharNaArvore(lista, teste) {
 export function ordenarColecoes(colecoes) {
   const lista = (colecoes || []).filter(c => c?.key);
   const chaves = new Set(lista.map(c => c.key));
+  const pais=new Map(lista.map(c=>[c.key,c.parentCollection&&chaves.has(c.parentCollection)?c.parentCollection:'']));
+  const porChave=new Map(lista.map(c=>[c.key,c]));
+  for(const c of lista){
+    const caminho=[],indices=new Map();let atual=c.key;
+    while(atual&&!indices.has(atual)){indices.set(atual,caminho.length);caminho.push(atual);atual=pais.get(atual);}
+    if(atual){const ciclo=caminho.slice(indices.get(atual));ciclo.sort((a,b)=>String(porChave.get(a).estruturaEm||'').localeCompare(String(porChave.get(b).estruturaEm||''))||a.localeCompare(b));pais.set(ciclo[0],'');}
+  }
   const filhosDe = new Map();
   for (const c of lista) {
-    const pai = c.parentCollection && chaves.has(c.parentCollection) ? c.parentCollection : '';
+    const pai = pais.get(c.key);
     if (!filhosDe.has(pai)) filhosDe.set(pai, []);
     filhosDe.get(pai).push(c);
   }

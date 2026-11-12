@@ -17,7 +17,7 @@ import {
   removerPastaDriveLocal,
   buscarPastaNaArvore
 } from '../core/athenes_colaboracao.js';
-import { RAIZ_BIBLIOGRAFIA, artigoEstaNaPasta, caminhoDaPasta, pastasDoNivel } from '../core/athenes_zotero_pastas.js';
+import { RAIZ_BIBLIOGRAFIA, artigoEstaNaPasta, caminhoDaPasta, pastasDoNivel, resolverAliasPasta } from '../core/athenes_zotero_pastas.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import {
   normalizarHexCor,
@@ -33,6 +33,18 @@ import { salvarArtigosEstudo } from './athenes_estudo_artigos_dados.js';
 
 export const STORAGE_KEY_BIB_PASTA_ATIVA = 'athenes_bib_pasta_ativa';
 export const STORAGE_KEY_DASH_PASTA = 'athenes_dash_pasta';
+
+export function remapearSelecaoPastas(aliases,storage=null){
+  let mudou=false;
+  try{storage ||= typeof sessionStorage!=='undefined'?sessionStorage:null;
+    for(const chave of [STORAGE_KEY_BIB_PASTA_ATIVA,STORAGE_KEY_DASH_PASTA]){
+      const id=storage?.getItem(chave),novo=resolverAliasPasta(id,aliases);
+      if(id&&novo!==id){storage.setItem(chave,novo);mudou=true;}
+    }
+  }catch(_){}
+  return mudou;
+}
+
 
 /**
  * Paleta de cores recomendadas para pastas acadêmicas e de bibliografia

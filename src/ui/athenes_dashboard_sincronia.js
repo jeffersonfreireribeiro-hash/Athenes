@@ -5,6 +5,7 @@
  */
 import { lerConta, gravarConta, obterContaAtiva } from '../core/athenes_conta.js';
 import { obterConfigGoogleDrive, salvarConfigGoogleDrive, nuvemAutenticada, obterOuCriarEstruturaPastasAthenes, obterPastasDriveLocais, salvarPastasDriveLocais } from '../core/athenes_colaboracao.js';
+import {remapearSelecaoPastas} from './athenes_estudo_artigos_pastas.js';
 import {remapearPastasDosArtigos} from '../core/athenes_zotero_pastas.js';
 import { sincronizarBiblioteca, obterArtigos, definirArtigos } from '../core/athenes_biblioteca_artigos.js';
 import { sincronizarTemplatesUsuario } from '../core/athenes_templates.js';
@@ -139,6 +140,7 @@ export const metodosDashboardSincronia = {
         else if (doc.pastaId && r.pastasExcluidas[doc.pastaId]) { doc.pastaId = undefined; mudou = true; }
       }
       if(Object.keys(r.mapaIds).length){
+      remapearSelecaoPastas(r.mapaIds);
       const artigos=structuredClone(obterArtigos());
       if(remapearPastasDosArtigos(artigos,r.mapaIds)){definirArtigos(artigos);mudou=true;}
       if(this.estudoView)remapearPastasDosArtigos(this.estudoView.artigos,r.mapaIds);

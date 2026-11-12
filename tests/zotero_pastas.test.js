@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { espelharColecoesNasPastas, ordenarColecoes, pastasDoItemZotero, artigoEstaNaPasta, caminhoDaPasta, pastasDoNivel, remapearPastasDosArtigos } from '../src/core/athenes_zotero_pastas.js';
 import {mesclarPerfil} from '../src/core/athenes_perfil_servidor.js';
+import {remapearSelecaoPastas,restaurarPastaAtiva} from '../src/ui/athenes_estudo_artigos_pastas.js';
 
 const raiz = () => [{ id: 'pasta_bib_raiz', nome: 'Bibliografia & Leituras', tipo: 'bibliografia', origem: 'minhas', subpastas: [] }];
 const colecoes = [
@@ -10,6 +11,23 @@ const colecoes = [
   { key: 'A', nome: 'Arquitetura', parentCollection: false },
   { key: 'C', nome: 'Urbanismo', parentCollection: false }
 ];
+test('movimentos conflitantes entre duas árvores válidas não criam ciclos nem duplicatas',()=>{
+ const cols=colecoes.filter(c=>c.key!=='C').map(c=>({...c,parentCollection:false}));
+ const original=espelharColecoesNasPastas(raiz(),cols,{agora:'2026-01-01'}).pastas;
+ const left=espelharColecoesNasPastas(original,cols.map(c=>c.key==='A'?{...c,parentCollection:'B'}:c),{agora:'2026-02-01'}).pastas;
+ const right=espelharColecoesNasPastas(original,cols.map(c=>c.key==='B'?{...c,parentCollection:'A'}:c),{agora:'2026-03-01'}).pastas;
+ const result=mesclarPerfil({pastas:left,documentos:[]},{pastas:right,documentos:[]});
+ const arq=result.pastas[0].subpastas.find(p=>p.zoteroKey==='A');assert.ok(arq);assert.equal(arq.subpastas[0].zoteroKey,'B');
+ const all=[];const walk=ps=>ps.forEach(p=>{all.push(p);walk(p.subpastas||[])});walk(result.pastas);
+ assert.equal(all.filter(p=>p.zoteroKey==='A').length,1);assert.equal(all.filter(p=>p.zoteroKey==='B').length,1);
+ assert.equal(mesclarPerfil(result.indice,{pastas:left,documentos:[]}).pastas[0].subpastas[0].zoteroKey,'A');
+});
+test('a seleção da pasta unificada continua selecionada depois de recarregar',()=>{
+ const values=new Map([['athenes_bib_pasta_ativa','antiga'],['athenes_dash_pasta','antiga']]);
+ const storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)};
+ assert.equal(remapearSelecaoPastas({antiga:'nova'},storage),true);
+ assert.equal(restaurarPastaAtiva({pastas:[{id:'nova'}],storage}),'nova');assert.equal(values.get('athenes_dash_pasta'),'nova');
+});
 test('subcoleções existentes mudam de pai sem trocar id, arquivos ou filhos locais',()=>{
  const initial=espelharColecoesNasPastas(raiz(),colecoes,{agora:'2026-01-01'});
  const arq=initial.pastas[0].subpastas.find(p=>p.zoteroKey==='A'),filho=arq.subpastas[0];
