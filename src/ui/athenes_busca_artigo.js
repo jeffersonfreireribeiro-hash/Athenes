@@ -78,7 +78,7 @@ export function instalarBuscaArtigo(view,root,art,estado={}){
     const top=list.scrollTop,de=Math.max(0,ativo-15);list.innerHTML=resultados.map((r,i)=>({r,i})).slice(de,de+60).map(({r,i})=>`<li><button type="button" data-result="${i}" ${i===ativo?'aria-current="true"':''}><strong>Página ${esc(r.pagina)}</strong><span>${r.antes?'…':''}${esc(r.trecho.slice(0,r.destaque.inicio))}<mark>${esc(r.trecho.slice(r.destaque.inicio,r.destaque.fim))}</mark>${esc(r.trecho.slice(r.destaque.fim))}${r.depois?'…':''}</span></button></li>`).join('');list.scrollTop=top;
     panel.querySelectorAll('[data-find=prev],[data-find=next]').forEach(b=>b.disabled=!resultados.length);
   }
-  function ir(index){if(!resultados.length)return;navegou=true;ativo=(index+resultados.length)%resultados.length;const r=resultados[ativo];revelar=r;view.rolarParaPagina(r.pagina,root);renderResultados();const el=list.querySelector('[aria-current]');if(el){const r=el.getBoundingClientRect(),l=list.getBoundingClientRect();if(r.bottom>l.bottom)list.scrollTop+=r.bottom-l.bottom;else if(r.top<l.top)list.scrollTop-=l.top-r.top;}agendarPintura();}
+  function ir(index){if(!resultados.length)return;navegou=true;ativo=(index+resultados.length)%resultados.length;const r=resultados[ativo];estado.atual={pagina:r.pagina,ordem:r.ordem};revelar=r;view.rolarParaPagina(r.pagina,root);renderResultados();const el=list.querySelector('[aria-current]');if(el){const r=el.getBoundingClientRect(),l=list.getBoundingClientRect();if(r.bottom>l.bottom)list.scrollTop+=r.bottom-l.bottom;else if(r.top<l.top)list.scrollTop-=l.top-r.top;}agendarPintura();}
   async function lerPagina(pagina,pdf){
     if(!pdf||pagina>(pdf.n||pdf.doc.numPages)){const layer=root.querySelector(`[data-num-pagina="${pagina}"] [data-texto-pag]`);return layer?modeloTexto(layer).texto:'';}
     let cache=cachePdf.get(pdf.doc);if(!cache){cache=new Map();cachePdf.set(pdf.doc,cache);}
@@ -86,6 +86,7 @@ export function instalarBuscaArtigo(view,root,art,estado={}){
     return cache.get(pagina);
   }
   async function procurar(autoRevelar=true){
+    const assinatura=JSON.stringify([input.value,estado.opcoes]);if(estado.assinatura!==assinatura)estado.atual=null;estado.assinatura=assinatura;const restaurar=!autoRevelar?estado.atual:null;
     abort?.abort();abort=new AbortController();const sinal=abort.signal,token=++geracao;estado.consulta=input.value;resultados=[];ativo=-1;limite=false;navegou=false;limpar();renderResultados();
     if(!input.value.trim()){status.textContent='Procure no texto do artigo inteiro.';return;}
     status.textContent='Lendo o texto das páginas…';
@@ -95,12 +96,12 @@ export function instalarBuscaArtigo(view,root,art,estado={}){
     try{
       const found=await buscarNasPaginas({total,lerPagina:p=>lerPagina(p,pdf),consulta:input.value,opcoes:{...estado.opcoes},signal:sinal,onProgress:p=>{if(token!==geracao||sinal.aborted)return;if(p.processadas%8===0||p.processadas===total){status.textContent=`Pesquisando página ${p.processadas} de ${total}…`;resultados=p.resultados;limite=p.limitado;if(ativo<0&&resultados.length)ativo=0;renderResultados();}}});
       if(found.cancelado||sinal.aborted||destruido||token!==geracao)return;
-      resultados=found.resultados;limite=found.limitado;ativo=resultados.length?Math.max(0,Math.min(ativo,resultados.length-1)):-1;renderResultados();
+      resultados=found.resultados;limite=found.limitado;ativo=resultados.length?Math.max(0,Math.min(ativo,resultados.length-1)):-1;if(restaurar){const anterior=resultados.findIndex(r=>r.pagina===restaurar.pagina&&r.ordem===restaurar.ordem);if(anterior>=0)ativo=anterior;}renderResultados();
       status.textContent=limite?'Mais de 1.000 ocorrências. Refine o termo para localizar as demais.':found.erros?`${resultados.length} ocorrências. Não foi possível ler ${found.erros} página(s).`:!total?'Abra um PDF para pesquisar o texto.':found.vazias===total?'Este PDF não possui texto pesquisável. PDFs digitalizados precisam de reconhecimento de texto (OCR).':resultados.length?`${resultados.length} ${resultados.length===1?'ocorrência':'ocorrências'} em ${new Set(resultados.map(r=>r.pagina)).size} ${new Set(resultados.map(r=>r.pagina)).size===1?'página':'páginas'}.`:'Nenhum trecho encontrado com estas opções.';
       if(resultados.length&&!navegou&&autoRevelar)ir(0);else agendarPintura();
     }catch(error){if(!sinal.aborted&&token===geracao)status.textContent='Não foi possível pesquisar este arquivo. Tente reabri-lo.';}
   }
-  function abrir(foco=true){if(!visivel()){estado.aberta=true;panel.hidden=true;return;}if(estado.aberta&&!panel.hidden){if(foco){input.focus();input.select();}return;}estado.aberta=true;panel.hidden=false;button.setAttribute('aria-expanded','true');if(foco){input.focus();input.select();}procurar();}
+  function abrir(foco=true){if(!visivel()){estado.aberta=true;panel.hidden=true;return;}if(estado.aberta&&!panel.hidden){if(foco){input.focus();input.select();}return;}estado.aberta=true;panel.hidden=false;button.setAttribute('aria-expanded','true');if(foco){input.focus();input.select();}procurar(foco);}
   function fechar(){estado.aberta=false;panel.hidden=true;button.setAttribute('aria-expanded','false');abort?.abort();geracao++;clearTimeout(timer);limpar();button.focus({preventScroll:true});}
   button.addEventListener('click',()=>abrir());input.addEventListener('input',()=>{estado.consulta=input.value;abort?.abort();geracao++;clearTimeout(timer);resultados=[];ativo=-1;limpar();renderResultados();status.textContent='Pesquisando…';timer=setTimeout(()=>{timer=0;procurar();},200);});
   panel.addEventListener('click',e=>{const option=e.target.closest('[data-option]'),result=e.target.closest('[data-result]'),action=e.target.closest('[data-find]')?.dataset.find;if(option){const name=option.dataset.option;estado.opcoes[name]=!estado.opcoes[name];option.setAttribute('aria-pressed',String(estado.opcoes[name]));clearTimeout(timer);procurar();}if(result){ir(Number(result.dataset.result));input.focus({preventScroll:true});}if(action==='close')fechar();if(action==='next')ir(ativo+1);if(action==='prev')ir(ativo-1);});

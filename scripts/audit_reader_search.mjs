@@ -38,7 +38,10 @@ try{
  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter'});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter'});
  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter'});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter'});
  await waitFor(`!!document.querySelector('[data-num-pagina="3"] .ath-pdf-search-layer>.is-current')`);
- assert.equal(await evaluate('currentPage'),3);assert.equal(await evaluate(`!!root.querySelector('[data-texto-pag="1"]')._athBuscaTexto`),true);
+ assert.equal(await evaluate('currentPage'),3);
+ await evaluate(`(async()=>{search.destroy();window.search=(await import('/src/ui/athenes_busca_artigo.js')).instalarBuscaArtigo(view,root,art,state);})()`);
+ await waitFor(`document.querySelector('.ath-reader-find [role=status]').textContent.includes('3 ocorrências')`);
+ assert.equal(await evaluate('currentPage'),3);assert.equal(await evaluate(`document.querySelector('.ath-reader-find [data-count]').textContent`),'3 / 3');assert.equal(await evaluate(`!!root.querySelector('[data-texto-pag="1"]')._athBuscaTexto`),true);
  await evaluate(`document.querySelector('[data-option=semAcentos]').click()`);
  await waitFor(`document.querySelector('.ath-reader-find [role=status]').textContent.includes('1 ocorrência')`);
  await evaluate(`document.querySelector('[data-option=semAcentos]').click();const input=document.querySelector('.ath-reader-find input');input.value='mobilidade';input.dispatchEvent(new Event('input',{bubbles:true}));`);
