@@ -1102,7 +1102,8 @@
   }
 }
 
-@media (max-width: 900px) {
+/* Apenas celulares estreitos usam a ficha isolada; tablets mantêm o livro aberto completo. */
+@media (max-width: 520px) {
   .ath-livro-3d.aberto {
     width: min(100%, 380px);
     flex-basis: min(100%, 380px);
