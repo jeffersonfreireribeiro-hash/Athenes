@@ -917,3 +917,11 @@ export function calcularPontoFinalLinhaReta(p0, p1, toleranciaGraus = 6) {
   }
   return { x: p1.x, y: p1.y };
 }
+
+/**
+ * Identifica acionamento temporário da borracha (botão direito do mouse ou botão borracha da caneta).
+ */
+export function ehBotaoBorracha(ev) {
+  if (!ev) return false;
+  return ev.button === 2 || ev.button === 5 || ((ev.buttons & 2) === 2) || ((ev.buttons & 32) === 32);
+}

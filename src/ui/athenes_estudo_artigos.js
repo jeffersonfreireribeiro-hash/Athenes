@@ -48,7 +48,7 @@ import { metodosEstudoModais } from './athenes_estudo_artigos_modais.js';
 import { metodosEstudoPastas, restaurarPastaAtiva, coletarPastasBibliografia, CORES_PASTAS_CRONOS } from './athenes_estudo_artigos_pastas.js';
 import { renderizarEstante3D, fecharTodosLivros3D, tratarTecladoLivro3D, moverLivroParaPasta, calcularLivrosPorPrateleira } from './athenes_estudo_artigos_estante.js';
 
-export { ehArtigoExemploFicticio, criarArtigosEstudoExemplo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, gerarHtmlNotaZoteroDoArtigo, calcularPontoFinalLinhaReta } from './athenes_estudo_artigos_dados.js';
+export { ehArtigoExemploFicticio, criarArtigosEstudoExemplo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, gerarHtmlNotaZoteroDoArtigo, calcularPontoFinalLinhaReta, ehBotaoBorracha } from './athenes_estudo_artigos_dados.js';
 
 export class EstudoArtigosView {
   constructor(containerEl, opcoes = {}) {

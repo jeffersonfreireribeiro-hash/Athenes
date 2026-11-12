@@ -15,7 +15,8 @@ import {
   criarArtigosEstudoExemplo,
   formatarCitacaoAbntDoArtigo,
   gerarHtmlNotaZoteroDoArtigo,
-  calcularPontoFinalLinhaReta
+  calcularPontoFinalLinhaReta,
+  ehBotaoBorracha
 } from '../src/ui/athenes_estudo_artigos.js';
 import { ZoteroClient } from '../src/core/athenes_zotero.js';
 
@@ -296,6 +297,81 @@ test('Estúdio de Artigos: Borracha precisa não apaga traços nem grifos vizinh
   };
   estudio.apagarTracosProximos({ id: 'a-html', fichamento: {} }, 1, 150, 230, undefined, null, mockFolhaHtml, 150, 230);
   assert.equal(pEl.childNodes.length, 1, 'Mark HTML a 12px do cursor não deve ser apagado');
+});
+
+test('Estúdio de Artigos: Botão direito do mouse e botão borracha da caneta acionam borracha temporária em qualquer ferramenta', () => {
+  assert.equal(ehBotaoBorracha({ button: 2, buttons: 2 }), true);
+  assert.equal(ehBotaoBorracha({ button: 5, buttons: 32 }), true);
+  assert.equal(ehBotaoBorracha({ button: -1, buttons: 2 }), true);
+  assert.equal(ehBotaoBorracha({ button: 0, buttons: 1 }), false);
+
+  const criarAlvoComEventos = () => {
+    const handlers = {};
+    return {
+      width: 794,
+      height: 1123,
+      dataset: { numPagina: '1', alturaReal: '1123' },
+      clientWidth: 794,
+      clientHeight: 1123,
+      addEventListener(tipo, fn) {
+        (handlers[tipo] ||= []).push(fn);
+      },
+      dispatch(tipo, ev) {
+        (handlers[tipo] || []).forEach(fn => fn(ev));
+      },
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 794, height: 1123 }),
+      getContext: () => ({ clearRect() {}, save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {} }),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      closest: () => null
+    };
+  };
+
+  const folha = criarAlvoComEventos();
+  const canvas = criarAlvoComEventos();
+  canvas.closest = (sel) => (sel === '.ath-pdf-folha-container' ? folha : null);
+
+  const estudio = new EstudoArtigosView(null);
+  const art = {
+    id: 'art-botao-direito',
+    fichamento: {
+      tracosPorPagina: {
+        1: [
+          { tipo: 'caneta', reta: true, espessura: 4, pontos: [{ x: 100, y: 100 }, { x: 200, y: 100 }] },
+          { tipo: 'caneta', reta: true, espessura: 4, pontos: [{ x: 300, y: 300 }, { x: 400, y: 300 }] }
+        ]
+      },
+      grifosPorPagina: {}
+    }
+  };
+  estudio.artigos = [art];
+  estudio.artigoAberto = art;
+  estudio.ferramentaAtiva = 'caneta';
+  estudio.definirPaginaAtivaSilencioso = () => {};
+  estudio.redesenharCanvasTinta = () => {};
+  estudio.renderizarColunaEsquerdaEstudio = () => {};
+  estudio.atualizarBotoesHistoricoEstudio = () => {};
+
+  const prevRaf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = () => {};
+  try {
+    estudio.inicializarCanvasTinta(canvas, art, 1, null);
+
+    // 1. Em modo Caneta, botão direito deve apagar sem criar novo traço
+    canvas.dispatch('pointerdown', { button: 2, buttons: 2, pointerId: 11, pointerType: 'mouse', clientX: 150, clientY: 100, preventDefault() {} });
+    folha.dispatch('pointerdown', { button: 2, buttons: 2, pointerId: 11, pointerType: 'mouse', clientX: 150, clientY: 100, preventDefault() {} });
+    folha.dispatch('pointerup', { button: 2, buttons: 0, pointerId: 11, pointerType: 'mouse', clientX: 150, clientY: 100 });
+    assert.equal(art.fichamento.tracosPorPagina[1].length, 1, 'Botão direito deve apagar traço sob o cursor em modo caneta');
+    assert.equal(art.fichamento.tracosPorPagina[1][0].pontos[0].x, 300);
+
+    // 2. Em modo Cursor (seleção), arrastar com botão direito na folha também apaga traço
+    estudio.ferramentaAtiva = 'cursor';
+    folha.dispatch('pointerdown', { button: 2, buttons: 2, pointerId: 12, pointerType: 'mouse', clientX: 350, clientY: 300, preventDefault() {} });
+    folha.dispatch('pointerup', { button: 2, buttons: 0, pointerId: 12, pointerType: 'mouse', clientX: 350, clientY: 300 });
+    assert.equal(art.fichamento.tracosPorPagina[1].length, 0, 'Botão direito deve apagar traço também no modo cursor');
+  } finally {
+    globalThis.requestAnimationFrame = prevRaf;
+  }
 });
 
 test('Estúdio de Artigos preserva folhas extras no PDF real e rolarParaPagina usa scroll do palco sem cortar topo', () => {

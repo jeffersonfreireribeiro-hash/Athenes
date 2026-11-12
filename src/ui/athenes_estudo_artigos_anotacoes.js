@@ -5,7 +5,7 @@
  */
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { svgIcone } from './athenes_icones.js';
-import { salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, calcularPontoFinalLinhaReta } from './athenes_estudo_artigos_dados.js';
+import { salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, calcularPontoFinalLinhaReta, ehBotaoBorracha } from './athenes_estudo_artigos_dados.js';
 
 export const metodosEstudoAnotacoes = {
   renderizarPinsDaPagina(layerEl, art, numPag, root) {
@@ -583,9 +583,10 @@ export const metodosEstudoAnotacoes = {
 
     let touchPanDedo = null;
     let tracoPointerId = null;
+    let usandoBorrachaDireito = false;
 
     const apagarNoPonto = (ev, pos) => {
-      const folha = canvas.closest('.ath-pdf-folha-container');
+      const folha = canvas.closest?.('.ath-pdf-folha-container') || null;
       const rect = rectCache || canvas.getBoundingClientRect();
       const scale = canvas.width / Math.max(1, rect.width || canvas.width);
       const raioBorracha = Math.max(4, Math.min(8, Math.round(6 * scale)));
@@ -593,10 +594,54 @@ export const metodosEstudoAnotacoes = {
       agendarRedesenho();
     };
 
+    const alvoFolha = canvas.closest?.('.ath-pdf-folha-container') || canvas;
+
+    const iniciarBorrachaTemporaria = (ev) => {
+      if (desenhando) return false;
+      if (ev.target?.closest?.('.ath-pdf-pin, button, input, textarea, select, a, .ath-sel-popover')) {
+        return false;
+      }
+      ev.preventDefault?.();
+      this.definirPaginaAtivaSilencioso(numPag, root);
+      rectCache = canvas.getBoundingClientRect();
+      const pos = obterPosicaoNoCanvas(ev);
+      desenhando = true;
+      usandoBorrachaDireito = true;
+      tracoPointerId = ev.pointerId;
+      alvoFolha.setPointerCapture?.(ev.pointerId);
+      apagarNoPonto(ev, pos);
+      return true;
+    };
+
+    alvoFolha.addEventListener('contextmenu', (ev) => {
+      if (ev.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      ev.preventDefault();
+    });
+
+    if (alvoFolha !== canvas) {
+      alvoFolha.addEventListener('pointerdown', (ev) => {
+        if (!ehBotaoBorracha(ev)) return;
+        iniciarBorrachaTemporaria(ev);
+      });
+      alvoFolha.addEventListener('pointermove', (ev) => {
+        if (!desenhando || !usandoBorrachaDireito) return;
+        if (tracoPointerId !== null && ev.pointerId !== tracoPointerId) return;
+        ev.preventDefault?.();
+        apagarNoPonto(ev, obterPosicaoNoCanvas(ev));
+      });
+    }
+
     canvas.addEventListener('pointerdown', (ev) => {
       // Rejeição de palma: se a caneta já estiver desenhando, ignora toque de dedo/palma
       if (desenhando && ev.pointerType === 'touch') {
         ev.preventDefault?.();
+        return;
+      }
+
+      if (ehBotaoBorracha(ev)) {
+        if (alvoFolha === canvas) {
+          iniciarBorrachaTemporaria(ev);
+        }
         return;
       }
 
@@ -682,7 +727,7 @@ export const metodosEstudoAnotacoes = {
       }
 
       if (!desenhando) return;
-      if (ev.pointerType === 'touch' && this.bloquearDedoParaRolar) return;
+      if (ev.pointerType === 'touch' && this.bloquearDedoParaRolar && !usandoBorrachaDireito) return;
 
       // Se este evento não é do ponteiro que iniciou o traço, ignora
       if (tracoPointerId !== null && ev.pointerId !== tracoPointerId) return;
@@ -691,7 +736,7 @@ export const metodosEstudoAnotacoes = {
       ev.preventDefault();
 
       const pos = obterPosicaoNoCanvas(ev);
-      if (this.ferramentaAtiva === 'borracha') {
+      if (this.ferramentaAtiva === 'borracha' || usandoBorrachaDireito) {
         apagarNoPonto(ev, pos);
         return;
       }
@@ -721,6 +766,7 @@ export const metodosEstudoAnotacoes = {
       }
       if (!desenhando) return;
       desenhando = false;
+      usandoBorrachaDireito = false;
       tracoPointerId = null;
       tracoAtual = null;
       pontoInicialReta = null;
@@ -733,6 +779,14 @@ export const metodosEstudoAnotacoes = {
       }
     };
 
+    if (alvoFolha !== canvas) {
+      alvoFolha.addEventListener('pointerup', (ev) => {
+        if (usandoBorrachaDireito) finalizarTraco(ev);
+      });
+      alvoFolha.addEventListener('pointercancel', (ev) => {
+        if (usandoBorrachaDireito) finalizarTraco(ev);
+      });
+    }
     canvas.addEventListener('pointerup', finalizarTraco);
     canvas.addEventListener('pointercancel', finalizarTraco);
   }
