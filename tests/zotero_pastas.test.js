@@ -36,6 +36,14 @@ test('hierarquia sincronizada não ressuscita uma coleção excluída',()=>{
  const merged=mesclarPerfil({pastas:old,documentos:[],pastasExcluidas:{zot_col_A:'2026-02-01'}},{pastas:old,documentos:[]});
  assert.ok(!JSON.stringify(merged.pastas).includes('zot_col_A'));assert.ok(!JSON.stringify(merged.pastas).includes('zot_col_B'));
 });
+test('pasta manual com mesmo nome não absorve a identidade de uma coleção Zotero',()=>{
+ const manual=raiz();manual[0].subpastas.push({id:'minha_pesquisa',nome:'Arquitetura',tipo:'bibliografia',subpastas:[]});
+ const synced=espelharColecoesNasPastas(manual,colecoes,{agora:'2026-02-01'}).pastas;
+ const result=mesclarPerfil({pastas:manual,documentos:[]},{pastas:synced,documentos:[]});
+ const children=result.pastas[0].subpastas;
+ assert.ok(children.some(p=>p.id==='minha_pesquisa'&&!p.zoteroKey));
+ assert.ok(children.some(p=>p.zoteroKey==='A'&&p.subpastas[0]?.zoteroKey==='B'));
+});
 test('caminho completo e faixa por nível não apresentam subpastas como raízes',()=>{
  const all=[{id:'root',nome:'Raiz'},{id:'a',nome:'Mãe',parentId:'root'},{id:'b',nome:'Filha',parentId:'a'},{id:'c',nome:'Neta',parentId:'b'}];
  assert.deepEqual(caminhoDaPasta(all,'c').map(p=>p.id),['root','a','b','c']);

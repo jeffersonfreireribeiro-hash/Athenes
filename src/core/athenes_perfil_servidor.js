@@ -48,8 +48,8 @@ function mesclarArvore(base = [], extra = [], mapa = {}, excluidas = {}) {
   const juntar = (p) => {
     if (excluidas[p.id] || (p.driveId && excluidas[p.driveId])) return;
     // Duas coleções do Zotero com chaves diferentes são entidades distintas e nunca se fundem mesmo se tiverem o mesmo nome
-    const distintas = (q) => q.zoteroKey && p.zoteroKey && q.zoteroKey !== p.zoteroKey;
-    const igual = saida.find(q => !distintas(q) && (q.id === p.id || (p.driveId && q.driveId && p.driveId === q.driveId) || nomeNorm(q.nome) === nomeNorm(p.nome)));
+    const distintas = (q) => (q.zoteroKey || p.zoteroKey) && q.zoteroKey !== p.zoteroKey;
+    const igual = saida.find(q => q.id === p.id || (!distintas(q) && ((p.driveId && q.driveId && p.driveId === q.driveId) || nomeNorm(q.nome) === nomeNorm(p.nome))));
     if (!igual) {
       const novo = { ...clone(p), subpastas: [] };
       saida.push(novo);
@@ -57,6 +57,7 @@ function mesclarArvore(base = [], extra = [], mapa = {}, excluidas = {}) {
       return;
     }
     if (igual.id !== p.id) mapa[p.id] = igual.id;
+    if (!igual.zoteroKey && p.zoteroKey) { igual.zoteroKey=p.zoteroKey;igual.origemZotero=true; }
     if (!igual.driveId && p.driveId) igual.driveId = p.driveId; // o servidor ainda não sabia o id da pasta no Drive
     // cor da pasta: vale a escolha mais recente (`corEm`); sem carimbo, a primeira cor conhecida
     if (p.cor && (!igual.cor || (p.corEm || '') > (igual.corEm || ''))) { igual.cor = p.cor; if (p.corEm) igual.corEm = p.corEm; }
