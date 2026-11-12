@@ -94,6 +94,7 @@ export function espelharColecoesNasPastas(pastas, colecoes, {agora=new Date().to
       if(existentes[0].paiId!==pai.id){movidas++;alterada=true;}
       for(const outra of existentes.slice(1)){if(outra.pasta.id!==pasta.id)idsUnificados[outra.pasta.id]=pasta.id;unirFilhas(pasta.subpastas||=([]),outra.pasta.subpastas);if(!pasta.driveId&&outra.pasta.driveId)pasta.driveId=outra.pasta.driveId;}
     }
+    if((c.nomeEm||'')>(pasta.zoteroNomeEm||''))pasta.zoteroNomeEm=c.nomeEm;
     if(!pasta.zoteroNomeEm)pasta.zoteroNomeEm=c.nomeEm||c.estruturaEm||(alterada?agora:'');
     pasta.parentId=pai.id;pasta.zoteroParentKey=c.parentCollection||false;
     if(alterada)pasta.zoteroEstruturaEm=c.estruturaEm||agora;

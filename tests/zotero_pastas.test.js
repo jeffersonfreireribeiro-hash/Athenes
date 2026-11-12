@@ -61,6 +61,14 @@ test('todas as referências acompanham aliases de pastas, inclusive as ausentes 
  assert.equal(records[0].pastaId,'nova');assert.deepEqual(records[0].pastasIds,['nova','outra']);assert.equal(records[1].pastaId,'velha');
  assert.equal(remapearPastasDosArtigos(records,{velha:'meio',meio:'nova'}),false);
 });
+test('sincronizar nomes iguais preserva a data da renomeação mais recente',()=>{
+ const initial=espelharColecoesNasPastas(raiz(),colecoes,{agora:'2026-01-01'}).pastas;
+ const renamed=espelharColecoesNasPastas(initial,colecoes.map(c=>c.key==='B'?{...c,nome:'Nome temporário'}:c),{agora:'2026-02-01'}).pastas;
+ const restored=espelharColecoesNasPastas(renamed,colecoes,{agora:'2026-03-01'}).pastas;
+ const merged=mesclarPerfil({pastas:initial,documentos:[]},{pastas:restored,documentos:[]});
+ const later=mesclarPerfil(merged.indice,{pastas:renamed,documentos:[]});
+ assert.equal(later.pastas[0].subpastas.find(p=>p.zoteroKey==='A').subpastas[0].nome,'Acústica');
+});
 test('caminho completo e faixa por nível não apresentam subpastas como raízes',()=>{
  const all=[{id:'root',nome:'Raiz'},{id:'a',nome:'Mãe',parentId:'root'},{id:'b',nome:'Filha',parentId:'a'},{id:'c',nome:'Neta',parentId:'b'}];
  assert.deepEqual(caminhoDaPasta(all,'c').map(p=>p.id),['root','a','b','c']);
