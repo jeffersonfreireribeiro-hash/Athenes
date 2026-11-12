@@ -584,6 +584,15 @@ export const metodosEstudoAnotacoes = {
     let touchPanDedo = null;
     let tracoPointerId = null;
 
+    const apagarNoPonto = (ev, pos) => {
+      const folha = canvas.closest('.ath-pdf-folha-container');
+      const rect = rectCache || canvas.getBoundingClientRect();
+      const scale = canvas.width / Math.max(1, rect.width || canvas.width);
+      const raioBorracha = Math.max(4, Math.min(8, Math.round(6 * scale)));
+      this.apagarTracosProximos(art, numPag, pos.x, pos.y, raioBorracha, pos, folha, ev.clientX, ev.clientY);
+      agendarRedesenho();
+    };
+
     canvas.addEventListener('pointerdown', (ev) => {
       // Rejeição de palma: se a caneta já estiver desenhando, ignora toque de dedo/palma
       if (desenhando && ev.pointerType === 'touch') {
@@ -631,9 +640,7 @@ export const metodosEstudoAnotacoes = {
         desenhando = true;
         tracoPointerId = ev.pointerId;
         canvas.setPointerCapture?.(ev.pointerId);
-        const folha = canvas.closest('.ath-pdf-folha-container');
-        this.apagarTracosProximos(art, numPag, pos.x, pos.y, 28, pos, folha, ev.clientX, ev.clientY);
-        agendarRedesenho();
+        apagarNoPonto(ev, pos);
         return;
       }
 
@@ -685,9 +692,7 @@ export const metodosEstudoAnotacoes = {
 
       const pos = obterPosicaoNoCanvas(ev);
       if (this.ferramentaAtiva === 'borracha') {
-        const folha = canvas.closest('.ath-pdf-folha-container');
-        this.apagarTracosProximos(art, numPag, pos.x, pos.y, 28, pos, folha, ev.clientX, ev.clientY);
-        agendarRedesenho();
+        apagarNoPonto(ev, pos);
         return;
       }
       if (!tracoAtual) return;

@@ -243,6 +243,61 @@ test('Estúdio de Artigos: Borracha apaga traços livres, linhas retas, marca-te
   assert.equal(artHtml.conteudoPaginasPdf[0].htmlGrifado.includes('<mark'), false, 'htmlGrifado não deve mais conter a tag mark');
 });
 
+test('Estúdio de Artigos: Borracha precisa não apaga traços nem grifos vizinhos que o mouse não encostou', () => {
+  const estudio = new EstudoArtigosView(null);
+  const art = {
+    id: 'art-borracha-precisa',
+    fichamento: {
+      tracosPorPagina: {
+        1: [
+          { tipo: 'caneta', reta: true, espessura: 3, pontos: [{ x: 100, y: 100 }, { x: 250, y: 100 }] },
+          { tipo: 'caneta', reta: true, espessura: 3, pontos: [{ x: 100, y: 120 }, { x: 250, y: 120 }] }
+        ]
+      },
+      grifosPorPagina: {
+        1: [
+          { xPct: 10, yPct: 20, wPct: 30, hPct: 2, cor: '#FDE047' }, // y = 224.6 .. 247.1
+          { xPct: 10, yPct: 23, wPct: 30, hPct: 2, cor: '#FDE047' }  // y = 258.3 .. 280.8 (~11px abaixo)
+        ]
+      }
+    }
+  };
+  const mockFolha = {
+    dataset: { numPagina: '1', alturaReal: '1123' },
+    clientWidth: 794,
+    clientHeight: 1123,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 794, height: 1123 }),
+    querySelector: () => null,
+    querySelectorAll: () => []
+  };
+
+  // Passa a borracha com raio padrão apenas na linha de cima (y = 100) e no primeiro grifo (clientY = 235)
+  estudio.apagarTracosProximos(art, 1, 150, 100, undefined, { xPct: 19, yPct: 21 }, mockFolha, 150, 235);
+  assert.equal(art.fichamento.tracosPorPagina[1].length, 1, 'Traço a 20px de distância não deve ser apagado');
+  assert.equal(art.fichamento.tracosPorPagina[1][0].pontos[0].y, 120);
+  assert.equal(art.fichamento.grifosPorPagina[1].length, 1, 'Grifo vizinho a 11px de distância não deve ser apagado');
+  assert.equal(art.fichamento.grifosPorPagina[1][0].yPct, 23);
+
+  // Grifo HTML a 10px abaixo do cursor também deve permanecer intacto
+  const pEl = { childNodes: [], innerHTML: '', normalize() {} };
+  const markDistante = {
+    classList: { contains: () => true },
+    parentNode: pEl,
+    childNodes: [{ nodeType: 3, textContent: 'linha de cima' }],
+    replaceWith() { pEl.childNodes = []; },
+    getClientRects: () => [{ left: 100, top: 200, right: 300, bottom: 218, width: 200, height: 18 }],
+    getBoundingClientRect: () => ({ left: 100, top: 200, right: 300, bottom: 218, width: 200, height: 18 }),
+    closest: () => ({ innerHTML: '' })
+  };
+  pEl.childNodes = [markDistante];
+  const mockFolhaHtml = {
+    ...mockFolha,
+    querySelectorAll: () => [markDistante]
+  };
+  estudio.apagarTracosProximos({ id: 'a-html', fichamento: {} }, 1, 150, 230, undefined, null, mockFolhaHtml, 150, 230);
+  assert.equal(pEl.childNodes.length, 1, 'Mark HTML a 12px do cursor não deve ser apagado');
+});
+
 test('Estúdio de Artigos preserva folhas extras no PDF real e rolarParaPagina usa scroll do palco sem cortar topo', () => {
   const codigoEstudo = lerCodigoEstudo();
   const cssDash = fs.readFileSync(path.resolve('src/css/athenes_dashboard.css'), 'utf8');

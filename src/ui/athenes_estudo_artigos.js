@@ -1661,8 +1661,9 @@ export class EstudoArtigosView {
   /* ==========================================================================
      MOTOR DE TINTA DIGITAL + MODO LINHA RETA EM CANVAS (POR PÁGINA)
      ========================================================================== */
-  apagarTracosProximos(art, numPag, x, y, raio = 28, posPct = null, folhaContainer = null, clientX = null, clientY = null) {
+  apagarTracosProximos(art, numPag, x, y, raio = 6, posPct = null, folhaContainer = null, clientX = null, clientY = null) {
     if (!art || !art.fichamento) return;
+    const r = Math.max(1, Number(raio) || 6);
 
     // 1. Apagar traços livres de caneta, marca-texto digital e linhas retas
     const lista = art.fichamento.tracosPorPagina?.[numPag];
@@ -1670,7 +1671,7 @@ export class EstudoArtigosView {
       art.fichamento.tracosPorPagina[numPag] = lista.filter(traco => {
         const pts = traco.pontos || [];
         if (pts.length === 0) return false;
-        const rEfetivo = (raio || 28) + ((traco.espessura || 3) / 2);
+        const rEfetivo = r + ((traco.espessura || 3) / 2);
 
         // Distância euclidiana ponto-segmento
         const distSeg = (px, py, x1, y1, x2, y2) => {
@@ -1707,34 +1708,40 @@ export class EstudoArtigosView {
       const qtdAntes = art.fichamento.grifosPorPagina[numPag].length;
       const alturaReal = folhaContainer ? (parseFloat(folhaContainer.dataset.alturaReal) || folhaContainer.clientHeight || 1123) : 1123;
       const larguraReal = folhaContainer ? (folhaContainer.clientWidth || 794) : 794;
-      const r = raio || 28;
+      const canvasEl = folhaContainer?.querySelector?.('canvas[data-canvas-pag]');
+      const larguraCanvas = canvasEl?.width || 794;
+      const alturaCanvas = canvasEl?.height || Math.round(larguraCanvas * alturaReal / Math.max(1, larguraReal));
+      const tolGrifo = Math.min(r, 3);
+      const rectFolha = (clientX != null && clientY != null && folhaContainer && typeof folhaContainer.getBoundingClientRect === 'function')
+        ? folhaContainer.getBoundingClientRect()
+        : null;
+      const usarTela = Boolean(rectFolha && rectFolha.width > 0 && rectFolha.height > 0);
 
       art.fichamento.grifosPorPagina[numPag] = art.fichamento.grifosPorPagina[numPag].filter(g => {
-        // A. Distância em coordenadas canônicas da página (canvas 794 x H)
-        const gx = (g.xPct / 100) * larguraReal;
-        const gy = (g.yPct / 100) * alturaReal;
-        const gw = (g.wPct / 100) * larguraReal;
-        const gh = (g.hPct / 100) * alturaReal;
-        const dxCanvas = Math.max(gx - x, 0, x - (gx + gw));
-        const dyCanvas = Math.max(gy - y, 0, y - (gy + gh));
-        if (Math.hypot(dxCanvas, dyCanvas) <= r) return false;
-
-        // B. Distância na viewport física (clientX, clientY)
-        if (clientX != null && clientY != null && folhaContainer && typeof folhaContainer.getBoundingClientRect === 'function') {
-          const rectFolha = folhaContainer.getBoundingClientRect();
+        // A. Quando há coordenadas reais da viewport e retângulo da folha, aplica contato exato na tela
+        if (usarTela) {
           const screenX = rectFolha.left + (g.xPct / 100) * rectFolha.width;
           const screenY = rectFolha.top + (g.yPct / 100) * rectFolha.height;
           const screenW = (g.wPct / 100) * rectFolha.width;
           const screenH = (g.hPct / 100) * rectFolha.height;
           const dxScreen = Math.max(screenX - clientX, 0, clientX - (screenX + screenW));
           const dyScreen = Math.max(screenY - clientY, 0, clientY - (screenY + screenH));
-          if (Math.hypot(dxScreen, dyScreen) <= r) return false;
+          return Math.hypot(dxScreen, dyScreen) > tolGrifo;
         }
 
-        // C. Tolerância percentual proporcional (posPct)
+        // B. Fallback em coordenadas canônicas do canvas
+        const gx = (g.xPct / 100) * larguraCanvas;
+        const gy = (g.yPct / 100) * alturaCanvas;
+        const gw = (g.wPct / 100) * larguraCanvas;
+        const gh = (g.hPct / 100) * alturaCanvas;
+        const dxCanvas = Math.max(gx - x, 0, x - (gx + gw));
+        const dyCanvas = Math.max(gy - y, 0, y - (gy + gh));
+        if (Math.hypot(dxCanvas, dyCanvas) <= tolGrifo) return false;
+
+        // C. Fallback percentual proporcional estrito (apenas quando chamado sem coordenadas de tela)
         if (posPct && typeof posPct.xPct === 'number' && typeof posPct.yPct === 'number') {
-          const margemXPct = Math.max(4.5, (r / larguraReal) * 100);
-          const margemYPct = Math.max(4.5, (r / alturaReal) * 100);
+          const margemXPct = (tolGrifo / Math.max(1, larguraReal)) * 100;
+          const margemYPct = (tolGrifo / Math.max(1, alturaReal)) * 100;
           const dentroX = posPct.xPct >= (g.xPct - margemXPct) && posPct.xPct <= (g.xPct + g.wPct + margemXPct);
           const dentroY = posPct.yPct >= (g.yPct - margemYPct) && posPct.yPct <= (g.yPct + g.hPct + margemYPct);
           if (dentroX && dentroY) return false;
@@ -1758,10 +1765,11 @@ export class EstudoArtigosView {
       const marks = Array.from(escopoBusca.querySelectorAll('mark.ath-pdf-grifo-texto, .ath-pdf-grifo-texto'));
       let alterouHtml = false;
       let ultimoColEl = null;
-      const r = raio || 28;
+      const tolMark = Math.min(r, 3);
 
       for (const mark of marks) {
         let atingido = false;
+        let verificouTela = false;
 
         // A. Verificação via coordenadas de tela (clientX, clientY)
         if (clientX != null && clientY != null && typeof mark.getBoundingClientRect === 'function') {
@@ -1770,37 +1778,41 @@ export class EstudoArtigosView {
             : [mark.getBoundingClientRect()];
           for (const mRect of rects) {
             if (mRect.width === 0 && mRect.height === 0) continue;
+            verificouTela = true;
             const dx = Math.max(mRect.left - clientX, 0, clientX - mRect.right);
             const dy = Math.max(mRect.top - clientY, 0, clientY - mRect.bottom);
-            if (Math.hypot(dx, dy) <= r) {
+            if (Math.hypot(dx, dy) <= tolMark) {
               atingido = true;
               break;
             }
           }
         }
 
-        // B. Verificação geométrica relativa à folhaContainer
-        if (!atingido && folhaContainer && typeof mark.getBoundingClientRect === 'function' && typeof folhaContainer.getBoundingClientRect === 'function') {
+        // B. Verificação geométrica relativa à folhaContainer quando não foi possível medir na tela
+        if (!atingido && !verificouTela && folhaContainer && typeof mark.getBoundingClientRect === 'function' && typeof folhaContainer.getBoundingClientRect === 'function') {
           const rectFolha = folhaContainer.getBoundingClientRect();
+          const canvasEl = folhaContainer.querySelector?.('canvas[data-canvas-pag]');
+          const larguraRef = canvasEl?.width || folhaContainer.clientWidth || 794;
+          const alturaRef = canvasEl?.height || folhaContainer.clientHeight || 1123;
           const rects = (typeof mark.getClientRects === 'function' && mark.getClientRects().length > 0)
             ? Array.from(mark.getClientRects())
             : [mark.getBoundingClientRect()];
           for (const mRect of rects) {
             if (mRect.width === 0 && mRect.height === 0) continue;
-            const relX = ((mRect.left - rectFolha.left) / rectFolha.width) * (folhaContainer.clientWidth || 794);
-            const relY = ((mRect.top - rectFolha.top) / rectFolha.height) * (folhaContainer.clientHeight || 1123);
-            const relW = (mRect.width / rectFolha.width) * (folhaContainer.clientWidth || 794);
-            const relH = (mRect.height / rectFolha.height) * (folhaContainer.clientHeight || 1123);
+            const relX = ((mRect.left - rectFolha.left) / rectFolha.width) * larguraRef;
+            const relY = ((mRect.top - rectFolha.top) / rectFolha.height) * alturaRef;
+            const relW = (mRect.width / rectFolha.width) * larguraRef;
+            const relH = (mRect.height / rectFolha.height) * alturaRef;
             const dx = Math.max(relX - x, 0, x - (relX + relW));
             const dy = Math.max(relY - y, 0, y - (relY + relH));
-            if (Math.hypot(dx, dy) <= r) {
+            if (Math.hypot(dx, dy) <= tolMark) {
               atingido = true;
               break;
             }
           }
         }
 
-        // C. Fallback para document.elementsFromPoint se aplicável
+        // C. Fallback para document.elementsFromPoint se o cursor estiver diretamente sobre o grifo
         if (!atingido && clientX != null && clientY != null && typeof document !== 'undefined' && typeof document.elementsFromPoint === 'function') {
           const elementos = document.elementsFromPoint(clientX, clientY) || [];
           if (elementos.includes(mark) || elementos.some(el => el.closest?.('mark.ath-pdf-grifo-texto') === mark)) {
