@@ -1,0 +1,9 @@
+.visual-download-menu{position:relative;display:inline-flex;flex:none;color:inherit}
+.visual-download-menu>summary.visual-icon-button,.visual-icon-button{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;flex:0 0 34px;width:34px;height:34px;min-width:34px;padding:0;list-style:none;border:1px solid #dce5f1;border-radius:8px;background:#fff;color:#315887;cursor:pointer}
+.visual-download-menu>summary::-webkit-details-marker{display:none}.visual-icon-button svg{width:18px;height:18px;display:block;flex:none}
+.visual-download-menu>summary:hover,.visual-download-menu[open]>summary{background:#edf3fb;border-color:#acc3df}
+.visual-format-options{position:absolute;right:0;top:calc(100% + 6px);z-index:100;width:205px;padding:5px;display:grid;gap:3px;background:#fff;border:1px solid #dce5f1;border-radius:12px;box-shadow:0 10px 30px #20385826}
+.visual-format-options>button{display:grid!important;justify-items:start;justify-content:stretch!important;width:100%!important;height:auto!important;min-width:0!important;gap:3px!important;padding:10px!important;border:0!important;border-radius:7px!important;background:white!important;color:#243a59!important;font:600 12px/1.4 Manrope,Arial,sans-serif!important;text-align:left!important}
+.visual-format-options>button:hover{background:#edf3fb!important}.visual-format-options small{font-size:10px;font-weight:400;color:#657c98}
+.visual-download-menu :focus-visible{outline:2px solid #5078ad;outline-offset:2px}
+@media print{.visual-download-menu,.visual-icon-button{display:none!important}}

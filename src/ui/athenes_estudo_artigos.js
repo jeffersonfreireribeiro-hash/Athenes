@@ -1,3 +1,4 @@
+import {podeEditarRelacoes as podeEditarRelacoesDestino} from '../core/athenes_relacoes.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Athenes — Estúdio de Leitura, Risco em PDF (estilo Samsung Notes) e Fichamento Síncrono (Zotero + Google Drive).
@@ -32,6 +33,9 @@ import {
   classificarAtalhoHistorico
 } from '../core/athenes_estudo_historico.js';
 import { svgIcone } from './athenes_icones.js';
+import {PainelConexoes} from './athenes_painel_conexoes.js';
+import {registrosReferencias,CAMPOS_RELACOES,inserirFiguraRelacoes} from '../core/athenes_relacoes.js';
+import * as documentosRelacoes from '../core/athenes_repositorio.js';
 import { espelharColecoesNasPastas, pastasDoItemZotero, artigoEstaNaPasta } from '../core/athenes_zotero_pastas.js';
 import { aplicarFilhosZoteroAoArtigo } from '../core/athenes_zotero_anexos_notas.js';
 import { tokenPodeLerTodoODrive, listarConteudoDoDrive, copiarPdfDoDriveParaAthenes, ESCOPOS_COM_LEITURA } from '../core/athenes_drive_navegar.js';
@@ -117,6 +121,17 @@ export class EstudoArtigosView {
     this.carregarCompartilhados();
   }
 
+  abrirAnaliseRelacoes(){
+    this._fecharRelacoes?.();
+    const overlay=document.createElement('div');overlay.className='ath-modal-backdrop';
+    const docs=documentosRelacoes.listar().filter(d=>podeEditarRelacoesDestino(d)&&!d.precisaCarregarConteudo&&d.secoes?.some(sec=>Array.isArray(sec.blocos)));
+    overlay.innerHTML=`<section class="ath-modal" style="width:min(1300px,96vw);max-width:1300px;max-height:94vh;overflow:hidden"><header class="ath-modal-head"><h2>Análise das referências</h2><button type="button" data-rel-close aria-label="Fechar">×</button></header><div style="padding:12px 20px"><label>Inserir em <select data-rel-destination><option value="">Escolha um documento aberto</option>${docs.map(d=>`<option value="${escapeHtml(d.id)}">${escapeHtml(d.titulo||'Documento')}</option>`).join('')}</select></label></div><div class="ath-modal-corpo" data-rel-body style="overflow:auto;padding:20px"></div></section>`;document.body.append(overlay);
+    const all=this.artigosCatalogo().filter(article=>!article.compartilhadoComigo),current=all.filter(a=>!this.pastaFiltroId||this.pastaFiltroId==='todas'||this.pastaFiltroId==='compartilhados_comigo'&&a.compartilhadoComigo||artigoEstaNaPasta(a,this.pastaFiltroId));
+    const sources=[{id:'library',label:'Todas as referências próprias',fields:CAMPOS_RELACOES,defaultStages:['author','theme','year'],records:()=>registrosReferencias(all)},{id:'current-folder',label:'Pasta atual',fields:CAMPOS_RELACOES,defaultStages:['author','theme','year'],records:()=>registrosReferencias(current)}];
+    if(this.pastaFiltroId==='compartilhados_comigo')sources.pop();
+    const panel=new PainelConexoes(overlay.querySelector('[data-rel-body]'),{referencias:all,secoes:[]},{sources,initial:this.analiseRelacoes,onSave:data=>{this.analiseRelacoes=data;},onInsert:data=>{const doc=docs.find(d=>d.id===overlay.querySelector('[data-rel-destination]').value);if(!doc)throw Error('Escolha um documento aberto para inserir o gráfico.');const source=sources.find(s=>s.id===data.sourceId),records=source.records();inserirFiguraRelacoes(doc,{...data,sourceId:'library',scope:data.sourceId==='current-folder'&&this.pastaFiltroId&&this.pastaFiltroId!=='todas'?{folderId:this.pastaFiltroId}:undefined,records});documentosRelacoes.gravarDocumento(doc);window.dispatchEvent(new CustomEvent('athenes:relacoes-inseridas',{detail:{doc}}));}});
+    const close=()=>{panel.destroy();overlay.remove();this._fecharRelacoes=null;};this._fecharRelacoes=close;overlay.querySelector('[data-rel-close]').addEventListener('click',close);overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+  }
   artigosCatalogo() {
     const proprios = this.artigos.filter(a => !a.compartilhadoComigo);
     return [...proprios, ...this.artigosCompartilhados];
@@ -315,6 +330,7 @@ export class EstudoArtigosView {
   }
 
   destruir() {
+    this._fecharRelacoes?.();
     if (typeof window !== 'undefined') {
       if (this._atalhoHistoricoEstudio) {
         window.removeEventListener('keydown', this._atalhoHistoricoEstudio);
@@ -494,6 +510,7 @@ export class EstudoArtigosView {
       : 'Conectar Zotero';
 
     const htmlBotoesAcao = `
+      <button type="button" class="ath-btn ath-btn-icone" id="athBtnAnalisarRelacoes" title="Analisar relações e termos" aria-label="Analisar relações e termos">${svgIcone('grafico',18)}</button>
       <button type="button" class="ath-btn ath-btn-icone ${conectado ? 'ath-btn-zotero-ok' : ''}" id="athBtnConfigurarChaveZotero" title="${conectado ? 'Zotero conectado (' + (this.zoteroClient.userId ? '#' + this.zoteroClient.userId : 'ativo') + '): clique para ver ou trocar credenciais' : 'Inserir sua API Key e User ID do Zotero'}" aria-label="Zotero">
         ${svgIcone('zotero', 20)}
       </button>
@@ -618,6 +635,7 @@ export class EstudoArtigosView {
       this.renderizarBarraPastasTopo(topoPastasWrap);
     }
 
+    wrap.querySelector('#athBtnAnalisarRelacoes')?.addEventListener('click',()=>this.abrirAnaliseRelacoes());
     const inputBusca = wrap.querySelector('#athEstudoBuscaInput');
     inputBusca?.addEventListener('input', () => {
       this.filtroBusca = inputBusca.value.trim().toLowerCase();

@@ -16,6 +16,7 @@ import { renderizarMermaid, validarMermaid, formatarMermaid, EXEMPLOS_MERMAID } 
 import { renderizarGraficoJson, validarGraficoJson, formatarGraficoJson, criarTemaVisual, EXEMPLOS_GRAFICO } from './athenes_grafico_json.js';
 import { fonteDoItem, obterConfigFigura, FUNDOS_CODIGO_CSS } from './athenes_figura_layout.js';
 import { FONTES_SISTEMA } from './athenes_estilos.js';
+import {graficoRelacaoDoItem} from './athenes_relacoes.js';
 
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
@@ -164,6 +165,7 @@ export { FUNDOS_CODIGO_CSS };
  * `tipo`: 'svg' (vetorial pronto) | 'html' | 'erro'.
  */
 export function resolverItemCodigo(bloco, item, idx, doc) {
+  if(item.relationAnalysis)item={...item,content:graficoRelacaoDoItem(item,doc)};
   const { sourceType } = fonteDoItem(item);
   const uid = uidDoItem(bloco, idx);
   if (sourceType === 'html_code') {

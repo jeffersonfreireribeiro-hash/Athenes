@@ -1,3 +1,4 @@
+import {downloadMenuMarkup} from '../relations/controls.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Athenes — UI de Figuras e Subgrid: seletores gráficos (ícones), grade de imagens e painel visual.
@@ -17,6 +18,7 @@ import {
   PAPEIS_SEMANTICOS, papelSemanticoDoBloco, definirPapelSemantico, FUNDOS_CODIGO, PALETAS_FIGURA
 } from '../core/athenes_figura_layout.js';
 import { montarConteudoCodigoDom } from './athenes_figura_codigo_ui.js';
+import {downloadRenderedVisual} from '../relations/download.js';
 import { rotuloDaFigura } from '../core/athenes_documento.js';
 import { FONTES_SISTEMA, estiloParaCssComAlinhamento, localizarEstilo } from '../core/athenes_estilos.js';
 
@@ -49,6 +51,10 @@ const CSS = `
 .ath-fig-painel input[type=number]{border:1px solid #D5DEE9;border-radius:6px}
 .ath-fig-moldura{transition:box-shadow .12s ease,outline-color .12s ease}
 .ath-fig-item{position:relative}
+.ath-visual-download{opacity:0;pointer-events:none;transition:opacity .12s ease}
+.ath-fig-item:hover>.ath-visual-download,.ath-fig-item:focus-within>.ath-visual-download{opacity:1;pointer-events:auto}
+@media(hover:none){.ath-visual-download{opacity:1;pointer-events:auto}}
+@media print{.ath-visual-download{display:none!important}}
 .ath-fig-item.interativo .ath-fig-moldura{cursor:pointer;outline:2px solid transparent;outline-offset:2px}
 .ath-fig-item.interativo:hover .ath-fig-moldura{outline-color:rgba(49,79,121,.35)}
 .ath-fig-item.sel .ath-fig-moldura{outline:2px solid #314F79!important;outline-offset:2px}
@@ -305,6 +311,7 @@ export function construirGradeFiguraDom(b, opc = {}) {
       mold.addEventListener('dblclick', (ev) => opc.aoDuploClique?.(it.idx, ev));
     }
     if (opc.selecionadoIdx === it.idx) cel.classList.add('sel');
+    if(opc.downloads!==false){const downloads=document.createElement('div');downloads.className='ath-visual-download';downloads.style.cssText='position:absolute;right:6px;top:6px;z-index:3;display:flex;justify-content:flex-end;padding:4px';downloads.innerHTML=downloadMenuMarkup(format=>`data-figure-format="${format}"`);downloads.addEventListener('click',async event=>{event.stopPropagation();const button=event.target.closest('[data-figure-format]');if(!button)return;button.closest('details').open=false;try{await downloadRenderedVisual(mold,b.titulo||'figura',button.dataset.figureFormat);}catch(error){button.title=error.message;}});cel.append(downloads);}
     grid.appendChild(cel);
   });
   return { grid, descricao: d };

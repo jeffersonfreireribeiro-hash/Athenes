@@ -24,7 +24,14 @@ export function mesclarBiblioteca(servidor, local) {
 /** Registra como reconhecer os artigos de exemplo antigos (fictícios) para não os enviar ao servidor como se fossem reais. */
 export const definirFiltroDeExemplos = (fn) => lista.definirFiltroLegado(fn);
 export const obterArtigos = () => lista.obter();
-export const definirArtigos = (l) => lista.definir(l);
+const ouvintesLocais=new Set();let avisoLocalAgendado=false;
+export const definirArtigos = (l) => {
+  const result=lista.definir(l);
+  if(Array.isArray(l)&&!avisoLocalAgendado){avisoLocalAgendado=true;queueMicrotask(()=>{avisoLocalAgendado=false;for(const callback of ouvintesLocais){try{callback(lista.obter());}catch(error){console.warn('[Athenes] Atualização local da biblioteca:',error);}}});}
+  return result;
+};
+/** Separate from remote UI refreshes: local typing must not rebuild the study screen. */
+export const aoEditarBiblioteca = callback => {ouvintesLocais.add(callback);return ()=>ouvintesLocais.delete(callback);};
 export const aoMudarBiblioteca = (cb) => lista.aoMudar(cb);
 export const sincronizarBiblioteca = (opcoes) => lista.sincronizar(opcoes);
 export const legadoDaBibliotecaPendente = () => lista.legadoPendente();

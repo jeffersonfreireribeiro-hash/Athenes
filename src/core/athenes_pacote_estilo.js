@@ -13,6 +13,7 @@ import { sanitizarEstiloAvancado } from './athenes_estilo_avancado.js';
 import { templatesParaPacote, importarTemplatesDoPacote } from './athenes_templates.js';
 import { criarModelosPaginaPadrao, MODOS_APLICACAO_MESTRA, SEPARADORES_LEGENDA, FORMATOS_NUMERO_FORMULA } from './athenes_documento.js';
 import { sanitizarNumeracao } from './athenes_paginacao.js';
+import {normalizeRelationStyle} from '../relations/render.js';
 import { normalizarConfigSumario, normalizarNumeracaoSecoes } from './athenes_sumario.js';
 import { normalizarMestraCanvas, normalizarRegrasMestra } from './athenes_mestra_canvas.js';
 import { declaracaoDeFontes, sanearDeclaracaoDeFontes, registrarFontePendente } from './athenes_fontes.js';
@@ -91,6 +92,7 @@ export function exportarPacoteEstilo(documento, opcoes = {}) {
     mestras: mestras,
     modelos_blocos: modelosBlocos,
     layout_padrao_figuras: layoutPadraoBlocos,
+    estilo_relacoes: normalizeRelationStyle(documento.estilo_relacoes||{primary:documento.cor_primaria||'#314F79'}),
     // templates de documento (Meus templates) que acompanham o tema
     ...(Array.isArray(opcoes.templates) && opcoes.templates.length ? { templates: templatesParaPacote(opcoes.templates) } : {})
   };
@@ -262,6 +264,7 @@ export function validarPacoteEstilo(conteudo) {
     mestras: (Array.isArray(obj.mestras) && obj.mestras.length > 0 ? obj.mestras : criarModelosPaginaPadrao('abnt')).map(m => normalizarMestraCanvas(m)),
     modelos_blocos: Array.isArray(obj.modelos_blocos) ? obj.modelos_blocos : [],
     layout_padrao_figuras: obj.layout_padrao_figuras || {},
+    estilo_relacoes: normalizeRelationStyle(obj.estilo_relacoes||{primary:'#314F79'}),
     ...(Array.isArray(obj.templates) ? { templates: templatesParaPacote(obj.templates) } : {})
   };
 
@@ -309,6 +312,8 @@ export function aplicarPacoteEstilo(documento, pacote, opcoes = {}) {
 
   const p = validacao.pacote;
   const aplicarNosBlocosExistentes = opcoes.aplicarNosBlocosExistentes !== false;
+  documento.estilo_relacoes=normalizeRelationStyle(p.estilo_relacoes);
+  if(aplicarNosBlocosExistentes)for(const sec of documento.secoes||[])for(const bloco of sec.blocos||[])for(const item of bloco.itens||[])if(item.relationAnalysis)item.relationAnalysis.style={...documento.estilo_relacoes};
 
   // 1. Atualiza Catálogo de Estilos de Texto
   documento.estilos = JSON.parse(JSON.stringify(p.estilos));
@@ -504,6 +509,7 @@ INSTRUÇÕES DE ANÁLISE:
    - largura_modo: "corpo" | "estendida" | "pagina" | "pct" (com largura_pct 20-100); alinhamento_bloco: "esquerda" | "centro" | "direita"; fluxo: "em_linha" | "contornar_esq" | "contornar_dir".
    - Figuras por código (SVG, HTML+CSS, Mermaid, gráficos JSON — conteúdo do bloco, não do tema): codigo_fundo: "transparente" | "branco" | "suave" (fundo do contêiner da figura por código); codigo_paleta: "tema" (cor primária do tema + complementares) | "vivida" | "cinza" (impressão P&B com hachuras); Mermaid e gráficos herdam também a tipografia do estilo de corpo. A proporção padrão por categoria é dada por proporcao_imagem (ex.: gráfico "4/3", diagrama "16/9"). Classificação semântica do bloco (semanticRole: chart/figure/diagram/scheme/frame) define o prefixo da legenda (Gráfico, Figura, Diagrama, Esquema, Quadro) e não faz parte do tema.
 
+5. REDES E RELAÇÕES: "estilo_relacoes" no nível raiz contém layout (force, clusters, radial, star, circle, ellipse, bundled, tree, sphere, arc, sankey ou temporal), primary (#RRGGBB), labels (boolean), nodeScale (0.5 a 2), edgeOpacity (0.05 a 0.9) e font (família). Inclua estes atributos ao extrair redes de um PDF. Dados, referências, filtros e ligações pertencem ao conteúdo do documento, nunca ao pacote de estilo.
 5. ESTILO DE CÉLULAS DE TABELAS E QUADROS ("estilo_tabela" dentro de layout_padrao_figuras.tabela e .quadro):
    - bordas.externas {t,r,b,l} e bordas.internas {h,v}: cada aresta é null (sem borda) ou { "largura_pt": 0.25-6, "estilo": "solida"|"tracejada"|"pontilhada"|"dupla", "cor": "#RRGGBB" }.
      Tabela ABNT/IBGE: apenas topo e base externas e divisórias horizontais finas internas; Quadro: todas as bordas.

@@ -1,9 +1,10 @@
+import {criarFilaSalvamento} from '../core/athenes_fila_salvamento.js';
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Athenes — Coordenador Principal da Aplicação Web e Roteamento de Telas.
  */
 
-import { definirContaAtiva } from '../core/athenes_conta.js';
+import { definirContaAtiva, obterContaAtiva } from '../core/athenes_conta.js';
 import * as repositorio from '../core/athenes_repositorio.js';
 import { sincronizarPerfil } from '../core/athenes_perfil_servidor.js';
 import { montarEstadoLocal } from '../core/athenes_perfil_local.js';
@@ -21,6 +22,8 @@ import { EditorView } from './athenes_editor.js';
 import { PainelPropriedades } from './athenes_painel_propriedades.js';
 import { PainelZotero } from './athenes_painel_zotero.js';
 import { PainelConexoes } from './athenes_painel_conexoes.js';
+import {obterArtigos,aoMudarBiblioteca,aoEditarBiblioteca} from '../core/athenes_biblioteca_artigos.js';
+import {sincronizarRelacoesBiblioteca,podeEditarRelacoes} from '../core/athenes_relacoes.js';
 import { PainelExportarModal } from './athenes_painel_exportar.js';
 import { ReguasController } from './athenes_reguas.js';
 import { carregarFontesImportadas, hidratarFontesDoDocumento, sincronizarDeclaracaoDeFontes } from './athenes_fontes_ui.js';
@@ -31,6 +34,10 @@ import { obterConfigGoogleDrive } from '../core/athenes_colaboracao.js';
 
 export class AthenesApp {
   constructor(appContainer) {
+    window.addEventListener('athenes:relacoes-inseridas',event=>{const doc=event.detail?.doc;if(doc&&repositorio.listar().includes(doc)){this.gravarDocumento(doc);if(this.documentoAtivo===doc)this.editorView?.renderizarFolhasPaginas?.();}});
+    this._filaPersistencia=criarFilaSalvamento();this._relacoesPendentes=new Set();this._relacoesEnvios=new Map();
+    const atualizarRelacoes=()=>{const artigos=obterArtigos(),docs=new Map(repositorio.listar().filter(doc=>doc.secoes).map(doc=>[doc.id,doc]));if(this.documentoAtivo)docs.set(this.documentoAtivo.id,this.documentoAtivo);for(const doc of docs.values())if(sincronizarRelacoesBiblioteca(doc,artigos)){repositorio.gravarDocumento(doc);this._relacoesPendentes.add(doc.id);if(doc!==this.documentoAtivo)this.agendarSalvamentoRelacoes(doc);}if(this.documentoAtivo&&this._relacoesPendentes.delete(this.documentoAtivo.id)){this.autoSalvar();this.editorView?.renderizarFolhasPaginas?.();}};
+    this._relacoesBiblioteca=aoMudarBiblioteca(atualizarRelacoes);this._relacoesLocais=aoEditarBiblioteca(atualizarRelacoes);
     ativarEnvioDaConexaoZotero(); // trocou a chave do Zotero: vai para a conta (servidor) e para o Drive
     this.container = appContainer;
     // o salvamento é adiado alguns instantes (ver autoSalvar); ao sair da aba/página o que está pendente é gravado na hora
@@ -242,6 +249,8 @@ export class AthenesApp {
   }
 
   navegarParaEditor() {
+    const relacoesMudaram=sincronizarRelacoesBiblioteca(this.documentoAtivo,obterArtigos());
+    if(relacoesMudaram||this._relacoesPendentes?.delete(this.documentoAtivo?.id))this.autoSalvar();
     this.editorView?.desmontarAtalhos?.();
     this.tela = 'editor';
     try {
@@ -368,6 +377,20 @@ export class AthenesApp {
     });
   }
 
+  agendarSalvamentoRelacoes(doc) {
+    clearTimeout(this._relacoesEnvios.get(doc.id));const conta=obterContaAtiva();
+    this._relacoesEnvios.set(doc.id,setTimeout(async()=>{
+      this._relacoesEnvios.delete(doc.id);
+      const valido=()=>conta===obterContaAtiva()&&podeEditarRelacoes(doc)&&repositorio.listar().includes(doc);
+      const results=await this._filaPersistencia.executar(doc.id,async()=>{if(!valido())return [];const jobs=[];
+      if(nuvemAutenticada())jobs.push(salvarDocumentoNoSupabase(doc,obterPerfilColaborador(),undefined,{preservarData:true}));
+      if(driveConectado())jobs.push((async()=>{const token=await obterTokenDrive();if(!valido())return;if(!token)throw Error('Reconecte o Google Drive.');return enviarDocumentoAoDrive(doc,token);})());
+      if(!jobs.length)return [];return Promise.allSettled(jobs);});if(!valido()||!results.length)return;
+      if(results.some(r=>r.status==='rejected'))mostrarAviso('Não foi possível salvar a atualização de relações em '+doc.titulo+'. Abra o documento para tentar novamente.');
+      else{this._relacoesPendentes.delete(doc.id);this.avisarServidorDoPerfil();}
+    },700));
+  }
+
   abrirModalConexoes() {
     const modal = document.createElement('div');
     modal.className = 'ath-modal-backdrop';
@@ -388,12 +411,14 @@ export class AthenesApp {
     modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
 
     const corpo = modal.querySelector('#athModalConexoesCorpo');
-    new PainelConexoes(corpo, this.documentoAtivo);
+    const painel=new PainelConexoes(corpo, this.documentoAtivo,{onChange:()=>{this.editorView?.salvarSnapshot?.();this.editorView?.renderizarFolhasPaginas?.();this.autoSalvar();}});
+    modal.querySelector('#athModalConexoesFechar').addEventListener('click',()=>painel.destroy(),{once:true});
   }
 
   /** Com o Drive conectado, o documento sobe (na pasta dele) alguns segundos depois da última alteração. */
   agendarEnvioDrive(doc = this.documentoAtivo) {
     if (!driveConectado() || !doc) return;
+    const conta=obterContaAtiva();
     clearTimeout(this._tDrive);
     this._tDrive = setTimeout(async () => {
       this._tDrive = null;
@@ -405,7 +430,7 @@ export class AthenesApp {
           return;
         }
         this._avisouReconectar = false;
-        await enviarDocumentoAoDrive(doc, token);
+        await this._filaPersistencia.executar(doc.id,()=>conta===obterContaAtiva()?enviarDocumentoAoDrive(doc,token):undefined);
         this.autoSalvar({ semDrive: true });
         this.avisarServidorDoPerfil(); // grava driveFileId/driveFolderId sem reagendar nem mudar dataModificacao
       } catch (e) {
@@ -428,12 +453,13 @@ export class AthenesApp {
   agendarEnvioNuvem(doc = this.documentoAtivo) {
     if (!doc || !nuvemAutenticada()) return;
     if ((doc.compartilhadoComigo || doc.proprietarioExterno) && doc.permissao === 'leitura') return;
+    const conta=obterContaAtiva();
     clearTimeout(this._tNuvem);
     this._tNuvem = setTimeout(async () => {
       this._tNuvem = null;
       this._enviando = (this._enviando || 0) + 1;
       try {
-        await salvarDocumentoNoSupabase(doc, obterPerfilColaborador(), undefined, { preservarData: true });
+        await this._filaPersistencia.executar(doc.id,()=>conta===obterContaAtiva()?salvarDocumentoNoSupabase(doc,obterPerfilColaborador(),undefined,{preservarData:true}):undefined);
         doc.salvoNuvem = true;
         this.avisarServidorDoPerfil();
       } catch (e) {
