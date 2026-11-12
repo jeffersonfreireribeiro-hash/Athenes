@@ -4,7 +4,7 @@ import {renderRelations,normalizeRelationStyle} from '../relations/render.js';
 import {criarNovoBloco} from './athenes_documento.js';
 import {artigoEstaNaPasta} from './athenes_zotero_pastas.js';
 const plain=s=>String(s??'').replace(/<br\s*\/?\s*>/gi,'\n').replace(/<\/(?:p|div)>/gi,'\n\n').replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&');
-const terms=v=>list(v).flatMap(t=>typeof t==='string'?t.split(/[;\n]+/):[t.tag||t.name||'']).map(t=>t.trim()).filter(Boolean);
+const terms=v=>list(v).flatMap(t=>typeof t==='string'?t.split(/[;\n]+/):[t.tag||t.name||'']).map(t=>t.trim()).filter(t=>t&&t.toLowerCase()!=='zotero');
 const list=v=>Array.isArray(v)?v:v?[v]:[];
 const name=a=>typeof a==='string'?a:[a.prenome||a.firstName,a.sobrenome||a.lastName||a.name].filter(Boolean).join(' ');
 export const podeEditarRelacoes=doc=>!!doc&&!['leitura','comentario'].includes(doc.permissao)&&(!(doc.compartilhadoComigo||doc.proprietarioExterno)||['edicao','admin','dono'].includes(doc.permissao));

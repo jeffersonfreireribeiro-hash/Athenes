@@ -41,3 +41,6 @@
 @media(max-width:850px){.relation-panel{grid-template-columns:1fr}.ath-relations-modal .relation-panel{grid-template-rows:minmax(160px,35%) minmax(0,1fr)}.ath-relations-modal .rel-viewport{flex-basis:160px;min-height:160px}}
 
 .ath-relations-modal .rel-controls input[type=checkbox]{min-height:0;width:15px;height:15px;margin:0;accent-color:#315887}.ath-relations-modal [data-rel-text-fields]{display:grid;gap:10px}
+.relation-map-svg [data-relation-node].is-selected circle,.relation-map-svg [data-relation-node].is-selected rect{stroke:#163c70;stroke-width:3}
+.relation-map-svg [data-relation-edge]{cursor:pointer;pointer-events:stroke}
+.relation-map-svg [data-relation-edge].is-selected{opacity:.85;stroke:#163c70}

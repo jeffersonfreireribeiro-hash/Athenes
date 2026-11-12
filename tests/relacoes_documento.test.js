@@ -9,6 +9,8 @@ import {normalizeRelationStyle} from '../src/relations/render.js';
 import {aoEditarBiblioteca,definirArtigos,reiniciar} from '../src/core/athenes_biblioteca_artigos.js';
 const refs=[{id:'a',titulo:'Artigo A',autores:[{prenome:'Ana',sobrenome:'Silva'}],tags:[{tag:'Habitação'}],ano:2024,fichamento:{notasPagina:{1:[{texto:'Texto de anotação'}]}}},{id:'b',titulo:'Artigo B',autores:['Bruno'],palavrasChave:['Saúde'],ano:2025}];
 test('palavras-chave e etiquetas têm campos próprios e metadados Zotero são preservados',()=>{
+ const [imported]=registrosReferencias([{palavrasChave:['Zotero','Saúde'],tags:[{tag:' zotero '},{tag:'Cidade'}]}]);
+ assert.deepEqual(imported.fields.theme,['Saúde','Cidade']);assert.deepEqual(imported.fields.keywords,['Saúde']);assert.deepEqual(imported.fields.tags,['Cidade']);
  const [r]=registrosReferencias([{palavrasChave:[],tags:[{tag:'Saúde'}],itemTypeZotero:'journalArticle',camposZotero:{publisher:'Editora A',language:'pt',DOI:'10.1/exemplo'}}]);
  assert.deepEqual(r.fields.theme,['Saúde']);assert.deepEqual(r.fields.tags,['Saúde']);assert.deepEqual(r.fields.keywords,[]);
  assert.equal(r.fields.type,'journalArticle');assert.equal(r.fields.publisher,'Editora A');assert.equal(r.fields.language,'pt');assert.equal(r.fields.doi,'10.1/exemplo');
