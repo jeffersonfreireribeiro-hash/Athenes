@@ -39,7 +39,7 @@ export async function resolverTraducaoReferencia(dados = {}, {
     if (!resposta.ok) {
       if (resposta.status === 429) return { status: 429, erro: 'Limite temporário da API Gemini. Aguarde e tente novamente.' };
       if (resposta.status === 401 || resposta.status === 403) return { status: 503, erro: 'A chave Gemini não está autorizada para tradução.' };
-      return { status: 502, erro: 'O serviço Gemini não conseguiu traduzir este trecho.' };
+      return { status: 502, erro: 'O serviço Gemini não conseguiu traduzir este trecho.', codigoProvedor: resposta.status };
     }
     const corpo = await resposta.json();
     const candidato = corpo?.candidates?.[0];

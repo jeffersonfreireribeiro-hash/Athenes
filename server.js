@@ -60,7 +60,7 @@ const server = http.createServer((req, res) => {
       catch { res.writeHead(400); res.end(JSON.stringify({ erro: 'Solicitação inválida.' })); return; }
       const resultado = await resolverTraducaoReferencia(dados);
       res.writeHead(resultado.status);
-      res.end(JSON.stringify(resultado.status === 200 ? { traducao: resultado.traducao } : { erro: resultado.erro }));
+      res.end(JSON.stringify(resultado.status === 200 ? { traducao: resultado.traducao } : { erro: resultado.erro, ...(resultado.codigoProvedor ? { codigoProvedor: resultado.codigoProvedor } : {}) }));
     });
     return;
   }

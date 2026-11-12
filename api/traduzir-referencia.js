@@ -11,5 +11,5 @@ export default async function handler(req, res) {
   } catch { return res.status(403).json({ erro: 'Origem não permitida.' }); }
   const resultado = await resolverTraducaoReferencia(req.body);
   return res.status(resultado.status).json(resultado.status === 200
-    ? { traducao: resultado.traducao } : { erro: resultado.erro });
+    ? { traducao: resultado.traducao } : { erro: resultado.erro, ...(resultado.codigoProvedor ? { codigoProvedor: resultado.codigoProvedor } : {}) });
 }
