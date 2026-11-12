@@ -31,7 +31,7 @@ try{
  })()`);
  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'f',code:'KeyF',modifiers:2});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'f',code:'KeyF',modifiers:2});
  assert.equal(await evaluate(`document.querySelector('.ath-reader-find').hidden`),false);
- assert.ok(await evaluate(`(()=>{const p=document.querySelector('.ath-reader-find'),r=p.getBoundingClientRect(),c=palco.getBoundingClientRect();return root.contains(p)&&r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom;})()`));
+ await waitFor(`(()=>{const p=document.querySelector('.ath-reader-find'),r=p.getBoundingClientRect(),c=palco.getBoundingClientRect();return root.contains(p)&&r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom;})()`);
  await send('Input.insertText',{text:'saude'});
  await waitFor(`document.querySelector('.ath-reader-find [role=status]').textContent.includes('3 ocorrência')`);
  await waitFor(`document.querySelectorAll('[data-num-pagina="1"] .ath-pdf-search-layer>span').length>=2`);
