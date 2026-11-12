@@ -31,6 +31,7 @@ try{
  })()`);
  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'f',code:'KeyF',modifiers:2});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'f',code:'KeyF',modifiers:2});
  assert.equal(await evaluate(`document.querySelector('.ath-reader-find').hidden`),false);
+ assert.ok(await evaluate(`(()=>{const p=document.querySelector('.ath-reader-find'),r=p.getBoundingClientRect(),c=palco.getBoundingClientRect();return root.contains(p)&&r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom;})()`));
  await send('Input.insertText',{text:'saude'});
  await waitFor(`document.querySelector('.ath-reader-find [role=status]').textContent.includes('3 ocorrência')`);
  await waitFor(`document.querySelectorAll('[data-num-pagina="1"] .ath-pdf-search-layer>span').length>=2`);
@@ -69,6 +70,12 @@ try{
  await waitFor(`document.querySelector('.ath-reader-find [role=status]').textContent.includes('1 ocorrência')`);
 
  const screenshot=await send('Page.captureScreenshot',{format:'png'});await writeFile('docs/search-audit/reader-find.png',Buffer.from(screenshot.data,'base64'));
+ const anchoredY=await evaluate(`document.querySelector('.ath-reader-find').getBoundingClientRect().top`);
+ await evaluate(`palco.scrollTop+=150`);
+ assert.equal(await evaluate(`document.querySelector('.ath-reader-find').getBoundingClientRect().top`),anchoredY);
+ await evaluate(`window.palcoStyle=palco.style.cssText;palco.style.width='320px';palco.style.height='200px';palco.style.marginLeft='40px';`);
+ await waitFor(`(()=>{const p=document.querySelector('.ath-reader-find'),r=p.getBoundingClientRect(),c=palco.getBoundingClientRect();return r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom&&p.scrollWidth===p.clientWidth;})()`);
+ await evaluate(`palco.style.cssText=palcoStyle`);
  await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});
  assert.equal(await evaluate(`document.querySelector('.ath-reader-find').hidden`),true);assert.equal(await evaluate(`document.querySelectorAll('.ath-pdf-search-layer').length`),0);
  await evaluate('search.destroy()');assert.equal(await evaluate(`document.querySelectorAll('.ath-reader-find').length`),0);
@@ -77,7 +84,7 @@ try{
  assert.equal(await evaluate(`(()=>{const e=new KeyboardEvent('keydown',{key:'f',ctrlKey:true,bubbles:true,cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;})()`),false);
  await evaluate(`root.hidden=false;search.abrir();`);
  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
- assert.ok(await evaluate(`(()=>{const p=document.querySelector('.ath-reader-find'),r=p.getBoundingClientRect();return r.left>=0&&r.right<=390&&p.scrollWidth===p.clientWidth;})()`));
+ await waitFor(`(()=>{const p=document.querySelector('.ath-reader-find'),r=p.getBoundingClientRect();return r.left>=0&&r.right<=390&&p.scrollWidth===p.clientWidth;})()`);
  await evaluate(`root.hidden=true`);await waitFor(`document.querySelector('.ath-reader-find').hidden`);
  await evaluate(`root.hidden=false`);await waitFor(`!document.querySelector('.ath-reader-find').hidden`);
  await evaluate('search.destroy()');
