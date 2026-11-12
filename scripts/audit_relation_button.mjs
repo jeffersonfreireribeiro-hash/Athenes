@@ -59,9 +59,23 @@ try{
  await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:edgePan.x+30,y:edgePan.y+20,button:'left',buttons:1});
  await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:edgePan.x+30,y:edgePan.y+20,button:'left',clickCount:1});
  assert.notEqual(await evaluate(`document.querySelector('.rel-drawing').style.transform`),edgePan.before);
+ await evaluate(`const year=document.querySelector('[name=yearField]');year.value='year';year.dispatchEvent(new Event('change',{bubbles:true}));`);
+ const layouts=await evaluate(`[...document.querySelectorAll('[data-rel-layout]')].map(b=>b.dataset.relLayout)`);
+ for(const layout of layouts){
+  await evaluate(`document.querySelector('[data-rel-action=fit]').click();document.querySelector('[data-rel-layout="${layout}"]').click();`);
+  const node=await evaluate(`(()=>{const r=document.querySelector('[data-relation-node] circle,[data-relation-node] rect').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,count:document.querySelectorAll('[data-relation-node]').length};})()`);
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',x:node.x,y:node.y,button:'left',clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:node.x+40,y:node.y+25,button:'left',buttons:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:node.x+40,y:node.y+25,button:'left',clickCount:1});
+  const moved=await evaluate(`(async()=>{const until=performance.now()+2000;while(performance.now()<until){if([...document.querySelectorAll('[data-relation-node]')].slice(1).some(n=>n.getAttribute('transform')!=='translate(0 0)'))return true;await new Promise(r=>setTimeout(r,20));}return false;})()`);
+  assert.equal(moved,true,layout+' must move neighbors');
+  assert.equal(await evaluate(`document.querySelectorAll('[data-relation-node]').length`),node.count,layout);
+  assert.equal(await evaluate(`/NaN|Infinity/.test(document.querySelector('.rel-drawing').innerHTML)`),false,layout);
+ }
+ console.log('Elastic drag verified in all '+layouts.length+' layouts.');
  await send('Input.dispatchMouseEvent',{type:'mouseWheel',x:geometry.x,y:geometry.y,deltaY:-150,deltaX:0});
  assert.match(await evaluate(`document.querySelector('.rel-drawing').style.transform`),/scale\(1\./);
- await evaluate(`const mode=document.querySelector('[name=mode]');mode.value='terms';mode.dispatchEvent(new Event('change',{bubbles:true}));`);
+ await evaluate(`document.querySelector('[data-rel-layout=force]').click();const mode=document.querySelector('[name=mode]');mode.value='terms';mode.dispatchEvent(new Event('change',{bubbles:true}));`);
  assert.equal(await evaluate(`Math.round(document.querySelector('.ath-relations-modal').getBoundingClientRect().height)`),Math.round(geometry.height));
  assert.equal(await evaluate(`document.querySelector('.rel-term-ranking').hidden`),false);
  assert.ok(await evaluate(`document.querySelector('.rel-term-ranking ol')?.textContent.toLowerCase().includes('mobilidade')`));

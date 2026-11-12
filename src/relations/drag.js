@@ -1,31 +1,32 @@
 import {stepNetwork} from './physics.js';
 // Pointer selection and exploratory physics share one SVG geometry cache.
-export function installRelationDrag(viewport,drawing,{elastic=()=>false}={}){
+export function installRelationDrag(viewport,drawing,{layout=()=> 'force'}={}){
  const offsets=new Map();let active=null,moved=false,suppressClick=false,frame=0,heat=0,lastFrame=0,geometry=null,simulation=[];
  const point=e=>new DOMPoint(e.clientX,e.clientY).matrixTransform(drawing.querySelector('svg').getScreenCTM().inverse());
  function stop(){cancelAnimationFrame(frame);frame=0;}
  function cache(){
   const svg=drawing.querySelector('svg');if(geometry?.svg===svg)return geometry;
   stop();simulation=[];
-  const nodes=[...drawing.querySelectorAll('[data-relation-node]')].map(el=>{const c=el.querySelector('circle'),r=el.querySelector('rect');return {el,id:el.dataset.relationNode,x:Number(c?.getAttribute('cx')||r?.getAttribute('x')||0),y:Number(c?.getAttribute('cy')||r?.getAttribute('y')||0)};});
+  const nodes=[...drawing.querySelectorAll('[data-relation-node]')].map(el=>{const c=el.querySelector('circle'),r=el.querySelector('rect');return {el,id:el.dataset.relationNode,x:c?Number(c.getAttribute('cx')):Number(r?.getAttribute('x')||0)+Number(r?.getAttribute('width')||0)/2,y:c?Number(c.getAttribute('cy')):Number(r?.getAttribute('y')||0)+Number(r?.getAttribute('height')||0)/2,marginX:c?Math.max(30,Number(c.getAttribute('r'))):Math.max(30,Number(r?.getAttribute('width')||0)/2),marginY:c?Math.max(30,Number(c.getAttribute('r'))):Math.max(30,Number(r?.getAttribute('height')||0)/2)};});
   const edges=[...drawing.querySelectorAll('[data-relation-edge]')].map(el=>{const [source,target]=JSON.parse(el.dataset.relationEdge),path=el.getAttribute('d'),numbers=path.match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi)||[];return {el,source,target,path,pairs:numbers.length/2};});
-  const halos=[...drawing.querySelectorAll('[data-relation-halo]')].map(el=>({el,ids:JSON.parse(el.dataset.relationHalo)}));geometry={svg,nodes,edges,halos};return geometry;
+  const halos=[...drawing.querySelectorAll('[data-relation-halo]')].map(el=>({el,ids:JSON.parse(el.dataset.relationHalo)}));const guides=[...drawing.querySelectorAll('[data-relation-guide]')];geometry={svg,nodes,edges,halos,guides};return geometry;
  }
  function apply(){
   const g=cache();
   for(const halo of g.halos){const members=g.nodes.filter(n=>halo.ids.includes(n.id)).map(n=>{const o=offsets.get(n.id)||{x:0,y:0};return {x:n.x+o.x,y:n.y+o.y,r:Number(n.el.querySelector('circle')?.getAttribute('r')||0)};});if(!members.length)continue;const x=members.reduce((s,n)=>s+n.x,0)/members.length,y=members.reduce((s,n)=>s+n.y,0)/members.length;halo.el.setAttribute('cx',x);halo.el.setAttribute('cy',y);halo.el.setAttribute('rx',Math.max(30,...members.map(n=>Math.abs(n.x-x)+n.r+15)));halo.el.setAttribute('ry',Math.max(30,...members.map(n=>Math.abs(n.y-y)+n.r+15)));}
+  for(const guide of g.guides){const o=offsets.get(guide.dataset.relationGuide)||{x:0,y:0};guide.setAttribute('transform',`translate(${o.x} ${o.y})`);}
   for(const n of g.nodes){const o=offsets.get(n.id)||{x:0,y:0};n.el.setAttribute('transform',`translate(${o.x} ${o.y})`);}
   for(const edge of g.edges){const a=offsets.get(edge.source)||{x:0,y:0},b=offsets.get(edge.target)||{x:0,y:0};let index=0;edge.el.setAttribute('d',edge.path.replace(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi,value=>{const i=index++,t=Math.floor(i/2)/(edge.pairs-1),axis=i%2?'y':'x';return Number(value)+a[axis]*(1-t)+b[axis]*t;}));}
  }
  function tick(now){
   frame=0;if(now-lastFrame<32){frame=requestAnimationFrame(tick);return;}lastFrame=now;if(!geometry?.svg?.isConnected)return;
-  stepNetwork(simulation,geometry.edges,active?.id,heat);
+  stepNetwork(simulation,geometry.edges,active?.id,heat,{layout:layout(),width:geometry.svg.viewBox.baseVal.width,height:geometry.svg.viewBox.baseVal.height});
   for(const n of simulation){const base=n.base;offsets.set(n.id,{x:n.x-base.x,y:n.y-base.y});}
   apply();heat*=.95;if(heat>.02)frame=requestAnimationFrame(tick);
  }
  function wake(){
-  const g=cache();if(!elastic()||g.nodes.length>180||g.edges.length>900||!g.nodes.every(n=>n.el.querySelector('circle')))return;
-  simulation=g.nodes.map(n=>{const o=offsets.get(n.id)||{x:0,y:0};return {id:n.id,x:n.x+o.x,y:n.y+o.y,base:n,vx:0,vy:0};});
+  const g=cache();if(g.nodes.length>180||g.edges.length>900)return;
+  simulation=g.nodes.map(n=>{const o=offsets.get(n.id)||{x:0,y:0};return {id:n.id,x:n.x+o.x,y:n.y+o.y,base:n,marginX:n.marginX,marginY:n.marginY,vx:0,vy:0};});
   heat=1;if(!frame)frame=requestAnimationFrame(tick);
  }
  function down(e){
