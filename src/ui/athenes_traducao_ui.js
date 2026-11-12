@@ -29,6 +29,7 @@ export function mostrarBalaoTraducao({ texto, destino = 'pt', ancora, aoSalvarNo
   balao.innerHTML = `
     <div class="ath-traducao-cabecalho"><span>${svgIcone('globo', 15)} Tradução · ${IDIOMAS_TRADUCAO[destino]}</span><button type="button" class="ath-traducao-fechar" aria-label="Fechar tradução">${svgIcone('fechar', 15)}</button></div>
     <p class="ath-traducao-original"></p>
+    <p class="ath-traducao-motor" aria-live="polite"></p>
     <div class="ath-traducao-resultado" aria-live="polite">Traduzindo…</div>
     <div class="ath-traducao-acoes"><button type="button" data-acao="copiar" disabled>${svgIcone('copiar', 14)} Copiar tradução</button><button type="button" data-acao="nota" disabled>${svgIcone('mais', 14)} Inserir no fichamento</button></div>`;
   balao.querySelector('.ath-traducao-original').textContent = texto;
@@ -51,7 +52,13 @@ export function mostrarBalaoTraducao({ texto, destino = 'pt', ancora, aoSalvarNo
     ev.currentTarget.textContent = 'Salvo no fichamento';
     ev.currentTarget.disabled = true;
   });
-  traduzirTextoAcademico(texto, { destino, signal: controlador.signal }).then(resultado => {
+  traduzirTextoAcademico(texto, {
+    destino, signal: controlador.signal,
+    aoMotor: motor => {
+      if (balao.isConnected) balao.querySelector('.ath-traducao-motor').textContent =
+        motor === 'basico' ? 'Modo gratuito com limite diário de uso.' : motor === 'local' ? 'Tradução local no navegador.' : '';
+    }
+  }).then(resultado => {
     if (!balao.isConnected) return;
     traduzido = resultado;
     balao.querySelector('.ath-traducao-resultado').textContent = resultado;
@@ -80,7 +87,7 @@ export function configurarTraducaoEstudio(view, root, art) {
     const painel = document.createElement('div');
     painel.className = 'ath-pdf-traducao-pagina';
     painel.controladorTraducao = controlador;
-    painel.innerHTML = `<div class="ath-pdf-traducao-topo"><strong>${svgIcone('globo', 16)} Página ${view.paginaAtual} · ${IDIOMAS_TRADUCAO[idioma.value]}</strong><button type="button">Ver original</button></div><div class="ath-pdf-traducao-corpo" aria-live="polite">Traduzindo página…</div>`;
+    painel.innerHTML = `<div class="ath-pdf-traducao-topo"><strong>${svgIcone('globo', 16)} Página ${view.paginaAtual} · ${IDIOMAS_TRADUCAO[idioma.value]}</strong><button type="button">Ver original</button></div><p class="ath-traducao-motor" aria-live="polite"></p><div class="ath-pdf-traducao-corpo" aria-live="polite">Traduzindo página…</div>`;
     pagina.append(painel);
     botao.setAttribute('aria-pressed', 'true');
     const fechar = () => { controlador.abort(); painel.remove(); botao.setAttribute('aria-pressed', 'false'); };
@@ -90,6 +97,10 @@ export function configurarTraducaoEstudio(view, root, art) {
       const traduzido = await traduzirTextoAcademico(texto, {
         destino: idioma.value,
         signal: controlador.signal,
+        aoMotor: motor => {
+          if (painel.isConnected) painel.querySelector('.ath-traducao-motor').textContent =
+            motor === 'basico' ? 'Modo gratuito com limite diário de uso.' : motor === 'local' ? 'Tradução local no navegador.' : '';
+        },
         aoProgresso: (concluidos, total) => {
           if (painel.isConnected && total > 1) painel.querySelector('.ath-pdf-traducao-corpo').textContent = `Traduzindo página… ${concluidos}/${total} trechos`;
         }

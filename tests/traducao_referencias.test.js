@@ -31,10 +31,64 @@ test('cliente usa a API local, preserva termo técnico e reutiliza cache', async
   assert.equal(chamadas, 1);
 });
 
-test('cliente mostra falha retornada pelo servidor sem inventar tradução', async () => {
-  await assert.rejects(traduzirTextoAcademico('The results are clear.', {
-    fetchImpl: async () => ({ ok: false, status: 503, json: async () => ({ erro: 'Tradução indisponível.' }) })
-  }), /Tradução indisponível/);
+test('prefere tradução local quando o navegador oferece o idioma', async () => {
+  let destruido = false;
+  const motores = [];
+  const resultado = await traduzirTextoAcademico('The unique acoustic result is clear.', {
+    origem: 'en',
+    TranslatorImpl: {
+      availability: async () => 'available',
+      create: async () => ({
+        translate: async () => 'O resultado acústico é claro.',
+        destroy: () => { destruido = true; }
+      })
+    },
+    fetchImpl: () => { throw new Error('Não deveria chamar a rede.'); },
+    aoMotor: motor => motores.push(motor)
+  });
+  assert.equal(resultado, 'O resultado acústico é claro.');
+  assert.deepEqual(motores, ['local']);
+  assert.equal(destruido, true);
+});
+
+test('falha do tradutor local volta para a tradução de rede', async () => {
+  const motores = [];
+  const resultado = await traduzirTextoAcademico('The fallback acoustic example is clear.', {
+    origem: 'en',
+    TranslatorImpl: {
+      availability: async () => 'available',
+      create: async () => ({ translate: async () => { throw new Error('Pacote local falhou'); } })
+    },
+    fetchImpl: async url => {
+      assert.equal(url, '/api/traduzir-referencia');
+      return { ok: true, json: async () => ({ traducao: 'O exemplo acústico está claro.' }) };
+    },
+    aoMotor: motor => motores.push(motor)
+  });
+  assert.equal(resultado, 'O exemplo acústico está claro.');
+  assert.deepEqual(motores, ['local', 'gemini']);
+});
+
+test('sem créditos Gemini, usa o serviço gratuito e informa seu limite', async () => {
+  const motores = [];
+  const resultado = await traduzirTextoAcademico('The unique findings are relevant.', {
+    origem: 'en', TranslatorImpl: null,
+    fetchImpl: async url => url === '/api/traduzir-referencia'
+      ? { ok: false, status: 503, json: async () => ({ erro: 'Sem créditos.', codigoProvedor: 402 }) }
+      : { ok: true, json: async () => ({ responseStatus: 200, responseData: { translatedText: 'Os resultados são relevantes.' } }) },
+    aoMotor: motor => motores.push(motor)
+  });
+  assert.equal(resultado, 'Os resultados são relevantes.');
+  assert.deepEqual(motores, ['gemini', 'basico']);
+});
+
+test('falha do serviço gratuito é mostrada sem inventar tradução', async () => {
+  await assert.rejects(traduzirTextoAcademico('The special results are clear.', {
+    TranslatorImpl: null,
+    fetchImpl: async url => url === '/api/traduzir-referencia'
+      ? { ok: false, status: 503, json: async () => ({ erro: 'Sem créditos.' }) }
+      : { ok: true, json: async () => ({ responseStatus: 403 }) }
+  }), /limite de uso/);
 });
 
 test('página longa preserva parágrafos e informa progresso', async () => {
@@ -61,7 +115,7 @@ test('retomada de página longa reutiliza os trechos já traduzidos', async () =
       chamadas++;
       return chamadas === 1
         ? { ok: true, json: async () => ({ traducao: 'Primeira parte' }) }
-        : { ok: false, status: 503, json: async () => ({ erro: 'Falha temporária' }) };
+        : { ok: false, status: 400, json: async () => ({ erro: 'Falha temporária' }) };
     }
   }), /Falha temporária/);
   const chamadasAntes = chamadas;
@@ -100,6 +154,9 @@ test('servidor usa Gemini com instrução acadêmica e não expõe a chave na re
 
 test('servidor informa cota temporária e resposta incompleta', async () => {
   const dados = { texto: 'Academic text', destino: 'pt' };
+  assert.deepEqual(await resolverTraducaoReferencia(dados, { apiKey: 'chave-falsa', fetchImpl: async () => ({ ok: false, status: 402 }) }), {
+    status: 503, erro: 'A conta Google da tradução está sem créditos. Verifique o faturamento no Google AI Studio.', codigoProvedor: 402
+  });
   assert.equal((await resolverTraducaoReferencia(dados, { apiKey: 'chave-falsa', fetchImpl: async () => ({ ok: false, status: 429 }) })).status, 429);
   assert.equal((await resolverTraducaoReferencia(dados, { apiKey: 'chave-falsa', fetchImpl: async () => ({
     ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'Parcial' }] }, finishReason: 'MAX_TOKENS' }] })

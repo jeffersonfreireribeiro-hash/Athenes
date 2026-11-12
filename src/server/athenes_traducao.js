@@ -37,6 +37,7 @@ export async function resolverTraducaoReferencia(dados = {}, {
       signal: AbortSignal.timeout(PRAZO_MS)
     });
     if (!resposta.ok) {
+      if (resposta.status === 402) return { status: 503, erro: 'A conta Google da tradução está sem créditos. Verifique o faturamento no Google AI Studio.', codigoProvedor: 402 };
       if (resposta.status === 429) return { status: 429, erro: 'Limite temporário da API Gemini. Aguarde e tente novamente.' };
       if (resposta.status === 401 || resposta.status === 403) return { status: 503, erro: 'A chave Gemini não está autorizada para tradução.' };
       return { status: 502, erro: 'O serviço Gemini não conseguiu traduzir este trecho.', codigoProvedor: resposta.status };

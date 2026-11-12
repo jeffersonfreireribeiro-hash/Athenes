@@ -13,6 +13,8 @@
 .ath-traducao-cabecalho span { display:flex; align-items:center; gap:6px; }
 .ath-traducao-fechar { display:grid; place-items:center; width:25px; height:25px; border:0; border-radius:7px; background:transparent; color:#526781; cursor:pointer; }
 .ath-traducao-original { margin:0; padding:10px 13px 0; color:#68788B; font-size:11px; line-height:1.45; max-height:58px; overflow:auto; }
+.ath-traducao-motor { margin:0; padding:3px 13px; color:#68788B; font:700 10px var(--glx-font, Nunito, sans-serif); }
+.ath-traducao-motor:empty { display:none; }
 .ath-traducao-resultado { padding:12px 13px; min-height:45px; overflow:auto; white-space:pre-wrap; font-size:13px; line-height:1.5; }
 .ath-traducao-acoes { display:flex; gap:7px; flex-wrap:wrap; padding:9px 13px 12px; border-top:1px solid #E4EAF2; }
 .ath-traducao-acoes button { display:inline-flex; align-items:center; gap:5px; border:1px solid #D7E1EC; border-radius:8px; background:#F7FAFD; color:#314F79; padding:6px 8px; font:800 10.5px var(--glx-font, Nunito, sans-serif); cursor:pointer; }
@@ -23,5 +25,6 @@
 .ath-pdf-traducao-topo strong { display:flex; align-items:center; gap:8px; color:#314F79; font:800 15px var(--glx-font, Nunito, sans-serif); }
 .ath-pdf-traducao-topo button { border:1px solid #C9D8E9; border-radius:8px; padding:7px 11px; background:#F8FAFC; color:#314F79; font:800 11px var(--glx-font, Nunito, sans-serif); cursor:pointer; }
 .ath-pdf-traducao-corpo { white-space:pre-wrap; overflow:auto; padding-top:22px; font:15px/1.7 var(--glx-font, Nunito, sans-serif); }
+.ath-pdf-traducao-pagina > .ath-traducao-motor { padding:10px 0 0; }
 @media (max-width:1100px) { .ath-traducao-controle button span { display:none; } }
 @media (max-width:720px) { .ath-pdf-traducao-pagina { padding:24px; } .ath-pdf-selecao-popover { gap:4px; } }
