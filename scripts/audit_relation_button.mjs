@@ -25,4 +25,27 @@ try{
  if(result.exceptionDetails)throw Error(result.exceptionDetails.exception?.description);
  console.log(result.result.value);
  for(const r of result.result.value){assert.equal(r.opened,true);assert.equal(r.svg,true);assert.equal(r.closed,true);}
+ const evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description);return r.result.value;};
+ await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+ await evaluate(`(async()=>{
+  document.head.insertAdjacentHTML('beforeend','<link rel="stylesheet" href="/src/css/athenes_paineis.css">');
+  const {EstudoArtigosView}=await import('/src/ui/athenes_estudo_artigos.js');
+  window.auditView=Object.assign(Object.create(EstudoArtigosView.prototype),{artigos:Array.from({length:12},(_,i)=>({id:'r'+i,titulo:'Mobilidade urbana sustentável',autores:['Ana','Bruno','Carla'][i%3],palavrasChave:['Mobilidade','Saúde'],ano:2020+i%5,resumo:'Mobilidade urbana e saúde coletiva. Planejamento das cidades e transporte sustentável.'})),artigosCompartilhados:[],pastaFiltroId:'todas'});
+  auditView.abrirAnaliseRelacoes();await new Promise(r=>setTimeout(r,300));
+ })()`);
+ const geometry=await evaluate(`(()=>{const n=document.querySelector('[data-relation-node] circle'),r=n.getBoundingClientRect(),m=document.querySelector('.ath-relations-modal').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,height:m.height};})()`);
+ await send('Input.dispatchMouseEvent',{type:'mousePressed',x:geometry.x,y:geometry.y,button:'left',clickCount:1});
+ await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:geometry.x+50,y:geometry.y+30,button:'left',buttons:1});
+ await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:geometry.x+50,y:geometry.y+30,button:'left',clickCount:1});
+ assert.notEqual(await evaluate(`document.querySelector('[data-relation-node]').getAttribute('transform')`),'translate(0 0)');
+ await send('Input.dispatchMouseEvent',{type:'mouseWheel',x:geometry.x,y:geometry.y,deltaY:-150,deltaX:0});
+ assert.match(await evaluate(`document.querySelector('.rel-drawing').style.transform`),/scale\(1\./);
+ await evaluate(`const mode=document.querySelector('[name=mode]');mode.value='terms';mode.dispatchEvent(new Event('change',{bubbles:true}));`);
+ assert.equal(await evaluate(`Math.round(document.querySelector('.ath-relations-modal').getBoundingClientRect().height)`),Math.round(geometry.height));
+ assert.equal(await evaluate(`document.querySelector('.rel-term-ranking').hidden`),false);
+ assert.ok(await evaluate(`document.querySelector('.rel-term-ranking ol')?.textContent.toLowerCase().includes('mobilidade')`));
+ await evaluate(`document.querySelector('[data-rel-action=fit]').click();`);
+ const screenshot=await send('Page.captureScreenshot',{format:'png'});
+ const {writeFile}=await import('node:fs/promises');await writeFile('docs/relations-audit/athenes-panel-refined.png',Buffer.from(screenshot.data,'base64'));
+ console.log('Node drag, pointer-centered zoom, stable modal height and term ranking passed.');
 }finally{ws.close();await fetch('http://127.0.0.1:9223/json/close/'+tab.id);}

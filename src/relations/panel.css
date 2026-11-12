@@ -4,3 +4,40 @@
 .rel-stage button{width:34px;height:34px;min-width:34px;flex:0 0 34px;padding:0;align-self:center}.rel-stage select{width:0;min-width:0}.rel-view-tools>button:not([data-rel-action="fit"]){width:34px;height:34px;min-width:34px;padding:0}.relation-block svg{display:block;width:100%;height:auto;max-height:720px}
 
 .rel-controls>[data-rel-fields],.rel-controls>[data-rel-terms]{display:grid;gap:14px}.rel-controls [data-rel-stages]{display:grid;gap:8px}.rel-controls .rel-stage{margin:0}.rel-controls [data-rel-action="stage-add"]{justify-self:start;margin:0 0 2px}.rel-controls label{margin:0;row-gap:7px}.rel-controls strong{line-height:1.5}.rel-controls fieldset{margin:2px 0 0;gap:14px;padding:14px 12px}.rel-controls legend{padding:0 5px}.rel-controls h3{margin-bottom:2px}
+
+.relation-panel{grid-template-columns:340px minmax(0,1fr)}
+.rel-controls{min-width:0;padding:6px 14px 20px 4px;scrollbar-gutter:stable}
+.rel-controls select{padding-right:28px;min-height:38px}
+.relation-map-svg [data-relation-node]{cursor:grab;touch-action:none}
+.relation-map-svg [data-relation-node]:active{cursor:grabbing}
+.rel-term-ranking{flex:none;max-height:150px;overflow:auto;border:1px solid #dce5f1;border-radius:10px;padding:10px 14px}.rel-term-ranking summary{cursor:pointer;font-weight:700}.rel-term-ranking ol{padding-left:24px}.rel-term-ranking li{padding:3px 0}.rel-term-ranking li strong{float:right;margin-left:12px}
+.ath-modal.ath-relations-modal{height:90dvh;max-height:90dvh;display:flex;flex-direction:column;overflow:hidden}
+.ath-relations-modal>header,.ath-relations-modal>div:not([data-rel-body]){flex:none}
+.ath-relations-modal [data-rel-body]{flex:1;min-height:0;overflow:hidden!important}
+.ath-relations-modal .relation-panel{height:100%;overflow:hidden}
+.ath-relations-modal .rel-controls{height:100%;max-height:none;overflow-y:auto}
+.ath-relations-modal .rel-result{min-height:0;height:100%;overflow-y:auto}
+.ath-relations-modal .rel-viewport{height:auto;flex:1 0 240px;min-height:240px;max-height:none}
+.ath-relations-modal .rel-inspect{flex:none;max-height:110px}
+.ath-modal.ath-relations-modal{border:1px solid #dce5f1;border-radius:20px;background:#fff;box-shadow:0 24px 80px #152b4b30;color:#243a59;font:13px/1.5 var(--glx-font,Nunito,Arial,sans-serif)}
+.ath-relations-modal .ath-modal-head{padding:18px 24px;border-bottom:1px solid #e4eaf3;display:flex;align-items:center;justify-content:space-between;flex:none}
+.ath-relations-modal .ath-modal-head h2{font:750 18px/1.4 var(--glx-font,Nunito,Arial,sans-serif);margin:0;color:#243e60}
+.ath-relations-modal [data-rel-close]{width:34px;height:34px;padding:0;border:0;border-radius:9px;background:#f0f4fa;color:#58708f;cursor:pointer;font-size:20px}
+.ath-relations-modal>div:not([data-rel-body]){background:#f8fafd;border-bottom:1px solid #e4eaf3}
+.ath-relations-modal>div>label{display:flex;align-items:center;gap:14px;color:#617792;font-weight:650}
+.ath-relations-modal [data-rel-destination]{font:inherit;color:#314f79;background:white;border:1px solid #dce5f1;border-radius:9px;padding:8px 30px 8px 12px;max-width:70%;min-width:0}
+.ath-relations-modal .rel-controls{background:#f7f9fc;border:1px solid #e5ebf4;border-radius:14px;padding:18px 16px;gap:18px}
+.ath-relations-modal .rel-controls label{font-size:12px;font-weight:600;color:#526b8a;gap:8px}
+.ath-relations-modal .rel-controls input,.ath-relations-modal .rel-controls select,.ath-relations-modal .rel-controls textarea{font-weight:450;color:#243e60;border-color:#d8e2f0;background:#fff;min-height:38px}
+.ath-relations-modal .rel-controls h3{font-size:14px;color:#294869}
+.ath-relations-modal .rel-controls fieldset{background:#fff;border-color:#e2e9f3;padding:14px}
+.ath-relations-modal .rel-controls legend{color:#315887;font-size:12px}
+.ath-relations-modal .rel-summary{font-size:11px;padding:0 3px}
+.ath-relations-modal .rel-view-tools{align-items:center;min-height:36px}
+.ath-relations-modal .rel-viewport{background:radial-gradient(#c9d5e544 .7px,transparent .7px) 0 0/20px 20px,#fff;border-color:#dce5ef}
+.ath-relations-modal .rel-inspect{background:#f7f9fc;border-color:#e4eaf3;color:#617792;font-size:12px}
+.ath-relations-modal .rel-warnings{flex:none;max-height:62px;overflow:auto;font-size:11px;color:#866332}
+.ath-relations-modal .rel-warnings p{margin:3px 0}
+@media(max-width:850px){.relation-panel{grid-template-columns:1fr}.ath-relations-modal .relation-panel{grid-template-rows:minmax(160px,35%) minmax(0,1fr)}.ath-relations-modal .rel-viewport{flex-basis:160px;min-height:160px}}
+
+.ath-relations-modal .rel-controls input[type=checkbox]{min-height:0;width:15px;height:15px;margin:0;accent-color:#315887}.ath-relations-modal [data-rel-text-fields]{display:grid;gap:10px}
