@@ -1573,7 +1573,7 @@ export class EstudoArtigosView {
     caixa.style.setProperty('--ath-pdf-page-height', `${h}px`);
   }
 
-  aplicarPinchZoom(novoZoom, root, conteudoIniX, conteudoIniY, zoomBaseTouch, midAtualX, midAtualY) {
+  aplicarPinchZoom(novoZoom, root, ancora, midAtualX, midAtualY) {
     const lim = Math.max(50, Math.min(250, Math.round(novoZoom * 10) / 10));
     const container = root || this.container;
     const palco = container?.querySelector('#athEstudioPalco');
@@ -1581,14 +1581,14 @@ export class EstudoArtigosView {
 
     this.zoomPct = lim;
     const escalaNova = this.zoomPct / 100;
-    const razao = this.zoomPct / zoomBaseTouch;
-
     palco.style.setProperty('--ath-zoom', String(escalaNova));
 
-    const novoScrollX = Math.round(conteudoIniX * razao - midAtualX);
-    const novoScrollY = Math.round(conteudoIniY * razao - midAtualY);
-    palco.scrollLeft = Math.max(0, novoScrollX);
-    palco.scrollTop = Math.max(0, novoScrollY);
+    if (ancora?.folha?.isConnected) {
+      // A posição da folha inclui centralização, margens e a altura das páginas anteriores.
+      const rect = ancora.folha.getBoundingClientRect();
+      palco.scrollLeft += rect.left + ancora.x * escalaNova - midAtualX;
+      palco.scrollTop += rect.top + ancora.y * escalaNova - midAtualY;
+    }
 
     clearTimeout(this._tZoomQualidade);
     this._tZoomQualidade = setTimeout(() => {

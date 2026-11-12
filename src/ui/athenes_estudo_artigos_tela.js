@@ -439,19 +439,35 @@ export const metodosEstudoTela = {
       // Gesto de pinça contínuo e pan simultâneo a 60/120 FPS via requestAnimationFrame (Tablets)
       let distIniTouch = 0;
       let zoomBaseTouch = 100;
-      let midIniX = 0;
-      let midIniY = 0;
-      let conteudoIniX = 0;
-      let conteudoIniY = 0;
-      let palcoZoomRect = null;
+      let ancoraPinch = null;
       let rafTouchId = null;
       let pinchPendente = null;
+
+      const localizarFolhaDoPinch = (x, y) => {
+        const sobDedos = document.elementFromPoint(x, y)?.closest?.('.ath-pdf-folha-container');
+        if (sobDedos && palcoZoomEl.contains(sobDedos)) return sobDedos;
+
+        // O centro da pinça pode cair no espaço entre folhas ou nas margens do palco.
+        let folhaMaisProxima = null;
+        let menorDistancia = Infinity;
+        palcoZoomEl.querySelectorAll('.ath-pdf-folha-container').forEach(folha => {
+          const rect = folha.getBoundingClientRect();
+          const dx = Math.max(rect.left - x, 0, x - rect.right);
+          const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+          const distancia = dx * dx + dy * dy;
+          if (distancia < menorDistancia) {
+            menorDistancia = distancia;
+            folhaMaisProxima = folha;
+          }
+        });
+        return folhaMaisProxima;
+      };
 
       const executarPinch = () => {
         if (!pinchPendente) return;
         const { novoZoom, midAtualX, midAtualY } = pinchPendente;
         pinchPendente = null;
-        this.aplicarPinchZoom(novoZoom, root, conteudoIniX, conteudoIniY, zoomBaseTouch, midAtualX, midAtualY);
+        this.aplicarPinchZoom(novoZoom, root, ancoraPinch, midAtualX, midAtualY);
       };
 
       palcoZoomEl.addEventListener('touchstart', (e) => {
@@ -461,11 +477,15 @@ export const metodosEstudoTela = {
           distIniTouch = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
           if (distIniTouch > 10) {
             zoomBaseTouch = this.zoomPct;
-            palcoZoomRect = palcoZoomEl.getBoundingClientRect();
-            midIniX = (t0.clientX + t1.clientX) / 2 - palcoZoomRect.left;
-            midIniY = (t0.clientY + t1.clientY) / 2 - palcoZoomRect.top;
-            conteudoIniX = palcoZoomEl.scrollLeft + midIniX;
-            conteudoIniY = palcoZoomEl.scrollTop + midIniY;
+            const x = (t0.clientX + t1.clientX) / 2;
+            const y = (t0.clientY + t1.clientY) / 2;
+            const folha = localizarFolhaDoPinch(x, y);
+            const rect = folha?.getBoundingClientRect();
+            ancoraPinch = rect ? {
+              folha,
+              x: (x - rect.left) / (zoomBaseTouch / 100),
+              y: (y - rect.top) / (zoomBaseTouch / 100)
+            } : null;
           }
         }
       }, { passive: true });
@@ -476,8 +496,8 @@ export const metodosEstudoTela = {
           const t0 = e.touches[0];
           const t1 = e.touches[1];
           const distAtual = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
-          const midAtualX = (t0.clientX + t1.clientX) / 2 - palcoZoomRect.left;
-          const midAtualY = (t0.clientY + t1.clientY) / 2 - palcoZoomRect.top;
+          const midAtualX = (t0.clientX + t1.clientX) / 2;
+          const midAtualY = (t0.clientY + t1.clientY) / 2;
 
           const ratio = distAtual / distIniTouch;
           const novoZoom = zoomBaseTouch * ratio;
@@ -496,7 +516,7 @@ export const metodosEstudoTela = {
         executarPinch();
         distIniTouch = 0;
         pinchPendente = null;
-        palcoZoomRect = null;
+        ancoraPinch = null;
         if (rafTouchId) {
           cancelAnimationFrame(rafTouchId);
           rafTouchId = null;
