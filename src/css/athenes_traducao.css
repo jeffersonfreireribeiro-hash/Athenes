@@ -1,0 +1,27 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.ath-traducao-controle { position:relative; display:inline-flex; align-items:center; gap:2px; padding:3px; border:1px solid #294469; border-radius:10px; background:#314F79; box-shadow:0 2px 6px rgba(24,45,72,.16); }
+.ath-traducao-controle::after { content:""; position:absolute; right:10px; top:50%; width:5px; height:5px; border-right:1.5px solid #DCEAF9; border-bottom:1.5px solid #DCEAF9; transform:translateY(-70%) rotate(45deg); pointer-events:none; }
+.ath-traducao-controle select { appearance:none; min-width:43px; max-width:50px; border:0; border-left:1px solid rgba(255,255,255,.28); padding:5px 15px 5px 7px; background:transparent; color:#fff; font:800 11px var(--glx-font, Nunito, sans-serif); cursor:pointer; }
+.ath-traducao-controle select option { color:#233A56; background:#fff; }
+.ath-traducao-controle button { display:inline-flex; align-items:center; gap:6px; border:0; border-radius:7px; padding:5px 9px; color:#fff; background:transparent; font:800 11px var(--glx-font, Nunito, sans-serif); cursor:pointer; white-space:nowrap; }
+.ath-traducao-controle button:hover,.ath-traducao-controle button[aria-pressed="true"] { background:rgba(255,255,255,.16); }
+.ath-traducao-controle button:focus-visible,.ath-traducao-controle select:focus-visible { outline:2px solid #9BC3F0; outline-offset:2px; }
+.ath-pdf-selecao-popover { max-width:calc(100vw - 24px); flex-wrap:wrap; border-radius:16px; }
+.ath-traducao-selecao-idioma { border:1px solid #D7E1EC; border-radius:8px; padding:4px; background:#fff; color:#314F79; font:700 11px var(--glx-font, Nunito, sans-serif); }
+.ath-traducao-balao { position:fixed; z-index:2400; width:min(350px, calc(100vw - 24px)); max-height:min(420px, calc(100dvh - 24px)); display:flex; flex-direction:column; background:#fff; border:1px solid #D7E1EC; border-radius:15px; box-shadow:0 14px 38px rgba(20,38,62,.24); color:#263A54; font-family:var(--glx-font, Nunito, sans-serif); overflow:hidden; }
+.ath-traducao-cabecalho { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 13px; border-bottom:1px solid #E4EAF2; background:#F7FAFD; font-size:12px; font-weight:800; }
+.ath-traducao-cabecalho span { display:flex; align-items:center; gap:6px; }
+.ath-traducao-fechar { display:grid; place-items:center; width:25px; height:25px; border:0; border-radius:7px; background:transparent; color:#526781; cursor:pointer; }
+.ath-traducao-original { margin:0; padding:10px 13px 0; color:#68788B; font-size:11px; line-height:1.45; max-height:58px; overflow:auto; }
+.ath-traducao-resultado { padding:12px 13px; min-height:45px; overflow:auto; white-space:pre-wrap; font-size:13px; line-height:1.5; }
+.ath-traducao-acoes { display:flex; gap:7px; flex-wrap:wrap; padding:9px 13px 12px; border-top:1px solid #E4EAF2; }
+.ath-traducao-acoes button { display:inline-flex; align-items:center; gap:5px; border:1px solid #D7E1EC; border-radius:8px; background:#F7FAFD; color:#314F79; padding:6px 8px; font:800 10.5px var(--glx-font, Nunito, sans-serif); cursor:pointer; }
+.ath-traducao-acoes button:disabled { opacity:.5; cursor:default; }
+.ath-traducao-acao-flutuante { position:fixed; z-index:2300; display:flex; align-items:center; gap:5px; border:1px solid #C9D8E9; border-radius:999px; padding:7px 10px; background:#fff; color:#314F79; box-shadow:0 7px 19px rgba(15,23,42,.16); font:800 11px var(--glx-font, Nunito, sans-serif); cursor:pointer; }
+.ath-pdf-traducao-pagina { position:absolute; inset:0; z-index:25; display:flex; flex-direction:column; background:#fff; color:#273A52; box-sizing:border-box; overflow:auto; padding:36px 44px; }
+.ath-pdf-traducao-topo { display:flex; justify-content:space-between; align-items:center; gap:15px; padding-bottom:13px; border-bottom:1px solid #DDE6F0; }
+.ath-pdf-traducao-topo strong { display:flex; align-items:center; gap:8px; color:#314F79; font:800 15px var(--glx-font, Nunito, sans-serif); }
+.ath-pdf-traducao-topo button { border:1px solid #C9D8E9; border-radius:8px; padding:7px 11px; background:#F8FAFC; color:#314F79; font:800 11px var(--glx-font, Nunito, sans-serif); cursor:pointer; }
+.ath-pdf-traducao-corpo { white-space:pre-wrap; overflow:auto; padding-top:22px; font:15px/1.7 var(--glx-font, Nunito, sans-serif); }
+@media (max-width:1100px) { .ath-traducao-controle button span { display:none; } }
+@media (max-width:720px) { .ath-pdf-traducao-pagina { padding:24px; } .ath-pdf-selecao-popover { gap:4px; } }

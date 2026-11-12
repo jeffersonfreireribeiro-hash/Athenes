@@ -12,6 +12,7 @@ import { svgIcone, svgLogo } from './athenes_icones.js';
 import { mostrarAviso } from './athenes_aviso.js';
 import { registrarPdfLocalNoArtigo, salvarArtigosEstudo, definirArtigoAbertoAtivo, formatarCitacaoAbntDoArtigo, artigoTemPdf, ehArtigoExemploFicticio } from './athenes_estudo_artigos_dados.js';
 import { paginaEditorialDoPdf } from '../core/athenes_pdf_identificadores.js';
+import { configurarTraducaoEstudio } from './athenes_traducao_ui.js';
 
 /**
  * PDF guardado pelo próprio Zotero (arquivo importado): fica na pasta de dados do Zotero, em storage/CHAVE-DO-ANEXO/arquivo.pdf.
@@ -259,6 +260,10 @@ export const metodosEstudoTela = {
 
             <!-- Botão de Adicionar Folha Extra e Indicador de Página à Direita -->
             <div style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+              <div class="ath-traducao-controle" aria-label="Tradução da página de referência">
+                <button type="button" id="athBtnTraduzirPagina" aria-pressed="false" title="Traduzir a página atual sem alterar o PDF">${svgIcone('globo', 15)}<span>Traduzir página</span></button>
+                <select id="athIdiomaTraducao" aria-label="Idioma de destino da tradução"><option value="pt">PT</option><option value="en">EN</option><option value="es">ES</option><option value="fr">FR</option><option value="it">IT</option></select>
+              </div>
               <span id="athIndicadorPagBarra" style="font:800 11.5px var(--glx-font); color:#314F79; background:#EEF4FA; padding:4px 10px; border-radius:999px;">
                 ${semPdf ? 'Sem PDF' : (paginaEditorialDoPdf(art, this.paginaAtual, pdfInfo?.n) ? `Pág. ${paginaEditorialDoPdf(art, this.paginaAtual, pdfInfo.n)} · PDF ${this.paginaAtual}/${pdfInfo.n}` : `Pág. ${this.paginaAtual} de ${totalPags}`)}
               </span>
@@ -296,6 +301,7 @@ export const metodosEstudoTela = {
               <button type="button" class="ath-sel-pop-btn" id="athSelBtnCopiarAbnt" title="Copiar trecho já formatado com (AUTOR, ANO, p. X)">
                 <span>Copiar ABNT</span>
               </button>
+              <button type="button" class="ath-sel-pop-btn" id="athSelBtnTraduzir" title="Traduzir o trecho selecionado">${svgIcone('globo', 13)}<span>Traduzir</span></button>
             </div>
 
             <div class="ath-pdf-todas-paginas-stack" id="athPdfTodasPaginasStack"></div>
@@ -350,9 +356,11 @@ export const metodosEstudoTela = {
 
     // Configura o Menu Flutuante de Seleção de Texto no PDF
     this.configurarSelecaoTextoInterativa(root, art, paginasPdf);
+    const limparTraducao = configurarTraducaoEstudio(this, root, art);
 
     // Eventos de Topo e Barra Flutuante
     const voltarParaCatalogo = () => {
+      limparTraducao?.();
       if (this._tecladoZoomHandler) {
         window.removeEventListener('keydown', this._tecladoZoomHandler);
         this._tecladoZoomHandler = null;

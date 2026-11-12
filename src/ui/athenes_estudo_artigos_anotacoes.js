@@ -6,6 +6,7 @@
 import { escapeHtml } from '../core/athenes_seguranca.js';
 import { svgIcone } from './athenes_icones.js';
 import { salvarArtigosEstudo, salvarArtigosEstudoDebounced, formatarCitacaoAbntDoArtigo, calcularPontoFinalLinhaReta, ehBotaoBorracha } from './athenes_estudo_artigos_dados.js';
+import { mostrarBalaoTraducao, salvarTraducaoComoNota } from './athenes_traducao_ui.js';
 
 export const metodosEstudoAnotacoes = {
   renderizarPinsDaPagina(layerEl, art, numPag, root) {
@@ -321,6 +322,9 @@ export const metodosEstudoAnotacoes = {
       popSel.style.top = `${Math.round(top)}px`;
       popSel.style.left = `${Math.round(left)}px`;
       popSel.hidden = false;
+      const bounds = popSel.getBoundingClientRect();
+      if (bounds.left < 12) popSel.style.left = `${Math.round(left + 12 - bounds.left)}px`;
+      else if (bounds.right > window.innerWidth - 12) popSel.style.left = `${Math.round(left - bounds.right + window.innerWidth - 12)}px`;
     };
 
     let prevRange = null;
@@ -346,6 +350,11 @@ export const metodosEstudoAnotacoes = {
     palco.addEventListener('mouseup', () => {
       encerrarModoSelecting();
       setTimeout(verificarSelecaoTexto, 20);
+    });
+    palco.addEventListener('pointerup', evento => {
+      if (evento.pointerType !== 'touch') return;
+      encerrarModoSelecting();
+      setTimeout(verificarSelecaoTexto, 100);
     });
     palco.addEventListener('keyup', () => {
       if (!isPointerDown) encerrarModoSelecting();
@@ -542,6 +551,20 @@ export const metodosEstudoAnotacoes = {
           popSel.hidden = true;
         }, 900);
       }
+    });
+
+    popSel.querySelector('#athSelBtnTraduzir')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!ultimaSelecao) return;
+      const { texto } = ultimaSelecao;
+      const ancora = popSel.getBoundingClientRect();
+      const destino = root.querySelector('#athIdiomaTraducao')?.value || 'pt';
+      popSel.hidden = true;
+      window.getSelection()?.removeAllRanges();
+      mostrarBalaoTraducao({
+        texto, destino, ancora,
+        aoSalvarNota: traduzido => salvarTraducaoComoNota(this, root, art, texto, traduzido, destino)
+      });
     });
   },
 

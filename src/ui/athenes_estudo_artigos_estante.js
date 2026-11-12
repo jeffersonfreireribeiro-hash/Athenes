@@ -49,7 +49,7 @@ export const CORES_CAPA_SELECAO = Object.freeze([
 export function calcularLivrosPorPrateleira(larguraDisponivel, espaco = 24) {
   const largura = Number(larguraDisponivel);
   if (!Number.isFinite(largura) || largura <= 0) return 6;
-  const larguraLivro = 164;
+  const larguraLivro = 190;
   const recuo = 8;
   return Math.max(1, Math.floor((Math.max(0, largura - recuo) + espaco) / (larguraLivro + espaco)));
 }
