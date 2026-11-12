@@ -635,7 +635,6 @@ export class EstudoArtigosView {
       this.renderizarBarraPastasTopo(topoPastasWrap);
     }
 
-    wrap.querySelector('#athBtnAnalisarRelacoes')?.addEventListener('click',()=>this.abrirAnaliseRelacoes());
     const inputBusca = wrap.querySelector('#athEstudoBuscaInput');
     inputBusca?.addEventListener('input', () => {
       this.filtroBusca = inputBusca.value.trim().toLowerCase();
@@ -717,6 +716,7 @@ export class EstudoArtigosView {
     document.addEventListener('click', this._fecharMenuOrdemBib);
 
     const escopoBotoes = containerHeaderAcoes || wrap;
+    escopoBotoes.querySelector('#athBtnAnalisarRelacoes')?.addEventListener('click',()=>this.abrirAnaliseRelacoes());
 
     escopoBotoes.querySelector('#athBtnConfigurarChaveZotero')?.addEventListener('click', () => {
       this.abrirModalCredenciaisZotero();
