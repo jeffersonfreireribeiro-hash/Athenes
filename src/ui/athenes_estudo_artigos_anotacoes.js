@@ -352,9 +352,9 @@ export const metodosEstudoAnotacoes = {
       setTimeout(verificarSelecaoTexto, 20);
     });
     palco.addEventListener('pointerup', evento => {
-      if (evento.pointerType !== 'touch') return;
+      if (evento.pointerType === 'mouse') return;
       encerrarModoSelecting();
-      setTimeout(verificarSelecaoTexto, 100);
+      setTimeout(verificarSelecaoTexto, 120);
     });
     palco.addEventListener('keyup', () => {
       if (!isPointerDown) encerrarModoSelecting();
@@ -386,6 +386,12 @@ export const metodosEstudoAnotacoes = {
           encerrarModoSelecting();
         }
         return;
+      }
+
+      // No Android, a seleção por caneta ou toque longo pode terminar após o pointerup.
+      if (!isPointerDown) {
+        clearTimeout(this._verificarSelecaoTimer);
+        this._verificarSelecaoTimer = setTimeout(verificarSelecaoTexto, 120);
       }
 
       const activeLayers = new Set();

@@ -20,6 +20,24 @@ import {
 } from '../src/ui/athenes_estudo_artigos.js';
 import { ZoteroClient } from '../src/core/athenes_zotero.js';
 
+test('Cronos ordena referências por acesso, edição, título, autor e ano', () => {
+  const artigos = [
+    { id: 'b', titulo: 'Zênite', autores: [{ sobrenome: 'Silva' }], ano: '2021', atualizadoEm: '2026-11-01T12:00:00Z' },
+    { id: 'a', titulo: 'Água', autores: [{ sobrenome: 'Almeida' }], ano: '2023-2024', atualizadoEm: '2026-11-02T12:00:00Z' },
+    { id: 'c', titulo: 'Cidade', autores: 'Costa', ano: '2019', atualizadoEm: '2026-11-03T12:00:00Z', ultimoAcessoEm: '2026-11-12T12:00:00Z' },
+    { id: 'd', titulo: 'Bairro', autores: [{ sobrenome: 'Barros' }], ano: '2025', fichamento: { atualizadoEm: '2026-11-11T12:00:00Z' } }
+  ];
+  const ordenar = ordemReferencias => EstudoArtigosView.prototype.ordenarArtigos.call({ ordemReferencias }, artigos).map(a => a.id);
+  assert.deepEqual(ordenar('recente_desc'), ['c', 'd', 'a', 'b']);
+  assert.deepEqual(ordenar('recente_asc'), ['b', 'a', 'd', 'c']);
+  assert.deepEqual(ordenar('titulo_asc'), ['a', 'd', 'c', 'b']);
+  assert.deepEqual(ordenar('titulo_desc'), ['b', 'c', 'd', 'a']);
+  assert.deepEqual(ordenar('autor_asc'), ['a', 'd', 'c', 'b']);
+  assert.deepEqual(ordenar('ano_desc'), ['d', 'a', 'b', 'c']);
+  assert.deepEqual(ordenar('ano_asc'), ['c', 'b', 'a', 'd']);
+  assert.deepEqual(artigos.map(a => a.id), ['b', 'a', 'c', 'd']);
+});
+
 // o estúdio é dividido em módulos (tela, painel direito, anotações, modais, dados): o código é lido em conjunto
 const lerCodigoEstudo = () => ['', '_dados', '_tela', '_painel_direito', '_anotacoes', '_modais']
   .map(n => fs.readFileSync(path.resolve(`src/ui/athenes_estudo_artigos${n}.js`), 'utf8')).join('');

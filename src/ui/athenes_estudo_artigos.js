@@ -40,7 +40,7 @@ import { ModalCompartilhar } from './athenes_compartilhar_modal.js';
 import { listarCompartilhadosComigo, carregarDocumentoCompartilhado } from '../core/athenes_compartilhamento.js';
 import { lerSessaoSupabase } from '../core/athenes_supabase_auth.js';
 import { paginaEditorialDoPdf } from '../core/athenes_pdf_identificadores.js';
-import { removerPdfLocal, PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, obterPdfComoDataUrl, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, gerarHtmlNotaZoteroDoArtigo, definirArtigoAbertoAtivo, lerSnapshotArtigosIdb, mesclarFichamentoPreservandoDados, compartilharPdfNoDrive } from './athenes_estudo_artigos_dados.js';
+import { removerPdfLocal, PASTA_PDFS_DRIVE, artigoTemPdf, ehArtigoExemploFicticio, carregarPdfJs, obterPdfLocal, obterPdfComoDataUrl, garantirPdfDoArtigo, migrarPdfsLocaisParaODrive, carregarArtigosEstudo, salvarArtigosEstudo, guardarSnapshotArtigosIdb, gerarHtmlNotaZoteroDoArtigo, definirArtigoAbertoAtivo, lerSnapshotArtigosIdb, mesclarFichamentoPreservandoDados, compartilharPdfNoDrive } from './athenes_estudo_artigos_dados.js';
 import { metodosEstudoTela } from './athenes_estudo_artigos_tela.js';
 import { metodosEstudoPainelDireito } from './athenes_estudo_artigos_painel_direito.js';
 import { metodosEstudoAnotacoes } from './athenes_estudo_artigos_anotacoes.js';
@@ -544,8 +544,8 @@ export class EstudoArtigosView {
                 <strong>Ordem das Referências</strong>
               </div>
               <ul class="ath-menu-ordenar-lista" id="athListaOpcoesOrdemBib">
-                <li><button type="button" role="menuitem" data-ordem-bib="recente_desc" class="${this.ordemReferencias === 'recente_desc' ? 'sel' : ''}"><span>Alterado recentemente (Padrão)</span>${this.ordemReferencias === 'recente_desc' ? svgIcone('check', 13) : ''}</button></li>
-                <li><button type="button" role="menuitem" data-ordem-bib="recente_asc" class="${this.ordemReferencias === 'recente_asc' ? 'sel' : ''}"><span>Alterado mais antigo</span>${this.ordemReferencias === 'recente_asc' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-ordem-bib="recente_desc" class="${this.ordemReferencias === 'recente_desc' ? 'sel' : ''}"><span>Usado recentemente (Padrão)</span>${this.ordemReferencias === 'recente_desc' ? svgIcone('check', 13) : ''}</button></li>
+                <li><button type="button" role="menuitem" data-ordem-bib="recente_asc" class="${this.ordemReferencias === 'recente_asc' ? 'sel' : ''}"><span>Usado há mais tempo</span>${this.ordemReferencias === 'recente_asc' ? svgIcone('check', 13) : ''}</button></li>
                 <li><button type="button" role="menuitem" data-ordem-bib="titulo_asc" class="${this.ordemReferencias === 'titulo_asc' ? 'sel' : ''}"><span>Título (A → Z)</span>${this.ordemReferencias === 'titulo_asc' ? svgIcone('check', 13) : ''}</button></li>
                 <li><button type="button" role="menuitem" data-ordem-bib="titulo_desc" class="${this.ordemReferencias === 'titulo_desc' ? 'sel' : ''}"><span>Título (Z → A)</span>${this.ordemReferencias === 'titulo_desc' ? svgIcone('check', 13) : ''}</button></li>
                 <li><button type="button" role="menuitem" data-ordem-bib="autor_asc" class="${this.ordemReferencias === 'autor_asc' ? 'sel' : ''}"><span>Primeiro autor (A → Z)</span>${this.ordemReferencias === 'autor_asc' ? svgIcone('check', 13) : ''}</button></li>
@@ -800,8 +800,8 @@ export class EstudoArtigosView {
     const lista = escopo?.querySelector('#athListaOpcoesOrdemBib');
     if (!lista) return;
     const opcoes = [
-      { id: 'recente_desc', rotulo: 'Alterado recentemente (Padrão)' },
-      { id: 'recente_asc', rotulo: 'Alterado mais antigo' },
+      { id: 'recente_desc', rotulo: 'Usado recentemente (Padrão)' },
+      { id: 'recente_asc', rotulo: 'Usado há mais tempo' },
       { id: 'titulo_asc', rotulo: 'Título (A → Z)' },
       { id: 'titulo_desc', rotulo: 'Título (Z → A)' },
       { id: 'autor_asc', rotulo: 'Primeiro autor (A → Z)' },
@@ -826,20 +826,28 @@ export class EstudoArtigosView {
 
   ordenarArtigos(artigos) {
     const obterTimestampArt = (a) => {
-      const dt = a.modificadoEm || a.fichamento?.modificadoEm || a.atualizado_em || a.dataAdicionado || a.data;
-      const t = dt ? new Date(dt).getTime() : 0;
-      return isNaN(t) ? 0 : t;
+      return Math.max(0, ...[
+        a.ultimoAcessoEm, a.atualizadoEm, a.fichamento?.atualizadoEm,
+        a.modificadoEm, a.fichamento?.modificadoEm, a.atualizado_em,
+        a.camposZotero?.dateModified, a.dataAdicionado,
+        a.camposZotero?.dateAdded, a.data
+      ].map(dt => {
+        const t = dt ? new Date(dt).getTime() : 0;
+        return Number.isFinite(t) ? t : 0;
+      }));
     };
 
     const obterAnoArt = (a) => {
-      const n = parseInt(String(a.ano || '').replace(/\D/g, ''), 10);
-      return isNaN(n) ? 0 : n;
+      const match = String(a.ano || '').match(/\b(?:1[5-9]\d{2}|20\d{2}|21\d{2})\b/);
+      return match ? Number(match[0]) : 0;
     };
 
     const obterPrimeiroAutor = (a) => {
-      const primeiro = a.autores?.[0];
+      const primeiro = Array.isArray(a.autores) ? a.autores[0] : a.autores;
       if (!primeiro) return '';
-      return `${primeiro.sobrenome || ''} ${primeiro.prenome || ''}`.trim().toLowerCase();
+      return (typeof primeiro === 'string' ? primeiro :
+        `${primeiro.sobrenome || primeiro.lastName || ''} ${primeiro.prenome || primeiro.firstName || primeiro.nome || ''}`)
+        .trim();
     };
 
     const ordem = this.ordemReferencias || 'recente_desc';
@@ -855,9 +863,9 @@ export class EstudoArtigosView {
         case 'autor_asc':
           return obterPrimeiroAutor(a).localeCompare(obterPrimeiroAutor(b), 'pt-BR', { sensitivity: 'base' });
         case 'ano_desc':
-          return obterAnoArt(b) - obterAnoArt(a);
+          return (obterAnoArt(b) || -Infinity) - (obterAnoArt(a) || -Infinity) || 0;
         case 'ano_asc':
-          return obterAnoArt(a) - obterAnoArt(b);
+          return (obterAnoArt(a) || Infinity) - (obterAnoArt(b) || Infinity) || 0;
         case 'recente_desc':
         default:
           return obterTimestampArt(b) - obterTimestampArt(a);
@@ -1118,6 +1126,14 @@ export class EstudoArtigosView {
 
   abrirArtigoNoEstudio(art, paginaInicial = 1) {
     const trocouArtigo = this.artigoAberto && String(this.artigoAberto.id) !== String(art?.id);
+    if (art?.id) {
+      art.ultimoAcessoEm = new Date().toISOString();
+      if (!art.compartilhadoComigo || this.artigos.includes(art)) {
+        // A leitura altera a ordem recente sem marcar o fichamento como editado.
+        bib.definirArtigos(this.artigos);
+        guardarSnapshotArtigosIdb(this.artigos).catch(() => {});
+      }
+    }
     definirArtigoAbertoAtivo(art);
     this.artigoAberto = art;
     this.garantirHistoricoArtigo(art);

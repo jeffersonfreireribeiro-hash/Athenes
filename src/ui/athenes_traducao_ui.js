@@ -137,17 +137,26 @@ export function configurarTraducaoEstudio(view, root, art) {
     acao.style.left = `${Math.max(12, Math.min(window.innerWidth - 180, ancora.left))}px`;
     acao.style.top = `${Math.max(12, ancora.top - 40)}px`;
     document.body.append(acao);
+    acao.addEventListener('pointerdown', ev => ev.preventDefault());
     acao.addEventListener('click', () => {
       mostrarBalaoTraducao({ texto, destino: idioma.value, ancora: acao, aoSalvarNota: resultado => salvarTraducaoComoNota(view, root, art, texto, resultado, idioma.value) });
       acao.remove(); acao = null;
     });
   };
   inspecao.addEventListener('mouseup', mostrarAcao);
-  inspecao.addEventListener('pointerup', ev => { if (ev.pointerType === 'touch') setTimeout(mostrarAcao, 100); });
+  inspecao.addEventListener('pointerup', ev => { if (ev.pointerType !== 'mouse') setTimeout(mostrarAcao, 120); });
   inspecao.addEventListener('keyup', mostrarAcao);
   inspecao.addEventListener('select', mostrarAcao, true);
+  let selecaoTimer = null;
+  const verificarSelecaoInspetor = () => {
+    clearTimeout(selecaoTimer);
+    selecaoTimer = setTimeout(mostrarAcao, 120);
+  };
+  document.addEventListener('selectionchange', verificarSelecaoInspetor);
   root.addEventListener('pointerdown', ev => { if (acao && !ev.target.closest('.ath-traducao-acao-flutuante')) { acao.remove(); acao = null; } });
   return () => {
+    document.removeEventListener('selectionchange', verificarSelecaoInspetor);
+    clearTimeout(selecaoTimer);
     acao?.remove();
     balaoAtual?.remove();
     balaoAtual = null;

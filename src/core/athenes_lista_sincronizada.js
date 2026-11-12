@@ -30,6 +30,7 @@ function enriquecerItemMesclado(vencedor, outro) {
   const fOut = outro.fichamento;
   let copia = vencedor;
   const clonar = () => { if (copia === vencedor) copia = { ...vencedor }; return copia; };
+  if ((outro.ultimoAcessoEm || '') > (vencedor.ultimoAcessoEm || '')) clonar().ultimoAcessoEm = outro.ultimoAcessoEm;
   if (!fichamentoTemDados(fVenc) && fichamentoTemDados(fOut) && !fVenc?.atualizadoEm) {
     clonar().fichamento = fOut;
   } else if (fVenc && fOut && (fOut.atualizadoEm || '') > (fVenc.atualizadoEm || '')) {

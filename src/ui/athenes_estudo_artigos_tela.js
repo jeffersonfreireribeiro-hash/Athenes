@@ -386,7 +386,7 @@ export const metodosEstudoTela = {
           window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
         } catch (_) {}
       }
-      salvarArtigosEstudo(this.artigos, art);
+      salvarArtigosEstudo(this.artigos);
       definirArtigoAbertoAtivo(null);
       this.artigoAberto = null;
       this.renderizar();
@@ -1148,7 +1148,7 @@ export const metodosEstudoTela = {
       card.addEventListener('click', () => {
         const alvo = this.artigos.find(a => a.id === card.dataset.abrirArtigoEsq);
         if (alvo && alvo.id !== artAtivo.id) {
-          salvarArtigosEstudo(this.artigos, artAtivo);
+          salvarArtigosEstudo(this.artigos);
           this.abrirArtigoNoEstudio(alvo);
         }
       });

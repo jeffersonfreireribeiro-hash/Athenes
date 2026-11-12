@@ -345,6 +345,7 @@ export function mesclarFichamentoPreservandoDados(artAlvo, artFonte) {
     if (artFonte.driveFileName) artAlvo.driveFileName = artFonte.driveFileName;
     if (artFonte.driveStatus) artAlvo.driveStatus = artFonte.driveStatus;
   }
+  if ((artFonte.ultimoAcessoEm || '') > (artAlvo.ultimoAcessoEm || '')) artAlvo.ultimoAcessoEm = artFonte.ultimoAcessoEm;
   if (!artAlvo.notaZoteroKey && artFonte.notaZoteroKey) artAlvo.notaZoteroKey = artFonte.notaZoteroKey;
   if (artFonte.docCompartilhadoId) artAlvo.docCompartilhadoId = artFonte.docCompartilhadoId;
   if (artFonte.compartilhamento) artAlvo.compartilhamento = artFonte.compartilhamento;
@@ -423,6 +424,7 @@ export async function guardarSnapshotArtigosIdb(lista) {
         id: a.id,
         chaveZotero: a.chaveZotero || '',
         atualizadoEm: a.atualizadoEm || '',
+        ultimoAcessoEm: a.ultimoAcessoEm || '',
         driveFileId: a.driveFileId || '',
         driveFileName: a.driveFileName || '',
         driveStatus: a.driveStatus || '',
