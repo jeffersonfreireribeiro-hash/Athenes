@@ -75,6 +75,8 @@ try{
  await evaluate(`root.hidden=false;search.abrir();`);
  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
  assert.ok(await evaluate(`(()=>{const p=document.querySelector('.ath-reader-find'),r=p.getBoundingClientRect();return r.left>=0&&r.right<=390&&p.scrollWidth===p.clientWidth;})()`));
+ await evaluate(`root.hidden=true`);await waitFor(`document.querySelector('.ath-reader-find').hidden`);
+ await evaluate(`root.hidden=false`);await waitFor(`!document.querySelector('.ath-reader-find').hidden`);
  await evaluate('search.destroy()');
  await evaluate(`(async()=>{
   root.querySelectorAll('[data-texto-pag]').forEach(el=>el.replaceChildren());
@@ -92,5 +94,7 @@ try{
   v.artigoAberto=null;v.renderizar();const cleaned=document.querySelectorAll('.ath-reader-find').length;v.destruir();container.remove();return {panels,buttons,cleaned};
  })()`);
  assert.deepEqual(integrated,{panels:1,buttons:1,cleaned:0});
+ await evaluate(`(async()=>{window.search=(await import('/src/ui/athenes_busca_artigo.js')).instalarBuscaArtigo(view,root,art,{});search.abrir();root.remove();})()`);
+ await waitFor(`!document.querySelector('.ath-reader-find')`);
  console.log('Real PDF: Ctrl+F, all pages, lazy highlights, accents, dehyphenation, navigation, cleanup and document integrity passed.');
 }finally{ws.close();await fetch('http://127.0.0.1:9223/json/close/'+tab.id);}

@@ -46,6 +46,7 @@ export function instalarBuscaArtigo(view,root,art,estado={}){
   input.value=estado.consulta;for(const b of panel.querySelectorAll('[data-option]'))b.setAttribute('aria-pressed',String(!!estado.opcoes[b.dataset.option]));
   let abort=null,timer=0,frame=0,resultados=[],ativo=-1,limite=false,destruido=false,revelar=null,navegou=false,modelos=new WeakMap(),geracao=0;
   const infoPdf=()=>view._pdfDocs?.get(art.pdfBlobUrl);
+  const visivel=()=>root.isConnected&&root.getClientRects().length&&!root.closest('[hidden],[aria-hidden="true"]')&&getComputedStyle(root).visibility!=='hidden';
   function limpar(){root.querySelectorAll('.ath-pdf-search-layer').forEach(el=>el.remove());}
   function agendarPintura(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;pintar();});}
   function pintar(){
@@ -99,12 +100,12 @@ export function instalarBuscaArtigo(view,root,art,estado={}){
       if(resultados.length&&!navegou&&autoRevelar)ir(0);else agendarPintura();
     }catch(error){if(!sinal.aborted&&token===geracao)status.textContent='Não foi possível pesquisar este arquivo. Tente reabri-lo.';}
   }
-  function abrir(foco=true){if(estado.aberta&&!panel.hidden){if(foco){input.focus();input.select();}return;}estado.aberta=true;panel.hidden=false;button.setAttribute('aria-expanded','true');if(foco){input.focus();input.select();}procurar();}
+  function abrir(foco=true){if(!visivel()){estado.aberta=true;panel.hidden=true;return;}if(estado.aberta&&!panel.hidden){if(foco){input.focus();input.select();}return;}estado.aberta=true;panel.hidden=false;button.setAttribute('aria-expanded','true');if(foco){input.focus();input.select();}procurar();}
   function fechar(){estado.aberta=false;panel.hidden=true;button.setAttribute('aria-expanded','false');abort?.abort();geracao++;clearTimeout(timer);limpar();button.focus({preventScroll:true});}
   button.addEventListener('click',()=>abrir());input.addEventListener('input',()=>{estado.consulta=input.value;abort?.abort();geracao++;clearTimeout(timer);resultados=[];ativo=-1;limpar();renderResultados();status.textContent='Pesquisando…';timer=setTimeout(()=>{timer=0;procurar();},200);});
   panel.addEventListener('click',e=>{const option=e.target.closest('[data-option]'),result=e.target.closest('[data-result]'),action=e.target.closest('[data-find]')?.dataset.find;if(option){const name=option.dataset.option;estado.opcoes[name]=!estado.opcoes[name];option.setAttribute('aria-pressed',String(estado.opcoes[name]));clearTimeout(timer);procurar();}if(result){ir(Number(result.dataset.result));input.focus({preventScroll:true});}if(action==='close')fechar();if(action==='next')ir(ativo+1);if(action==='prev')ir(ativo-1);});
   const teclado=e=>{
-    if(destruido||!root.isConnected||!root.getClientRects().length||root.closest('[hidden],[aria-hidden="true"]')||getComputedStyle(root).visibility==='hidden'||document.querySelector('.ath-modal-backdrop,.ath-modal-overlay'))return;
+    if(destruido||!visivel()||document.querySelector('.ath-modal-backdrop,.ath-modal-overlay'))return;
     if((e.ctrlKey||e.metaKey)&&!e.altKey&&e.key.toLowerCase()==='f'){e.preventDefault();e.stopPropagation();abrir();return;}
     if(!estado.aberta)return;
     if(e.key==='Escape'){e.preventDefault();e.stopPropagation();fechar();}
@@ -113,6 +114,10 @@ export function instalarBuscaArtigo(view,root,art,estado={}){
   window.addEventListener('keydown',teclado,true);palco?.addEventListener('scroll',agendarPintura,{passive:true});window.addEventListener('resize',agendarPintura);
   const pronto=e=>{const layer=e.target.closest('[data-texto-pag]');if(layer)modelos.delete(layer);agendarPintura();};root.addEventListener('athenes:pdf-text-ready',pronto);
   const observer=new MutationObserver(mutations=>{let mudou=false,reindexar=false;for(const m of mutations){const el=m.target.nodeType===1?m.target:m.target.parentElement;const layer=el?.closest('[data-texto-pag]');if(layer){modelos.delete(layer);mudou=true;if(el.closest('[data-colunas-pag]'))reindexar=true;}}if(mudou)agendarPintura();if(reindexar&&estado.aberta&&input.value.trim()){abort?.abort();geracao++;clearTimeout(timer);timer=setTimeout(()=>{timer=0;procurar(false);},200);}});observer.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['style']});
-  if(estado.aberta){abrir(false);if(estado.foco){input.focus({preventScroll:true});if(estado.selecao)input.setSelectionRange(estado.selecao.inicio,estado.selecao.fim);}}
-  return {abrir,destroy(){estado.foco=document.activeElement===input;estado.selecao={inicio:input.selectionStart||0,fim:input.selectionEnd||0};destruido=true;abort?.abort();geracao++;clearTimeout(timer);cancelAnimationFrame(frame);observer.disconnect();root.removeEventListener('athenes:pdf-text-ready',pronto);window.removeEventListener('keydown',teclado,true);window.removeEventListener('resize',agendarPintura);palco?.removeEventListener('scroll',agendarPintura);limpar();panel.remove();button.remove();}};
+  let lifecycle;
+  const controller={abrir,destroy(){if(destruido)return;estado.foco=!!estado.aberta&&document.activeElement===input;estado.selecao={inicio:input.selectionStart||0,fim:input.selectionEnd||0};destruido=true;abort?.abort();geracao++;clearTimeout(timer);cancelAnimationFrame(frame);observer.disconnect();lifecycle?.disconnect();root.removeEventListener('athenes:pdf-text-ready',pronto);window.removeEventListener('keydown',teclado,true);window.removeEventListener('resize',agendarPintura);palco?.removeEventListener('scroll',agendarPintura);limpar();panel.remove();button.remove();}};
+  lifecycle=new MutationObserver(()=>{if(destruido)return;if(!root.isConnected){estado.aberta=false;controller.destroy();return;}if(!visivel()&&!panel.hidden){panel.hidden=true;abort?.abort();geracao++;clearTimeout(timer);limpar();}else if(visivel()&&estado.aberta&&panel.hidden)abrir(false);});
+  for(let el=root;el;el=el.parentElement)lifecycle.observe(el,{childList:true,attributes:true,attributeFilter:['hidden','aria-hidden','style','class']});
+  if(estado.aberta){abrir(false);if(estado.foco&&visivel()){input.focus({preventScroll:true});if(estado.selecao)input.setSelectionRange(estado.selecao.inicio,estado.selecao.fim);}}
+  return controller;
 }
