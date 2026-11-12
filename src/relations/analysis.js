@@ -24,17 +24,17 @@ export function analyzeRelations(input=[],configuration={}){
  const addLink=(source,target,value,recordId)=>{if(!nodes.has(source)||!nodes.has(target))return;const id=JSON.stringify([source,target]);if(!links.has(id)){if(links.size>=20000){limited=true;return;}links.set(id,{source,target,value:0,records:[],recordCount:0,seen:new Set()});}const l=links.get(id);l.value+=value;if(!l.seen.has(recordId)){l.seen.add(recordId);l.recordCount++;if(l.records.length<100)l.records.push(recordId);}};
  for(const row of Array.isArray(input)?input:[]){const id=clean(row.id);if(!id||ids.has(id)||chosen.size&&!chosen.has(id))continue;ids.add(id);
   if(config.yearField&&(config.startYear||config.endYear)){const rawYear=values(row,config.yearField)[0]||'',year=Number(rawYear.match(/\b\d{4}\b/)?.[0]||rawYear);if(!year||config.startYear&&year<config.startYear||config.endYear&&year>config.endYear)continue;}
-  if(processed>=LIMITS.records){omitted++;continue;}processed++;recordGroup=config.colorField?values(row,config.colorField).sort().join(' / ')||'Não informado':'';
+  if(processed>=LIMITS.records){omitted++;continue;}processed++;recordGroup=config.colorField?values(row,config.colorField).sort().join(' / ')||(row.omitEmptyFields?.includes(config.colorField)?'':'Não informado'):'';
   if(config.mode==='terms'){
    if(textBudget<=0){omitted++;continue;}const rawContent=config.textFields.map(f=>row.text?.[f]??values(row,f).join(' ')).join('\n'),content=rawContent.slice(0,Math.min(40000,textBudget));textBudget-=content.length;if(content.length<rawContent.length)warnings.push('O texto foi limitado a 40 mil caracteres por registro e 2 milhões por análise. Refine os registros para analisar o restante.');const contexts=config.context==='paragraph'?content.split(/\n\s*\n/):[content];const perRecord=new Set();if(contexts.length>300)warnings.push('O contexto foi limitado aos primeiros 300 parágrafos do registro.');
    for(const context of contexts.slice(0,300)){const terms=extractTerms(context,config);for(const t of terms)addNode('term:'+t,t,0,id);for(let i=0;i<terms.length;i++)for(let j=i+1;j<terms.length;j++){const pair=[terms[i],terms[j]].sort(),k=JSON.stringify(pair);if(!perRecord.has(k)){perRecord.add(k);addLink('term:'+pair[0],'term:'+pair[1],1,id);}}}
   }else{
    if(config.stages.length<2)continue;
-   const stages=config.stages.map(f=>{const list=values(row,f);if(!list.length){missing++;return ['Não informado'];}return list;});const combinations=stages.reduce((n,a)=>n*a.length,1);
+   const stages=config.stages.map(f=>{const list=values(row,f);if(!list.length){missing++;return row.omitEmptyFields?.includes(f)?[null]:['Não informado'];}return list;});const combinations=stages.reduce((n,a)=>n*a.length,1);
    if(combinations>LIMITS.paths){warnings.push(`Registro ${id}: mais de ${LIMITS.paths} combinações; refine os campos.`);continue;}
    let weight=config.measure?Number(values(row,config.measure)[0]):1;if(!Number.isFinite(weight)||weight<=0||weight>1e12){omitted++;continue;}recordWeight+=weight;
    const unit=config.counting==='fractional'?weight/combinations:weight;let paths=[[]];for(const stage of stages)paths=paths.flatMap(p=>stage.map(v=>[...p,v]));
-   for(const p of paths){const chain=p.map((v,s)=>addNode(JSON.stringify([s,key(v)]),v,s,id));for(let i=0;i<chain.length-1;i++)if(chain[i]&&chain[i+1])addLink(chain[i].id,chain[i+1].id,unit,id);}
+   for(const p of paths){const chain=p.map((v,s)=>v===null?null:addNode(JSON.stringify([s,key(v)]),v,s,id));for(let i=0;i<chain.length-1;i++)if(chain[i]&&chain[i+1])addLink(chain[i].id,chain[i+1].id,unit,id);}
   }
  }
  const selected=[...nodes.values()].filter(n=>n.value>=config.minimum).sort((a,b)=>b.value-a.value||a.id.localeCompare(b.id)).slice(0,LIMITS.nodes),keep=new Set(selected.map(n=>n.id));

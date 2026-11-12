@@ -8,6 +8,16 @@ import {exportarPacoteEstilo,validarPacoteEstilo,aplicarPacoteEstilo,obterPrompt
 import {normalizeRelationStyle} from '../src/relations/render.js';
 import {aoEditarBiblioteca,definirArtigos,reiniciar} from '../src/core/athenes_biblioteca_artigos.js';
 const refs=[{id:'a',titulo:'Artigo A',autores:[{prenome:'Ana',sobrenome:'Silva'}],tags:[{tag:'Habitação'}],ano:2024,fichamento:{notasPagina:{1:[{texto:'Texto de anotação'}]}}},{id:'b',titulo:'Artigo B',autores:['Bruno'],palavrasChave:['Saúde'],ano:2025}];
+test('palavras-chave ausentes não viram um termo Não informado nem inventam ligações',()=>{
+ const records=registrosReferencias([{id:'empty',autores:['Ana'],ano:2025,palavrasChave:['Não informado','Zotero']},{id:'real',autores:['Bruno'],ano:2024,palavrasChave:['Saúde']}]);
+ for(const field of ['theme','keywords','tags']){
+  const graph=analyzeRelations(records,{stages:['author',field,'year']});
+  assert.ok(!graph.nodes.some(n=>n.label==='Não informado'));
+  assert.ok(graph.nodes.some(n=>n.label==='Ana'));assert.ok(graph.nodes.some(n=>n.label==='2025'));
+  assert.ok(!graph.links.some(l=>l.records.includes('empty')));
+ }
+ assert.deepEqual(records[0].fields.keywords,[]);
+});
 test('palavras-chave e etiquetas têm campos próprios e metadados Zotero são preservados',()=>{
  const [imported]=registrosReferencias([{palavrasChave:['Zotero','Saúde'],tags:[{tag:' zotero '},{tag:'Cidade'}]}]);
  assert.deepEqual(imported.fields.theme,['Saúde','Cidade']);assert.deepEqual(imported.fields.keywords,['Saúde']);assert.deepEqual(imported.fields.tags,['Cidade']);
