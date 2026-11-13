@@ -1,0 +1,50 @@
+name: glauxtools
+services:
+  cronos:
+    image: glauxtools-cronos:${RELEASE:?set RELEASE}
+    container_name: glauxtools-cronos
+    restart: unless-stopped
+    env_file: ./private/cronos.env
+    ports: ["127.0.0.1:3001:3000"]
+    networks: [proxy]
+    read_only: true
+    tmpfs: ["/tmp:size=32m,noexec,nosuid"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 0.50
+    pids_limit: 96
+    logging: {driver: json-file, options: {max-size: 5m, max-file: "3"}}
+    healthcheck:
+      test: [CMD, node, -e, "require('node:http').get('http://127.0.0.1:3000/api/health',{headers:{host:new URL(process.env.APP_PUBLIC_URL).host}},r=>{r.resume();r.on('end',()=>process.exit(r.statusCode===200?0:1))}).on('error',()=>process.exit(1))"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+  athenes:
+    image: glauxtools-athenes:${RELEASE:?set RELEASE}
+    container_name: glauxtools-athenes
+    restart: unless-stopped
+    environment:
+      APP_PUBLIC_URL: https://athenes.glauxtools.online
+    env_file: ./private/athenes.env
+    ports: ["127.0.0.1:3301:3300"]
+    networks: [proxy]
+    read_only: true
+    tmpfs: ["/tmp:size=32m,noexec,nosuid"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.35
+    pids_limit: 96
+    logging: {driver: json-file, options: {max-size: 5m, max-file: "3"}}
+    healthcheck:
+      test: [CMD, node, -e, "require('node:http').get('http://127.0.0.1:3300/api/health',{headers:{host:'athenes.glauxtools.online'}},r=>{r.resume();r.on('end',()=>process.exit(r.statusCode===200?0:1))}).on('error',()=>process.exit(1))"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+networks:
+  proxy:
+    external: true
+    name: glauxgis_default

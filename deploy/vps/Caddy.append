@@ -1,0 +1,17 @@
+
+# Glaux family applications. Preserve the existing GlauxGIS site blocks above.
+cronos.glauxtools.online {
+    header X-Content-Type-Options nosniff
+    request_body {
+        max_size 8MB
+    }
+    reverse_proxy glauxtools-cronos:3000
+}
+
+athenes.glauxtools.online {
+    header X-Content-Type-Options nosniff
+    request_body {
+        max_size 8MB
+    }
+    reverse_proxy glauxtools-athenes:3300
+}

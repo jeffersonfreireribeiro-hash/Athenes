@@ -1,0 +1,14 @@
+.git
+.env*
+.audit-*
+.vercel
+.claude
+.agents
+.qodo
+android
+node_modules
+docs
+tests
+scripts
+scratch
+*.log
