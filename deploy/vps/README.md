@@ -1,6 +1,6 @@
 # Hostinger VPS: Athenes + Cronos
 
-Servidor: 200.141.22.152. Serviços separados do GlauxGIS existente. A rede externa glauxgis_default é reutilizada apenas para o proxy Caddy; o banco PostGIS e o contêiner do GlauxGIS não são alterados.
+Servidor: 200.141.22.152. Serviços separados do GlauxGIS existente. Cronos e Athenes usam a rede externa dedicada glauxtools_proxy; somente o Caddy também se conecta a ela. A API e o PostGIS do GlauxGIS permanecem exclusivamente na sua rede original glauxgis_default. O banco e o código do GlauxGIS não são alterados.
 
 ## Preservação de dados
 
@@ -13,7 +13,7 @@ Servidor: 200.141.22.152. Serviços separados do GlauxGIS existente. A rede exte
 
 1. Construir as imagens de cada repositório com seu deploy/vps/Dockerfile, usando o mesmo identificador RELEASE. Somente arquivos selecionados entram nas imagens; .env e .git ficam fora.
 2. Colocar compose.yaml em /opt/glauxtools, com private/cronos.env e private/athenes.env. Os segredos são transferidos por SSH e não devem aparecer em logs. athenes.env pode conter GEMINI_API_KEY e GEMINI_TRANSLATION_MODEL se a tradução estiver configurada. A chave marcada como sensitive na Vercel não pode ser recuperada pela API: ATHENES_TRANSLATION_LEGACY=1 mantém somente a tradução no endpoint HTTPS antigo, sem encaminhar cookies ou credenciais. Configurar GEMINI_API_KEY na VPS desativa automaticamente essa ponte.
-3. Executar RELEASE=<id> docker compose up -d --wait. Os serviços são publicados somente em loopback (3001 e 3301) e na rede interna do proxy. Têm limites de memória, CPU, processos e logs, usuário sem privilégios e filesystem somente leitura.
+3. Criar a rede com docker network create glauxtools_proxy e conectar o Caddy com docker network connect glauxtools_proxy glauxgis-proxy-1 (somente se ainda não existir/conectar). Executar RELEASE=<id> docker compose up -d --wait. Os serviços são publicados somente em loopback (3001 e 3301) e na rede dedicada do proxy. Têm limites de memória, CPU, processos e logs, usuário sem privilégios e filesystem somente leitura. Se o contêiner Caddy for recriado em manutenção futura do GlauxGIS, reconectá-lo a glauxtools_proxy; reiniciar a VPS ou o mesmo contêiner preserva a conexão.
 4. Testar /api/health, login, arquivos estáticos, proteção de arquivos privados e acesso aos dados. Não criar registros de teste no banco real.
    O endpoint PDF aceita somente uma busca por vez por instância (inclusive até terminar o envio); pedidos concorrentes recebem 429 e Retry-After. Isso limita os buffers de PDFs de até 40 MB dentro dos 256 MB reservados. Um cliente desconectado não libera uma busca que ainda esteja em andamento.
 5. Fazer backup de /opt/glauxgis/Caddyfile, acrescentar os blocos Caddy.append, validar a configuração e recarregar com sinal USR1 (admin off). Não reiniciar os serviços ou o banco do GlauxGIS.
