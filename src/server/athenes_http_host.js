@@ -19,7 +19,7 @@ export function createAppHost({ root, route, isPublicPath, publicOrigin, maxBody
       if (publicOrigin && req.headers.host !== new URL(origin).host) return res.status(421).json({error:'Endereço inválido.'});
       const url = new URL(req.url, origin);
       const path = decodeURIComponent(url.pathname);
-      if (path.includes('\0') || path.includes('\\') || path.split('/').some(part => part.startsWith('.'))) return res.status(404).end();
+      if (path.includes('\0') || path.includes('\\') || path.includes('//') || path.split('/').some(part => part.startsWith('.'))) return res.status(404).end();
       const handler = route(url);
       if (path.startsWith('/api/')) {
         res.setHeader('Cache-Control','no-store');
@@ -54,6 +54,7 @@ export function createAppHost({ root, route, isPublicPath, publicOrigin, maxBody
       stream.on('error', () => res.destroy());
       stream.pipe(res);
     } catch (error) {
+      if (!['ENOENT','ENOTDIR'].includes(error.code) && !(error instanceof URIError)) console.error('http_request_failed',JSON.stringify({method:req.method,code:error.code || 'INTERNAL',frames:String(error.stack || '').split('\n').filter(line=>/^\s+at /.test(line)).slice(0,4)}));
       if (res.headersSent) { res.destroy(); return; }
       res.status(['ENOENT','ENOTDIR'].includes(error.code) ? 404 : error instanceof URIError ? 400 : 500).json({error:'Não foi possível atender a solicitação.'});
     }

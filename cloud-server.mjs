@@ -18,7 +18,21 @@ export async function translationRoute(req,res,fetchImpl=fetch) {
     return res.status(response.status).json(result);
   } catch { return res.status(502).json({erro:'Não foi possível conectar ao serviço de tradução.'}); }
 }
-const routes = { '/api/pdf-aberto':pdf, '/api/traduzir-referencia':translationRoute,
+// A 40 MB PDF may occupy several buffers. Keep one upstream request at a time,
+// including the response drain; an aborted client does not release a running fetch.
+export function limitPdfRequests(handler) {
+  let busy=false;
+  return async (req,res)=>{
+    if(busy){res.setHeader('Retry-After','10');return res.status(429).json({erro:'Um PDF está sendo carregado. Tente novamente em instantes.'});}
+    busy=true;let settled=false,finished=false,released=false;
+    const release=()=>{if(!released&&settled&&finished){released=true;busy=false;res.removeListener('finish',onFinish);res.removeListener('close',onFinish);}};
+    const onFinish=()=>{finished=true;release();};
+    res.once('finish',onFinish);res.once('close',onFinish);
+    try {return await handler(req,res);}
+    finally {settled=true;finished ||= res.writableFinished || res.destroyed;release();}
+  };
+}
+const routes = { '/api/pdf-aberto':limitPdfRequests(pdf), '/api/traduzir-referencia':translationRoute,
   '/api/health':(req,res)=>res.status(200).json({ok:true}) };
 export const isPublicPath = path => ['/index.html','/oauth_callback.html','/manifest.json','/sw.js','/version.json','/athenes.apk'].includes(path) ||
   (/^\/(src|temas)\/[a-zA-Z0-9_./ -]+\.(js|css|svg|png|jpe?g|webp|json|woff2?|ttf|pdf|geojson)$/.test(path) && !path.startsWith('/src/server/'));
