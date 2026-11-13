@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { readFile,stat } from 'node:fs/promises';
 import { createAppHost } from './src/server/athenes_http_host.js';
 import pdf from './api/pdf-aberto.js';
 import traducao from './api/traduzir-referencia.js';
@@ -32,11 +33,19 @@ export function limitPdfRequests(handler) {
     finally {settled=true;finished ||= res.writableFinished || res.destroyed;release();}
   };
 }
+async function appInfo(req,res) {
+  if(req.method!=='GET')return res.status(405).json({erro:'Método não permitido.'});
+  const info=JSON.parse(await readFile(new URL('./version.json',import.meta.url),'utf8'));
+  const file=await stat(new URL('./athenes.apk',import.meta.url));
+  return res.json({...info,tamanhoBytes:file.size,tamanhoFormatado:`${(file.size/1024/1024).toFixed(1)} MB`,atualizadoEm:file.mtime.toISOString(),downloadUrl:'/athenes.apk'});
+}
+const appDownload=(req,res)=>['GET','HEAD'].includes(req.method)?res.redirect(302,'/athenes.apk'):res.status(405).json({erro:'Método não permitido.'});
 const routes = { '/api/pdf-aberto':limitPdfRequests(pdf), '/api/traduzir-referencia':translationRoute,
+  '/api/v1/app/info':appInfo, '/api/v1/app/download':appDownload,
   '/api/health':(req,res)=>res.status(200).json({ok:true}) };
 export const isPublicPath = path => ['/index.html','/oauth_callback.html','/manifest.json','/sw.js','/version.json','/athenes.apk'].includes(path) ||
   (/^\/(src|temas)\/[a-zA-Z0-9_./ -]+\.(js|css|svg|png|jpe?g|webp|json|woff2?|ttf|pdf|geojson)$/.test(path) && !path.startsWith('/src/server/'));
-export const createCloudServer = options => createAppHost({root:import.meta.dirname,route:url=>routes[url.pathname],isPublicPath,publicOrigin:process.env.APP_PUBLIC_URL,...options});
+export const createCloudServer = options => createAppHost({root:import.meta.dirname,route:url=>routes[url.pathname],isPublicPath,publicOrigin:process.env.APP_PUBLIC_URL,maxBodyBytes:30000,...options});
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   if (!process.env.APP_PUBLIC_URL?.startsWith('https://')) throw new Error('Configure APP_PUBLIC_URL com HTTPS.');
   const server=createCloudServer();

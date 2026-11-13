@@ -9,6 +9,11 @@ test('VPS serves Athenes and OAuth callback without exposing private files',asyn
  for(const path of ['/.env','/.git/config','/src/server/athenes_traducao.js','/AGENTS.md','/server.js','/src//server/athenes_traducao.js','/src/%2fserver/athenes_traducao.js'])assert.equal((await fetch(base+path)).status,404,path);
  assert.equal((await fetch(base+'/api/traduzir-referencia',{method:'POST',headers:{Origin:'https://evil.example','Content-Type':'application/json'},body:'{}'})).status,403);
  assert.equal((await fetch(base+'/api/traduzir-referencia',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,400);
+ assert.equal((await fetch(base+'/api/traduzir-referencia',{method:'POST',headers:{Origin:'null','Content-Type':'application/json'},body:'{}'})).status,403);
+ assert.equal((await fetch(base+'/api/traduzir-referencia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:'x'.repeat(30001)})})).status,413);
+ const info=await(await fetch(base+'/api/v1/app/info')).json();assert.ok(info.versao);assert.ok(info.tamanhoBytes>0);assert.equal(info.downloadUrl,'/athenes.apk');
+ const apk=await fetch(base+'/api/v1/app/download',{redirect:'manual'});assert.equal(apk.status,302);assert.equal(apk.headers.get('location'),'/athenes.apk');
+ assert.equal((await fetch(base+'/athenes.apk',{method:'HEAD'})).status,200);
 });
 test('PDF: um pedido em andamento, inclusive durante envio e cancelamento do cliente',async()=>{
  let complete,calls=0;const limited=limitPdfRequests(async()=>{calls++;await new Promise(resolve=>complete=resolve);});

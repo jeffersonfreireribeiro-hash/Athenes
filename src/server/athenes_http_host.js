@@ -25,7 +25,10 @@ export function createAppHost({ root, route, isPublicPath, publicOrigin, maxBody
         res.setHeader('Cache-Control','no-store');
         if (!handler) return res.status(404).json({error:'Rota não encontrada.'});
         if (!['GET','HEAD','OPTIONS'].includes(req.method)) {
-          if (req.headers.origin && new URL(req.headers.origin).origin !== new URL(origin).origin) return res.status(403).json({error:'Origem não permitida.'});
+          if (req.headers.origin) {
+            try { if (new URL(req.headers.origin).origin !== new URL(origin).origin) return res.status(403).json({error:'Origem não permitida.'}); }
+            catch { return res.status(403).json({error:'Origem não permitida.'}); }
+          }
           if (req.headers['sec-fetch-site'] === 'cross-site') return res.status(403).json({error:'Origem não permitida.'});
           const chunks = []; let size = 0;
           for await (const chunk of req) {
